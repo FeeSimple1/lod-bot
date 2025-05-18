@@ -1,0 +1,143 @@
+{
+  "Quebec_City": {
+    "type": "City",
+    "adj": [
+      "Quebec|New_Hampshire"
+    ]
+  },
+  "Quebec": {
+    "type": "Reserve",
+    "adj": [
+      "Quebec_City|Northwest"
+    ]
+  },
+  "New_Hampshire": {
+    "type": "Colony",
+    "adj": [
+      "Quebec_City|New_York|Massachusetts"
+    ]
+  },
+  "Massachusetts": {
+    "type": "Colony",
+    "adj": [
+      "Boston|New_York|Connecticut_Rhode_Island"
+    ]
+  },
+  "Boston": {
+    "type": "City",
+    "adj": [
+      "Massachusetts|Connecticut_Rhode_Island"
+    ]
+  },
+  "Connecticut_Rhode_Island": {
+    "type": "Colony",
+    "adj": [
+      "Boston|Massachusetts|New_York"
+    ]
+  },
+  "New_York_City": {
+    "type": "City",
+    "adj": [
+      "New_York|New_Jersey"
+    ]
+  },
+  "New_York": {
+    "type": "Colony",
+    "adj": [
+      "New_Hampshire|Massachusetts|Connecticut_Rhode_Island|New_York_City|New_Jersey|Pennsylvania|Quebec|Northwest"
+    ]
+  },
+  "New_Jersey": {
+    "type": "Colony",
+    "adj": [
+      "New_York_City|Philadelphia|Pennsylvania"
+    ]
+  },
+  "Philadelphia": {
+    "type": "City",
+    "adj": [
+      "New_Jersey|Maryland-Delaware|Pennsylvania"
+    ]
+  },
+  "Pennsylvania": {
+    "type": "Colony",
+    "adj": [
+      "Northwest|New_York|New_Jersey|Philadelphia|Maryland-Delaware"
+    ]
+  },
+  "Maryland-Delaware": {
+    "type": "Colony",
+    "adj": [
+      "Philadelphia|Virginia|Pennsylvania|Northwest"
+    ]
+  },
+  "Norfolk": {
+    "type": "City",
+    "adj": [
+      "Virginia|North_Carolina"
+    ]
+  },
+  "Virginia": {
+    "type": "Colony",
+    "adj": [
+      "Norfolk|Maryland-Delaware|Northwest|Southwest|North_Carolina"
+    ]
+  },
+  "North_Carolina": {
+    "type": "Colony",
+    "adj": [
+      "Southwest|Virginia|Norfolk|Charles_Town|South_Carolina"
+    ]
+  },
+  "South_Carolina": {
+    "type": "Colony",
+    "adj": [
+      "Charles_Town|North_Carolina|Southwest|Georgia|Savannah"
+    ]
+  },
+  "Charles_Town": {
+    "type": "City",
+    "adj": [
+      "North_Carolina|South_Carolina"
+    ]
+  },
+  "Savannah": {
+    "type": "City",
+    "adj": [
+      "South_Carolina|Georgia"
+    ]
+  },
+  "Georgia": {
+    "type": "Colony",
+    "adj": [
+      "Florida|Savannah|South_Carolina|Southwest"
+    ]
+  },
+  "Northwest": {
+    "type": "Reserve",
+    "adj": [
+      "Quebec|New_York|Southwest|Pennsylvania|Maryland-Delaware|Virginia"
+    ]
+  },
+  "Southwest": {
+    "type": "Reserve",
+    "adj": [
+      "Virginia|Northwest|North_Carolina|South_Carolina|Florida|Georgia"
+    ]
+  },
+  "Florida": {
+    "type": "Reserve",
+    "adj": [
+      "Southwest|Georgia"
+    ]
+  }
+
+  "West_Indies": {
+    "type": "Special",
+    "population": 0,
+    "adj": [],
+    "support_fixed": "NEUTRAL",
+    "max_squadrons": 3
+  }
+
+}

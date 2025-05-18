@@ -1,0 +1,578 @@
+{
+  "scenario": "1775 Short \u2013 A People Numerous and Armed",
+  "campaign_year": 1775,
+  "resources": {
+    "BRITISH": 49,
+    "PATRIOTS": 18,
+    "FRENCH": 47,
+    "INDIANS": 15
+  },
+  "fni_level": 0,
+  "toa_played": false,
+"leaders": {
+  "WASHINGTON":      null,
+  "GAGE":            null,
+  "HOWE":            null,
+  "CLINTON":         "FL",
+
+  "ROCHAMBEAU":      "Connecticut_RI",
+  "LAUZUN":          "Connecticut_RI",
+
+  "BRANT":           "Northwest",
+  "CORNPLANTER":     "Pennsylvania",
+  "DRAGGING_CANOE":  "Southwest"
+},
+  "bs_played": {
+    "BRITISH": false,
+    "PATRIOTS": false,
+    "INDIANS": false,
+    "FRENCH": false
+  },
+  "casualties": {
+    "BRITISH": 0,
+    "PATRIOTS": 0
+  },
+  "unavailable": {
+    "FRENCH_REGULARS": 4,
+    "FRENCH_SQUADRONS": 0
+  },
+  "current_event": 104,
+  "upcoming_event": null,
+  "deck": [
+    10,
+    32,
+    4,
+    35,
+    33,
+    20,
+    82,
+    15,
+    51,
+    6,
+    86,
+    2,
+    41,
+    54,
+    28,
+    43,
+    68,
+    49,
+    72,
+    29,
+    56,
+    90,
+    24,
+    83,
+    92,
+    53,
+    46,
+    84,
+    75,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104
+  ],
+  "eligible_order": [
+    "PATRIOTS",
+    "INDIANS",
+    "BRITISH",
+    "FRENCH"
+  ],
+  "spaces": {
+    "Quebec_City": {
+      "British_Regulars": 1,
+      "British_Tory": 1,
+      "British_Fort": 1,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 2,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 1,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_WP_A": 3,
+      "_WP_U": 0,
+      "_Militia_U": 0
+    },
+    "Boston": {
+      "British_Regulars": 3,
+      "British_Tory": 1,
+      "British_Fort": 1,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 0,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_Militia_U": 0,
+      "_WP_A": 0,
+      "_WP_U": 0
+    },
+    "New_York_City": {
+      "British_Regulars": 1,
+      "British_Tory": 1,
+      "British_Fort": 0,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 0,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_Militia_U": 0,
+      "_WP_A": 0,
+      "_WP_U": 0
+    },
+    "Philadelphia": {
+      "British_Regulars": 0,
+      "British_Tory": 0,
+      "British_Fort": 0,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 0,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_WP_A": 0,
+      "_WP_U": 0,
+      "_Militia_U": 0
+    },
+    "Norfolk": {
+      "British_Regulars": 1,
+      "British_Tory": 1,
+      "British_Fort": 0,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 0,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_Militia_U": 0,
+      "_WP_A": 0,
+      "_WP_U": 0
+    },
+    "Charles_Town": {
+      "British_Regulars": 0,
+      "British_Tory": 0,
+      "British_Fort": 0,
+      "Patriot_Continentals": 2,
+      "Patriot_Fort": 1,
+      "Indian_Village": 0,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 1,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_WP_A": 0,
+      "_WP_U": 0,
+      "_Militia_U": 0
+    },
+    "Savannah": {
+      "British_Regulars": 1,
+      "British_Tory": 1,
+      "British_Fort": 0,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 0,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_Militia_U": 0,
+      "_WP_A": 0,
+      "_WP_U": 0
+    },
+    "Quebec": {
+      "British_Regulars": 1,
+      "British_Tory": 1,
+      "British_Fort": 1,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 1,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 1,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_Militia_U": 0,
+      "_WP_A": 1,
+      "_WP_U": 0
+    },
+    "Northwest": {
+      "British_Regulars": 0,
+      "British_Tory": 0,
+      "British_Fort": 0,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 3,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_Militia_U": 0,
+      "_WP_A": 8,
+      "_WP_U": 0
+    },
+    "Southwest": {
+      "British_Regulars": 0,
+      "British_Tory": 0,
+      "British_Fort": 0,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 1,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_Militia_U": 0,
+      "_WP_A": 1,
+      "_WP_U": 0
+    },
+    "Florida": {
+      "British_Regulars": 1,
+      "British_Tory": 1,
+      "British_Fort": 1,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 1,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_Militia_U": 0,
+      "_WP_A": 1,
+      "_WP_U": 0
+    },
+    "New_Hampshire": {
+      "British_Regulars": 0,
+      "British_Tory": 2,
+      "British_Fort": 0,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 0,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_Militia_U": 0,
+      "_WP_A": 0,
+      "_WP_U": 0
+    },
+    "Massachusetts": {
+      "British_Regulars": 0,
+      "British_Tory": 0,
+      "British_Fort": 0,
+      "Patriot_Continentals": 1,
+      "Patriot_Fort": 1,
+      "Indian_Village": 0,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 1,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_WP_A": 0,
+      "_WP_U": 0,
+      "_Militia_U": 0
+    },
+    "Connecticut_RI": {
+      "British_Regulars": 0,
+      "British_Tory": 2,
+      "British_Fort": 0,
+      "Patriot_Continentals": 1,
+      "Patriot_Fort": 1,
+      "Indian_Village": 0,
+      "French_Regulars": 4,
+      "French_Squadron": 0,
+      "Support": 1,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_Militia_U": 0,
+      "_WP_A": 0,
+      "_WP_U": 0,
+      "name": "Connecticut_RI"
+    },
+    "New_York": {
+      "British_Regulars": 0,
+      "British_Tory": 3,
+      "British_Fort": 0,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 1,
+      "Indian_Village": 1,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_Militia_U": 0,
+      "_WP_A": 2,
+      "_WP_U": 0,
+      "name": "New_York"
+    },
+    "New_Jersey": {
+      "British_Regulars": 0,
+      "British_Tory": 3,
+      "British_Fort": 0,
+      "Patriot_Continentals": 2,
+      "Patriot_Fort": 1,
+      "Indian_Village": 0,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_WP_A": 0,
+      "_WP_U": 0,
+      "name": "New_Jersey",
+      "_Militia_U": 0
+    },
+    "Pennsylvania": {
+      "British_Regulars": 0,
+      "British_Tory": 0,
+      "British_Fort": 0,
+      "Patriot_Continentals": 5,
+      "Patriot_Fort": 1,
+      "Indian_Village": 0,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_WP_A": 1,
+      "_WP_U": 0,
+      "_Militia_U": 0
+    },
+    "Maryland_Delaware": {
+      "British_Regulars": 0,
+      "British_Tory": 0,
+      "British_Fort": 0,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 0,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_Militia_U": 0,
+      "_WP_A": 0,
+      "_WP_U": 0
+    },
+    "Virginia": {
+      "British_Regulars": 0,
+      "British_Tory": 2,
+      "British_Fort": 0,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 0,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_Militia_U": 0,
+      "_WP_A": 0,
+      "_WP_U": 0
+    },
+    "North_Carolina": {
+      "British_Regulars": 0,
+      "British_Tory": 0,
+      "British_Fort": 0,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 0,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_WP_A": 0,
+      "_WP_U": 0,
+      "_Militia_U": 0
+    },
+    "South_Carolina": {
+      "British_Regulars": 0,
+      "British_Tory": 0,
+      "British_Fort": 0,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 1,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_WP_A": 1,
+      "_WP_U": 0,
+      "_Militia_U": 0
+    },
+    "Georgia": {
+      "British_Regulars": 0,
+      "British_Tory": 0,
+      "British_Fort": 0,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 0,
+      "French_Regulars": 0,
+      "French_Squadron": 0,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_WP_A": 0,
+      "_WP_U": 0,
+      "_Militia_U": 0
+    },
+    "West_Indies": {
+      "British_Regulars": 0,
+      "British_Tory": 0,
+      "British_Fort": 0,
+      "Patriot_Continentals": 0,
+      "Patriot_Fort": 0,
+      "Indian_Village": 0,
+      "French_Regulars": 3,
+      "French_Squadron": 3,
+      "Support": 0,
+      "Opposition": 0,
+      "_Militia_A": 0,
+      "_Militia_U": 0,
+      "_WP_A": 0,
+      "_WP_U": 0
+    },
+    "NH": {
+      "_Militia_U": 0,
+      "_WP_U": 0
+    },
+    "CT": {
+      "_Militia_U": 0,
+      "_WP_U": 0,
+      "British_Tory": 1
+    },
+    "MA": {
+      "_Militia_U": 0,
+      "_WP_U": 0
+    },
+    "NY": {
+      "_Militia_U": 0,
+      "_WP_U": 0,
+      "British_Tory": 1
+    },
+    "NJ": {
+      "_Militia_U": 0,
+      "_WP_U": 0
+    },
+    "PA": {
+      "_Militia_U": 0,
+      "_WP_U": 0
+    },
+    "MD": {
+      "_Militia_U": 0,
+      "_WP_U": 0
+    },
+    "VA": {
+      "_Militia_U": 0,
+      "_WP_U": 0
+    },
+    "NC": {
+      "_Militia_U": 0,
+      "_WP_U": 0,
+      "British_Tory": 1
+    },
+    "SC": {
+      "_Militia_U": 0,
+      "_WP_U": 0
+    },
+    "GA": {
+      "_Militia_U": 0,
+      "_WP_U": 0
+    },
+    "QC": {
+      "_Militia_U": 0,
+      "_WP_U": 0
+    },
+    "NW": {
+      "_Militia_U": 0,
+      "_WP_U": 0,
+      "British_Tory": 2
+    },
+    "SW": {
+      "_Militia_U": 0,
+      "_WP_U": 0,
+      "British_Tory": 1
+    },
+    "FL": {
+      "_Militia_U": 0,
+      "_WP_U": 0
+    },
+    "ON": {
+      "_Militia_U": 0,
+      "_WP_U": 0
+    },
+    "OH": {
+      "_Militia_U": 0,
+      "_WP_U": 0
+    },
+    "KY": {
+      "_Militia_U": 0,
+      "_WP_U": 0
+    },
+    "IL": {
+      "_Militia_U": 0,
+      "_WP_U": 0
+    },
+    "IN": {
+      "_Militia_U": 0,
+      "_WP_U": 0,
+      "British_Tory": 1
+    },
+    "AL": {
+      "_Militia_U": 0,
+      "_WP_U": 0,
+      "British_Tory": 2
+    },
+    "LA": {
+      "_Militia_U": 0,
+      "_WP_U": 0
+    }
+  },
+  "brit_support_total": 5,
+  "opposition_total": 0,
+  "loyalist_pieces": 28,
+  "pool": {
+    "British_Tory": 0
+  },
+  "victory": {
+    "BRITISH_TAX": 30,
+    "INDIAN_TRADE": 44,
+    "FRENCH_TRADE": 34
+  },
+  "british_casualties": 9,
+  "patriot_casualties": 6,
+  "fni": 0,
+  "villages_on_map": 10,
+  "patriot_forts": 6,
+  "ineligible": [],
+  "ineligible_next": [
+    "PATRIOTS",
+    "FRENCH",
+    "INDIANS",
+    "BRITISH"
+  ],
+  "last_card": 91
+}
