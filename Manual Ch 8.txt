@@ -1,0 +1,954 @@
+This section governs actions by any Factions beyond those
+represented by a player, for solitaire or as an alternative to the
+No Non-Player option for two or three players (1.5). See also
+the Playbook’s Non-Player Examples of Play.
+Each Non-player Faction has a flowchart determining its ac-
+tions. Due to space constraints, the instructions on the flow-
+charts are often heavily abbreviated. They are also described in
+more detail in rule sections 8.4 - 8.7, so whenever the flowcharts
+seem unclear, please refer to the rulebook.
+Note: In the flowcharts, the short-hands “Rebel” and “Pop”
+are used instead of “Rebellion” and “Population” respectively.
+Note: Non-player Factions may not act only in their own
+direct interest. Like players, they sometimes help, sometimes
+harm, one another.
+Important: If playing solitaire, be sure to read the special
+one-player victory conditions (8.8) before you start!
+8.1 Non-Player Sequence of Play
+The Non-player flowcharts describe the order in which the Non-
+players attempt to execute the options available to them. Op-
+tions that would be illegal to execute are ignored. Non-players
+must follow all rules in chapters 1-7 except for the following:
+• Commands Not Limited. Whenever a Non-player Faction
+by the Sequence of Play (2.3.4) is to execute a Limited
+Command (2.3.5), it instead executes a full Command and
+Special Activity. Non-players execute free LimComs granted
+by Event (5.3) normally as LimComs, using the flowchart
+to select the Command but executing it in a maximum of
+one space (or with a maximum of one destination space, as
+appropriate for the Command selected) and with no Special
+Activity (unless the Event grants that too).
+• No voluntary removal. Non-player Factions never use the
+1.4.1 option to take their own forces from the map in order
+to place them elsewhere when they have no appropriate pieces
+Available.
+• Event, Command or Pass? If a Non-player Faction has the
+option to execute an Event, look at that Faction’s symbol on
+the card. If it is underlined by a sword icon ( ), the
+Faction will automatically ignore the Event and continue with
+the flowchart, otherwise the conditions listed in the “Event
+or Command?” box on the flowchart determines whether or
+not the Non-player will opt for the Event. If the Faction’s
+symbol is underlined by a Brown Bess Musket icon ( ),
+there are special Event Instructions (8.3.1) on the back of
+the Random Spaces sheet that can affect this decision. If
+the Faction does not play the Event, follow the flowchart to
+see whether it Passes (2.3.3) or executes a Command and
+Special Activity.
+• Paying Resource Costs. A Non-player Faction that has too
+few Resources to pay even the minimum amount possible for
+the selected Command (e.g., Non-player French attempting
+to Muster with only 1 Resource to spend) immediately follows
+the flowchart instructions as if the Faction were unable to
+execute any of the instructions for the Command, until
+another Command that it can afford to execute is found.
+The same applies if an allied Faction is unable to pay for a
+combined Command (e.g., if Non-player Indians attempt
+to Scout (3.4.3) but the British are unable to pay). If it has
+sufficient Resources to execute at least some instructions of
+the selected Command, it pays the appropriate Resource
+cost when it selects each space, or as soon as any instruction
+of the Command itself is executed (i.e., not counting any
+accompanying Special Activity) in case the Command is of
+a type that does not select any specific space (e.g., Garrison
+(8.4.1) or Roderigue Hortalez et Cie (8.6.1, 8.6.3)).
+• Brilliant Strokes. Non-player French plays the Treaty
+of Alliance as soon as they are Eligible (even if not 1st or
+2nd Eligible), and the sum of Squadrons in WI + Available
+French Regulars + half of Cumulative British Casualties
+exceed 15, and no Winter Quarters card is showing. Non-
+player Factions will not play any other Brilliant Stroke
+Events until the Treaty of Alliance has been played, and
+then only when certain Faction-specific conditions apply
+(8.4.11, 8.5.8, 8.6.11, 8.7.8). Rule 8.3.7 describes Non-player
+execution of these Brilliant Stroke Events.
+Note: While the entire CBC counts towards allowing the
+Treaty of Alliance for players, Non-player French only
+count only half of it in order to ensure that they have a rea-
+sonable number of Regulars in play before entering the war.
+• Non-player Leader Movement. During Campaigns, Non-
+player Leaders follow the largest group of units from their
+own Faction that moves from (or stays in) their origin space.
+If two or more such groups are of the same size, select which
+one the Leader joins randomly.
+8.1.1 Events, Commands, and Special Activities
+To execute an Event with a Non-player, follow the section below
+about Non-player Events and any individual Event instructions
+on the reverse of the Random Spaces sheet (8.3.1). To execute a
+Non-player Faction’s Commands and Special Activities, see the
+Non-Player flow charts and the rules section below governing
+that Faction’s actions.
+Guidelines:
+Unless otherwise specified, carry out whatever actions apply
+to the maximum extent (such as in the most spaces or with
+the most pieces allowed and only as long as needed pieces
+and Resources are available). Normal Resource costs, require-
+ments, and procedures apply.
+The terms “most Support” and “most Opposition” refer to
+the value a space contributes to the Total Support or Total
+Opposition score, i.e., the Support or Opposition level times
+the Population of the space.
+Play Note: To more easily implement Commands that move
+pieces (March, Garrison, Raid, Scout, 8.4-8.7), first identify
+which pieces can move, then their destinations.
+8.1.2 Pieces and Resources. The Random Spaces sheet summa-
+rizes the following. Unless the instruction or Event text being
+executed specify which pieces to place, remove or move, once
+spaces involved are selected, Non-player Factions:
+• As far as possible, place friendly Forts and Villages, then
+Militia or War Parties, then alternating Regulars and
+Continentals/Tories beginning with whichever is fewest in
+the space (Regulars if even).
+• Remove friendly pieces, first alternating Regulars and
+Continentals/Tories, beginning with whichever is most in
+the space (Regulars if even) but if possible without removing
+the last Tory/Continental in any space, then Active before
+Underground Militia or War Parties, and finally Forts and
+Villages.
+• Move friendly pieces from Unavailable first if possible, then
+from Available. Move Unavailable or Casualty pieces and
+markers to Available or the map in this order: Blockades,
+Forts, Continentals/ Tories, then Regulars.
+• As far as possible, target or remove enemy Forts and Villages,
+then Militia or War Parties, then alternating Regulars and
+Continentals/Tories beginning with whichever is fewest
+in the space (Regulars if even). Within that, target enemy
+Underground Militia or War Parties before Active ones.
+• Remove enemy pieces to be replaced even if no pieces are
+available to replace them. (For friendly pieces, see 8.3.3.)
+• March so as to get as many Underground Militia or War
+Parties as possible to the destination (3.3.2, 3.4.2). Within
+that requirement, March Active Militia or War Parties first.
+8.1.3 Selecting Spaces. When executing Commands and Special
+Activities by the priorities on the Non-Player flowcharts (8.4
+to 8.7), select spaces for each listed priority in order until there
+are no more legal candidate spaces or actions for that priority,
+or until any space limit within that priority is reached. Then
+move on to the next priority and do the same, until any overall
+space limit for the Command or Special Activity is reached, or
+until the Faction runs out of Resources (if applicable). Break
+ties within each priority by selecting equal candidates randomly
+as described below (8.2), unless a subsequent priority explicitly
+modifies the selection (using a “within…” or similar statement).
+8.2 Random Spaces
+If several candidate Province or Cities have equal priority for
+a Non-player Command, Special Activity, or Event, select one
+using the Random Spaces table:
+• Roll 1D3 to find the column on the table, and 1D6 to find
+the row. If the box names two spaces, choose the top space
+first if possible.
+Note: The boxes show Population of each space.
+EXAMPLE: Choose Florida before South Carolina.
+• If the resulting space is not a candidate, move down the
+column until one is reached. Follow the arrows, moving from
+the bottom of one column to the top of the next and from
+Massachusetts to Quebec City (or just follow the arrows on
+the Random Spaces Map).
+• Carry out as much of the action as possible in the candidate
+space reached, then roll again to select another space only if
+needed.
+Play Note: If players agree, choose among a few spaces by
+equal chance die roll instead.
+8.3 Non-Player Events
+Note: Events will not always benefit the executing Non-player
+Faction directly.
+8.3.1 Event Instructions. If the Faction Symbol is underlined by
+a Brown Bess Musket icon ( ), there are special instruc-
+tions for that Event on the reverse side of the Random Spaces
+sheet. These instructions can affect whether the Faction plays
+the Event or continues with the flowchart, e.g., by making the
+Event Ineffective (8.3.3).
+When a Faction plays an Event that gives free Commands or
+Special Activities (5.3) to another Non-player Faction, or forces
+it to make other choices (e.g., to remove some of its pieces),
+the 2nd Faction’s Event instructions (if any) apply to how it
+executes those actions.
+8.3.2 Dual-Use Events. Unless Event Instructions (8.3.1) say
+otherwise, Non-player Patriot and French executing a Dual-
+Use Event (5.2) use the shaded text, while Non-player British
+and Indian use unshaded text. If there is only one Event Text,
+all Factions use it.
+8.3.3 Ineffective Events. If an Event, after any Event Instruc-
+tions (8.3.1) are taken into account, would have no effect at
+all (not even manipulating Eligibility), or where the only ef-
+fect would be to remove one or more friendly pieces without
+replacing them with other friendly pieces, or the Event shifts
+the difference between Support and Opposition in favor of the
+enemy side, a Non-player Faction will consider it to be Inef-
+fective and choose a Command and Special Activity instead.
+8.3.4 Event Placement. Place, remove, or relocate as many
+pieces (per 8.1.2) as Events, availability (1.4.1), and stacking
+(1.4.2) allow. When allowed and unless otherwise specified,
+Non-player Factions place or move friendly pieces from out of
+Unavailable then from Available.
+8.3.5 Events: Who, What, and Where. Unless the Event text
+or Event instruction (8.3.1) says otherwise:
+• When there is a choice of who gets Event benefits (such
+as Resources, free Commands, or placing pieces), select the
+executing Faction, then the other friendly Faction, then a
+random enemy, Non-player first. If the Event effects are
+harmful (such as removing pieces, Activating War Parties or
+Militia, or similar), select a random enemy, player first.
+• For any choices as part of free Commands (including
+Limited Commands) or Special Activities, use that Faction’s
+priorities (8.4-8.7). For multiple free Commands (such as
+“March then Battle”), use the priorities for the first. Where
+the priorities are not applicable, choose pieces per 8.1.2 and
+spaces randomly (8.2).
+Note: If there is a choice among free Commands, use the
+Faction’s flowchart to select one, ignoring any flowchart
+instructions to play Events or Pass. If there is a choice
+among free Special Activities without a Command, follow
+the flowcharts to see which Command and Special Activity
+is selected, but execute only the Special Activity.
+• If a Non-player Faction executes an Event due to one of the
+“Event or Command?” questions on the flowchart, select
+as many spaces as possible that match that question before
+selecting other spaces (if any).
+• Select spaces for shifts in Support or Opposition per 8.3.6
+below.
+• Within the above (if applicable), select Event spaces to
+ensure that as many Forts and Villages then other pieces as
+possible are placed, removed, or replaced. When removing
+enemy pieces, use the priorities in 8.1.2 above. If friendly
+pieces are to be removed and there is a choice, remove the
+other Faction’s pieces.
+• Otherwise, select spaces randomly (8.2).
+8.3.6 Events that Shift Support/Opposition. Unless otherwise
+specified, Non-player Factions select spaces for Event effects
+that shift Support or Opposition as follows:
+• Royalist Factions for the highest gain in Support, then the
+highest loss in Opposition. If the difference between Support
+and Opposition would shift in favor of the Rebellion, the
+Royalist Non-player Faction instead executes a Command
+and Special Activity.
+• Rebellion Factions for the highest gain in Opposition,
+then the highest loss in Support. If the difference between
+Opposition and Support would shift in favor of the Royalists,
+the Rebellion Non-player Faction instead executes a
+Command and Special Activity.
+8.3.7 Brilliant Stroke. Non-player British, Indians and
+French holding a Brilliant Stroke card other than the
+Treaty of Alliance will play when the Treaty of Alliance
+has been played, that Faction is Eligible, no Winter Quarters
+card is showing, and the Faction’s specific conditions for playing
+the card are met (8.4.11, 8.5.8, 8.6.11, 8.7.8). If two or three
+Non-players play Brilliant Stroke at the same time, they
+trump one another normally.
+To execute a Brilliant Stroke Event other than the Treaty
+of Alliance, follow the executing Faction’s flowchart to select
+the first Limited Command that both matches the flowchart
+priorities and can involve that Faction’s Leader. If no such
+Limited Command is possible, the Brilliant Stroke play
+is aborted. Use the flowchart to select the Special Activity to
+match the first Command, but if possible execute it indepen-
+dently (e.g., ignoring what spaces were selected for a LimCom
+Muster or Garrison Command when executing a Skirmish
+Special Activity). Then use the flowchart again to select the
+second Limited Command.
+Note: This is less flexible than a human player’s execution
+of a Brilliant Stroke, but ensures that the Non-player’s
+Brilliant Stroke play will be legal. An example of Non-
+player British execution of a Brilliant Stroke Event can
+be found in the Playbook.
+8.3.8 Other Event Choices. When a Non-player Faction while
+executing an Event has a choice that is not otherwise covered
+above, choose randomly among the possibilities.
+8.4 Non-Player British Actions
+When Non-player British are 1st or 2nd Eligible, they will
+ignore the Event if the British Faction Symbol is underlined
+with a sword. Otherwise, if they are Eligible to play the Event,
+check any relevant Event Instructions (8.3.1), and execute the
+unshaded Event text if at least one of the following conditions
+are met:
+• Opposition exceeds Support, and the Event will shift
+Opposition and/or Support in favor of the Royalist side
+(including by removing a Blockade from a Support City by
+reducing FNI, but not by free Battles).
+• The Event places any British pieces from Unavailable.
+• The Event places Tories in an Active Opposition space with
+none already, a British Fort in a Colony with none already,
+or any Regulars in a City or Colony.
+• The Event inflicts Rebellion Casualties (including a free
+Skirmish or Battle, applying any additional conditions in
+8.4.4 or 8.4.1).
+• The British Control at least five Cities, the Event is Effective
+(8.3.3), and a D6 rolls “5” or higher.
+If the British do not play the Event, they execute a Command
+and Special Activity if British Resources exceed 0, otherwise
+Pass (2.3.3).
+8.4.1 Garrison. If the British are to execute a Command and
+have a total of 10 or more Regulars in all Cities and Provinces
+on the map combined, and a City without a Patriot Fort is
+Rebellion Controlled, the British Garrison (3.2.2) as follows:
+• First execute Naval Pressure, or if that is not possible,
+Skirmish.
+• Then Garrison. When executing movements per the bullets
+below, leave two more Royalist than Rebellion pieces in each
+origin space with British Control, and remove the last Regular
+only from spaces with Population 0 or Active Support. Do
+not move Regulars to any City where a Skirmish has been
+executed.
+o Move just enough Regulars to add British Control of Cities,
+first where there are the most Rebellion pieces without a
+Patriot Fort, then to New York City, then random.
+o Then move additional Regulars, first to give each British
+Controlled City without Active Support at least one
+Regular, then to give each British Controlled City at least
+three British cubes of any types beginning with those Cities
+that have Underground Militia.
+• If no Regulars have moved yet, abort the Garrison Command
+and execute a Muster (8.4.2) instead.
+• If any Regulars did move, Activate Underground Militia
+everywhere possible, then displace the largest possible
+number of Rebellion pieces, first to a Province with the most
+Opposition then with least Support, within that to the lowest
+Population possible.
+NAVAL PRESSURE: Execute Naval Pressure as follows:
+• If FNI > 0 and Gage or Clinton is the British Leader, remove
+one Blockade, first from a City selected for Battle, then from
+the City with most Rebellion pieces without a Patriot Fort,
+then from the City with the most Support.
+• Otherwise, if FNI is 0, add +1D3 British Resources.
+• If neither of the above is possible, instead Skirmish.
+SKIRMISH: Execute Skirmish as follows:
+Skirmish first in the West Indies, then where there is exactly
+one British Regular, then per the highest priority possible in
+the bullets below:
+• Remove as many Rebellion cubes as possible, first whichever
+type is least in the space, removing one British Regular if
+necessary.
+• If it is not possible to remove any Rebellion cubes, instead
+remove one Rebellion piece, first where there is only one
+Rebellion piece in a space, within that first in a City.
+• If Clinton is in the space, remove one additional Militia if
+possible.
+• If no Skirmish is possible, instead execute Naval Pressure.
+If that is not possible either, the British execute no Special
+Activity.
+8.4.2 British Muster. If the British did not select Garrison and
+a D6 roll is less than the number of British Regulars Available,
+or if the British selected a Garrison or March Command but
+were unable to execute any of the instructions, they Muster
+(3.2.1) in up to four spaces as follows:
+• Place as many Regulars as possible, first in spaces that are
+Neutral or at either Passive Opposition or Passive Support,
+then elsewhere; within that first to add British Control,
+then where Tories are the only British units present, then
+elsewhere; within each of those first in the spaces with highest
+Population.
+• Then place Tories, first where Regulars are the only British
+units (within that, first where Regulars were placed above),
+then to change Control of the most Population, then in
+Colonies with less than five British Cubes and no British
+Fort.
+• Then Reward Loyalty or place a Fort, if possible in one of the
+spaces already selected above, otherwise if fewer than four
+spaces have been selected yet in one additional Muster space:
+o If Opposition exceeds Support + 1D3 or if no British Forts
+are Available, Reward Loyalty in one space per 8.4.5.
+o If no Reward Loyalty was executed, place a Fort in a Colony
+with no British Fort already, five or more British cubes and
+room. Remove British cubes per 8.1.2.
+• If any of the Muster instructions above were executed and
+no Special Activity has been used yet, also Skirmish (8.4.1)
+or, if that is not possible, Naval Pressure (8.4.1).
+IF NONE: If no Muster is possible, then March (8.4.3) or, if
+that is not possible either, Pass (2.3.3).
+8.4.3 British March. If the British did not select either Garrison
+or Muster, and there is no space (nor WI) with both British
+and at least 2 Active Rebellion pieces where British Regulars
+plus Leader outnumber all Rebellion pieces plus Leaders, or
+if the British selected a Battle or Muster Command but were
+unable to execute any of the instructions, then March (3.2.3)
+in or into up to four destination spaces as follows:
+• When executing the bullets below, do not move any pieces
+needed for British Control of the origin space, nor remove
+the last Tory or War Party from any space, nor the last British
+Regular from a space with British Control but no Active
+Support.
+o First identify all groups of British units able to March.
+o Moving the largest groups first, add British Control to
+Cities, then Colonies (but not Indian Reserve Provinces),
+for a total of up to two spaces; within each first where there
+are Rebellion cubes, then with the highest Population. Stop
+moving groups into each destination space once British
+Control is established. Use Common Cause to include
+War Parties (Active first) if this would increase the size of
+a Marching group moving into an adjacent Province.
+o Then March to spaces with Population one or two that are
+not at Active Support, first to add Tories where Regulars are
+the only British units, then to add Regulars where Tories
+are the only British units; within each, move first to March
+destinations already selected above.
+o Then March in place to Activate Underground Militia, first
+in spaces with Support.
+If no Common Cause was used during the March, instead
+Skirmish or Naval Pressure per 8.4.1.
+IF NONE: If no March is possible, the British instead Muster
+(8.4.2) or, if that is not possible, Pass (2.3.3).
+COMMON CAUSE: If the British either March to add Brit-
+ish Control or Battle, they use Common Cause to make up the
+difference between the number of Regulars and Tories in the
+group, except as follows:
+• If March, do not use the last War Party (Underground if
+possible) in the space.
+• If Battle, do not use the last Underground War Party in the
+space.
+8.4.4 British Battle. If the British did not select either Garrison
+or Muster, and there is at least one space (including WI) with
+at least two Rebellion pieces that are outnumbered by British
+Regulars+Leader, Battle (3.2.4) as follows:
+• Select all spaces (and WI) with Rebellion Forts and/or cubes
+where the Royalist Force Level plus modifiers exceeds the
+Rebellion Force Level plus modifiers, first where there are
+most British pieces. Use Common Cause (8.4.3) wherever
+possible to increase the British Force Level.
+• If Common Cause cannot increase the Force Level in any
+Battle space, instead Skirmish (8.4.1) in a space not selected
+for Battle, or if that is not possible, Naval Pressure (8.4.1). If
+that is not possible either, execute no Special Activity.
+• Then resolve Battles in all selected spaces.
+IF NONE: If no spaces are selected for Battle, the British
+instead March per 8.4.3 above.
+8.4.5 Reward Loyalty. If more than one space is eligible to
+Reward Loyalty, first select the space or spaces with the lowest
+total of Raid and Propaganda markers, within that where the
+largest change in (Support – Opposition) is possible. Do not
+Reward Loyalty in a space if only Raid and/or Propaganda
+markers would be removed.
+8.4.6 Indian Trade Special Activity. If the Indians request
+Trade and Indian Resources are less than British Resources,
+roll 1D6: if the result is < British Resources, offer to transfer
+half the number rolled (rounding up) from British Resources
+to Indian Resources.
+8.4.7 British Supply. In each City and Colony where British
+cubes are out of supply (6.2.1), pay for supply if the cubes are
+needed to prevent Committees of Correspondence or allow
+Reward Loyalty during the Support Phase (6.4) given expected
+British earnings from Forts and Cities (but not the West Indies)
+(6.3). Pay with Resources as far as possible, first in spaces with
+highest Population. In each remaining space that needs Supply,
+shift one level towards Active Opposition if possible. Remove
+the cubes to Available if they are not needed for the Support
+Phase or if no supply is possible.
+8.4.8 West Indies Battle. If the British Control the West Indies
+after the Supply Phase Battle (6.2.2), pay one Resource to keep
+the Regulars there. Otherwise return all British Regulars from
+the West Indies to Available.
+8.4.9 British Leader Redeployment. Redeploy the British
+Leader (6.5.2) to the space with the most British Regulars.
+8.4.10 Loyalist Desertion. Remove Tories so as to change the
+least Control possible, if possible without removing the last
+Tory from any space.
+8.4.11 British Brilliant Stroke. Non-player British will use
+its Brilliant Stroke card if the Treaty of Alliance Event has
+been played, the British Leader is in a space with four or more
+British Regulars, and a Rebellion player Faction is 1st Eligible
+or the Patriots play their Brilliant Stroke card.
+8.5 Non-Player Patriot Actions
+When Non-player Patriots are 1st or 2nd Eligible, they will
+ignore the Event if the Patriot Faction Symbol is underlined
+with a sword. Otherwise, if they are Eligible to play the Event,
+check any relevant Event Instructions (8.3.1), and execute the
+Event if at least one of the following conditions are met:
+• Support exceeds Opposition, and the Event will shift
+Opposition and/or Support in favor of the Rebellion side
+(including by increasing FNI, but not by free Battles).
+• The Event places Underground Militia in at least one Active
+Support or Village space that has none already.
+• The Event places a Patriot Fort or removes an Indian Village.
+• The Event adds at least three Patriot Resources.
+• The Patriots have at least 25 pieces on the map, the Event is
+Effective (8.3.3), and a D6 rolls “5” or higher.
+If the Patriots do not play the Event, they execute a Command
+and Special Activity if Patriot Resources exceed 0, otherwise
+Pass (2.3.3).
+8.5.1 Patriot Battle. If any space has both Royalist pieces and
+Rebellion cubes, and the total number of Rebellion cubes and
+Leaders there outnumber all Active Royalist pieces combined,
+the Patriots execute Battle (3.3.3) as follows:
+• Select all spaces where the Rebellion Force Level (including as
+many French as possible) plus modifiers exceeds the Royalist
+Force Level plus modifiers. If Patriot Resources are too low
+to pay for all such spaces, select the space with Washington
+first, then the spaces with highest Population, then with the
+largest number of Villages, then randomly.
+• For each Battle space selected, if French Regulars are present
+and French Resources exceed 0, pay one French Resource to
+include as many French Regulars as possible.
+• Then resolve all Battles.
+If no spaces are selected for Battle, the Patriots instead Rally
+(8.5.2).
+For each space where the Rebellion side Wins the Day (3.6.8),
+the Patriots execute a free Rally Command (8.5.2) in one
+space. For each City where the Rebellion side Wins the Day,
+the French may move any Blockades from that City to another
+City with more Support.
+If any Battles were resolved, execute a Partisans Special Activity
+per below, or if that is not possible, Skirmish, or if that is not
+possible, Persuasion. If none of these are possible, execute no
+Special Activity.
+PARTISANS: If Patriot Resources are 0, instead execute
+Persuasion if possible. Otherwise, execute a Partisans Special
+Activity (4.3.2) in a space with Underground Militia and enemy,
+first to remove a Village, then to remove the most War Parties,
+then the most British units (in both cases per the priorities in
+8.1.2); within each first to add most Rebellion Control, then
+to remove most British Control, then random.
+SKIRMISH: If Patriot Resources are 0, instead execute Persua-
+sion if possible. Otherwise, execute a Skirmish in a space with
+Continentals and enemy, first to remove a British Fort, within
+that first to add the most Rebellion Control, then to remove
+the most British Control, then random.
+PERSUASION: In up to three spaces with Rebellion Control
+and Underground Militia, first spaces with Patriot Forts, Acti-
+vate one Militia per space to add Patriot Resources.
+8.5.2 Rally. If the Patriots did not select Battle, and Rally would
+place a Patriot Fort or 1D6 rolls higher than the number of Un-
+derground Militia on the map, or the Patriots selected a Battle
+or Rabble-Rousing Command but were unable to execute it,
+the Patriots Rally (3.3.1) in up to four spaces as follows:
+• If Patriot Resources reach 0 during the Rally, the Patriots
+immediately execute a Persuasion Special Activity (8.5.1)
+before continuing the Rally Command.
+• Place a Fort in each space with 4+ Patriot units and room, first
+Cities, within that first in the spaces with highest Population.
+• Then place Militia, first at each Patriot Fort with no other
+Rebellion pieces, then if any Continentals are Available at
+the Fort with the largest number of Militia already.
+• In the Patriot Fort space with most Militia of those already
+selected for Rally, replace all Militia except one Underground
+with Continentals.
+• Then, if any Patriot Fort is Available, place Militia in the
+space with most Patriot units already, but no Patriot Fort.
+• Then place Militia, first to change Control, then in spaces
+not at Active Opposition, within each first in Cities, within
+that first in the highest Population.
+• Then, in one Fort space not already selected above, move in
+all Active Militia from adjacent spaces that can be moved
+without changing Control of their origin spaces, then flip
+all Militia at the Fort Underground.
+Then, if no Persuasion was used during the Rally, the Patriots
+execute a Partisans Special Activity per 8.5.1, or if that is not
+possible Skirmish, or if that is not possible, Persuasion. If none
+of these are possible, execute no Special Activity.
+IF NONE: If no Rally is possible, the Patriots instead execute
+Rabble-Rousing (8.5.3), or if that is not possible either, Pass
+(2.3.3).
+8.5.3 Rabble-Rousing. If the Patriots did not select Battle or
+Rally, and Rabble-Rousing could shift any space towards Active
+Opposition, or they selected a Rally or March Command but
+were unable to execute it, the Patriots execute Rabble-Rousing
+(3.3.4) as follows:
+• If Patriot Resources reach 0 during Rabble-Rousing, the
+Patriots immediately execute a Persuasion Special Activity
+(8.5.1) before continuing the Command.
+• Use Rabble-Rousing in each space that can be shifted towards
+Active Opposition, first in spaces with Active Support, within
+that first in the space with highest Population.
+IF NONE: If no Rabble-Rousing is possible, the Patriots in-
+stead Rally (8.5.2), or if that is not possible either, Pass (2.3.3).
+Then, if no Persuasion was used during Rabble-Rousing, the
+Patriots execute a Partisans Special Activity per 8.5.1, or if that
+is not possible, Skirmish, or if that is not possible, Persuasion.
+If none of these are possible, execute no Special Activity.
+8.5.4 Patriot March. If the Patriots did not select Battle or Rally,
+and Rabble-Rousing could not shift any space towards Active
+Opposition, the Patriots March (3.3.2) as follows:
+• While executing the bullets below, lose no Rebellion Control,
+leave an Active Patriot unit with each Patriot Fort, and leave
+a Patriot unit (if possible an Underground Militia) in each
+space that is not already at Active Opposition.
+o First identify all groups of Patriot units able to March.
+o Moving the largest groups first, add Rebellion Control to
+two spaces, first with Villages, then Cities, then elsewhere;
+within that first to the spaces with largest Population.
+Stop moving groups into each destination once Rebellion
+Control is established. If French Resources exceed 0,
+include as many French Regulars as possible in the moves.
+
+o Then March to get one Militia (Underground if possible)
+into each space with none, first to change Control of the
+most Population, then elsewhere.
+Then execute a Partisans Special Activity per 8.5.1, or if that is
+not possible, Skirmish, or if that is not possible, Persuasion. If
+none of these are possible, execute no Special Activity.
+IF NONE: If no March moves can be executed, the Patriots
+instead execute Rally (8.5.2).
+8.5.5 Patriot Supply. The Patriots pay one Patriot Resource
+for each space where removing Patriot pieces would change
+Control, within those first where the British would otherwise
+be able to Reward Loyalty, then in the spaces with most Vil-
+lages, then with highest Population. In all other spaces where
+Supply is needed, remove Patriot pieces per 8.1.2.
+8.5.6 Patriot Leader Redeployment. Redeploy Washington to
+the space with most Continentals.
+8.5.7 Patriot Desertion. Remove Militia and Continentals so as
+to change as little Control as possible, within that first without
+removing the last Patriot unit from any space.
+8.5.8 Patriot Brilliant Stroke. Non-player Patriots will use
+its Brilliant Stroke card if the Treaty of Alliance Event
+has been played, Washington is in a space with four or more
+Continentals, and a player Faction is 1st Eligible.
+8.5.9 Committees of Correspondence. If more than one space
+is eligible for Committees of Correspondence, first select the
+spaces with the lowest number of Raid markers, within that
+where the largest change in (Opposition - Support) is possible.
+Do not execute Committees of Correspondence in a space if
+only Raid markers would be removed.
+8.6 Non-Player French Actions
+If Non-player French are 1st or 2nd Eligible, they will ignore
+the Event if the French Faction Symbol is underlined with a
+sword. Otherwise, if they are Eligible to play the Event, check
+any relevant Event Instructions (8.3.1), and execute the Event
+if at least one of the following conditions are met:
+• Support exceeds Opposition, and the Event will shift
+Opposition and/or Support in favor of the Rebellion side
+(including by increasing FNI and placing a Blockade to
+reduce Support), but not by free Battles.
+• The Event moves French Regulars or Squadrons from
+Unavailable.
+• The Event places Available French pieces on the map.
+• The Event inflicts British Casualties (including a free French
+Battle, applying any additional priorities in 8.6.6. or 8.6.3).
+• The Event adds French Resources.
+• The Treaty of Alliance has been played, the Event is
+Effective (8.3.3), and a D6 rolls “5” or higher.
+If the French do not play the Event, they execute a Command
+and Special Activity if French Resources exceed 0, otherwise
+Pass (2.3.3).
+8.6.1 Roderigue Hortalez et Cie (before ToA). If the Treaty
+of Alliance has not been played, and a D3 roll exceeds Pa-
+triot Resources or the French were unable to execute French
+Agent Mobilization (8.6.2), execute Roderigue Hortalez et Cie
+(3.5.2) by spending up to 1D3 French Resources to increase
+Patriot Resources.
+Then execute a Préparer la Guerre Special Activity.
+Préparer la Guerre (Before Treaty Of Alliance). Move one
+Blockade marker from Unavailable to the West Indies. If no
+Blockade markers are Unavailable, instead move up to three
+French Regulars from Unavailable to Available. If neither
+of these is possible, Non-player French executes no Special
+Activity.
+8.6.2 French Agent Mobilization (Before Treaty Of Alli-
+ance). If the Treaty of Alliance has not been played and
+the French did not execute Roderigue Hortalez et Cie, execute
+French Agent Mobilization (3.5.1) by placing two Militia or, if
+that is not possible, one Continental, in one of Quebec, New
+York Colony, New Hampshire or Massachusetts, first to add
+most Rebellion Control, then where there are most Patriot
+units already.
+Then execute a Préparer la Guerre Special Activity (8.6.1).
+IF NONE: If no French Agent Mobilization was possible,
+instead execute Roderigue Hortalez et cie (8.6.1).
+8.6.3 Roderigue Hortalez Et Cie (After Treaty Of Al-
+liance). If the Treaty of Alliance has been played and
+the French were unable to execute a Muster (8.6.4), execute
+Roderigue Hortalez et Cie by spending up to 1D3 French
+Resources to add Patriot Resources.
+If any Resources were transferred to the Patriots, execute a
+Special Activity per the instructions below: Skirmish, or if that
+is not possible, Préparer la Guerre, or if that is not possible
+either, Naval Pressure. If none of these are possible, execute no
+Special Activity.
+SKIRMISH: Skirmish in the West Indies if possible, otherwise
+in one space with both French and British that is not selected
+for Battle or Muster. In the selected space, remove a British
+Fort if possible, otherwise as many British cubes as possible.
+PRÉPARER LA GUERRE (after Treaty of Alliance): If 1D6
+rolls equal to or less than the number of Unavailable French
+Regulars+Blockades, move one Blockade marker from Unavail-
+able to the West Indies, or if that is not possible, move up to
+three French Regulars from Unavailable to Available. If no
+Blockades or French Regulars were moved from Unavailable
+but French Resources = 0, add +2 French Resources.
+NAVAL PRESSURE: Add one Blockade, first to a City selected
+for Battle, then the City with most Support.
+8.6.4 French Muster. If the Treaty of Alliance has been played
+and a D6 roll is less than the number of Available French
+Regulars, the French Muster (3.5.3) as follows:
+• If fewer than four French Regulars are Available and WI
+does not have Rebellion Control, place as many Regulars as
+possible in WI.
+• Otherwise, place as many Regulars as possible in a City
+or Colony with Rebellion Control, first a space with
+Continentals, then elsewhere.
+Then execute Skirmish (8.6.3), or if that is not possible Préparer
+la Guerre (8.6.1), or if that is not possible either Naval Pressure
+(8.6.3). If none of these are possible, execute no Special Activity.
+IF NONE: If the Muster instructions cannot be executed,
+instead execute Roderigue Hortalez et cie (8.6.3).
+8.6.5 French March. If the Treaty of Alliance card has been
+played, the French did not select Muster or Roderigue Hortalez
+et cie, and Rebellion cubes + Leaders do not outnumber British
+pieces in a space with both, the French March (3.5.4) as follows:
+• While executing the bullets below, lose no Rebellion Control.
+• Within that restriction, March with as many French Regulars
+and Continentals as possible to add Rebellion Control, first
+in Cities, then Colonies, within each first to spaces with most
+British pieces.
+• Then March any French Regulars that are not in or adjacent
+to a space with British pieces towards the nearest British.
+• If neither of the above are possible, March one French Regular
+to a space with both Patriots and British pieces.
+Then execute a Special Activity: Skirmish (8.6.3), or if that is
+not possible Préparer la Guerre (8.6.3), or if that is not pos-
+sible either Naval Pressure (8.6.3). If none of these are possible,
+execute no Special Activity.
+IF NONE: If no March moves are possible, the French Muster
+(8.6.4).
+8.6.6 French Battle. If the Treaty of Alliance has been played
+and the French did not select Muster, March or Roderigue
+Hortalez et cie, and Rebellion cubes plus Leader outnumber
+British pieces in at least one space with both, the French Battle
+(3.5.5) as follows:
+• Select all spaces with both French and British pieces where
+the Rebellion Force Level (including Continentals if possible)
+plus Battle Modifiers exceeds the Royalist Force Level plus
+Battle Modifiers. Within that, select the space with highest
+Population first. If there are no such spaces, abort the Battle
+Command and instead execute a March (8.6.5).
+• Then execute a Special Activity: Naval Pressure (8.6.3), or if
+that is not possible Skirmish (8.6.3) in a space not selected
+for Battle, or if that is not possible either Préparer la Guerre
+(8.6.3). If none of these are possible, execute no Special
+Activity.
+Note: The order in which the Special Activities are at-
+tempted is different for Battle than for the other French
+Commands.
+• Then resolve Battle in all selected spaces.
+For each space where the Rebellion side Wins the Day (3.6.8),
+the Patriots execute a free Rally Command (8.5.2) in one
+space. For each City where the Rebellion side Wins the Day,
+the French may move any Blockades from that City to another
+City with more Support.
+8.6.7 French Supply. The French pay one Resource for each
+space where moving French Regulars would change Control.
+Within each of these, pay first where the British would other-
+wise be able to Reward Loyalty, then with highest Population.
+In all other spaces where Supply is needed, move French pieces
+to the nearest Patriot Fort (or if none, to Available).
+8.6.8 West Indies Battle. If any French Regulars remain in
+the West Indies after the Supply Phase Battle (6.2.2), pay one
+Resource to keep them there if possible, otherwise return them
+to Available.
+8.6.9 French Redeployment. Redeploy the French Leader
+(6.5.2) to a space with both French Regulars and Continentals
+if possible, within that to the space with most French Regulars.
+Remove a Blockade from the City with least Support; remaining
+Blockades are moved to Cities with most Support.
+8.6.10 Loyalist Desertion. Remove a Tory so as to change
+Control of the most Population possible, then to remove the
+last Tory in the space with most Population that is not already
+at Active Support, then elsewhere.
+8.6.11 French Brilliant Stroke. Non-player French will
+use their Brilliant Stroke card if the Treaty of Alliance
+Event has been played, the French Leader is in a space with four
+or more French Regulars, and any player Faction is 1st Eligible
+or the British play their Brilliant Stroke card.
+8.7 Non-Player Indian Actions
+When Non-player Indians are 1st or 2nd Eligible, they will
+ignore the Event if the Indian Faction Symbol is underlined
+with a sword. Otherwise, if they are Eligible to play the Event,
+check any relevant Event Instructions (8.3.1), and execute the
+Event if at least one of the following conditions are met:
+• Opposition exceeds Support, and the Event will shift
+Opposition and/or Support in favor of the Royalist side
+(including by reducing FNI, but not by free Battles).
+• The Event places at least one Indian Village or grants a free
+Gather. (If so, place the Village in a space that already has
+War Parties if possible.)
+• The Event removes a Patriot Fort.
+• There are at least four Indian Villages on the map, the Event
+is Effective (8.3.3), and a D6 rolls five or higher.
+If the Indians do not play the Event, they execute a Command
+and Special Activity.
+8.7.1 Raid. If the Indians are to execute a Command and Sup-
+port plus 1D6 does not exceed Opposition, Raid (3.4.4) up to
+three spaces as follows:
+• Raid Colonies at Opposition with or adjacent to Underground
+War parties (or within two spaces of Dragging Canoe), first
+where Plunder will be possible after the Raid movement,
+then elsewhere, within each in the spaces with the highest
+Population.
+• While executing the following bullets, do not remove the last
+War Party from any Village space.
+• Move an Underground War Party into each Raid target that
+doesn’t already have at least one, or where War Parties do not
+outnumber Rebellion pieces.
+
+Liberty or Death ~ Rules of Play
+• If Resources fall to zero during the Raid Command, Plunder
+(or if that is not possible, Trade) before completing the Raid
+Command.
+• If no Raid is possible, instead execute Gather (8.7.2).
+If no Special Activity was used during the Raid, instead War
+Path after the Raid, or if that is not possible, Trade.
+PLUNDER: Execute Plunder (4.4.3) in a Raid space with
+more War Parties than Rebellion pieces, within that in the
+highest Population.
+WAR PATH: If Indian Resources are 0, execute Trade instead
+if possible. Otherwise War Path in one space, first to remove
+a Patriot Fort, then to remove the most Rebellion pieces pos-
+sible per 8.1.2, within that first in a province with at least one
+Village then elsewhere.
+TRADE: If there is at least one Underground War Party at
+a Village, Trade in the Village space with most Underground
+War Parties, first requesting Resources from the British (if
+Non-player Britiish, see 8.4.6 for results).
+8.7.2 Gather. If the Indians did not select Raid, and Gather
+would place two or more Villages or a D6 roll is less than the
+number of War Parties Available, or if the Indians selected a
+Raid or March Command but were unable to execute it, Gather
+(3.4.1) in up to four spaces as follows:
+• Place a Village in each space with room for one and at least
+three War Parties (at least two War Parties if Cornplanter is
+in the space), first in the space with the Indian Leader.
+• Then place War Parties at Villages, first where there are enemy
+pieces, then where there are no Underground War Parties,
+then with the Indian Leader, then elsewhere.
+• Then, if any Villages are Available, place War Parties in up
+to two spaces with room for a Village, first where there are
+exactly two War Parties already, then where there is exactly
+one War Party, then elsewhere.
+• Then, if no more War Parties are Available but fewer than four
+Gather spaces have been selected, Gather in one additional
+Village space to move in all adjacent Active War Parties
+possible without adding any Rebellion Control, then flip all
+Active War Parties in that space Underground.
+After the Command, execute a War Path Special Activity (8.7.1)
+or, if that is not possible, Trade. If neither is possible, do not
+execute any Special Activity.
+IF NONE: If no Gather is possible, the Indians instead March
+(8.7.3), or if that is not possible either, Pass (2.3.3).
+8.7.3 March. If the Indians did not select Raid or Gather and
+no space has both a War Party and British Regulars, or if the
+Indians selected a Scout or Gather Command but were unable
+to execute it, the Indians March (3.4.2) into up to three spaces
+as follows:
+• When executing the following bullets, March first with
+Underground then with Active War Parties, without either
+moving the last War Party from any Village space, moving
+the last 3 War Parties from a space where Gather could place
+a Village, or adding any Rebellion Control.
+• If at least one Village is Available, first March to get 3+ War
+Parties in one additional Neutral or Passive space with room
+for a Village.
+• Then March to remove the most Rebellion Control possible,
+first in spaces with no Active Support.
+IF NONE: If no March is possible, the Indians instead Gather
+(8.7.2), or if that is not possible either, Pass (2.3.3).
+If any March moves were made, execute War Path (8.7.1), or
+if that is not possible, Trade.
+8.7.4 Scout. If the Indians did not select Raid or Gather, and at
+least one space has both British Regulars and at least one War
+Party, they Scout (3.4.3) into one space as follows:
+• Move one War Party and the most Regulars and Tories
+possible without losing British Control or adding Rebellion
+Control in the origin space, first to a space with a Patriot Fort,
+then to a Village space with enemy pieces, then to remove
+the most Rebellion Control possible.
+• Skirmish in the destination space to remove to remove a
+Patriot Fort if possible, otherwise to remove the largest
+number of enemy pieces possible.
+If a Scout move was made, execute War Path (8.7.1), or if that
+is not possible, Trade.
+IF NONE: If no Scout move is possible, instead execute a
+March (8.7.3).
+8.7.5 Indian Supply. For each Colony with War Parties but no
+Village, pay one Resource for Indian Supply first if moving the
+War Parties would add Rebellion Control, then where Gather
+could place a Village. If Indian Resources run out or neither
+of the above conditions are met, move the War Parties in that
+Colony to the nearest Village space.
+8.7.6 Patriot Desertion. Remove the first Patriot Militia and
+Continental first from spaces with Villages, then to remove
+Rebellion Control, then to remove the last Patriot of that type
+in a space, then elsewhere.
+8.7.7 Indian Leader Redeployment. Redeploy Brant or Drag-
+ging Canoe to the space with most War Parties. Redeploy
+Cornplanter to a Neutral or Passive Province with two or more
+War Parties and room for a Village; if there is no such Province,
+Redeploy him to the space with most War Parties.
+8.7.8 Indian Brilliant Stroke. Non-player Indians will use
+its Brilliant Stroke card if the Treaty of Alliance Event
+has been played, the Indian Leader is in a space with three or
+more War Parties, and any player Faction is 1st Eligible or a
+Rebellion Faction plays a Brilliant Stroke card other than
+Treaty of Alliance.
+8.7.9 Defending in Battle. If the Indians are Defenders in a
+Battle in a space with at least one Village, Activate all but 1
+Underground War Party.
+8.8 One-Player Victory
+A lone player plays either any one Faction against three Non-
+players, or British and Indian together, or Patriot and French
+together (1.5), with the remaining Factions controlled by Non-
+players. A player playing two Factions together uses the lower
+victory margin (7.3) of those two Factions.
+To succeed, the player must avoid a win by any Non-player
+through each Winter Quarters Round and have the highest
+victory margin(s) after the final Round. The lone player never
+wins during a Victory Phase (6.1, 7.2).
+One-Player Difficulty Option
+For greater challenge regardless of scenario or Period
+Events Option (2.1) selected, beginning with the second
+Winter Quarters Round, the player also must avoid having
+a lower victory margin with any player Faction than any
+Non-player Faction during each Victory Phase.
+Non-Player Victory: If the player fails to avoid such an out-
+come, the Non-player with the highest victory margin (ties to
+French then Indian then Patriot) wins the War of Independence:
+• If French: Vive la France! Although France’s treasury is
+almost empty, the successful French intervention in America
+has cost Britain even more dearly. France replaces Britain as
+the leading power both in Europe and in the colonies …at
+least until domestic unrest grows too strong.
+• If Patriot: Freedom is ours! The United States of America
+have won their independence and crushed their Indian
+neighbors. In coming years, they will sweep across the width
+of the entire continent and eventually even replace the British
+as the leading power of the world—but that time is still far
+in the future.
+• If Indian: Proclamation Line confirmed! With the colonies
+brought under firm control by the combined efforts of British
+and Indians, King George and his Parliament guarantees the
+rights of the native nations of America in the territories west
+of the Proclamation Line of 1763. While skirmishes and
+raids will continue, the frontier will remain stationary in the
+Appalachians for several decades before population pressure
+starts to force it westward again.
+• If British: John Bull triumphant! With both the French and
+the Patriots thoroughly defeated, Britain is indeed Great and
+takes its rightful place as the leading power in the world. Its
+Indian allies are soon forgotten and the colonists will press
+westward once more—but under the Union Jack, not the
+Star-Spangled Banner.
+Player Draw or Victory: If the player does survive to the final
+Round, subtract the highest Non-player victory margin from
+the lowest player victory margin to gauge the outcome. A dif-
+ference of 5 or less is a stalemate; six or more a victory for the
+player’s Faction(s):
+• 1 to 5: The struggle continues! Although all sides are
+economically exhausted, none are willing to surrender. The
+war in the Americas will continue until one of the European
+powers becomes embroiled in a war closer to home and is
+forced to withdraw its forces.
+• 6 or more, Player as Patriots and/or French: Secession
+successful! The United States is recognized as an independent
+state and will soon expand far to the west at the expense of
+both native nations and other Europeans.
+• 6 or more, Player as British and/or Indians: Rebellion
+defeated! The British Crown re-establishes firm control over
+all its colonies. Expansion westward is slowed down by treaties
+both with native nations and other European colonies

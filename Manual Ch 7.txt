@@ -1,0 +1,68 @@
+Each Faction has two victory conditions. These victory condi-
+tions are specified below and on the Faction player aid sheets.
+During victory checks (6.1, 7.2) the two victory conditions are
+checked separately; at the end of the game (6.4.3, 7.3) they are
+combined into a single total victory margin for each Faction.
+7.1 Ranking Wins and Breaking Ties
+During the Winter Quarters Round Victory Check Phase (6.1,
+7.2), both of a Faction’s victory conditions must have a positive
+victory margin in order to win the game. The victory margin
+is the amount a Faction is beyond or short of its condition set
+forth below. During the final Winter Quarters Round Support
+Phase victory calculation (6.4.3, 7.3), both measures are net-
+ted together and the highest net measure wins (neither victory
+margin needs to be positive).
+If any Non-player Faction passes a victory check (7.2), all players
+lose equally. Whenever a player Faction passes a victory check
+(6.1), the Faction on that side with the highest victory margin
+takes first place and the other Faction on that side takes second.
+The Faction on the other side that reached the highest victory
+margin takes 3rd place, and the other Faction on that Side takes
+4th. Also, if the Treaty of Alliance Event was not played,
+the French come in last place (regardless of their margin or
+whether they are a Non-player).
+Ties are resolved in order of Non-players, the Patriots, British,
+French and Indian Factions.
+If playing solitaire, see also One-Player Victory (8.8).
+7.2 During The Victory Check Phase
+Check victory at the start of each Winter Quarters Round (6.1).
+In order to win, both of a Faction’s victory conditions must
+have a positive victory margin (otherwise there is no winner,
+in which case play continues). For the French to win, Treaty
+of Alliance also must have been played.
+Victory conditions are:
+• British: 1. Support exceeds Opposition by more than 10 and
+2. Cumulative Rebellion Casualties (CRC) is greater than
+Cumulative British Casualties (CBC).
+• Patriots: 1. Opposition exceeds Support by more than 10 and
+2. Patriot Forts plus 3 is greater than Villages.
+• French: 1. Opposition exceeds Support by more than 10
+and 2. Cumulative British Casualties (CBC) is greater
+than Cumulative Rebellion Casualties (CRC). Treaty of
+Alliance must have been played.
+• Indians: 1. Support exceeds Opposition by more than 10 and
+2. Villages less 3 is greater than Patriot Forts.
+Combined Victory: A player running both Factions of one side
+achieves a combined Royalist or Rebellion win at victory check
+if all of both the player’s Factions’ victory conditions are fulfilled.
+7.3 During The Support Phase
+If the final Winter Quarters Round (2.4.1) Support Phase is
+completed without a victory check win (7.2), the victory mar-
+gin for the two victory conditions for each Faction are added
+together to determine its total victory margin. The Faction with
+the highest total victory margin wins.
+Note: Positive victory margins are not required to win at
+Game End. (6.4.3) A player running both Factions of one
+side uses the worse of the two Factions’ total victory margins.
+The French cannot win without having played the Treaty
+of Alliance card.
+Victory conditions are:
+• British: Support less Opposition plus Cumulative Rebellion
+Casualties (CRC) less Cumulative British Casualties (CBC).
+• Patriots: Opposition less Support plus Patriot Forts plus 3
+less Villages.
+• French: Opposition less Support plus Cumulative British
+Casualties (CBC) less Cumulative Rebellion Casualties
+(CRC). Treaty of Alliance must have been played.
+• Indians: Support less Opposition plus Villages less 3 less
+Patriot Forts.

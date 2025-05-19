@@ -1,0 +1,139 @@
+When a Winter Quarters card is turned up, stop
+play and swap it with the played card. Conduct a
+Winter Quarters Round in the sequence of phases
+below for each Winter Quarters card. The Se-
+quence of Play sheet and board also list this sequence. Note
+that each Winter Quarters card has an event that will take
+effect at the end of the Reset Phase of the Winter Quarters
+Round.
+6.1 Victory Check Phase
+If any Faction has met its victory conditions (all victory con-
+ditions are positive for at least one Faction), the game ends
+(exceptions: Non-player option; one-player). See victory (7.2)
+to determine winner and rank order. Otherwise, continue with
+the Winter Quarters Round. After conducting the final Win-
+ter Quarters card’s Winter Quarters Round Support Phase
+(6.4.3), determine victory per 7.2.
+6.2 Supply Phase
+6.2.1 Extended Supply Lines: Check each Faction’s units to
+see if they are in supply:
+British: British cubes are in supply if they are in a space with
+a British Fort or in a City with British Control.
+If not, the British must:
+• Pay one Resource per space, or
+• Remove cubes to Available, or
+• Shift the space one level toward Active Opposition. If no
+shift possible and no Resource paid, remove to Available.
+Note: This does not apply to British Regulars in the West
+Indies.
+Patriots: Patriot Militia and Continentals are in supply if they
+are in a space with a Patriot Fort, or a Colony or City with
+Rebellion Control.
+If not, the Patriots may either pay one Resource per space or
+remove one for every two total Patriot units there (rounding
+down) to Available.
+French: French Regulars are in supply if they are in a space
+with a Patriot Fort, or a Colony or City with Rebellion Control.
+If not, French may either move those units to the nearest space
+with a Rebellion Fort or pay one Resource per space. If not
+possible, return these French Regulars to Available.
+Note: This does not apply to French Regulars in the West
+Indies.
+Indians: If no Villages are on the map, Indians place one Vil-
+lage in any one Indian Reserve Province. Indian War Parties are
+in supply if they are in a space with a Village or in an Indian
+Reserve Province.
+If not, the Indians may either pay one Resource per space or
+move the War Parties to the nearest Province with a Village.
+6.2.2 West Indies Battle: French must conduct a free Battle in
+the West Indies if French and British pieces are present, per
+the Battle Procedure (3.6). French then British may return any
+friendly remaining units to Available and/or pay one Resource
+if any remain.
+6.3 Resources Phase
+Add Resources to each Faction as follows, to a maximum of 50:
+6.3.1 British Earnings: Add to Resources the number of Brit-
+ish Forts plus population of non-Blockaded British Controlled
+Cities. +5 if British Control West Indies.
+6.3.2 Indians Earnings: Add to Resources half the number of
+Villages on the map (rounding down).
+6.3.3 Patriots Earnings: Add to Resources the number of Pa-
+triot Forts plus half the number of Rebellion Controlled spaces
+not including the West Indies (rounding down).
+6.3.4 French Earnings: Before TOA: Add to Resources two
+times Squadron/Blockade markers in West Indies. After TOA:
+Add to Resources FNI level plus population of Cities not British
+Controlled. +5 if Rebellion Controls West Indies.
+6.4 Support Phase
+The British then the Patriots may spend Resources to affect
+Support and Opposition. The game ends if this is the final
+Winter Quarters Round.
+6.4.1 Reward Loyalty. The British may spend Resources to build
+Support in British Controlled spaces with both one or more
+British Regulars and one or more Tories. Every one Resource
+spent removes one Raid or Propaganda marker—once no Raid
+or Propaganda is in a space—shifts it one level toward Active
+Support to a maximum of two levels per space.
+6.4.2 Committees of Correspondence. The Patriots may spend
+Resources to encourage Opposition in Rebellion Controlled
+spaces with Patriot pieces. Every one Resource spent removes
+one Raid marker or—once no Raid is in a space—shifts it one
+level toward Active Opposition to a maximum of two levels
+per space.
+6.4.3 Game End? If this the final Winter Quarters Round
+(2.4.1), the game ends. See Victory (7.3). If not, continue with
+the Redeployment Phase.
+Note: The final round omits Redeployment Phase, Desertion
+Phase, and Reset Phase (6.5-6.7).
+6.5 Redeployment Phase
+6.5.1 Leader Change. Consult the Event card on deck. If
+possible, the first Faction on that card must make a Leader
+Change. The Leader Change Summary below shows the Leader
+progression from the current Leader. If no further changes can
+be made for that Faction, then no action is taken. The French do
+not make Leader Changes until after the Treaty of Alliance
+has been played. If the Leader is changed, set aside the current
+Leader marker and replace it with the new Leader marker.
+Leader Change Summary
+British:
+• If Gage, replace with Howe.
+• If Howe, replace with Clinton.
+• If Clinton, no further Leader Changes.
+French
+• No changes before Treaty of Alliance.
+• If Rochambeau, replace with Lauzun.
+• If Lauzun, no further Leader Changes.
+Indians
+• If Joseph Brant, replace with Cornplanter.
+• If Cornplanter, replace with Dragging Canoe.
+• If Dragging Canoe, no further Leader Changes.
+Patriots
+• No Leader Changes.
+6.5.2 Leader Redeployment. Each Faction may redeploy its
+Leader marker to a space with same Faction’s pieces or Available
+in the following order: Indians, French, British and Patriots.
+6.5.3 British Release Date. British move pieces from Unavail-
+able box to Available box on the British Release Date Schedule
+in the Scenario instructions. If there are fewer units in the
+Unavailable box than are to be moved to the Available box,
+then move only those that are in Unavailable.
+6.5.4 French Naval Intervention (After Treaty of Alliance).
+Lower FNI one level. Remove one Blockade to West Indies.
+The French may rearrange any remaining Blockades on Cities.
+6.6 Desertion Phase
+6.6.1 Patriot Desertion. Remove 1 in 5 Militia and 1 in 5
+Continentals from the map (rounding down). Indians choose
+the first Militia and first Continental to desert, then Patriots
+choose the remainder.
+6.6.2 Tory Desertion. Remove 1 in 5 Tories from the map
+(rounding down). French choose the first Tory to desert, then
+British choose the remainder.
+6.7 Reset Phase
+Prepare for the next card as follows:
+• Remove all Raid and Propaganda markers.
+• Mark all Factions Eligible.
+• Move cubes from the Casualties box to their Available box.
+• Flip all Militia and War Parties to Underground.
+• Reveal the draw deck’s new top card.
+• Resolve any applicable Event on the Winter Quarters
+card.

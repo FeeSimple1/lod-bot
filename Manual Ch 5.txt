@@ -1,0 +1,62 @@
+Each Event bears a title, card number, Period Event years, itali-
+cized flavor text, and Event text. Flavor text provides historical
+interest and has no effect on play.
+5.1 Executing Events
+When a Faction executes an Event, it carries out the Event
+text literally (sometimes involving actions or decisions by other
+Factions). Unless otherwise specified, the executing Faction
+makes all selections involved in implementing the text, such as
+which pieces are affected or which Faction will execute a Free
+Command (5.3). If another Faction is specified or selected to
+take an action, that Faction decides the details of the action.
+5.1.1 Where Event text contradicts rules, the Event takes
+precedence. However:
+• Events may not violate stacking (and so never place Forts/
+Villages where there are already two nor place French pieces
+on the Map before the Treaty of Alliance card has been
+played (2.3.9)).
+• Events place only Available pieces (1.4.1) and markers unless
+specifying from Unavailable, Casualties or West Indies; they
+remove rather than replace if the replacement is not Available
+or if stacking (1.4.2) would be violated.
+• Events may not raise a Faction’s Resources beyond 50 or
+below 0 (1.8).
+5.1.2 If two Events contradict, the currently played Event takes
+precedence.
+5.1.3 An executed Event’s text that can be implemented must
+be. If not all of its text can be carried out, implement that
+which can.
+5.1.4 Brilliant Stroke cards are Events held by a Faction
+and may have preconditions for play. They Trump other Event
+cards, including Faction order. The executing Faction must
+execute the Event described on the card (2.3.8).
+Card Number
+Illustration
+Title
+Italicized
+flavor text
+Event text
+Shaded Text
+(See Dual
+Use 5.2)
+Period Event
+years
+Faction flags
+Musket (8.1)
+Note: Muskets or Swords below Faction symbols regard
+Non-player instructions (8.1).
+5.2 Dual Use
+Many Events have both unshaded and shaded Event text. The
+executing Faction may select either the unshaded or shaded
+text to carry out (not both). The unshaded text helps the British
+and/or Indians while the shaded text often favors the Patriots
+and/or French. A Faction may select either text option regard-
+less of Faction.
+
+5.3 Free Commands
+Some Events allow the Executing or another Faction an im-
+mediate Command or Special Activity that interrupts the usual
+sequence of play and typically is free: it bears no Resource cost
+to any Faction involved and does not affect Eligibility (3.1.2,
+2.3.1), though other requirements remain unless Trumped by
+Event text (5.1.1)
