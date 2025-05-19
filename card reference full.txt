@@ -1,0 +1,1350 @@
+CARD #: 1
+TITLE: Waxhaws Massacre
+YEARS: 1779-1780
+ORDER: PBFI
+ICON: none
+
+UNSHADED:
+"Tarleton's quarter: In one space with British, remove two Continentals to Casualties, shift one level toward Active Support. Place two Propaganda there."
+
+SHADED:
+"Patriot rage: Patriots free March to and free Battle in one space. Place two Propaganda there. Shift one level toward Neutral."
+
+
+CARD #: 2
+TITLE: Common Sense
+YEARS: 1775-1776
+ORDER: PBFI
+ICON: none
+
+UNSHADED:
+"British organize a backlash: British may place two British Regulars and two Tories in any one City. Place two Propaganda markers there. British Resources +4."
+
+SHADED:
+"Impact of the writings of Thomas Paine: Shift two Cities one level each toward Active Opposition. Place two Propaganda markers in each."
+
+
+CARD #: 3
+TITLE: George Rogers Clark's Illinois Campaign
+YEARS: 1777-1778
+ORDER: PBFI
+ICON: none
+
+UNSHADED:
+"Indian retaliation raids succeed: Remove all Patriot pieces in Northwest and Southwest."
+
+SHADED:
+"Patriot offensive succeeds: Patriots may place two Militia and free Partisans in both Northwest and Southwest."
+
+
+CARD #: 4
+TITLE: The Penobscot Expedition
+YEARS: 1775-1776
+ORDER: PBFI
+ICON: I – Musket
+
+UNSHADED:
+"Expedition fails and ships scuttled: Remove three Patriot Militia. Patriot Resources –2."
+
+SHADED:
+"Expedition is a success: Place one Fort or Village and three Militia or War Parties in Massachusetts."
+
+
+CARD #: 5
+TITLE: William Alexander, Lord Stirling
+YEARS: 1777-1778
+ORDER: PBIF
+ICON: none
+
+UNSHADED:
+"Captured at Long Island: Patriots Ineligible through the next card."
+
+SHADED:
+"…bravest man in America: Patriots may free March to and free Battle in one space."
+
+
+CARD #: 6
+TITLE: Benedict Arnold
+YEARS: 1775-1776
+ORDER: PBIF
+ICON: none
+
+UNSHADED:
+"Treachery undermines the Patriot cause: Remove one Patriot Fort to Casualties and two Patriot Militia to Available from one Colony."
+
+SHADED:
+"Shows great leadership and resourcefulness: Remove one British Fort and two British cubes from one space to Casualties."
+
+
+CARD #: 7
+TITLE: John Paul Jones
+YEARS: 1779-1780
+ORDER: PBIF
+ICON: none
+
+UNSHADED:
+"Limited impact: British Resources +3. Lower FNI one level. Move up to two British Regulars from Available to West Indies or any City."
+
+SHADED:
+"Significant benefit: Patriot Resources +5. Raise FNI one level."
+
+
+CARD #: 8
+TITLE: Culpeper Spy Ring
+YEARS: 1777-1778
+ORDER: PBIF
+ICON: P – Musket
+
+UNSHADED:
+"Hercules Mulligan arrested: Activate three Patriot Militia anywhere."
+
+SHADED:
+"Spies reduce British effectiveness: Remove three British cubes to Casualties."
+
+
+CARD #: 9
+TITLE: Friedrich Wilhelm von Steuben
+YEARS: 1777-1778
+ORDER: PFBI
+ICON: I – Sword
+
+UNSHADED:
+"Patriots do not listen: British may Skirmish in up to three spaces."
+
+SHADED:
+"Patriots more effective: Patriots may Skirmish in up to three spaces."
+
+
+CARD #: 10
+TITLE: Benjamin Franklin Travels to France
+YEARS: 1775-1776
+ORDER: PFBI
+ICON: none
+
+UNSHADED:
+"Franklin is ineffective in France: Shift any two Cities each one level toward Active Support."
+
+SHADED:
+"Franklin takes France by storm: French Resources +3. Patriot Resources +2."
+
+CARD #: 11
+TITLE: Thaddeus Kosciuszko, Expert Engineer
+YEARS: 1777-1778
+ORDER: PFBI
+ICON: none
+
+UNSHADED:
+"Patriots ignore: Patriots remove any two Patriot Forts."
+
+SHADED:
+"Patriots embrace: In each of two Patriot Controlled spaces, Patriots may remove one Patriot piece and add one Patriot Fort."
+
+
+CARD #: 12
+TITLE: Martha Washington to Valley Forge
+YEARS: 1777-1778
+ORDER: PFBI
+ICON: none
+
+UNSHADED:
+"No Bread – No Soldiers: Execute Patriot Desertion as per Winter Quarters Round."
+
+SHADED:
+"Women step in to bolster support and raise money: Patriot Resources +5."
+
+
+CARD #: 13
+TITLE: "...the origin of all our misfortunes"
+YEARS: 1775-1776
+ORDER: PFIB
+ICON: none
+
+UNSHADED:
+"Soldiers leave: Execute Patriot Desertion as per Winter Quarters Round."
+
+SHADED:
+"Patriots strengthen commitment: In up to four spaces with Militia, Patriots may add an Active Militia."
+
+
+CARD #: 14
+TITLE: Overmountain Men Fight for North Carolina
+YEARS: 1777-1778
+ORDER: PFIB
+ICON: none
+
+UNSHADED:
+"Trouble in North Carolina: Indians free Scout or March to North Carolina or Southwest, then Indians War Path or British free Battle in that space."
+
+SHADED:
+"Overmountain Men make trouble: Patriots free March to and free Battle in North Carolina or Southwest."
+
+
+CARD #: 15
+TITLE: Morgan’s Rifles
+YEARS: 1775-1776
+ORDER: PFIB
+ICON: none
+
+UNSHADED:
+"Virginians unhappy their Militia was sent to New England: Shift Virginia two levels toward Active Support. Place two Tories there."
+
+SHADED:
+"Elite light-infantry unit commanded by Daniel Morgan is deployed: Patriots perform free March to any one Colony, then free Battle, then Partisans there."
+
+
+CARD #: 16
+TITLE: Mercy Warren’s “The Motley Assembly”
+YEARS: 1779-1780
+ORDER: PFIB
+ICON: I – Sword
+
+UNSHADED:
+"Anger rallies the Tories: Place two Tories anywhere."
+
+SHADED:
+"Rallies the Patriots: Shift one City to Passive Opposition."
+
+
+CARD #: 17
+TITLE: Jane McCrea Murdered by Indians
+YEARS: 1777-1778
+ORDER: PIBF
+ICON: F – Sword
+
+UNSHADED:
+"Indian Country fears: Remove one Patriot Fort from one Indian Reserve Province."
+
+SHADED:
+"Backlash against Indians: Remove one Indian Village."
+
+
+CARD #: 18
+TITLE: “If it hadn’t been so stormy…”
+YEARS: 1779-1780
+ORDER: PIBF
+ICON: P – Musket, I – Musket, B – Musket, F – Sword
+
+UNSHADED:
+"Murphy’s Law in application: Any one Faction Ineligible through the next card."
+
+SHADED:
+(none)
+
+CARD #: 19
+TITLE: Legend of Nathan Hale
+YEARS: 1779-1780
+ORDER: PIBF
+ICON: none
+
+UNSHADED:
+"Poor information gathering plagues the Patriots: Patriot Resources –4."
+
+SHADED:
+"The legend grows and Patriots respond: Place three Patriot Militia anywhere. Patriot Resources +3."
+
+
+CARD #: 20
+TITLE: Continental Marines
+YEARS: 1775-1776
+ORDER: PIBF
+ICON: none
+
+UNSHADED:
+"Deployed to Louisiana to block British: Patriots remove four Continentals from map to Available."
+
+SHADED:
+"Deployed to defend New Jersey: Patriots place four Continentals in New Jersey."
+
+CARD #: 21
+TITLE: The Gamecock Thomas Sumter
+YEARS: 1779-1780
+ORDER: PIFB
+ICON: I – Musket
+
+UNSHADED:
+"British pressure the Gamecock: Shift South Carolina or Georgia two levels toward Active Support."
+
+SHADED:
+"“My greatest plague”: Patriots free March to and free Battle in South Carolina or Georgia."
+
+
+CARD #: 22
+TITLE: The Newburgh Conspiracy
+YEARS: 1779-1780
+ORDER: PIFB
+ICON: I – Musket
+
+UNSHADED:
+"Patriot officers threaten to revolt: Remove four Patriot Militia and/or Continentals in any one Colony."
+
+SHADED:
+"Tories revolt over lack of support: Immediately execute Tory Desertion as per Winter Quarters Round."
+
+
+CARD #: 23
+TITLE: Lieutenant Colonel Francis Marion
+YEARS: 1779-1780
+ORDER: PIFB
+ICON: B – Musket
+
+UNSHADED:
+"“Damned old fox” breaks an ankle: British or Indians move all Patriot units in North Carolina or South Carolina into an adjacent Province."
+
+SHADED:
+"With Liberty or Death on his cap: If Militia occupy North Carolina or South Carolina, remove four British units from that space."
+
+
+CARD #: 24
+TITLE: Declaration of Independence
+YEARS: 1775-1776
+ORDER: PIFB
+ICON: none
+
+UNSHADED:
+"Patriots stay fractured: Remove two Continentals, two Militia and one Patriot Fort."
+
+SHADED:
+"Patriots come together: Place up to three Militia anywhere, one Propaganda with each. Place one Fort anywhere."
+
+
+CARD #: 25
+TITLE: British Prison Ships
+YEARS: 1779-1780
+ORDER: BPFI
+ICON: none
+
+UNSHADED:
+"British efficiently deal with prisoners: Shift two Cities one level each toward Passive Support."
+
+SHADED:
+"British reputation damaged: In two Cities place one Militia and shift each one level toward Passive Opposition. Place one Propaganda in each."
+
+
+CARD #: 26
+TITLE: Josiah Martin, NC Royal Governor, Plots
+YEARS: 1777-1778
+ORDER: BPFI
+ICON: I – Sword
+
+UNSHADED:
+"North Carolina Tories rise up: Place one British Fort or two Tories in North Carolina."
+
+SHADED:
+"North Carolina Tories targeted: Patriots may free March to then free Battle in North Carolina."
+
+
+CARD #: 27
+TITLE: The Queen’s Rangers Show for Battle
+YEARS: 1777-1778
+ORDER: BPFI
+ICON: I – Sword
+
+UNSHADED:
+"Reporting for duty: Place two Tories from Unavailable or Available in each of two Colonies with British Control."
+
+SHADED:
+"Patriots rally against the Queen’s Rangers: Shift two Cities one level each toward Active Opposition and place one Militia in each."
+
+CARD #: 28
+TITLE: Battle of Moore’s Creek Bridge
+YEARS: 1775-1776
+ORDER: BPFI
+ICON: none
+
+UNSHADED:
+"Tories win: In any one space, replace every one Militia with two Tories."
+
+SHADED:
+"Patriots win: In any one space, replace every one Tory with two Militia."
+
+
+CARD #: 29
+TITLE: Edward Bancroft, British Spy
+YEARS: 1775-1776
+ORDER: BPIF
+ICON: B – Musket, P – Musket, I – Musket, F – Sword
+
+UNSHADED:
+"Critical plans leaked: Patriots or Indians must Activate their Militia or War Parties until ½ of them are Active, rounding down."
+
+SHADED:
+(none)
+
+
+CARD #: 30
+TITLE: Hessians
+YEARS: 1775-1776
+ORDER: BPIF
+ICON: B – Musket
+
+UNSHADED:
+"Hessians are a force multiplier: In each of up to three British Controlled spaces with British Regulars, place up to two British Regulars from Available or Unavailable. British Resources +2."
+
+SHADED:
+"Hessians settle in Colonies: British remove one in five British Regulars from the map, rounding down."
+
+CARD #: 31
+TITLE: Thomas Brown and the King’s Rangers
+YEARS: 1779-1780
+ORDER: BPIF
+ICON: none
+
+UNSHADED:
+"Tom Brown supports Tories in the South: Place one British Fort and two Tories in South Carolina or Georgia."
+
+SHADED:
+"Sons of Liberty rally against: Patriots place two Militia in South Carolina or Georgia and may Partisans there."
+
+
+CARD #: 32
+TITLE: Rule Britannia!
+YEARS: 1775-1776
+ORDER: BPIF
+ICON: I – Musket
+
+UNSHADED:
+"“Rule, Britannia! rule the waves”: Place up to two British Regulars and two Tories from Unavailable or Available to any Colony."
+
+SHADED:
+"“Thy cities shall with commerce shine”: Any Faction may add one Resource for half the Cities under British Control, rounding down."
+
+
+CARD #: 33
+TITLE: The Burning of Falmouth
+YEARS: 1775-1776
+ORDER: BFIP
+ICON: none
+
+UNSHADED:
+"Intimidated Patriots: Patriot Resources –3. Patriots remove two Militia."
+
+SHADED:
+"Patriots outraged over aggressive actions: Free Rally in two spaces adjacent to Massachusetts. Patriot Resources +3."
+
+
+CARD #: 34
+TITLE: Lord Sandwich, First Lord of the Admiralty
+YEARS: 1777-1778
+ORDER: BFIP
+ICON: none
+
+UNSHADED:
+"Captain James Cook sponsored by Sandwich provides know-how: British Resources +6. Lower FNI one level."
+
+SHADED:
+"British lack ships to execute in America: Raise FNI one level. British Ineligible through next card."
+
+
+CARD #: 35
+TITLE: Tryon Plot
+YEARS: 1775-1776
+ORDER: BFIP
+ICON: none
+
+UNSHADED:
+"Governor Tryon’s work results in destruction of critical magazines: Remove two Patriot pieces in New York or New York City. All Militia there are Activated."
+
+SHADED:
+"Plot foiled: Remove all Tories in New York or in one adjacent space."
+
+
+CARD #: 36
+TITLE: Naval Battle in West Indies
+YEARS: 1779-1780
+ORDER: BFIP
+ICON: none
+
+UNSHADED:
+"British Victory at Battle of the Saintes: French remove three French Regulars on map or West Indies to Available. Lower FNI one level."
+
+SHADED:
+"French hold their own in the Battle de la Dominique: British remove four British Regulars from West Indies to Available."
+
+
+CARD #: 37
+TITLE: The Armada of 1779
+YEARS: 1779-1780
+ORDER: BFPI
+ICON: none
+
+UNSHADED:
+"French finances impact Patriots: Patriot Resources –2. French Resources –3. Lower FNI one level."
+
+SHADED:
+"British forces distracted from the Colonies: Remove four British Regulars from the map to Available. Raise FNI one level."
+
+
+CARD #: 38
+TITLE: Johnson’s Royal Greens
+YEARS: 1777-1778
+ORDER: BFPI
+ICON: I – Musket
+
+UNSHADED:
+"Ready for action: British may place four British cubes in either Quebec or New York from Unavailable or Available. British Eligible."
+
+SHADED:
+"Guerrillas rally to answer the Greens: Place three Militia or three War Parties in New York."
+
+
+CARD #: 39
+TITLE: “His Majesty, King Mob” Protests
+YEARS: 1779-1780
+ORDER: BFPI
+ICON: none
+
+UNSHADED:
+"Anti-Catholic protests in England damage reputation: Shift three Cities one level toward Neutral."
+
+SHADED:
+(none)
+
+
+CARD #: 40
+TITLE: Battle of the Chesapeake
+YEARS: 1779-1780
+ORDER: BFPI
+ICON: none
+
+UNSHADED:
+"British assert their naval dominance: FNI to 0. British Resources +2."
+
+SHADED:
+"British fleet distracted from Cities: FNI to 3."
+
+
+CARD #: 41
+TITLE: William Pitt: America Can’t Be Conquered
+YEARS: 1775-1776
+ORDER: BIPF
+ICON: none
+
+UNSHADED:
+"Colonists worry as Pitt’s warning is ignored: Shift two Colonies two levels each toward Passive Support."
+
+SHADED:
+"Patriots take heart: Shift two Colonies two levels each toward Passive Opposition."
+
+
+CARD #: 42
+TITLE: British Attack Danbury
+YEARS: 1777-1778
+ORDER: BIPF
+ICON: none
+
+UNSHADED:
+"British take out supply depot: Patriot Resources –3. British place one Tory in Connecticut."
+
+SHADED:
+"Battle of Ridgefield: Patriots place three Militia and one Continental in Connecticut."
+
+CARD #: 43
+TITLE: HMS Russian Merchant with 4,000 Muskets
+YEARS: 1775-1776
+ORDER: BIPF
+ICON: none
+
+UNSHADED:
+"HMS Russian Merchant arrives in Charles Town: In up to three spaces with a British Regular, the British may add up to two Tories per space from Available or Unavailable."
+
+SHADED:
+"Transport sinks before arrival: British remove one in three Tories, rounding down."
+
+
+CARD #: 44
+TITLE: Earl of Mansfield Recalled From Paris
+YEARS: 1777-1778
+ORDER: BIPF
+ICON: B – Musket, I – Musket, P – Musket, F – Sword
+
+UNSHADED:
+"Chaos amongst the diplomats: Any one Faction Ineligible through the next card."
+
+SHADED:
+(none)
+
+
+CARD #: 45
+TITLE: Adam Smith ~ Wealth of Nations
+YEARS: 1779-1780
+ORDER: BIFP
+ICON: none
+
+UNSHADED:
+"British intellectuals advance economy: British Resources +6."
+
+SHADED:
+"Adam Smith’s economic case against Imperialism: British Resources –4."
+
+
+CARD #: 46
+TITLE: Edmund Burke on Conciliation
+YEARS: 1775-1776
+ORDER: BIFP
+ICON: none
+
+UNSHADED:
+"“Americans were descended largely from Englishmen”: Place one Tory from Unavailable or Available in each of three spaces."
+
+SHADED:
+“…they bear the burthens of unlimited monopoly”: Shift two Cities one level each toward Passive Opposition.”
+
+
+CARD #: 47
+TITLE: Tories Tested
+YEARS: 1777-1778
+ORDER: BIFP
+ICON: none
+
+UNSHADED:
+"Tories thrive: Place three Tories in one Colony with British Control."
+
+SHADED:
+"Tories flee: Replace Tories in one Colony with Militia. Place two Propaganda there."
+
+CARD #: 48
+TITLE: God Save the King
+YEARS: 1779-1780
+ORDER: BIFP
+ICON: I – Sword, F – Sword, P – Sword
+
+UNSHADED:
+"“Scatter his enemies”: British free March to one space and may free Battle there."
+
+SHADED:
+"“But be God’s mercies known”: A non-British Faction moves units from three spaces containing British Regulars into any adjacent spaces."
+
+
+CARD #: 49
+TITLE: Claude Louis, Comte de Saint-Germain
+YEARS: 1775-1776
+ORDER: FPBI
+ICON: none
+
+UNSHADED:
+"Reforms opposed: Move 5 French Regulars from Available to Unavailable."
+
+SHADED:
+"Reorganizes Army: Move 5 French Regulars from Unavailable to Available."
+
+
+CARD #: 50
+TITLE: Admiral d’Estaing, French Fleet Arrives
+YEARS: 1777-1778
+ORDER: FPBI
+ICON: none
+
+UNSHADED:
+"French poorly coordinate: French are Ineligible and remain Ineligible through next card. Remove two French Regulars from West Indies or map to Available."
+
+SHADED:
+"Well-coordinated French: Place two Continentals and two French Regulars (from Available or West Indies) in any one Colony."
+
+
+CARD #: 51
+TITLE: Bermuda Gunpowder Plot
+YEARS: 1775-1776
+ORDER: FPBI
+ICON: F – Sword, P – Musket, B – Musket, I – Sword
+
+UNSHADED:
+"Gunpowder shortage: British free March to then free Battle in one space. –2 to Attacker’s Loss Level."
+
+SHADED:
+"Gunpowder aplenty: Patriots free March to then free Battle in one space. +2 to Defender’s Loss Level."
+
+CARD #: 52
+TITLE: French Fleet Arrives in the Wrong Spot
+YEARS: 1779-1780
+ORDER: FPBI
+ICON: F – Musket, P – Musket, B – Musket, I – Sword
+
+UNSHADED:
+"Coordination with the French is a challenge: Remove up to four French Regulars from the map to Available. Free Battle anywhere with +2 Force Level."
+
+SHADED:
+(none)
+
+
+CARD #: 53
+TITLE: French Ports Accept Patriot’s Ships
+YEARS: 1775-1776
+ORDER: FPIB
+ICON: none
+
+UNSHADED:
+"Backlash against French: British Resources +3. Lower FNI two levels."
+
+SHADED:
+"Extended range of privateers impacts shipping: British Resources –2. Patriot Resources +2. Raise FNI one level."
+
+
+CARD #: 54
+TITLE: Antoine de Sartine, Secretary of the Navy
+YEARS: 1775-1776
+ORDER: FPIB
+ICON: none
+
+UNSHADED:
+"Fuels establishment push back: Move one Squadron/Blockade from West Indies to Unavailable."
+
+SHADED:
+"Rationalizes the French Navy: Move two Squadrons/Blockades from Unavailable to West Indies."
+
+
+CARD #: 55
+TITLE: French Navy Dominates Caribbean
+YEARS: 1777-1778
+ORDER: FPIB
+ICON: none
+
+UNSHADED:
+"French reinforce their success: Move three French Regulars from map to West Indies. French may free Battle in West Indies. Lower FNI one level."
+
+SHADED:
+"British fight back: Move any four British Regulars from map to West Indies. British must free Battle there."
+
+
+CARD #: 56
+TITLE: Jacques Turgot’s Economic Liberalism
+YEARS: 1775-1776
+ORDER: FPIB
+ICON: none
+
+UNSHADED:
+"As minister of the Navy, opposed support for Patriots: Patriot Resources –3."
+
+SHADED:
+"Believes in the virtue of the American cause: Patriot Resources +3."
+
+
+CARD #: 57
+TITLE: French Fleet Sails for the Caribbean
+YEARS: 1779-1780
+ORDER: FBIP
+ICON: none
+
+UNSHADED:
+"French focus away from the Colonies: Move two French Regulars from Available to the West Indies. French Ineligible through the next card. Lower FNI one level."
+
+SHADED:
+"French battle in Grenada: Move two British Regulars from map to West Indies. British Ineligible through the next card."
+
+
+CARD #: 58
+TITLE: Marquis de Lafayette Arrives in Colonies
+YEARS: 1777-1778
+ORDER: FBIP
+ICON: none
+
+UNSHADED:
+"Lafayette’s arrival upsets King Louis XVI: Patriot Resources –4."
+
+SHADED:
+"Lafayette leads Patriots North: In New York, Quebec and Northwest replace Tories with Patriot Militia."
+
+
+CARD #: 59
+TITLE: Tronson de Coudray Arrives in America
+YEARS: 1777-1778
+ORDER: FBIP
+ICON: none
+
+UNSHADED:
+"Arrogance damages coordination: Remove two Continentals and two French Regulars from one space to Available."
+
+SHADED:
+"Drowns in the Schuylkill River: Patriot Resources +3."
+
+
+CARD #: 60
+TITLE: Comte d’Orvilliers Builds a Fleet at Brest
+YEARS: 1777-1778
+ORDER: FBIP
+ICON: none
+
+UNSHADED:
+"British are prepared: Lower FNI two levels. French Resources –4."
+
+SHADED:
+"Challenges British naval dominance: Raise FNI one level. British Resources –3."
+
+CARD #: 61
+TITLE: Minister Comte de Vergennes
+YEARS: 1777-1778
+ORDER: FBPI
+ICON: none
+
+UNSHADED:
+"Patriots distracted by French priorities: Patriots Ineligible through the next card."
+
+SHADED:
+"Minister favors the Colonies: Patriot Resources +3. French Resources +2."
+
+
+CARD #: 62
+TITLE: Charles Michel de Langlade
+YEARS: 1779-1780
+ORDER: FBPI
+ICON: F – Musket, B – Musket
+
+UNSHADED:
+"Assists the British: Place three War Parties or three Tories in New York, Quebec or Northwest."
+
+SHADED:
+"Patriots and French rally to fight: Place three French Regulars in Quebec or three Militia in Northwest."
+
+
+CARD #: 63
+TITLE: French and Spanish Besiege Gibraltar
+YEARS: 1777-1778
+ORDER: FBPI
+ICON: none
+
+UNSHADED:
+"British weather the storm: British Resources +1. Lower FNI one level. Remove two British Regulars from West Indies to Available."
+
+SHADED:
+"British struggle to defend: British Resources –5."
+
+
+CARD #: 64
+TITLE: The Affair of Fielding and Bylandt
+YEARS: 1779-1780
+ORDER: FBPI
+ICON: none
+
+UNSHADED:
+"British seize Dutch contraband: British Resources +3. Lower FNI one level."
+
+SHADED:
+"Dutch avoid seizure and provide resources to Patriots: Patriot Resources +5."
+
+
+CARD #: 65
+TITLE: Jacques Necker, Finance Minister
+YEARS: 1779-1780
+ORDER: FIBP
+ICON: none
+
+UNSHADED:
+"War is expensive for French: French Resources –4."
+
+SHADED:
+"War is pricey but resources allocated to America: French Resources +3."
+
+
+CARD #: 66
+TITLE: Don Bernardo Takes Pensacola
+YEARS: 1779-1780
+ORDER: FIBP
+ICON: B – Sword
+
+UNSHADED:
+"British reinforce the lower Mississippi River Valley: Place six British cubes in either Florida or Southwest."
+
+SHADED:
+"Led Spanish forces against the British: French or Patriots free March to and free Battle in Florida with a +2 Force Level."
+
+
+CARD #: 67
+TITLE: De Grasse Arrives with the French Fleet
+YEARS: 1779-1780
+ORDER: FIBP
+ICON: none
+
+UNSHADED:
+"Balances effort in West Indies: Lower FNI one level. Remove three French Regulars from West Indies to Available."
+
+SHADED:
+"French coordination in North America: French or Patriots free Rally or Muster in one space and remain or become Eligible."
+
+
+CARD #: 68
+TITLE: French in America Want Canada
+YEARS: 1775-1776
+ORDER: FIBP
+ICON: F – Sword, I – Sword, B – Sword
+
+UNSHADED:
+"Invasion Canada: Relocate up to six of the executing Faction’s cubes on map to Quebec and place one friendly Fort there from Available."
+
+SHADED:
+(none)
+
+CARD #: 69
+TITLE: Admiral Pierre André de Suffren
+YEARS: 1777-1778
+ORDER: FIPB
+ICON: none
+
+UNSHADED:
+"Sent to India to assist: Lower FNI two levels. British Resources +2."
+
+SHADED:
+"Squadron isolation strategy has great success: Raise FNI one level. French Resources +3."
+
+
+CARD #: 70
+TITLE: British Gain From French in India
+YEARS: 1779-1780
+ORDER: FIPB
+ICON: P – Musket, B – Musket, F – Musket, I – Musket
+
+UNSHADED:
+"Conflict in India impacts the war: Remove three Regulars from map or West Indies to Available."
+
+SHADED:
+(none)
+
+CARD #: 71
+TITLE: Treaty of Amity and Commerce
+YEARS: 1777-1778
+ORDER: FIPB
+ICON: I – Sword, P – Musket, B – Sword
+
+UNSHADED:
+"Patriots receive financial benefit: Add population of Cities under Rebellion Control to Patriot Resources."
+
+SHADED:
+"French benefit economically from commercial treaty with the Colonies: French Resources +5."
+
+
+CARD #: 72
+TITLE: French Settlers Help
+YEARS: 1775-1776
+ORDER: FIPB
+ICON: I – Musket, B – Sword
+
+UNSHADED:
+"French settlers impact the war: Place one friendly Fort or Village and three friendly Militia, War Parties or cubes in any one Indian Reserve Province."
+
+SHADED:
+(none)
+
+
+CARD #: 73
+TITLE: Sullivan Expedition vs. Iroquois and Tories
+YEARS: 1779-1780
+ORDER: IPBF
+ICON: F – Musket
+
+UNSHADED:
+"Raids: Remove one Fort or Village in New York, Northwest or Quebec."
+
+SHADED:
+(none)
+
+
+CARD #: 74
+TITLE: Chickasaw Ally with the British
+YEARS: 1777-1778
+ORDER: IPBF
+ICON: F – Sword
+
+UNSHADED:
+"Benefit from the alliance: Indians or British add one Resource for every two Indian Villages on map."
+
+SHADED:
+"Battles in the back country: In each of two spaces, remove one War Party and two Militia or one Militia and two War Parties."
+
+
+CARD #: 75
+TITLE: Congress’ Speech to the Six Nations
+YEARS: 1775-1776
+ORDER: IPBF
+ICON: F – Sword
+
+UNSHADED:
+"Take up hatchets for King’s Troops: Indians free Gather in three Indian Reserve Provinces then free War Path in one of those spaces."
+
+SHADED:
+"Colonial backlash: Remove three Indian pieces from Northwest (Villages last)."
+
+
+CARD #: 76
+TITLE: Edward Hand Raids into Indian Country
+YEARS: 1777-1778
+ORDER: IPBF
+ICON: F – Sword
+
+UNSHADED:
+"Three key lieutenants defect: British replace three Militia with three Tories in one Province."
+
+SHADED:
+"“Squaw Campaign” Patriots intimidate Indians: British remove two Villages."
+
+
+CARD #: 77
+TITLE: General Burgoyne Cracks Down
+YEARS: 1777-1778
+ORDER: IPFB
+ICON: F – Sword
+
+UNSHADED:
+"Indians respond positively: Indians place one Village in one space with British and Indian pieces. All War Parties on the map to Underground."
+
+SHADED:
+"Indian backlash: Remove one British piece in three Provinces shared with Indians (Forts last). Place one Raid marker in each space."
+
+
+CARD #: 78
+TITLE: Cherry Valley Destroyed by Tories
+YEARS: 1777-1778
+ORDER: IPFB
+ICON: none
+
+UNSHADED:
+"Patriots intimidated: Patriots remove 1/4 of their total units on map, rounding down."
+
+SHADED:
+"Patriots rally against Tories and Indians: Add one Patriot Militia in four spaces with a Tory or Indian piece."
+
+
+CARD #: 79
+TITLE: Tuscarora and Oneida Come to Washington
+YEARS: 1779-1780
+ORDER: IPFB
+ICON: F – Sword, B – Sword
+
+UNSHADED:
+"Rally with the Patriots: Place one Village and two War Parties in one Colony."
+
+SHADED:
+"Other tribes rally against: Remove one Village and two War Parties in one Colony."
+
+CARD #: 80
+TITLE: Confusion Allows Slaves to Escape
+YEARS: 1777-1778
+ORDER: IPFB
+ICON: I – Musket, P – Musket, F – Sword, B – Musket
+
+UNSHADED:
+"Change in the midst of chaos: Select one Faction. That Faction must remove two of its own pieces in each of two spaces."
+
+SHADED:
+(none)
+
+
+CARD #: 81
+TITLE: Creek and Seminole Active in South
+YEARS: 1779-1780
+ORDER: IBPF
+ICON: none
+
+UNSHADED:
+"Increased Indian activity: Place two War Parties, one Raid marker, and one Village in South Carolina or Georgia."
+
+SHADED:
+"Indians challenged: Remove two War Parties total in South Carolina and/or Georgia."
+
+
+CARD #: 82
+TITLE: Frustrated Shawnee Warriors Attack
+YEARS: 1775-1776
+ORDER: IBPF
+ICON: none
+
+UNSHADED:
+"Raiding parties in the South: Indians place a War Party and Raid marker in VA, GA, NC and SC."
+
+SHADED:
+"Colonies backlash: Remove three Indian pieces total from VA, GA, NC and/or SC (Villages last)."
+
+
+CARD #: 83
+TITLE: Guy Carleton and Indians Negotiate
+YEARS: 1775-1776
+ORDER: IBPF
+ICON: I – Musket, P – Musket, F – Musket
+
+UNSHADED:
+"Quebec alignment: Shift Quebec City to Active Support. Place two War Parties in Quebec."
+
+SHADED:
+"Quebec chaos: Place up to three pieces (no more than one Fort or Village) in either Quebec or Quebec City."
+
+
+CARD #: 84
+TITLE: “Merciless Indian Savages”
+YEARS: 1775-1776
+ORDER: IBPF
+ICON: F – Sword
+
+UNSHADED:
+"Indians encroach on the Colonies: Indians free Gather in two Colonies."
+
+SHADED:
+"Indians are attacked after the Declaration of Independence: Patriots remove one Village."
+
+
+CARD #: 85
+TITLE: Indians Help British Raids on Mississippi
+YEARS: 1779-1780
+ORDER: IBFP
+ICON: B – Sword
+
+UNSHADED:
+"Increases force level: British place a total of three British Regulars and/or Tories in Southwest."
+
+SHADED:
+"Patriots rally against British and Indians: Place two Militia or Continentals and two French Regulars in Southwest."
+
+
+CARD #: 86
+TITLE: Stockbridge Indians
+YEARS: 1775-1776
+ORDER: IBFP
+ICON: P – Musket
+
+UNSHADED:
+"Fight the Colonists: Activate all Militia in Massachusetts or in any one space with an Indian piece."
+
+SHADED:
+"Join the Colonists: Add three Militia in Massachusetts or any one space with an Indian piece."
+
+
+CARD #: 87
+TITLE: Patriots Massacre Lenape Indians
+YEARS: 1779-1780
+ORDER: IBFP
+ICON: none
+
+UNSHADED:
+"Gnadenhütten Massacre: Remove one piece in Pennsylvania. Remain Eligible."
+
+SHADED:
+(none)
+
+
+CARD #: 88
+TITLE: “If it hadn’t been so foggy…”
+YEARS: 1777-1778
+ORDER: IBFP
+ICON: I – Musket, B – Musket, F – Musket, P – Musket
+
+UNSHADED:
+"Fog allows disengagement: Select one Faction. Move any own units sharing a space with that Faction to adjacent spaces."
+
+SHADED:
+(none)
+
+
+CARD #: 89
+TITLE: War Damages Colonies’ Economy
+YEARS: 1777-1778
+ORDER: IFBP
+ICON: I – Musket, F – Musket
+
+UNSHADED:
+"Patriots turn against the Continental Congress: Replace any four Militia or Continentals with Tories."
+
+SHADED:
+"Patriots hunker down and redouble efforts to support war: Replace any three Tories with Patriot Militia."
+
+CARD #: 90
+TITLE: “The World Turned Upside Down”
+YEARS: 1775-1776
+ORDER: IFBP
+ICON: I – Musket, P – Musket
+
+UNSHADED:
+"“Till then upon Ararat’s hill”: Place one friendly Fort or Village."
+
+SHADED:
+"British surrender anthem: Remove two British Regulars on map to Casualties."
+
+
+CARD #: 91
+TITLE: Indians Help British Outside Colonies
+YEARS: 1775-1776
+ORDER: IFBP
+ICON: F – Sword
+
+UNSHADED:
+"Indians assisted: Place one Village and two War Parties in one Indian Reserve Province."
+
+SHADED:
+"Indians need assistance: Remove one Village in one Indian Reserve Province."
+
+
+CARD #: 92
+TITLE: Cherokees Supplied by the British
+YEARS: 1775-1776
+ORDER: IFBP
+ICON: B – Sword
+
+UNSHADED:
+"Grow in strength: Place a second Fort or Village in a space where you have one."
+
+SHADED:
+(none)
+
+
+CARD #: 93
+TITLE: Wyoming Massacre
+YEARS: 1777-1778
+ORDER: IFPB
+ICON: none
+
+UNSHADED:
+"Indians intimidate on the frontier: Shift up to three Colonies adjacent to an Indian Reserve Province one level toward Neutral. Place one Raid marker in each."
+
+SHADED:
+(none)
+
+
+CARD #: 94
+TITLE: Herkimer’s Relief Column
+YEARS: 1779-1780
+ORDER: IFPB
+ICON: none
+
+UNSHADED:
+"Tories and Indians ambush: Indians free Gather and Tories free Muster in New York. Remove all Militia from New York."
+
+SHADED:
+"Patriot backlash: Remove four War Parties in or adjacent to Pennsylvania."
+
+
+CARD #: 95
+TITLE: Ohio Country Frontier Erupts
+YEARS: 1779-1780
+ORDER: IFPB
+ICON: F – Musket, B – Musket
+
+UNSHADED:
+"Attacks and backlash: In Northwest, remove any one enemy Fort or Village and place three friendly units."
+
+SHADED:
+(none)
+
+
+CARD #: 96
+TITLE: Iroquois Confederacy
+YEARS: 1779-1780
+ORDER: IFPB
+ICON: F – Sword, B – Sword
+
+UNSHADED:
+"Iroquois Confederacy reconstitutes: Indians free Gather and War Path in two Indian Reserve Provinces."
+
+SHADED:
+"Iroquois Confederacy shatters: Remove one Indian Village."
+
+CARD #: 97
+TITLE: Winter Quarters – Royals Commit
+WINTER_QUARTERS: yes
+
+EFFECT:
+"Royals commit: If CRC > CBC, French Resources +5, else British Resources +5 during Reset Phase."
+
+
+CARD #: 98
+TITLE: Winter Quarters – Overconfident at Home
+WINTER_QUARTERS: yes
+
+EFFECT:
+"Overconfident at home: If CRC > CBC, British Resources –3, else French Resources –3 during Reset Phase."
+
+
+CARD #: 99
+TITLE: Winter Quarters – West Indies Conflict Goes the Other Way
+WINTER_QUARTERS: yes
+
+EFFECT:
+"West Indies conflict goes the other way: Reduce the larger of CRC or CBC by half the difference (rounding down) during Reset Phase."
+
+
+CARD #: 100
+TITLE: Winter Quarters – India Conflict Goes the Other Way
+WINTER_QUARTERS: yes
+
+EFFECT:
+"India conflict goes the other way: Reduce the larger of CRC or CBC by half the difference (rounding down) during Reset Phase."
+
+
+CARD #: 101
+TITLE: Winter Quarters – Floods Shift the Balance
+WINTER_QUARTERS: yes
+
+EFFECT:
+"Floods shift the balance: If Patriots or Indians are ahead in their second victory condition (§7.2), that Faction loses two Resources during Reset Phase."
+
+
+CARD #: 102
+TITLE: Winter Quarters – War on the Frontier
+WINTER_QUARTERS: yes
+
+EFFECT:
+"War on the frontier: If Patriots or Indians are ahead in their second victory condition (§7.2), that Faction removes one of its Forts or Villages during Reset Phase."
+
+
+CARD #: 103
+TITLE: Winter Quarters – Severe Winter
+WINTER_QUARTERS: yes
+
+EFFECT:
+"Severe Winter: If Patriots or Indians are ahead in their second victory condition (§7.2), that Faction removes one of its Forts or Villages during Reset Phase."
+
+
+CARD #: 104
+TITLE: Winter Quarters – Hurricane Hits the South
+WINTER_QUARTERS: yes
+
+EFFECT:
+"Hurricane hits the South: If Patriots or Indians are ahead in their second victory condition (§7.2), that Faction loses two Resources during Reset Phase."
+
+CARD #: 105
+TITLE: Brilliant Stroke! (Patriots)
+TYPE: BRILLIANT_STROKE
+
+EFFECT:
+"Execute two free Limited Commands and one Special Activity in any order. Leader must be involved in at least one of the Limited Commands.  
+All Factions to Eligible."
+
+
+CARD #: 106
+TITLE: Brilliant Stroke! (British)
+TYPE: BRILLIANT_STROKE
+
+EFFECT:
+"Execute two free Limited Commands and one Special Activity in any order. Leader must be involved in at least one of the Limited Commands. Note: Reward Loyalty is **not** free.  
+British may Trump Patriot “Brilliant Stroke!”  
+All Factions to Eligible."
+
+
+CARD #: 107
+TITLE: Brilliant Stroke! (French)
+TYPE: BRILLIANT_STROKE
+
+EFFECT:
+"Execute two free Limited Commands and one Special Activity in any order. Leader must be involved in at least one of the Limited Commands.  
+French may Trump Patriot or British “Brilliant Stroke!”  
+All Factions to Eligible."
+
+
+CARD #: 108
+TITLE: Brilliant Stroke! (Indians)
+TYPE: BRILLIANT_STROKE
+
+EFFECT:
+"Execute two free Limited Commands and one Special Activity in any order. Leader must be involved in at least one of the Limited Commands.  
+Indians may Trump Patriot, British or French “Brilliant Stroke!”  
+All Factions to Eligible."
+
+
+CARD #: 109
+TITLE: Brilliant Stroke! – Treaty of Alliance
+TYPE: BRILLIANT_STROKE  # **special**
+
+EFFECT:
+"If French Preparation (French pieces Available + Blockades Available + CBC) > 15, French may choose to enter the war:  
+• French free Muster and place Rochambeau there.  
+• Raise FNI one level.  
+• Place three French and three British Regulars (Unavailable first, then Available) in West Indies.  
+• May Trump any “Brilliant Stroke!”  
+• All Factions to Eligible.
+
+NOTE:
+When executed, this card should set `state["toa_played"] = True` so that later VP checks allow French and Patriots to win (helper already respects this flag)."
