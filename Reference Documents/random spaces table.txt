@@ -1,0 +1,37 @@
+random_spaces:
+  x_axis:  # Red die (1d3)
+    1: "Left Column"
+    2: "Center Column"
+    3: "Right Column"
+  y_axis:  # Black die (1d6)
+    1: "Top Row"
+    2: "Second Row"
+    3: "Third Row"
+    4: "Fourth Row"
+    5: "Fifth Row"
+    6: "Bottom Row"
+  spaces:
+    1:
+      1: "Quebec City"
+      2: "Northwest / Maryland-Delaware"
+      3: "North Carolina"
+    2:
+      1: "Quebec / New York"
+      2: "Philadelphia"
+      3: "Savannah"
+    3:
+      1: "New Hampshire"
+      2: "Pennsylvania"
+      3: "Florida / South Carolina"
+    4:
+      1: "Connecticut / Rhode Island"
+      2: "Norfolk"
+      3: "Georgia"
+    5:
+      1: "New York City"
+      2: "Southwest / Virginia"
+      3: "Boston"
+    6:
+      1: "New Jersey"
+      2: "Charles Town"
+      3: "Massachusetts"
