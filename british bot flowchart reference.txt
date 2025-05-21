@@ -58,6 +58,7 @@ nodes:
   B8:
     type: process
     title: "Muster"
+    limitation:  Max 4
     text: |
       • Place Regulars, first in Neutral or Passive, within that first to add British Control then where Tories are the only British units then random; within each firs tin highest Pop.
       • Then place TOries, first where Regulars are the only British cubes (within that first where Regulars were just placed), then to change most Control, then in Colonies with < 5 British cubes and no British Fort.
@@ -79,6 +80,7 @@ nodes:
   B10:
     type: process
     title: "March"
+    limitation:  Max 4
     text: |
       • Lose no British Control.  Leave last Tory and War Party in each space, and last Regular if British Control but no Active Support.  Within that:
       • Moving the largest groups first, add British Control to up to 2 Cities then Colonies, within each first where Rebel cubes then highest Pop. Use Common Cause to increase group size if destination is adjacent Province.
@@ -89,6 +91,7 @@ nodes:
     edges:
       With:  B13
       "If None": B8
+
 
   B12:
     type: process
