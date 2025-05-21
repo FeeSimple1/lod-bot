@@ -1,0 +1,162 @@
+4.1 Special Activities in General
+When a Faction per the Event card sequence of play (2.3) ex-
+ecutes a Command in at least one space (3.0), it may also execute
+one of its Special Activities (Exception: Limited Commands,
+2.3.5). Some Events grant free Special Activities (3.1.2). There is
+no added Resource cost for the Special Activity. As with Com-
+mands, the executing Faction selects spaces, Factions, or pieces
+affected and the order of actions. Select a given space only once
+as a location for a given Special Activity. Events may grant free
+Special Activities (not further affecting Eligibility, 3.1.2, 5.3).
+Important: A Faction may execute its Special Activity at any
+one time immediately before, during, or immediately after the
+execution of its Command.
+EXAMPLE: Indians with 0 Resources uses Plunder or Trade to
+pay for the necessary accompanying Commands thereafter (4.1.1).
+Play Note: If the 1st Eligible Faction uses a Special Activity,
+the 2nd Eligible will have the option of executing the card’s
+Event (2.3.4).
+4.1.1. Accompanying Commands. Some Special Activities
+specify that they may only accompany certain types of Com-
+mands (3.0). Certain Special Activities either must occur or
+may not occur where their Accompanying Commands occurred.
+If not otherwise specified, Special Activities may accompany
+any Commands and take place in any otherwise valid spaces.
+4.2 British Special Activities
+The British may choose from Common Cause, Skirmish or
+Naval Pressure Special Activities.
+4.2.1 Common Cause. Common Cause allows the British to
+utilize War Parties as if they were Tories. It may take place in
+any spaces with British pieces and War Parties. It may accom-
+pany March or Battle.
+PROCEDURE: In a Command space, the British may
+utilize one or more War Parties as if they were Tories. War
+Parties may never move into or between Cities. Activate War
+Parties utilized.
+4.2.2 Skirmish. Skirmish uses British Regulars to make a lim-
+ited strike on Rebellion pieces. It may accompany any Com-
+mand but not in a Battle, Garrison destination or Muster space.
+PROCEDURE: In any one space or West Indies with both
+British Regulars and Rebellion pieces and no Battle, Gar-
+rison destination, or Muster in the space (cubes and Forts
+are removed to Casualties):
+• Remove one Rebellion cube/Active Militia, or
+• 2 Rebellion cubes/Active Militia and one British Regular,
+or
+• If no Rebellion cubes or Active Militia, remove one Patriot
+Fort and one British Regular.
+4.2.3 Naval Pressure. Naval Pressure produces
+Resources or decreases the level of French Naval
+Intervention (FNI). It may accompany any Com-
+mand.
+PROCEDURE: Before TOA, add 1D3 to British Resources.
+After TOA, if FNI is 0, then add 1D3 to British Resources.
+If FNI > 0, lower FNI one level. British removes any one
+Blockade to the West Indies.
+4.3 Patriot Special Activities
+Patriots may choose from Persuasion, Partisans or Skirmish
+Special Activities.
+4.3.1 Persuasion. Persuasion enables Patriots to
+gain Resources from Colonies/Cities that are Re-
+bellion Controlled. Patriots may Persuade in up to
+three Colonies/Cities with Rebellion Control (1.7)
+and Underground Militia. It may accompany any Command.
+PROCEDURE: For each selected Colony/City, Activate
+one Underground Militia there (1.4.3) and add one Patriot
+Resource (1.8). Place one Propaganda marker in each unless
+none available (there are 12).
+4.3.2 Partisans. Partisans is a limited strike on Royalist pieces
+in one space. The space must include Royalist pieces and at
+least one Underground Militia (1.4.3). It may accompany any
+Command but not in a Battle space.
+PROCEDURE: In one space with Underground Militia and
+Royalist pieces and no Battle (cubes are removed to Casualties):
+• Activate one Underground Militia and remove any one
+Royalist unit, or
+• Activate two Underground Militia, remove one of the two
+Militia and remove any two Royalist units, or
+• If no War Parties there, Activate two Underground Militia
+and remove one of the two Militia and remove one Village.
+4.3.3 Skirmish. Skirmish uses Continentals to make a limited
+strike on British pieces in one space. The space must include
+British pieces and Continentals. It may accompany any Com-
+mand but no Battle in the space.
+PROCEDURE: In any one space with both Continentals
+and British pieces and no Battle (cubes and Forts are removed
+to Casualties):
+• Remove one British cube, or
+• Remove two British cube and one Continental, or
+• If no British cubes, remove one British Fort and one
+Continental.
+4.4 Indian Special Activities
+The Indians may choose from Trade, War Path, or Plunder
+Special Activities.
+4.4.1 Trade. Trade exposes War Parties for mercantile activity to
+generate Resources. Trade may occur in any one Province with
+an Underground War Party and a Village. It may accompany
+any Command.
+PROCEDURE: The British chooses an amount (or none) of
+Resources to transfer to the Indians. If greater than 0, then
+transfer that amount from the British to the Indians and
+Activate one Underground War Party in selected Province.
+if 0, then Activate one Underground War Party in the
+selected Province and add one Resource.
+4.4.2 War Path. War Path is a limited strike on Rebellion pieces
+in one space. The space must include Rebellion pieces and at
+least one Underground War Party (1.4.3). It may accompany
+any Command.
+PROCEDURE: In any one space with Underground War
+Parties and Rebellion pieces (cubes and Forts are removed
+to Casualties):
+• Activate one Underground War Party and remove one
+Rebellion unit, or
+• Activate two Underground War Parties, remove one of the
+two War Parties and remove two Rebellion units, or
+• If no Rebellion units, remove one Patriot Fort, Activate
+two Underground War Parties and remove one of the two
+War Parties.
+4.4.3 Plunder. Plunder takes Resources from the Patriots.
+Plunder may only occur where War Parties exceed Rebellion
+pieces. It may only accompany a Raid Command.
+PROCEDURE: In one Province where there is a Raid
+Command and War Parties exceed Rebellion pieces, remove
+Resources equal to that Province’s population from the Pa-
+triots. Add that number of Resources to the Indians. Indians
+remove one War Party from that Province.
+4.5 French Special Activities
+French may choose only Préparer la Guerre before Treaty of
+Alliance. After Treaty of Alliance the French may choose
+from Préparer la Guerre, Skirmish, or Naval Pressure Special
+Activities.
+4.5.1 Préparer la Guerre. Préparer la Guerre allows the French
+to make preparations for war and make French Regulars and
+Squadrons/Blockades Available. It may accompany any Com-
+mand.
+PROCEDURE: Move either one Squadron/Blockade marker
+to West Indies or three Regulars from the Unavailable Forces
+box (1.3.9) to the Available Forces box. The French may
+alternatively add two Resources to French Resources.
+4.5.2 Skirmish. After Treaty of Alliance, Skirmish uses
+French Regulars to make a limited strike on British pieces. It
+may accompany any Command but French Agent Mobilization,
+and not in a Battle or Muster space.
+PROCEDURE: In one space or the West Indies with both
+French Regulars and British pieces and no Battle or Muster
+(cubes and Forts are removed to Casualties):
+• Remove one British cube, or
+• Remove two British cubes and one French Regular, or
+• If no British cubes, remove one British Fort and one French
+Regular.
+4.5.3 Naval Pressure. After Treaty of Alliance,
+Naval Pressure increases the level of French Naval
+Intervention (FNI). It may accompany any Com-
+mand but French Agent Mobilization.
+PROCEDURE: Raise FNI one level. FNI may not be higher
+than the number of Squadron/Blockade available to place on
+Cities. The French either:
+• Remove a Squadron marker from the West Indies and place
+it on any City on its Blockade side, or
+• If no Squadron/Blockade markers are in the West Indies,
+rearrange Blockade markers already on Cities to any Cities.
+Note: There is no limit to the number of Blockades that may
+be placed on one City.

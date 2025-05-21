@@ -1,0 +1,314 @@
+1.1 General Course Of Play
+In Liberty or Death, cards are played from the deck one at a
+time with the current card in play as well as one card ahead
+revealed to all players. Each Event card shows the order in which
+the Factions become Eligible to choose either from a menu
+of Commands and Special Activities or the card’s particular
+Event. Executing an Event or Command renders that Faction
+Ineligible to do so on the next card. Winter Quarters cards
+mixed in with the Event cards provide periodic opportunities
+for instant victory and activities such as collecting Resources.
+
+1.3 The Map
+The map shows the British Colonies of North America and
+neighboring Provinces divided into various types of spaces.
+
+Liberty or Death ~ Rules of Play3© 2015, 2016 GMT Games, LLC
+1.3 The Map
+The map shows the British Colonies of North America and
+neighboring Provinces divided into various types of spaces.
+1.3.1 Map Spaces. Map spaces include rural Provinces (Colo-
+nies and Indian Reserve) and urban Cities. All spaces can hold
+forces.
+1.3.2 Provinces. Each Province shows a Population value (Pop)
+of 0 to 2 (each Population value representing roughly 50,000
+Colonists). Population value affects victory by counting toward
+a Faction’s Support for or Opposition to the British (1.6).
+Population value also affects some Commands (3.0).
+1.3.3 Cities. Similarly, each City shows a Population value
+of 1 to 2 (each Population value representing roughly 50,000
+Colonists with adjustments made for economic value).
+Note: The Cities of New York and Philadelphia are displaced
+to the east to improve playability on the map. Their actual
+location is marked by a smaller circle connected by a white
+shaded area.
+Naming Convention Note: When referring to Quebec City
+and New York City, the word City always designates those
+Cities. Otherwise “Quebec” and “New York” always refers to
+the Province.
+1.3.4 Indian Reserve Provinces. The map includes parts of the
+Indian Reserve Provinces of Quebec, Northwest, Southwest
+and Florida. These are considered Provinces but not Colonies.
+They have 0 population.
+1.3.5 Colonies. Colonies are Provinces that represent the thir-
+teen British Colonies. Delaware and Maryland are combined
+into one Colony space, as are Connecticut and Rhode Island;
+as a result there are only eleven Colony spaces.
+1.3.6 Adjacency. Adjacency affects the movement of forces and
+implementation of certain Events. Any two spaces that border
+on (touch) one another are adjacent.
+1.3.7 West Indies. West Indies (WI) is a holding box that is
+not in play until after Treaty of Alliance (TOA) is played.
+It has 0 population.
+Note: The West Indies have a number of characteristics de-
+tailed in later sections regarding stacking (1.4.2), Squadron/
+Blockade markers (1.9), Winter Quarters (6.2.2, 6.3.1), and
+Battle (3.6).
+1.3.9 Unavailable. Use the Unavailable French Forces box to
+hold certain French Regulars and Squadrons/Blockades prior to
+the French moving them to the Available French Forces box (or
+the West Indies box in the case of the Squadrons/Blockades).
+Use the Unavailable British Forces box to hold certain British
+Regulars and Tories prior to their Release Date as designated
+by the Scenario Set-up (2.1).
+1.4 Pieces
+The wooden pieces represent the Factions’ various forces: British
+Regulars (red cubes) and Tories (green cubes), Patriot Militia
+(blue hexagonal cylinders), Patriot Continentals (blue cubes),
+French Regulars (white cubes), Indian War Parties (tan hex-
+agonal cylinders), Indian Villages (tan discs), and all British and
+Patriot Forts (five-pointed stars). Leaders are represented by
+either round markers or stand-up markers (players may choose
+to use one type or the other).
+1.4.1 Availability and Removal. The Available Forces Table on
+page 35 lists the number of pieces in the game and Leaders for
+each Faction. Scenario set up (2.1) specifies units as Available
+and Unavailable. Keep forces Available for placement in the
+Available Forces box. Place Indian Villages, Patriot Forts and
+British Forts in the highest-numbered empty spaces on the
+Available Indian Villages, Available Patriot Forts or Available
+British Forts tracks to show the number of on-map Forts and
+Villages. This also helps track victory (7.0) and calculate Re-
+sources added (6.3). Some French and British forces may be
+Unavailable and will remain in the Unavailable Forces box until
+moved to the Available Forces box by Special Activity, Event, or
+during the Winter Quarters Redeployment Phase (6.5.3). Brit-
+ish and French may have forces in the West Indies box—neither
+Available, Unavailable nor on the map—and British, Patriots
+and French forces can become Casualties (1.6.4). Otherwise,
+forces removed from the map go to Available.
+Unless otherwise instructed (by Event, 5.1), forces may only
+be placed from or replaced with those in the Available boxes.
+A piece to be replaced by a piece that is unavailable is simply
+removed.
+Important: Factions, while executing a Command, Special
+Activity, or Event to place their own forces, may take them
+from elsewhere on the map into Available if and only if the
+desired force type is not Available.
+EXAMPLE: Indians without Available War Parties could
+remove War Parties during a Gather (3.4.1) in order to place
+them Underground.
+EXCEPTION: The British and French may not do so with
+Regulars but may with Tories and Forts.
+1.4.2 Stacking. No more than two Forts/Villages (of any Fac-
+tions) may occupy a single City, Province or the West Indies.
+Placing pieces (such as Forts or Villages via Muster (3.2.1,
+3.5.3), Rally (3.3.1), Gather (3.4.1) or Event (5.1)) or moving
+pieces may never violate stacking. The only pieces that may oc-
+cupy the West Indies (1.3.7) are British and French Regulars,
+British Forts and French Squadrons. Indian pieces may never
+occupy a City space.
+1.4.3 Underground/Active. Militia or War Parties are either
+Underground-symbol end down-or Active-symbol end up.
+Certain actions and Events flip them from one state to the other.
+Villages, Forts and Cubes are always Active. Always set up and
+place new Militia and War Parties Underground (including if
+replacing a piece).
+Note: Unless instructions specify “Underground” Militia or
+War Parties, it is sufficient to “Activate” already Active Militia
+or War Parties (they stay Active). Also, “moving” or “relocat-
+ing” Militia or War Parties does not affect Underground
+status unless specified.
+1.5 Players & Factions
+The game may have up to four players, each as one or more
+Factions: the British (red and green), the Patriots (blue), the
+Indians (tan), and the French (white). In a one-player game,
+the player may play the British and Indians together, or the
+Patriots and French, or any one Faction (8.8). Leftover Factions
+are controlled either by rules section 8 as “Non-Players” or, if
+preferred with two or three players, as below.
+No Non-Player Option. With two or three players, the play-
+ers (rather than the Non-Player rules, 8.0) may control any
+leftover Factions:
+• With two players, one player controls British and Indians
+(Royalists), the other Patriots and French (Rebellion).
+• With three players, a single player controls British and Indians
+(Royalists) or, if preferred, Patriots and French (Rebellion).
+1.5.1 Side: The Royalist, the British and Indians, are one side.
+The Rebellion, Patriots and French, are the other side.
+Note: Although the Factions on the same side share strategic
+and tactical affinities, they do not share victory conditions
+(7.0). When one Faction wins, the other Faction on the same
+side does not win.
+1.5.2 Friends and Enemies. Factions on the same side are
+Friends with (Friendly to) one another. Factions on opposing
+Sides are Enemies to one another. Friendly Factions cannot
+Battle, Skirmish, War Path or Partisans one another.
+1.5.3 Negotiation. Factions may make any mutual arrange-
+ments within the rules. Factions are not permitted to transfer
+Resources to another Faction except by Command, Special
+Activity or Event (per 2.3). All negotiations are open. The rules
+do not bind Factions to agreements.
+1.6 Support, Opposition, Casualties And Forts/
+Villages
+Support and Opposition affect victory and some Commands
+and Special Activities.
+1.6.1 Cities and Provinces with at least one Population (1.3.2-
+.3) always show 1 of 5 levels of its populace’s Support for or
+Opposition to the British government that can shift during play:
+• Active Support
+• Passive Support
+• Neutral
+• Passive Opposition
+• Active Opposition
+Spaces with 0 Population are always Neutral, never at Support
+or Opposition.
+1.6.2 Active Support/Opposition counts double Population
+for Total Support/Opposition (1.6.3) affecting victory (7.2,
+7.3). Show Support or Opposition with markers placed in each
+City or Province. Show Neutral spaces by the absence of such
+markers. The four Indian Reserve spaces and the West Indies
+are marked as “Always Neutral” and never contain such markers.
+1.6.3 Total Support and Total Op-
+position. Every Faction’s victory de-
+pends on the total value of population
+Support or Opposition, respectively.
+Adjust “Total Support” or “Total Opposition” on the numbered
+edge track per the box below as any change to Support or Op-
+position occurs.
+Neutral
+Total Support = (2 x Population in Active Support) +
+(1 x Population in Passive Support)
+Total Opposition = (2 x Population in Active Opposition) +
+(1 x Population in Passive Opposition)
+1.6.4 Casualties. British Regulars, Tories, British Forts, French
+Regulars, Patriot Continentals, and Patriot Forts removed due
+to certain Commands, Special Activities or as designated by
+certain Events are placed in the Casualties box. Units in the
+Casualties box are not available to be used in any manner until
+the Reset Phase of the Winter Quarters Round (6.7). Exception:
+Forts are immediately returned to Available and may be built
+immediately but are still counted toward Cumulative British
+Casualties or Cumulative Rebellion Casualties. During the
+Reset Phase of the Winter Quarters Round, all units in the
+Casualties box are returned to Available.
+Cumulative British Casualties (CBC)
+reflects the total British Regular, To-
+ries and Fort Casualties during the
+entire game and is tracked by accumu-
+lating Casualties as they occur on the numbered edge track.
+Cumulative Rebellion Casualties (CRC) reflects the total
+French Regular, Continental and Patriot Fort Casualties during
+the entire game and is tracked by accumulating Casualties as
+they occur on the numbered edge track.
+Note: Casualties are not limited to 50. If the CRC or CBC
+marker approaches 50, reset both CRC and CBC markers
+down 10 (or 20) each. The difference is what matters for
+Victory calculations.
+1.6.5 Forts and Villages. Patriot Forts and Indian Villages
+placed on the map are tracked to determine victory conditions.
+British Forts are placed in the Available British Forts track.
+Available Patriot Forts and Indian Villages are placed on, and
+removed from, the Available Indian Villages/Patriot Forts track
+which facilitates calculation of the number placed on the map.
+The highest value showing in the empty holding space indicates
+the number of Forts/Villages on the map.
+Note: The tracks are offset by three so players can look at
+the number of Forts/Villages placed and visually determine
+which Faction is ahead in its second victory condition (7.2).
+1.7 Control
+The Rebellion Controls a Province or
+City if the pieces of the two Rebellion
+Factions (Patriot and French) com-
+bined exceed those of the Royalist
+Factions (British and Indians) combined. The British Control
+a Province or City if Royalist pieces exceed Rebellion pieces
+and at least one British piece is present in the space. If Indian
+pieces with no British pieces are in a space and they equal or
+exceed Rebellion pieces, no Faction Controls the space. Control
+affects certain activities. Adjust British Control and Rebellion
+Control markers as Control changes due to placement, re-
+moval, or movement of pieces. If no Faction Controls a space
+then there is no Control marker placed in that space.
+1.8 Resources
+At any moment, each Faction has between 0 and 50 Resources
+that it uses to pay for Commands (3.0). Mark Resources on the
+edge track with a cylinder of the Faction’s color (1.5). Factions
+are not permitted to transfer Resources to another Faction
+except by Command, Special Activity or Event (per 2.3).
+1.9 French Naval Intervention
+French Naval Intervention (FNI) represents the
+commitment of French naval strength to North
+America. At each level, the French will have that
+number of Blockades placed on Cities. Both the
+French and British may adjust the level of FNI through the use
+of the Naval Pressure Special Activity after the Treaty of
+Alliance card is played (2.3.9). The FNI level must remain at
+0 before the Treaty of Alliance card is played. Blockades
+are placed by the French as the FNI level is raised. For each
+level the FNI is lowered the British remove one Blockade to
+the West Indies and flip the counter to the Squadron side.
+Available Blockade markers
+that have not been placed on a
+City reside in the West Indies
+holding box (or in the Un-
+available French Forces box
+depending on the Scenario) on
+their Squadron side. They increase British Loss Level in the
+West Indies by one total (during any Battle Command) (3.6.5,
+3.6.6). FNI level may never exceed the number of Blockades
+that are Available.
+Blockades may not be placed until after the
+Treaty of Alliance card is played (2.3.9).
+After Treaty of Alliance is played, Available
+Squadrons/Blockades remain in the West
+Indies on their Squadron side unless placed
+through increasing FNI.
+Squadrons/Blockades have the following im-
+pact on play:
+• No British Muster of Regulars in that City,
+nor in an adjacent Colony unless that Colony is also adjacent
+to another City that is not Blockaded,
+• No British Garrison to or from that City,
+• No British March to that City or Provinces adjacent to that
+City (unless destination space is adjacent to starting space),
+• The population of that City is considered 0 for purposes of
+calculating Support and during the Resource Phase of the
+Winter Quarters Round, and
+• More than one Blockade may be placed on a City but the
+additional Blockade has no additional impact.
+• British Garrison not available if FNI at Level 3.
+Note: FNI-related events may come up before the Treaty
+of Alliance card has been played. Factions should ignore
+all impacts on FNI and may not place Blockades until the
+Treaty of Alliance card is played and Blockades are avail-
+able in the West Indies (as Squadrons.)
+1.10 Leaders
+Leader markers represent political
+and military figures who may have
+an impact on Events, Commands
+and Special Activities. Each Faction
+receives one Leader in the Scenario
+Set-Up. Only one Leader per Faction is in play
+at any time. A Leader can follow any unit of its
+Faction anywhere it goes on the map during an
+Command or Event. A Leader in the Available Forces box may
+be placed on the map or West Indies along with any piece from
+the Available Forces box. A Leader has the following impact
+on play:
+• Leader units cannot be eliminated. If at any time the current
+Leader is in a space with no pieces of its Faction, the owning
+Faction moves that Leader to any space with the same
+Faction’s pieces or to its Available Forces box.
+• During the Redeploy Phase of the Winter Quarters Round,
+one Faction’s Leader may change (6.5.1). Each Faction may
+move its current Leader to any space with that Faction’s
+pieces in the following order: Indians, French, British, Patriots
+(6.5.2).
+• If a Faction plays a Brilliant Stroke card (5.1.4), the
+Leader must be in a space involved in at least one of the
+Limited Commands (including an origination space for
+a March, Scout, Raid or Garrison Limited Command). If
+not, the Brilliant Stroke cannot be played. A Brilliant
+Stroke card may only be played once (unless Trumped by
+another Faction in which case it is returned for future use).

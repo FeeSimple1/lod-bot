@@ -1,0 +1,246 @@
+# patriot_flowchart.yaml
+nodes:
+  P1:
+    type: decision
+    text: "Sequence of Play prevents Event play or Patriot symbol has 🗡 ?"
+    edges:
+      No:  P2
+      Yes: P3
+
+  P2:
+    type: process
+    title: "Event or Command?"
+    text: |
+      Check Event Instructions (⚫), then play Event (shaded if no other Instruction) if any of:
+        • Support > Opposition, and Event shifts Support/Opposition in Rebel favor?
+        • Event places Underground Militia in at least one Active Opposition or Village space with none?
+        • Event places a Patriot Fort or removes an Indian Village?
+        • Event adds 3+ Patriot Resources?
+        • Event is effective, Patriots have 25+ pieces on the map, and a D6 rolls 5+?
+
+      If none, continue with the flowchart.
+    edges:
+      "No Event": P3
+
+  P3:
+    type: decision
+    text: "Patriot Resources > 0?"
+    edges:
+      No:  PASS
+      Yes: P6
+
+  P4:
+    type: process
+    title: "Battle"
+    text: |
+      * Select all spaces where the Rebel Force Level (*if possible including French*) + modifiers
+        exceeds the British Force Level + modifiers, *first* with Washington, *then* in highest Pop,
+        *then* where most Villages, *then* random.
+      * *Then* resolve all Battles. If **Win the Day**, Patriots free Rally in 1 space per below and
+        French move Blockade to City with more Support.
+
+      If none, Rally.
+    edges:
+      Then:     P8
+      "If none": P7
+
+  P5:
+    type: process
+    title: "March"
+    text: |
+      * Lose no Rebel Control. Leave 1 Active Patriot unit with each Patriot Fort, and 1 Patriot unit
+        (*if possible* Underground Militia) where no Active Opposition.
+      * *Moving the largest groups first*, add Rebel Control to 2 spaces, *first* where Villages,
+        *then* Cities, *then* elsewhere, *within that* where largest Pop. Include most French Regulars
+        possible.
+      * *Then* get 1 Militia (Underground *if possible*) into each other space with none, *first* to
+        change most Control *then* random.
+
+      If none, execute Rally.
+    edges:
+      Then:     P8
+      "If none": P7
+
+  P6:
+    type: decision
+    text: "Rebel cubes + Leader > Active British and/or Indian pieces in space with both?"
+    edges:
+      Yes: P4
+      No:  P9
+
+  P7:
+    type: process
+    title: "Rally"
+    limitation:  Max 4
+    text: |
+      If Patriot Resources reach 0, immediately use Persuasion before continuing the Rally Command.
+
+      * Place a Fort in each space with 4+ Patriot units and room, *first* in Cities, *within that*
+        in highest Pop.
+      * *Then* place Militia, *first* at each Patriot Fort with no other Rebellion pieces, *then* if
+        any Continentals are Available at the Fort with the largest number of Militia already.
+      * In the Patriot Fort space with most Militia of those already selected for Rally, replace all
+        Militia except 1 Underground with Continentals.
+      * *If Patriot Fort Available*, place Militia in the space with no Patriot Fort and most Patriot
+        units.
+      * *Then* place Militia, *first* to change Control *then* where no Active Opposition, *within
+        each first* in Cities, *within that* in highest Pop.
+      * At 1 Fort, move all adjacent Active Militia possible there without losing any Rebel Control,
+        *then* flip all Militia at that Fort Underground.
+
+      If none, execute Rabble-Rousing.
+    edges:
+      "Then If Persuasion has not already been used": P8
+      "If none": P11
+
+  P8:
+    type: process
+    title: "Partisans"
+    limitation:  Max 1
+    text: |
+      * If Patriot Resources = 0, instead execute Persuasion.
+      * Otherwise, Partisans in a space with Underground Militia and enemy, *first* to remove a
+        Village, *then* to remove most War Parties *then* British; within each *first* to add most
+        Rebel Control *then* to remove most British Control, *then* random.
+
+      If none, Skirmish.
+    edges:
+      "If none": P12
+
+  P9:
+    type: decision
+    text: "Rally would place Fort, or 1D6 > Underground Militia on map?"
+    edges:
+      Yes: P7
+      No:  P10
+
+  P10:
+    type: decision
+    text: "Rabble-Rousing can shift 1+ spaces toward Active Opposition?"
+    edges:
+      Yes: P11
+      No:  P5
+
+  P11:
+    type: process
+    title: "Rabble-Rousing"
+    text: |
+      If Patriot Resources reach 0, immediately use Persuasion before continuing the Rabble-Rousing
+      Command.
+      * In each space where Rabble-Rousing can shift towards Active Opposition, first in Active
+        Support, *within that* first in highest Pop.
+
+      If none, Rally.
+    edges:
+      "Then If Persuasion has not already been used": P8
+      "If none": P7
+
+  P12:
+    type: process
+    title: "Skirmish"
+    limitation:  Max 1
+    text: |
+      * If Patriot Resources = 0, instead execute Persuasion.
+      * Otherwise, Skirmish in a space with Continentals and enemy, *first* to remove a British Fort;
+        *within that first* to add most Rebel Control *then* to remove most British Control, *then*
+        random.
+
+      If none, Persuasion.
+    edges:
+      "If none": P13
+
+  P13:
+    type: process
+    title: "Persuasion"
+    limitation:  Max 3
+    text: |
+      In up to 3 spaces with Rebel Control and Underground Militia, *first* where Patriot Forts,
+      Activate 1 Militia per space to add Patriot Resources.
+
+      If none, no Special Activity.
+
+  PASS:
+    type: terminator
+    text: "Pass"
+
+  OPS:
+    type: info
+    title: "Operations Summary"
+    text: |
+      Patriot Supply: Pay only if removing Patriot pieces would change Control, *within that first*
+        where British would be able to Reward Loyalty, *then* where most Indian Villages, *then* in
+        highest Pop.
+      Redeploy: Redeploy Washington to the space with most Continentals.
+      Patriot Desertion: Remove Militia and Continentals so as to change the least Control possible,
+        *within that first* without removing the last Patriot unit from any space.
+
+      Brilliant Stroke: Use after Treaty of Alliance when Washington is in a space with 4+ Continentals,
+        *and* a player Faction is 1st Eligible.
+      Leader Movement: During Campaigns, Rebel Leaders move/stay with the largest group of units from
+        their Faction that moves from (or stays in) their origin spaces.
+
+# Non-Player Patriot Cards Special Instructions
+"Culper Spy Ring":
+  number: 8
+  instruction: |
+    If French is a human player, choose Command & Special Activity instead.
+
+"If it hadn’t been so stormy…":
+  number: 18
+  instruction: |
+    Target an Eligible enemy Faction. If none, choose Command & Special Activity instead.
+
+"Edward Bancroft, British Spy":
+  number: 29
+  instruction: |
+    Target Indians.
+
+"Earl of Mansfield Recalled from Paris":
+  number: 44
+  instruction: |
+    Target an Eligible enemy Faction. If none, choose Command & Special Activity instead.
+
+"Bermuda Gunpowder Plot":
+  number: 51
+  instruction: |
+    March to set up Battle per the Battle instructions. If not possible, choose Command & Special Activity instead.
+
+"French Fleet Arrives in the Wrong Spot":
+  number: 52
+  instruction: |
+    Remove no French Regulars; select space per Battle instructions, else ignore.
+
+"British Gain From French in India":
+  number: 70
+  instruction: |
+    Remove British Regulars from spaces with Patriot pieces.
+
+"Treaty of Amity and Commerce":
+  number: 71
+  instruction: |
+    Use the unshaded text.
+
+"Confusion Allows Slaves to Escape":
+  number: 80
+  instruction: |
+    Select a space shared with another Faction, then move per March from that origin.
+
+"Guy Carleton and Indians Negotiate":
+  number: 83
+  instruction: |
+    Play in Quebec City if possible to change Control there, otherwise in Quebec.
+
+"Stockbridge Indians":
+  number: 86
+  instruction: |
+    Select a Village space if possible.
+
+"If it hadn’t been so foggy…":
+  number: 88
+  instruction: |
+    Select a space shared with an enemy Faction, then move per the March instructions from that origin.
+
+“The World Turned Upside Down”:
+  number: 90
+  instruction: |
+    Use the unshaded text.

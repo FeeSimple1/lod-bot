@@ -1,0 +1,184 @@
+2.1 Set-Up
+Follow the instructions on last four pages of this rule book to
+choose a Scenario and various play options, assign Factions to
+players, prepare the draw deck, and set up markers and forces.
+2.2 Start
+Begin play by revealing the top card of the draw deck and
+placing it onto a played cards pile. Then reveal the next card
+and place it on top of the draw deck. The card on the played
+card stack is played first; the card on top of the draw deck will
+be played next.
+Note: Players will see one card ahead into the deck (2.3.7).
+All played cards and the number of cards in the draw deck are
+open to inspection.
+When a Winter Quarters card is turned up, stop play and
+swap it with the played card. Conduct a Winter Quarters Round
+immediately (6.0).
+Record Steps: As the steps of each Event card play are com-
+pleted, place a cylinder of the Faction’s color (1.5) into the
+appropriate box on the Sequence of Play track (or, for Winter
+Quarters Rounds 6.0, advance the Winter Quarters marker).
+2.3 Event Cards
+When playing an Event card, up to two Factions will execute
+Commands or the Event.
+• Factions whose cylinder is in the “Eligible” box receive these
+options in the left-to-right order of the Faction symbols
+shown at the top of the card.
+• Factions with cylinders in the “Ineligible” box do nothing.
+2.3.1 Eligibility. Factions that did not execute a Command or
+Event on the previous card are Eligible (their cylinders will
+start the card in the “Eligible” box per 2.3.6). Factions that did
+are Ineligible. (All Factions start the game Eligible.) See also
+Free Commands (3.1.2).
+2.3.2 Faction Order. The Eligible Faction with the leftmost
+symbol (skipping any Ineligible Factions) is the 1st Eligible to
+execute a Command or Event or to Pass. The next leftmost is
+the 2nd Eligible.
+2.3.3 Passing. If a 1st or 2nd Eligible Faction opts to Pass, it
+receives +1 Resource if Patriots or Indians, or +2 Resources if
+British or French, and remains Eligible for the next card. The
+next leftmost Eligible Faction then replaces the Passing Fac-
+tion as the new 1st or 2nd Eligible Faction and receives the
+same options to execute or Pass. If the last (rightmost) Eligible
+Faction Passes, adjust cylinders (2.3.6) and play the next card.
+2.3.4 Options for Eligible Factions.
+1 ST ELIGIBLE: If the 1st Eligible Faction does not Pass (2.3.3),
+it may execute either:
+• a Command (Com) (3.0)—with or without a Special Activity
+(4.0); or
+• the Event shown on the card.
+OPTIONS FOR 2 ND ELIGIBLE: If the 2nd Eligible Faction
+does not Pass (2.3.3), it also may execute a Command and pos-
+sibly the Event, but its options depend on what the 1st Eligible
+Faction executed:
+• Command Only: If the 1st Eligible Faction executed a
+Command only, the 2nd Eligible Faction may execute a
+Limited Command (2.3.5).
+• Command and Special Activity: If the 1st Eligible Faction
+executed a Command with a Special Activity, the 2nd Eligible
+Faction may execute a Limited Command or instead execute
+the Event.
+• Event: If the 1st Eligible Faction executed the Event, the
+2nd Eligible Faction may execute a Command, with a Special
+Activity if desired.
+For a Command to qualify as executed it must occur within
+(select) at least one space, with or without effect.
+EXCEPTION: The French Command Roderigue Hortalez et Cie
+(3.5.2) never selects any space, but counts as executed if at least one
+French Resource is paid.
+Note: For ease of reference, these options are illustrated on
+the Sequence of Play aid sheet and on the game board.
+2.3.5 Limited Command. A Limited Command is a Com-
+mand in just one space with no Special Activity. If the Limited
+Command involves pieces from multiple spaces, it can only
+include one destination space. A Limited Command counts as
+a Command. See also Non-player Commands (8.1).
+2.3.6 Adjust Eligibility. After the 1st and 2nd Eligible Factions
+complete all execution of Commands, Special Activities, and
+Events (or after Eligible Factions instead have Passed), adjust
+cylinders on the Sequence of Play track as follows:
+• Any Faction that did not execute a Command or Event (and
+was not rendered Ineligible by an Event) to the “Eligible” box.
+• Any Faction that executed a Command (including a Limited
+Command) or Event to the “Ineligible” box (unless otherwise
+specified by the Event; see also Free Commands, 3.1.2).
+• If a Faction played a Brilliant Stroke card (2.3.8), all
+Factions to “Eligible”.
+Play Note: Some Events (5.0) will enable the executing Fac-
+tion to remain Eligible or render other Factions Ineligible
+through the next card. As a reminder, mark a Faction thus
+remaining Eligible by placing its cylinder at the left edge of
+its Sequence of Play “Event” box. Mark a Faction thus ren-
+dered Ineligible by placing its cylinder under the executing
+Faction’s, to show that it will be Ineligible for the next card.
+2.3.7 Next Card. After adjusting Eligibility, move the draw
+deck’s top card onto the played card pile face-up and reveal
+the draw deck’s next card. If the just revealed card is a Winter
+Quarters card, switch it with the played Event card, so that
+the Winter Quarters card becomes the current played card
+(2.2, 2.4). Play the played card, proceeding with the appropriate
+sequence (2.3 or 6.0).
+2.3.8 Brilliant Stroke. Each
+Faction begins the Scenarios with
+one Brilliant Stroke card
+(5.1.4) except for the French, who
+begin with two including the
+Treaty of Alliance, but the
+Treaty of Alliance must be
+played first. Brilliant Stroke
+cards are a type of Event (5.0). A
+Faction may play its Brilliant
+Stroke card to cancel and discard
+a currently played Event card if:
+• the Faction playing the Brilliant Stroke card is Eligible,
+• the 1st Eligible Faction has not yet taken an action, and
+• no Winter Quarters card is showing.
+PROCEDURE: The Faction with the Brilliant Stroke
+card interrupts the usual Sequence of Play by placing the
+Brilliant Stroke card over the played Event card and
+executing the instructions on the Brilliant Stroke card.
+The Brilliant Stroke card stays in the played card pile, as
+normal. The played Event card under the Brilliant Stroke
+card remains there and is never played.
+BRILLIANT STROKE CARD EVENTS: The Faction play-
+ing a Brilliant Stroke card may execute the instructions with
+no Resource cost. (EXCEPTION: British must pay for Reward
+Loyalty). Each Command and Special Activity is independent
+(but still allows a Common Cause Special Activity to affect a
+March or Battle Command on the same Brilliant Stroke card)
+and not limited by other actions on this card. All Factions are
+moved to Eligible after the play of a Brilliant Stroke card
+including the Faction that played it.
+TRUMPING BRILLIANT STROKE CARDS: Trumping is
+the act of playing a Faction’s Brilliant Stroke card to cancel
+a just-played Brilliant Stroke card. (The Trump card takes
+the place of the Trumped card and is executed as if it had been
+played first.) A Trumped Brilliant Stroke card is returned
+to its owner for possible use later. The Treaty of Alliance
+Brilliant Stroke card may Trump another Faction’s Bril-
+liant Stroke card. The Indian Faction may Trump another
+Faction’s Brilliant Stroke card (excluding the Treaty of
+Alliance Brilliant Stroke card); The French Faction may Trump the Patriots or British; British may Trump the Patriots;
+Patriots may not Trump.
+Play Note: The 1st Eligible Faction need not declare what it
+would execute before a Faction must decide whether to play
+its Brilliant Stroke card.
+2.3.9 Brilliant Stroke - Treaty of Alliance. The French
+Faction chooses when to play the Treaty of Alliance card
+subject to the following conditions.
+• The French have accumulated more than 15
+Available French Regulars and Squadrons/
+Blockades plus Cumulative British Casualties
+(CBC) (1.6.4, 7.2). This total is also referred to
+as French Preparations and is tracked on the edge track;
+• the French Faction is Eligible;
+• the 1st Eligible Faction has not yet taken an action; and
+• no Winter Quarters card is showing.
+Treaty of Alliance replaces and cancels the played Event
+card as long as no one has acted on that Event card. It can also
+Trump (2.3.8) any other Brilliant Stroke card from another
+Faction and it cannot be Trumped by another Faction. This still
+allows the French Faction to play one Brilliant Stroke later.
+All Factions are Eligible after this card is played. The French
+Faction must execute the event and nothing else.
+After the French play Treaty of Alliance:
+• They have a second Brilliant Stroke card available to use
+from that point forward.
+• They may execute any Commands and Special Activities
+except those that are limited to before Treaty of Alliance.
+Before the Treaty of Alliance, the French may execute
+only Roderigue Hortalez et Cie (3.5.2) and French Agent
+Mobilization (3.5.1) and the Préparer la Guerre (4.5.1) plus
+Events from Event cards (5.3).
+• French pieces may now be deployed on the map and West
+Indies (and conversely may not before the Treaty of
+Alliance).
+• They qualify for Victory (7.2).
+2.4 W inter Q uarters Card
+If playing a Winter Quarters card, conduct a Winter Quar-
+ters Round (6.0).
+2.4.1 Final Winter Quarters. If the Final Winter Quarters
+card’s Support Phase is completed without a victory (6.1), the
+game ends: determine victory under 7.3.
+Play Note: Each series of Event cards up to a Winter
+Quarters card is a “Campaign,” representing one year of war.

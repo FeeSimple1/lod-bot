@@ -1,0 +1,219 @@
+# indian_flowchart.yaml
+nodes:
+  I1:
+    type: decision
+    text: "Sequence of Play prevents Event play or Indian symbol has 🗡 ?"
+    edges:
+      No:  I2
+      Yes: I3
+
+  I2:
+    type: process
+    title: "Event or Command?"
+    limitation: Max 3
+    text: |
+      Check Event Instructions (⚫), then play Event (unshaded if no other Instruction) if any of:
+        * Opposition > Support, and Event shifts Support/Opposition in Royalist favor?
+        * Event places at least one Indian Village (first with War Parties) or grants free Gather?
+        * Event removes a Patriot Fort?
+        * Event is effective, 4+ Villages on the map, and a D6 rolls 5 or higher?
+      If none, continue with the flowchart.
+    edges:
+      "No Event": I3
+
+  I3:
+    type: decision
+    text: "(Support + 1D6) > Opposition?"
+    edges:
+      No:  I4
+      Yes: I6
+
+  I4:
+    type: process
+    title: "Raid"
+    limitation: Max 3
+    text: |
+      * Raid Opposition Colonies with/adjacent to Underground War parties (or within 2 spaces of Dragging Canoe), first where Plunder possible after Raid move, then elsewhere, within each highest Pop.
+      * Without removing last War Party from any Village, move an Underground War Party into each Raid target with none OR where War Parties don’t exceed Rebels.
+      * If Resources fall to zero during the Raid Command, if possible Plunder then Trade before completing the Raid.
+      If no Raid possible, instead Gather.
+    edges:
+      With:     I5
+      "If none": I6
+
+  I5:
+    type: process
+    title: "Plunder"
+    limitation: Max 1
+    text: |
+      If Patriot Resources > 0, Plunder in a
+      Raid space with more War Parties
+      than Rebel pieces, within that in
+      highest Pop.
+      If no Plunder, instead War Path.
+    edges:
+      Else: I8
+
+  I6:
+    type: decision
+    text: "Gather would place 2+ Villages, or 1D6 < Available War Parties?"
+    edges:
+      Yes: I7
+      No:  I9
+
+  I7:
+    type: process
+    title: "Gather"
+    limitation: Max 4
+    text: |
+      * Place Villages where room and 3+ War Parties (2+ if Cornplanter in the space), first with Indian Leader.
+      * Then place War Parties at Villages, first where enemies, then where no Underground War Parties, then with Indian Leader, then random.
+      * If any Villages Available: Place War Parties in 2 spaces with room for a Village, first where exactly 2 War Parties already, then where exactly 1 War Party, then random.
+      * Then if no more War Parties are Available, in 1 Village space move in all adjacent Active War Parties possible without adding any Rebel Control, then flip them Underground.
+    edges:
+      Then:     I8
+      "If none": I10
+
+  I8:
+    type: process
+    title: "War Path"
+    limitation: Max 1
+    text: |
+      If Indian Resources = 0, Trade if possible. Otherwise War Path, first to remove a Patriot Fort, then most Rebel pieces, within that first in a Province with 1 + Villages, then random.
+      If no such space, Trade.
+    edges:
+      Else: I11
+
+  I9:
+    type: decision
+    text: "A space has War Party and British Regulars?"
+    edges:
+      No:  I10
+      Yes: I12
+
+  I10:
+    type: process
+    title: "March"
+    limitation: Max 3
+    text: |
+      * With: Underground then Active War Parties, without moving last War Party from any Village or adding any Rebel Control.
+      * If 1+ Villages Available, March to get 3+ War Parties in 1 additional Neutral or Passive space with room for a Village.
+      * Then to remove most Rebel Control, first where no Active Support.
+      If no March possible, Gather.
+    edges:
+      Then:     I8
+      "If none": I7
+
+  I11:
+    type: process
+    title: "Trade"
+    limitation: Max 1
+    text: |
+      If Underground War Parties at any Village, first request Resources from the British. If no Resources given, Trade in the Village space with most Underground War Parties.
+      If not possible, no Special Activity.
+
+  I12:
+    type: process
+    title: "Scout"
+    limitation: Max 1
+    text: |
+      * Move 1 War Party + most Regulars+Tories possible without changing Control in origin space, first to a Patriot Fort, then to a Village with enemy, then to remove most Rebel Control.
+      * Skirmish to remove first a Patriot Fort then most enemy pieces.
+      If no Scout possible, March.
+    edges:
+      Then:     I8
+      "If none": I10
+
+  OPS:
+    type: info
+    title: "Operations Summary"
+    text: |
+      Supply: Pay Supply first where necessary to prevent Rebel Control, then where Gather could place a Village.
+      Patriot Desertion: Remove Patriots first from Village spaces, then to remove most Rebel Control, then to remove last Patriot of that type in a space, then random.
+      Redeploy:
+        Brant/Dragging Canoe: To the space with most War Parties.
+        Cornplanter: To a Neutral/Passive Province with 2+ War Parties and room for a Village. If none, to the space with most War Parties.
+
+      Brilliant Stroke: Use after Treaty of Alliance when the Indian Leader is in a space with 3+ War Parties, and a player is 1st Eligible or a Rebel Faction plays a Brilliant Stroke card other than the Treaty of Alliance.
+      Leader Movement: During Campaigns, Royalist Leaders accompany the largest group of units from their Faction that moves from (or stays in) their origin spaces.
+      Defending in Battle: If there are any Village in the Battle space, Activate all but 1 Underground War Party. Otherwise, Activate no Underground War Parties.
+
+  PASS:
+    type: terminator
+    text: "Pass"
+
+# Non-Player Indian Cards Special Instructions
+The Penobscot Expedition:
+  number: 4
+  instruction: |
+    Use the shaded text. If no Village can be placed, choose Command & Special Activity instead.
+
+“If it hadn’t been so stormy…”:
+  number: 18
+  instruction: |
+    Target an Eligible enemy Faction. If none, choose Command & Special Activity instead.
+
+The Gamecock Thomas Sumter:
+  number: 21
+  instruction: |
+    First in non-Village spaces.
+
+The Newburgh Conspiracy:
+  number: 22
+  instruction: |
+    First in Village spaces.
+
+Edward Bancroft, British Spy:
+  number: 29
+  instruction: |
+    Target Patriots.
+
+Rule Britannia!:
+  number: 32
+  instruction: |
+    Use the shaded text.
+
+Johnson’s Royal Greens:
+  number: 38
+  instruction: |
+    Use the shaded text. Place War Parties; if not possible, choose Command & Special Activity instead.
+
+Earl of Mansfield Recalled from Paris:
+  number: 44
+  instruction: |
+    Target an Eligible enemy Faction. If none, choose Command & Special Activity instead.
+
+British Gain From French in India:
+  number: 70
+  instruction: |
+    Remove French Regulars from Village spaces first.
+
+French Settlers Help:
+  number: 72
+  instruction: |
+    If no Village can be placed, choose Command & Special Activity instead.
+
+Confusion Allows Slaves to Escape:
+  number: 80
+  instruction: |
+    Select a space shared with another Faction, then move per March from that origin.
+
+Guy Carleton and Indians Negotiate:
+  number: 83
+  instruction: |
+    Use the shaded text if a Village can be placed, otherwise the unshaded text.
+
+“If it hadn’t been so foggy…”:
+  number: 88
+  instruction: |
+    Select a space shared with an enemy Faction, then move per the March instructions from that origin.
+
+War Damages Colonies’ Economy:
+  number: 89
+  instruction: |
+    First in Village spaces.
+
+“The World Turned Upside Down”:
+  number: 90
+  instruction: |
+    If no Village can be placed, choose Command & Special Activity instead.

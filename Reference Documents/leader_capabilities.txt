@@ -1,0 +1,17 @@
+CARD #: 110
+TITLE: Leader Capabilities
+TYPE: REFERENCE_CARD   # not in the Event deck
+
+TABLE:
+Leader           Faction   Capability
+───────          ───────   ──────────────────────────────────────────────────────────────────────────────────────────
+Washington       Patriots  Double Rebellion “Win the Day” shift in the space. –1 to Defender Loss Level when
+                           Rebellion is defending in that space.
+Rochambeau       French    French may March and Battle with a Patriot Command at no Resource cost.
+Lauzun           French    +1 additional Defender Loss Level when the French are Attacking in the space.
+Gage             British   First Loyalty shift: Reward Loyalty is free in the space.
+Howe             British   Before executing a British Special Activity, first lower FNI by 1 level.
+Clinton          British   Skirmish removes 1 additional Militia in the space.
+Brant            Indians   War Path removes 1 additional Militia in the space.
+Cornplanter      Indians   Gather builds Villages for 1 War Party in the space.
+Dragging Canoe   Indians   Raid may move 1 extra space if it originated in the space.

@@ -1,0 +1,348 @@
+Accompanying: Command required for
+Special Activity. (4.1.1)
+Activate: Flip or leave Militia or War
+Party Active. (1.4.3)
+Active: Militia or War Party symbol end
+up: vulnerable to Battle. Cubes, Forts
+and Villages are always Active. (1.4.3)
+Adjacent: Spaces next to each other for
+movement or Events. (1.3.6)
+Always Neutral: The four Indian Re-
+serve spaces and the West Indies are
+never at Support or Opposition. (1.6.2)
+Attacker: The Faction initiating the
+Battle. (3.6.2)
+Available: Force pieces in holding boxes
+that may be placed. (1.4.1)
+Battle: Command that may remove En-
+emy pieces at the potential cost of losing
+Friendly pieces. (3.6, 3.2.4, 3.3.3, 3.5.5)
+Blockade: French Naval Intervention
+impact on a City, reducing population
+to zero in certain circumstances, and
+limiting certain Commands while in
+effect. (1.9)
+Brilliant Stroke: Event card that a
+Faction holds and may use to Trump the
+active Event card. (2.3.8)
+British: A Faction that represents
+the forces and interests of the British
+Empire who governed the Colonies.
+(1.0, 1.5)
+Campaign: Event card series leading
+up to a Winter Quarters Round. (6.0)
+Casualties: French Regulars, British
+Regulars, Tories, Forts and Continen-
+tals eliminated due to Battle, Skirmish,
+Partisans, War Path and certain events.
+(1.6.4)
+City: Type of space: urban areas. (1.3.3)
+Colony: Provinces that represent the
+thirteen British Colonies. (1.3.5)
+Command (Com): Core action Faction
+performs with its Forces. (3.0)
+Common Cause: British Command
+allowing the British to use War Parties
+as if they were Tories. (4.2.1)
+Continental: Patriot Controlled Force
+piece specializing in March, Battle and
+Skirmish. (1.4)
+Control: Possession of more pieces in
+a Province or City by a Side than the
+other Side, marked for British or Re-
+bellion instantly (Indians alone cannot
+Control). (1.7)
+Cost: Resources given up for a Com-
+mand. (3.1)
+Cube: Regular, Continental or Tory
+piece. (1.4)
+Cumulative British Casualties (CBC):
+Cumulative total British cubes and Brit-
+ish Forts removed to Casualties. (1.6.4)
+Cumulative Rebellion Casualties
+(CRC): Cumulative total French Reg-
+ulars, Continentals and Patriot Forts
+removed to Casualties. (1.6.4)
+Cylinder: Token to mark a Faction’s
+Resources or Eligibility. (1.4, 2.2)
+Defender: The Side opposite of the At-
+tacker. (3.6.2)
+Deployment: Initial set up of Forces.
+(2.1, pages 36-39)
+Desertion: Winter Quarters Round
+phase when certain pieces may be re-
+moved to Available. (6.6)
+Dual Use: Event with two alternative
+effects. (5.2)
+Eligible: Faction able to execute Event
+or Command: per Faction order, 1st and
+2nd Eligible. (2.3.1-.2)
+Enemy: Assets of the other Side from
+the executing Faction. (1.5.2)
+Event: Card with Faction order and text
+a Faction may execute. (2.3, 5.0)
+Execute: Implement Event or conduct
+Command or Special Activity. (2.3)
+Faction: Player or Non-Player role:
+British, Patriots, French, Indians. (1.5)
+Faction Order: Card symbols determin-
+ing 1st and 2nd Eligible. (2.3.2)
+Final: Last (as defined by the scenario)
+Winter Quarters Round, game end.
+(2.4.1, 7.3)
+Flip: Switch Militia or War Party be-
+tween Underground and Active. (1.4.3)
+Force Level: A calculation of pieces for
+one Side during a Battle that determines
+how many dice are rolled to determine
+Loss Level. (3.6.3)
+Forces: Regulars, Tories, War Parties,
+Continentals, Militia, Villages and Forts
+(pieces). (1.4)
+Fort: Mostly-immobile Force pieces
+that affect Muster, Rally, Resources, and
+Victory, among other functions. (1.4)
+Free: Command or Special Activity via
+Event that does not cost Resources from
+any Faction involved or affect Eligibility.
+(2.3.6, 3.1.2, 5.3)
+French: A Faction that represents the
+forces and interests of the Kingdom of
+France. (1.0, 1.5)
+French Agent Mobilization: French
+Command to place certain Patriot
+pieces. (3.5.1)
+French Naval Intervention: Table that
+tracks the level of French Naval Inter-
+vention (FNI) and Blockades. (1.9)
+French Preparations: Available French
+Regulars and Squadrons/Blockades plus
+CBC. If greater than 15, the French may
+play TOA. (2.3.9)
+Friendly: Assets of the executing side.
+(1.5.2)
+Garrison: British Command to deploy
+into Cities. (3.2.2)
+Gather: Indian Command to place or
+regroup pieces. (3.4.1)
+In the space: Requirement for some
+Leader Capabilities that the Leader
+must be in the space benefiting from
+the Capability. (1.10)
+Indian Reserve: Provinces outside the
+Colonies (Quebec, Northwest, South-
+west, and Florida). (1.3.4)
+Indians: A Faction that represents the
+many Indian Tribes active during the
+American Revolution. (1.0, 1.5)
+Ineffective Events: Non-player avoid-
+ance of Events without effect. (8.1,
+8.3.3)
+Ineligible: Faction skipped in Faction
+order. (2.3.1-.2)
+Leader: Factional Leaders who may
+impact Commands or other activities.
+(1.10, 6.5.1)
+Leader Capability: Capability possessed
+by each Leader potentially impacting
+play. (1.10)
+Level: Support/Opposition status of a
+space. (1.6.1)
+Limited Command (Lim Com): A play-
+er Command in just one (destination)
+space, with no Special Activity. (2.3.5)
+Loser: The Side in a Battle opposite the
+Winner. (3.6.8)
+Loss Level: Total of dice rolled for
+Battle and Modifiers included for the
+Enemy Side. (3.6.4)
+March: Command to move units and
+flip Militia or War Parties to Active.
+(3.2.3)
+Militia: Patriot-led Force pieces. (1.4)
+Modifiers: Adjustments to pieces re-
+moved in a Battle Command. (3.6.4,
+3.6.6)
+Muster: British and French Command
+to place or regroup pieces. (3.2.1, 3.5.3)
+Naval Pressure: British and French Spe-
+cial Activity to Change French Naval
+Intervention (FNI) level. (4.2.3, 4.5.3)
+Neutral: Space not in Support nor Op-
+position. (1.6.1)
+Non-Player: Faction controlled by the
+game. (1.5, 8.0)
+Opposition: Status of space’s population
+against the British. (1.6)
+Overflow: Boxes and markers to help
+manage cases of overcrowding. (1.3.8)
+Partisans: Patriot Special Activity that
+removes Enemy pieces. (4.3.2)
+Pass: Decline to execute an Event or
+Command when Eligible. (2.3.3)
+Passive: City or Province in reserved
+Support or Opposition. (1.6.1)
+Patriots: A Faction that represents the
+forces and interests of the people in the
+Colonies who are in rebellion. (1.0, 1.5)
+Pawn: Token to designate spaces se-
+lected for Command (black) or Special
+Activity (gray). (3.1.1)
+Persuasion: Patriot Special Activity to
+raise Resources. (4.3.1)
+Phase: Segment of a Winter Quarters
+Round. (6.0)
+Piece: Regulars, Tories, War Parties,
+Continentals, Militia, Villages and
+Forts (not a marker like Leaders or
+Blockades). (1.4)
+Place: Move a piece from Available to
+map. (1.4.1)
+Plunder: Indian Special Activity to take
+Resources from the Patriots following a
+Raid Command. (4.4.3)
+Population (Pop): Representation of the
+populace of a Province or City, 50,000
+to 100,000 people per point. (1.3.2-.3)
+Préparer la Guerre: A French Special
+Activity allowing the French to move
+pieces from Unavailable to Available.
+(4.5.1)
+Priorities: Rules guiding Non-player
+Factions. (8.0)
+Propaganda: Marker left after Rabble-
+Rousing Command in City or Province.
+(3.3.4)
+Province: Type of space representing
+rural areas. (1.3.2)
+Rabble-Rousing: Command that places
+Propaganda marker in a City or Colony
+while shifting it toward Active Opposi-
+tion. (3.3.4, 6.4.1)
+Raid: Indian Command to reduce Op-
+position. (3.4.4)
+Rally: Patriot Command to place or
+regroup pieces. (3.3.1)
+Rebellion: Patriots and French Fac-
+tions. (1.5)
+Redeployment: W inter Q uar ters
+Round phase in which British moves
+cubes. (6.5)
+Regular: British and French Force
+pieces specializing in March, Battle and
+Skirmish. NOTE: Continentals are not
+Regulars. (1.4)
+Release Date: The Winter Quarters
+Round during which certain British
+units are moved from Unavailable to
+Available per Scenario instructions.
+(6.5.3)
+Remove: Take from map (Forces to
+Available). (1.4.1)
+Replace: Exchange pieces between
+Available and map. (1.4.1)
+Reset: Winter Quarters Round phase
+to ready for next card. (6.7)
+Resources: Factions’ wherewithal for
+Commands and other actions. (1.8)
+Reward Loyalty: British action to in-
+crease Support. (3.2.1, 6.4.1)
+Roderigue Hortalez et Cie: French
+Command to provide Resources to the
+Patriots. (3.5.2)
+Royalist: British and Indians Factions.
+(1.5)
+Scout: Indian Command allowing the
+Indians to move British units with In-
+dian War Parties. (3.4.3)
+Select: Choose an action’s locations or
+targets. (3.1, 3.1.1, 4.1, 5.1)
+Shaded: Second text choice of Dual-Use
+Event, often pro-Rebellion. (5.2)
+Shift: Change a space’s Support/Op-
+position. (1.6.1)
+Side: Either Rebellion (Patriots and
+French) or Royalists (British and In-
+dians). (1.5)
+Skirmish: A Special Activity to elimi-
+nate Enemy pieces. (4.2.2, 4.3.3, 4.5.2)
+Space: Map area that holds pieces in
+play: Province or City. (1.3.1)
+Special Activities: Actions accompany-
+ing Commands; most are cost-free and
+unique to a Faction. (4.0)
+Squadron: Back side of the Blockade
+counter; used when counter is placed in
+the West Indies. (1.9)
+Stacking: Limits on pieces that can oc-
+cupy a space. (1.4.2)
+Support: Status of space’s population
+favoring the British. (1.6)
+35© 2015, 2016 GMT Games, LLC
+Liberty or Death ~ Rules of Play
+Target: Enemy Side, Faction or piece
+that is the object of a Command, Special
+Activity, or Event. (3.1, 4.1)
+TOA: Abbreviation for Treaty of Al-
+liance. (2.3.9)
+Tory: British-led force pieces represent-
+ing local forces Loyal to the King. (1.4)
+Total Opposition: Passive Opposition
+Population plus twice Active Opposition
+Population. (1.6.3)
+Total Support: Passive Support Popula-
+tion plus twice Active Support Popula-
+tion. (1.6.3)
+Trade: Indian Special Activity to pro-
+vide Resources. (4.4.1)
+Treaty of Alliance (TOA): The card
+played by the French to enter the war. It
+is treated as a Brilliant Stroke card
+and can be played under certain condi-
+tions. (2.3.9)
+Trumping: Trumping is the act of
+playing a Faction’s Brilliant Stroke
+card canceling a just played Brilliant
+Stroke card. (2.3.8)
+Unavailable: Space for certain British
+and French units before the British
+move theirs according to the Release
+Date schedule or the French move theirs
+to Available with Préparer la Guerre.
+(1.3.9, 1.4.1, 4.5.1)
+Uncontrolled: A City or Province with
+neither British nor Rebellion Control.
+(1.7)
+Underground: Militia or War Party,
+symbol end down: capable of Raid or
+Rabble-Rousing for example. (1.4.3)
+Units: Regulars, Tories, War Parties,
+Continentals and Militia but not Forts
+or Villages. (1.4)
+Unshaded: First text choice of Dual-Use
+Event, often pro-Royalist. (5.2)
+Victory Margin: Calculation, unique
+to a Faction, of closeness to its Victory
+condition. (7.1)
+Village: Mostly-immobile Indian Force
+pieces that affect Gather, Resources, and
+Victory, among other functions. (1.4)
+War Party: Indian-led force pieces. (1.4)
+War Path: Indian Special Activity that
+removes Enemy pieces. (4.4.2)
+West Indies: A holding box that is not
+in play until after Treaty of Alliance
+(TOA) is played. (1.3.7)
+Win the Day: A shift in Support or
+Opposition for the winning Side in a
+Battle. (3.6.8)
+Winner (Battle): The Side in a Battle
+losing fewest pieces, unless one Side
+eliminated then surviving Side is the
+winner. Defender is the winner if equal.
+None if both Sides eliminated. (3.6.8)
+Winter Quarters: Cards triggering
+stop of play and Rounds of the same
+name that include victory checks, Re-
+source acquisition, and several other
+periodic functions. (2.4, 6.0)

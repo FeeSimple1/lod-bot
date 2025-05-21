@@ -1,0 +1,393 @@
+3.1 Commands In General
+The Faction executing a Command chooses one of the Com-
+mands listed on its Faction player aid sheet and, if applicable,
+selects the map spaces (typically several) to be involved. Select
+a given space only once for a given Command.
+Commands usually cost Resources, often per space selected;
+the paying Faction must have enough Resources to pay for the
+Command, including in each selected space.
+The executing Faction chooses the order of the spaces in which
+the Command is resolved, the Enemy Factions (1.5) or pieces
+to be affected (targeted), and the friendly pieces to be placed,
+replaced, removed, or moved. Actions affecting another Fac-
+tion’s pieces, Friendly or Enemy, do not require that Faction’s
+permission.
+3.1.1 Pawns. If desired, mark spaces selected for Commands
+(3.0), Special Activities (4.0), or other actions with gray and
+black pawns. The pawns are for convenience, not a limit on play.
+3.1.2 Free Commands. Certain Events (5.0) or phases (6.2.2),
+grant free Commands or Special Activities: they cost no Re-
+sources to any Faction involved and, if executed by a Faction
+other than the one playing an Event, could leave it Eligible
+(2.3.6). Other requirements and procedures still apply unless
+modified by Event text (5.1).
+3.2 British Commands
+The British chooses from Muster, Garrison, March, and Battle
+Commands
+3.2.1 Muster. Muster Commands add British forces and can
+build Support (1.6). Select any qualifying space and pay one
+Resource per selected space.
+• To place British Regulars, the British Faction may select any
+one City that is not Blockaded or an adjacent Colony, or the
+West Indies.
+• To place Tories, the British Faction may select any Cities
+or Colonies (not the West Indies) containing or adjacent to
+British Regulars or British Forts, not at Active Opposition.
+PROCEDURE: First, in one selected City (except a Block-
+aded City), adjacent Colony or the West Indies, place up to
+six Regulars.
+Next, in any selected Cities or Colonies (not at Active Op-
+position) containing or adjacent to British Regulars or Forts,
+place up to two Tories or one if at Passive Opposition.
+Then, in up to one selected Muster space (including West
+Indies if selected):
+• Replace any three British cubes (Regulars or Tories) with
+one Fort, or
+• Reward Loyalty (6.4.1) to build Support. The British must
+have one or more British Regulars, one or more Tories, and
+Control (1.7) in the space and must pay one added Resource
+per level of Opposition and Support (and Propaganda and
+Raid marker) (even if Muster was free (3.1.2)). There is
+no limit to the number of levels shifted when Rewarding
+Loyalty during Muster.
+3.2.2 Garrison. Garrison Commands protect Cities by moving
+in Regulars and locating and displacing Enemy units there. Pay
+two Resources total (not per space). If a Limited Command
+(2.3.5), all moving British Regulars must end in a single desti-
+nation City. A Blockaded City or units starting there may not
+be included in any part of a Garrison Command.
+PROCEDURE: Move any number of British Regulars from
+any spaces (not Blockaded Cities) to Cities that are not Block-
+aded. Then, in each City that is not Blockaded (whether or not
+a British Regular just moved there), Activate one Militia for
+every three British cubes there. Then, if desired, in one City
+(under British Control, no Patriot Fort and not Blockaded)
+displace all Rebellion units to an adjacent space at no added
+cost. If executing a Limited Command (2.3.5), the units
+Activated and/or displaced must be in/from the destination
+City. Garrison not available if FNI at level 3.
+3.2.3 March. March Commands may move cubes and locate
+Militia. Select any spaces as destinations. Pay one Resource per
+destination space selected. If executing a Limited Command
+(2.3.5), all moving pieces must end in a single destination space.
+PROCEDURE: Move any British Regulars onto an adja-
+cent space (1.3.6) or, if moving units are in or adjacent to a
+City (not Blockaded), to another City (not Blockaded) or a
+Province adjacent to it. Tories may only accompany (through
+the entire process) British Regulars 1 for 1 (Any cubes that
+move must reach destination spaces paid for).
+Then, in selected destination spaces, Activate one Militia
+(1.4.3) for every three British cubes there (whether they just
+moved or were already there). No unit moves more than once.
+3.2.4 Battle. Battle Commands allow the British to fight Re-
+bellion Factions with the possible help of Indians. Select any
+spaces and/or West Indies with British and Rebellion pieces.
+Pay one Resource per space selected.
+PROCEDURE: In one space or West Indies at a time, ex-
+ecute Battle according to the Battle Procedure Table (3.6).
+3.3 Patriot Commands
+Patriots choose from Rally, March, Battle and Rabble-Rousing.
+3.3.1 Rally. Rally Commands add or recover Patriot forces.
+Select any spaces without Active Support (1.6) and pay one
+Resource per space selected. Militia may not be placed in an
+Indian Reserve space or the West Indies.
+PROCEDURE: In each selected space, place one Available
+Militia or replace two units with one Fort. If the space already
+has at least one Patriot Fort, may instead either:
+• Place a number of Militia up to the number of Patriot Forts
+there plus the space’s Population value (1.3.2-.3), or
+• Move any Militia from any adjacent spaces to there and
+flip all Militia there Underground (whether they moved
+or not) (1.4.3).
+The Patriots may select any one Rally space with a Patriot
+Fort and replace any Militia with Continentals.
+No Militia may be placed in Indian Reserve spaces.
+No unit moves more than once.
+3.3.2 March. March Commands may move Militia, Conti-
+nentals and French Regulars and locate War Parties. Select
+any spaces as the destinations of the moving units. Pay one
+Resource per destination selected. For each destination space
+French enter (Patriot’s choice), the French must also pay one
+Resource. If a Limited Command (2.3.5), all moving units must
+end in a single destination space.
+PROCEDURE: The Patriot moves any of its units desired
+into adjacent spaces (1.3.6). No unit moves more than once.
+French Regulars may accompany Continentals 1 for 1 at the
+Patriot’s option. Units moving from one space to another
+move as a single group. Activate one War Party for every
+two Continentals in the destination space. Set Militia of a
+moving group to Active (1.4.3) if:
+• The destination is a British Controlled City before the
+move, and
+• The moving group’s number of units plus the number of
+British cubes in the destination space exceeds 3.
+Note: March often Activates Militia, but moves by Event
+(5.0) do so only if specified.
+3.3.3 Battle. Battle Commands allow the Patriots to fight
+Royalist Factions with the possible help of the French. Select
+any spaces with Patriot and Royalist pieces. Pay one Resource
+per space. For each space French pieces are involved, French
+must also pay 1 Resource.
+PROCEDURE: In one space at a time, execute according
+to the Battles Procedure Table (3.6). For each space French
+Regulars are involved in the Battle (at the Patriot’s option
+if the French have one or more Resources), the French must
+also pay one Resource.
+3.3.4 Rabble-Rousing. Rabble-Rous-
+ing Commands in Provinces or Cities
+build Opposition (1.6) and place
+Propaganda markers that hinder future
+Royalist efforts to influence it. Select any spaces with Rebellion
+Control and Patriot pieces or at least one Underground Militia.
+Pay one Resource per space selected.
+PROCEDURE: Place a Propaganda marker and shift one
+level toward Active Opposition. Unless Rebellion Control
+with a Patriot piece, activate one Underground Militia in
+each selected space.
+NOTE: Do not place a Propaganda marker if all are already
+on the map (there are 12). Adjust Total Support or Opposi-
+tion (1.6).
+Note: The 12 Propaganda markers have a different historical
+character on each. This is provided as historical color only. The
+Patriots select which Propaganda marker to use.
+3.4 Indian Commands
+Indians choose from Gather, March, Scout and Raid.
+3.4.1 Gather. Gather Commands add or recover Indian forces.
+Select any Provinces at Neutral, Passive Opposition or Pas-
+sive Support (not Active Opposition or Active Support.) Pay
+one Resource per Province selected. Pay 0 for the first Indian
+Reserve Province.
+PROCEDURE: In each selected Province, place one Avail-
+able War Party or replace two War Parties with one Village.
+If the Province already has at least one Village, may instead
+either:
+• Place a number of Available War Parties up to the number
+of Villages there plus one or
+• Move any War Parties from any adjacent spaces to there
+and flip all War Parties there Underground (whether they
+moved or not) (1.4.3).
+No unit moves more than once.
+3.4.2 March. March Commands move War Parties. Select any
+Provinces (not Cities) as destinations of the moving pieces.
+Pay one Resource per destination Province. Pay 0 for the first
+destination where all War Parties are originating from Indian
+Reserve Provinces. If a Limited Command (2.3.5), all moving
+War Parties must end in a single destination Province.
+PROCEDURE: Move any War Parties into adjacent Prov-
+inces (1.3.6). No War Parties move more than once. War
+Parties moving from one Province to another move as a
+single group. Set Underground War Parties moving to Ac-
+tive (1.4.3) if:
+• The destination space is a Colony Controlled by the
+Rebellion before the move, and
+• The moving group’s number of pieces plus the number of
+Militia in the destination Province exceed 3.
+Note: March often Activates War Parties but moves by Event
+(5.0) do so only if specified.
+3.4.3 Scout. Scout Commands allow War Parties to move
+British cubes into an adjacent Province and Skirmish. Pay one
+Resource. British also pay one Resource.
+PROCEDURE: From one selected Province, the Indians
+move at least one War Party into an adjacent Province (not
+City) (1.3.6). Activate all moving War Parties. At least one
+British Regular must (and Tories up to the number of Regu-
+lars may) move with the War Parties. All choices as to who
+to move is made at the Indians’ option. All pieces move from
+one Province to another as a single group. Activate all Militia
+in the destination space. Then the Indians may use British
+Regulars to Skirmish (4.2.2) in the destination Province.
+3.4.4 Raid. Raid Commands shift
+Opposition in up to three Provinces
+one level toward Neutral (1.6) and
+place Raid markers that hinder future
+efforts to influence it. Select up to three Provinces with (or
+adjacent to Provinces with) at least one Underground War
+Party and at Opposition; pay one Resource per Province.
+PROCEDURE: In up to three Provinces, move in up to one
+adjacent War Party. Then in each selected Province, Activate
+one Underground War Party to place a Raid marker and
+shift Opposition one level toward Neutral. Each affected
+Province must have a newly-Activated War Party that ei-
+ther just moved in or was already there. Do not place a Raid
+marker if all are already on the map (there are 12). Adjust
+Total Opposition (1.6).
+Note: The 12 Raid markers have a different Indian tribe on
+the back of each. This is provided as historical color only. The
+Indian player selects which Raid marker to use.
+3.5 French Commands
+French choose from French Agent Mobilization and Roderigue
+Hortalez et Cie before the Treaty of Alliance. After the
+Treaty of Alliance, the French may choose Roderigue
+Hortalez et Cie, Muster, March and Battle.
+3.5.1 French Agent Mobilization. French Agent Mobilization
+Commands allows the French to utilize its agents in North
+America to place Patriot units before the Treaty of Alliance
+card has been played. Select one of the following: Quebec, New
+York, New Hampshire, or Massachusetts. The space may not be
+at Active Support. Pay one Resource.
+PROCEDURE: In the selected Province, place two Available
+Militia or one Continental.
+3.5.2 Roderigue Hortalez et Cie. Roderigue Hortalez et Cie
+was a Spanish trading company used as a front for funneling
+gunpowder, equipment and currency to the Patriots. The French
+may use this Command to increase Patriot Resources before and
+after the Treaty of Alliance card has been played.
+PROCEDURE: The French pays one or more Resources as
+they choose. Patriot Resources are increased by that amount
+plus 1.
+3.5.3 Muster. Muster Commands augment French forces after
+the Treaty of Alliance card has been played. Select any one
+Colony or City with Rebellion Control or the West Indies.
+Pay two Resources.
+PROCEDURE: In the selected Colony, City or West Indies,
+the French may place up to four Regulars. Then, if desired in
+the selected Colony or City and if Patriots have one or more
+Resources, replace two French Regulars with one Patriot Fort
+and Patriots pay one Resource.
+3.5.4 March. March Commands move French Regulars and
+potentially Continentals after the Treaty of Alliance card
+has been played. Select any spaces as the destination that already
+have Patriot pieces or any space if bringing along one or more
+Continentals. Pay one Resource per destination space selected.
+For each destination space Continentals enter (French choice),
+the Patriots must also pay one Resource. If a Limited Command
+(2.3.5), all moving pieces must end in a single destination space.
+PROCEDURE: Move any French Regulars into an adjacent
+(1.3.6) space containing a Patriot piece or, if moving units
+are in or adjacent to a Rebellion Controlled City, to another
+Rebellion Controlled City or a Province adjacent to it (similar
+to British March (3.2.3) except that Cities must be Rebellion
+Controlled). Continentals may only accompany (through
+the entire process) French Regulars 1 for 1 (any cubes that
+move must reach destination spaces paid for). Continentals
+accompany French Regulars at the French’s option. No unit
+moves more than once.
+3.5.5 Battle. Battle Commands allow the French to fight Roy-
+alist Factions with the possible help of the Patriots after the
+Treaty of Alliance card has been played. Select any spaces
+and/or West Indies with French and Royalist pieces. Pay one
+Resource per space or West Indies. For each space Patriot pieces
+are involved, Patriot must also pay 1 Resource.
+PROCEDURE: In one space or West Indies at a time,
+execute according to the Battle Procedure Table (3.6). For
+each space Patriot pieces are involved in the Battle (at the
+French’s option if the Patriots have one or more Resources),
+the Patriots must also pay one Resource.
+3.6 Battle Procedure
+Whenever a Faction initiates Battle, whether proceeding from
+a Battle Command (3.2.4, 3.3.3, 3.5.5), by Event (2.3.4), or
+Winter Quarters Round (6.2.2), this Battle procedure is used
+(also following the common Battle Procedure Table in the
+player aids).
+3.6.1 Factional Cooperation. Decisions in the Battle Procedure
+are always made by the executing Faction unless otherwise
+specified. See Definitions in 3.6.2 below for additional detail.
+When Attacking: The Faction executing the Battle Command
+makes all choices in the Battle for that side. French may only
+use Patriot pieces and Leader if Patriots pay. Patriots may
+only use French pieces and Leader if French pay. British may
+always use Indian pieces and Leader if a War Party is in the
+space during the Battle. Indians are not capable of executing
+a Battle Command.
+When Defending: British or Patriots make all choices for
+combined Defending Royalist or Rebellion side respectively. If
+solely French or Indian pieces are Defending, then that Faction
+makes all choices. All Leaders are applicable when Defending.
+3.6.2 Definitions. Attacker is the Faction and side executing
+the Battle Command. Defender is the enemy of the Attacker.
+Force Level refers to the total of each side’s cubes that can
+participate, half Active Militia or War Parties if they can par-
+ticipate (rounding down), and Forts if Defending. Loss Level
+refers to the result of the enemy side’s dice roll plus modifiers
+for the side taking the losses.
+3.6.3 Force Levels. Attacker then Defender calculates their
+own Force Level.
+• Choose whether or not to Activate any of its own side’s
+Underground units, War Parties (if British Attacking or either
+British or Indians Defending) or Militia (if Patriots paid or
+either Patriots or French Defending).
+• Add half (rounding down) Active War Parties (if British
+Attacking or Royalist Defending) or Militia (if Patriots paid
+or either Patriots or French Defending) to own cubes.
+o If British Attack, include Tories only up to the number of
+British Regulars.
+o If Rebellion Attack, if that Faction paid, add French
+Regulars or Continentals up to the number of own Faction’s
+cubes.
+o If Defending, include all that Side’s cubes, Forts and half
+of Active Militia or War Parties.
+3.6.4 Enemy Loss Level. Attacker rolls and adds modifiers to
+the roll to determine their Enemy’s (Defender) Loss Level.
+Then, Defender rolls and adds modifiers to the roll to determine
+their Enemy’s (Attacker) Loss Level.
+• Divide the Force Level by 3, rounding down, to determine
+how many D3s to roll (not more than 3). If Force Level is
+two or less, then roll no dice and consider the die roll 0.
+• Roll the dice.
+• Adjust the dice roll per the modifiers below in 3.6.5 and 3.6.6.
+The modified total is the Enemy Loss Level.
+3.6.5 Defender Loss Level modifiers (cumulative)
+At least half Attacking Cubes are Regulars (if any)..... +1
+At least one Attacking side piece Underground ......... +1
+At least one Attacking Leader .................................... +1
+Attacking including French with Lauzun ................... +1
+British Attacking in Blockaded City........................... –1
+British Attacking in West Indies and at least one
+Squadron is present ................................................. –1
+Per Defending Fort .................................................... –1
+Indians Defending in Indian Reserve ......................... –1
+Patriots/French Defending with Washington ............. –1
+3.6.6 Attacker Loss Level modifiers (cumulative)
+At least half Defending Cubes are Regulars (if any) ... +1
+At least one Defending side piece Underground ........ +1
+At least one Defending Leader ................................... +1
+British Defending in Blockaded City ......................... –1
+British Defending in West Indies and at least one
+Squadron is present ................................................. –1
+Per Defending Fort..................................................... +1
+3.6.7 Removal. Attacker then Defender must remove own
+pieces with values totaling their modified Loss Level or more
+(none if negative). For purposes of determining the number of
+pieces to be removed, Regulars, Continentals and Forts each
+count as two losses and all other pieces count as one loss each.
+Liberty or Death ~ Rules of Play16© 2015, 2016 GMT Games, LLC
+Loss Value Table
+Counts as two losses British Regulars, French Regulars,
+Continentals and Forts
+Counts as one loss Tories, Militia, War Parties and
+Villages
+Pieces are removed subject to the priorities below.
+• Royalists alternate removing one each British Regulars then
+Tories. Once exhausted, remove Active War Parties. Once
+exhausted, if and only if Royalists Defending, Villages then
+Forts.
+• Rebellion alternate removing one each French Regulars then
+Continentals then Active Militia. Once exhausted, if and only
+if Rebellion Defending, Forts.
+• Ignore Underground War Parties and Underground Militia.
+• Place all removed British Regulars, Tories, French Regulars,
+and Continentals into the Casualties box. Forts also count
+as Casualties but return to Available immediately. Adjust the
+CBC and CRC markers accordingly. Other removed pieces
+to Available.
+3.6.8 Win the Day. Battle winner potentially adjusts Support/
+Opposition.
+• Win the Day occurs only in Battles with loser removing a
+cube or a Fort, loser removing 2+ pieces, and not in West
+Indies.
+• Winner is the side losing the fewest pieces unless one side
+is eliminated (excluding Underground War Parties and
+Underground Militia), in which case the surviving side is
+the winner. Defender is the winner if equal. If both sides
+are eliminated (excluding Underground War Parties and
+Underground Militia), there is no winner or loser.
+• Shift Support/Opposition levels in the Battle space by half
+the number of pieces the Loser removed (rounding down)
+to a maximum of three levels. (If Rebellion is the winner,
+Washington can double to no more than six.)
+o If all shifts are not possible in the Battle space, British (if
+Royalist winner) or Patriots (if Rebellion winner) may use
+remaining shifts in adjacent spaces.
+• If Rebellion winner, Patriots may free Rally in any one eligible
+space, and French may move any Blockades from the Battle
+City to another City.

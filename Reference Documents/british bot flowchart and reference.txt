@@ -1,0 +1,229 @@
+# british_flowchart.yaml
+nodes:
+  B1:
+    type: decision
+    text: "Sequence of Play prevents Event play OR British symbol has 🔪 ?"
+    edges:
+      No:  B2           # go to Event/Command test
+      Yes: B3           # skip Event, test Resources
+
+  B2:
+    type: process
+    title: "Event or Command?"
+    text: |
+      Check Event Instructions 🟤, then play the unshaded Event if any of:
+        • Opposition > Support, and Event shifts Support/Opposition in British favor (including by removing a Blockade)?
+        • Event places British pieces from Unavailable?
+        • Event places Tories in Active Opposition with none, a British Fort
+          in a Colony with none, or British Regulars in a City or Colony?
+        • Event inflicts Rebel Casualties (incl. free Skirmish or Battle)?
+        • British control 5+ Cities, Event is Effective, and a D6 rolls 5+?
+      If none, continue with the flow-chart.
+    edges:
+      "No Event": B3    # bullets not satisfied
+
+  B3:
+    type: decision
+    text: "British Resources > 0 ?"
+    edges:
+      No:  PASS         # small terminator circle
+      Yes: B4
+
+  B4:
+    type: decision
+    text: "10+ British Regulars on map AND Rebels control City w/o Rebel Fort ?"
+    edges:
+      Yes: B5           # Garrison
+      No:  B6
+
+  B5:
+    type: process
+    title: "Garrison"
+    text: |
+      • First execute a Special Activity.
+      • In origin spaces with British Control leave 2 more British and/or Indian than Rebel
+        pieces and remove the last Regular only if Pop 0 or Active Support. Within that, move:
+          – First, just enough to add British Control; first where most Rebels without Patriot Fort, then New York City, then random.
+          – Then give each British controlled City first 1+ Regular if without Active Support,, then 3+ British cubes where Underground Militia.
+      • If no cubes have moved yet, instead Muster.
+      • If any cubes did move, Activate Underground Militia then displace most possible rebels, first to a Province with most Opposition, then least Support, and within that to lowest Pop.
+
+  B6:
+    type: decision
+    text: "Available British Regulars > 1 D6 ?"
+    edges:
+      Yes: B8
+      No:  B9
+
+  B8:
+    type: process
+    title: "Muster"
+    limitation:  Max 4
+    text: |
+      • Place Regulars, first in Neutral or Passive, within that first to add British Control then where Tories are the only British units then random; within each firs tin highest Pop.
+      • Then place TOries, first where Regulars are the only British cubes (within that first where Regulars were just placed), then to change most Control, then in Colonies with < 5 British cubes and no British Fort.
+      • Then, in 1 space, first one already selected above:
+          – If Opposition > Support + 1 D3 OR no British Forts Avail, Reward Loyalty.
+          – If no Reward Loyalty, place Fort in Colony with 5+ British Cubes & no British Fort.
+      • If any Muster was done, execute a Special Activity .
+      • If not possible, March unless already tried, else Pass.
+      Then:  B11        # SA performed
+      "If None": B10
+
+  B9:
+    type: decision
+    text: "2+ Active Rebels in space outnumbered by British Regulars + Leader ?"
+    edges:
+      No:  B10
+      Yes: B12
+
+  B10:
+    type: process
+    title: "March"
+    limitation:  Max 4
+    text: |
+      • Lose no British Control.  Leave last Tory and War Party in each space, and last Regular if British Control but no Active Support.  Within that:
+      • Moving the largest groups first, add British Control to up to 2 Cities then Colonies, within each first where Rebel cubes then highest Pop. Use Common Cause to increase group size if destination is adjacent Province.
+      • Then March to Pop 1+ spaces not at Active Support, first to add Tories where Regulars are the only British units, then to add Regulars where Tories are the only British unites, within each first in the above destinations.
+      • Then March in place to Activate Militia, first in Support.
+      • If no Common Cause used, execute a Special Activity.
+      • If not possible, Muster unless already tried, else Pass.
+    edges:
+      With:  B13
+      "If None": B8
+
+  B12:
+    type: process
+    title: "Battle"
+    text: |
+      • Select all spaces/West Indies with Rebel Forst and/or Rebel cubes where Royalist Force Level + modifiers exceeds Rebel Force Level + modifiers, first where most British.  Use Common Cause to increase British Force Leve.
+      • If no Common Cause was used, execute Skirmish or Naval Pressure per the flowchart.
+      • Then resolve all Battles.
+      • If not possible, March
+    edges:
+      With:  B13
+      "If None": B10
+
+  B13:
+    type: process
+    title: "Common Cause"
+    text: |
+      If British Regulars > Tories, use War Parties (Active first) as Tories
+      up to number of Regulars.
+        – If Marching adto an adjacent province, do NOT use the last War Party (Underground
+          if possible) in the origin space.
+        – If Battle, do NOT use the last Underground War Party.
+      If not possible → Skirmish.
+    edges:
+      to_B11: B11   # unlabelled arrow back to Skirmish
+
+  B7:
+    type: process
+    title: "Naval Pressure"
+    text: |
+      • If FNI>0 and Gage or Clinton is Leader, remove 1 Blockade, first from a Battle space, then from the City with the most Rebels without a Patriot Fort, then from the City with most Support.
+      • Otherwise if FNI = 0, add +1D3 British Resources.
+      • If neither is possible, Skirmish.
+    edges:
+      "Loop No SA": B11
+
+  B11:
+    type: process
+    title: "Skirmish"
+    text: |
+      First in West Indies, then where exactly 1 British Regular, then per below.
+      • Remove as many Rebel cubes as possible, first whichever type is least in the space, removing 1 British Regular if necessary.
+      • Remove 1 Rebel piece, first last Rebel in space, within that first in a City.
+      • If Clinton in the space:  Remove 1 additional Milita if possible
+      If none:  Naval Pressure if possible, otherwise no Special Activity.
+    edges:
+      "Loop No SA": B7
+
+  PASS:
+    type: terminator
+    text: "Pass"
+
+  RL:
+    type: info
+    title: "Reward Loyalty"
+    text: |
+      First where fewest Raid + Propaganda markers, then for largest
+      shift in (Support – Opposition).  Do not Reward Loyalty if only
+      Raid/Propaganda markers would be removed.
+
+  OPS:
+    type: info
+    title: "Operations Summary"
+    text: |
+      Indian Trade: If Indians request Trade and Indian Resources < British
+        Resources, roll 1 D6; if result < Brit Resources, offer to transfer
+        half (round up) rolled Resources to Indians.
+      British Supply / West Indies: Pay only where removing British would
+        prevent Reward Loyalty or allow Committees; highest Pop first; pay to
+        stay in West Indies only if British control it.
+      Redeploy: Move British Leader to space with most British Regulars.
+      Brilliant Stroke: After Treaty, if Leader + 4 Regs and Rebellion player
+        1st-Eligible or Patriots play their BS.
+      Leader Movement: Brit/Indian Leaders follow largest group of own units
+        that moves (or stays) in their space.
+
+# Non-Player British Cards Special Instructions
+"If it hadn’t been so stormy…":
+  number: 18
+  instruction: |
+    Target an Eligible enemy Faction. If none, choose Command & Special Activity instead.
+
+"Lieutenant Colonel Francis Marion":
+  number: 23
+  instruction: |
+    If possible, move Patriots from Support to non-Support spaces.
+
+"Edward Bancroft, British Spy":
+  number: 29
+  instruction: |
+    Target Patriots. If < 4 Militia would Activate, choose Command & Special Activity instead.
+
+"Hessians":
+  number: 30
+  instruction: |
+    If the shaded text is played by an enemy Faction, leave 1 Regular per space if possible.
+
+"Earl of Mansfield Recalled from Paris":
+  number: 44
+  instruction: |
+    Target an Eligible enemy Faction. If none, choose Command & Special Activity instead.
+
+"Bermuda Gunpowder Plot":
+  number: 51
+  instruction: |
+    March to set up Battle per the Battle instructions. If not possible, choose Command & Special Activity instead.
+
+"French Fleet Arrives in the Wrong Spot":
+  number: 52
+  instruction: |
+    March to set up Battle per the Battle instructions. If not possible, choose Command & Special Activity instead.
+
+"Charles Michel de Langlade":
+  number: 62
+  instruction: |
+    If New York is at Active Opposition and has no Tories already, place Tories there. Otherwise, choose Command & Special Activity instead.
+
+"British Gain From French in India":
+  number: 70
+  instruction: |
+    Remove French Regulars from West Indies, then from spaces with British pieces. If none, choose Command & Special Activity instead.
+
+"Confusion Allows Slaves to Escape":
+  number: 80
+  instruction: |
+    Choose a Rebel Faction with pieces in Cities, and select Cities where that Faction has pieces. If none, choose Command & Special Activity instead.
+
+"If it hadn’t been so foggy…":
+  number: 88
+  instruction: |
+    Select a space shared with an enemy Faction, then move per the March instructions from that origin.
+
+"Ohio Country Frontier Erupts":
+  number: 95
+  instruction: |
+    Place War Parties first.

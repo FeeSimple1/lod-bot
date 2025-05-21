@@ -1,0 +1,243 @@
+# french_flowchart.yaml
+nodes:
+  F1:
+    type: decision
+    text: "Sequence of Play prevents Event play OR French symbol has 🗡 ?"
+    edges:
+      No:  F2
+      Yes: F3
+
+  F2:
+    type: process
+    title: "Event or Command?"
+    text: |
+      Check Event Instructions (⚫), then play the shaded Event if any of:
+        • Support > Opposition, and Event shifts Support/Opposition in Rebel favor?
+        • Event moves French Regulars or Squadrons from Unavailable?
+        • Event places Available French pieces on the map?
+        • Event inflicts British Casualties (including free French Battle)?
+        • Event adds French Resources?
+        • If Treaty of Alliance has been played: Event is effective, and a D6 rolls 5 +
+      If none, continue with the flow-chart.
+    edges:
+      "No Event": F3
+
+  F3:
+    type: decision
+    text: "French Resources > 0 ?"
+    edges:
+      No:  PASS
+      Yes: F4
+
+  F4:
+    type: decision
+    text: "Treaty of Alliance played ?"
+    edges:
+      No:  F5
+      Yes: F9
+
+  F5:
+    type: decision
+    text: "Patriot Resources < 1D3 ?"
+    edges:
+      Yes: F6
+      No:  F7
+
+  F6:
+    type: process
+    title: "Roderigue Hortalez et Cie (before Treaty)"
+    text: |
+      Spend 1D3 French Resource to add Patriot Resources.
+      If none, Pass.
+    edges:
+      Then: F8
+
+  F7:
+    type: process
+    title: "French Agent Mobilization"
+    limitation:  Max 1
+    text: |
+      Place 2 Militia, or—if not possible—1 Continental, in Quebec City, New York,
+      New Hampshire, or Massachusetts, first to add most Rebel Control, then
+      where most Patriot units.
+    edges:
+      "If none": F6
+      Then:      F8
+
+  F8:
+    type: process
+    title: "Préparer la Guerre (before Treaty)"
+    text: |
+      Move 1 Blockade from Unavailable to the West Indies; if none, move up to
+      3 French Regulars from Unavailable to Available.
+      If none, no Special Activity.
+    # (no outgoing edges)
+
+  F9:
+    type: decision
+    text: "1D6 < Available French Regulars ?"
+    edges:
+      Yes: F10
+      No:  F13
+
+  F10:
+    type: process
+    title: "Muster"
+    limitation:  Max 1
+    text: |
+      In 1 space with Rebel Control or the West Indies:
+        • If fewer than 4 French Regulars are Available and West Indies is not
+          Rebel Controlled, Muster in West Indies.
+        • Otherwise, Muster first in a Colony or City with Continentals, then random.
+      If not possible, Roderigue Hortalez et Cie.
+    edges:
+      Then:     F12
+      "If none": F11
+
+  F11:
+    type: process
+    title: "Roderigue Hortalez et Cie (after Treaty)"
+    text: |
+      Spend up to 1D3 French Resource to add Patriot Resources.
+    edges:
+      Then: F12
+
+  F12:
+    type: process
+    title: "Skirmish"
+    text: |
+      In 1 space with both French and British not selected for Battle or Muster,
+      first West Indies.
+        • Remove first a British Fort, then most British cubes.
+      If none, Préparer la Guerre.
+    edges:
+      to_F15: F15    # unlabeled arrow to Préparer la Guerre (after Treaty)
+
+  F13:
+    type: decision
+    text: "Rebel cubes + Leader exceed British pieces in space with both ?"
+    edges:
+      Yes: F16
+      No:  F14
+
+  F14:
+    type: process
+    title: "March"
+    text: |
+      • Lose no Rebel Control.
+      • Within that, March with as many French Regulars and Continentals as
+        possible to add Rebel Control, first in Cities, within that first where
+        most British.
+      • March French not in/adjacent to space with British toward nearest
+        British pieces.
+      • If none of the above possible, March 1 French Regular to a space with
+        Patriots and British.
+      If none, Muster.
+    edges:
+      Then:      F12
+      "If none": F10
+
+  F15:
+    type: process
+    title: "Préparer la Guerre (after Treaty)"
+    text: |
+      If 1D6 ≤ Unavailable French Regulars + Blockades, move 1 Blockade to
+      West Indies, or—if none—move up to 3 Regulars from Unavailable to Available.
+      If no Regulars or Blockades moved and French Resources = 0, add +2 French
+      Resources.
+      If none, Naval Pressure.
+    edges:
+      to_F17: F17    # unlabeled
+
+  F16:
+    type: process
+    title: "Battle"
+    text: |
+      • Select all spaces with British where Rebel Force Level (incl. Continentals
+        if possible) + modifiers exceeds Royalist Force Level + modifiers,
+        within that first in highest Pop:
+        • First execute a Special Activity.
+        • Then resolve all Battles.
+      If none, March.
+    edges:
+      With:    F17
+      "If none": F14
+
+  F17:
+    type: process
+    title: "Naval Pressure"
+    text: |
+      Add 1 Blockade, first in a City selected for Battle, then at most Support.
+      If none, Skirmish.
+    edges:
+      Loop: F12     # unlabeled arrow completing 12–15–17 loop
+
+  PASS:
+    type: terminator
+    text: "Pass"
+
+  OPS:
+    type: info
+    title: "Operations Summary"
+    text: |
+      French Supply / West Indies: Pay for each space where moving French
+        Regulars would change Control, *within that first* where the British
+        could Reward Loyalty, then higher Pop.  Pay to keep French Regulars in
+        West Indies if possible.
+      Redeploy: Redeploy the French Leader to a space with French Regulars and
+        Continentals if possible, *within that* where most French Regulars.
+      Loyalist Desertion: Remove a Tory so as to change the most Control
+        possible, then the last Tory in a space with most Pop not already at
+        Active Support, then random.
+
+      Treaty of Alliance: Play the Treaty of Alliance if
+        (Squadrons in West Indies + Available French Regulars +
+         ½ × Cumulative British Casualties) > 15.
+      Brilliant Stroke: Use after Treaty of Alliance when the French Leader is
+        in a space with 4 + French Regulars, and any player Faction is
+        1st Eligible *or* the British play their Brilliant Stroke.
+
+      Leader Movement: During Campaigns, Rebel Leaders move/stay with the
+        largest group of their faction’s units that moves from (or stays in)
+        their origin spaces.
+
+# Non-Player French Cards Special Instructions
+"French Fleet Arrives in the Wrong Spot":
+  number: 52
+  instruction: |
+    Remove no French Regulars. If the Battle Command instruction would select no Battle space, choose Command & Special Activity instead.
+
+"Charles Michel de Langlade":
+  number: 62
+  instruction: |
+    Place Militia only. If not possible, choose Command & Special Activity instead.
+
+"British Gain From French in India":
+  number: 70
+  instruction: |
+    Remove British Regulars from spaces with Rebels. If none, choose Command & Special Activity instead.
+
+"Sullivan Expedition vs Iroquois and Tories":
+  number: 73
+  instruction: |
+    If no British Fort is removed, choose Command & Special Activity instead.
+
+"Guy Carleton and Indians Negotiate":
+  number: 83
+  instruction: |
+    Select Quebec City. If playing the Event does not gain Rebellion there, choose Command & Special Activity instead.
+
+"If it hadn’t been so foggy…":
+  number: 88
+  instruction: |
+    Select a space shared with an enemy Faction, then move per the March instructions from that origin.
+
+"War Damages Colonies’ Economy":
+  number: 89
+  instruction: |
+    Select Active Support spaces first.
+
+"Ohio Country Frontier Erupts":
+  number: 95
+  instruction: |
+    If no British Fort is removed, choose Command & Special Activity instead.
