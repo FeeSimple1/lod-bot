@@ -20,4 +20,3 @@ BRITISH = {
 PATRIOT: dict[int, str] = {}
 INDIAN:  dict[int, str] = {}
 FRENCH:  dict[int, str] = {}
-``` :contentReference[oaicite:0]{index=0}:contentReference[oaicite:1]{index=1}
