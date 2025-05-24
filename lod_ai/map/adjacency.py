@@ -17,7 +17,7 @@ from typing import Dict, Set
 # ----------------------------------------------------------------------
 _MAP_FILE = Path(__file__).parent / "data" / "map.json"
 with _MAP_FILE.open("r", encoding="utf-8") as fh:
-    _RAW_MAP: Dict = json.load(fh)                                   # :contentReference[oaicite:0]{index=0}:contentReference[oaicite:1]{index=1}
+    _RAW_MAP: Dict = json.load(fh)                                  
 
 # Build helpers
 _ADJ: Dict[str, Set[str]] = {}
