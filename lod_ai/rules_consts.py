@@ -76,7 +76,6 @@ DEFAULT_EVENT_SIDE = {
     "French"  : True,    # shaded
 }
 
-# Leaders  (reference: Leader Capabilities card)  :contentReference[oaicite:0]{index=0}:contentReference[oaicite:1]{index=1}
 LEADERS = [
     "LEADER_WASHINGTON",
     "LEADER_ROCHAMBEAU",
