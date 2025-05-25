@@ -1,59 +1,124 @@
-"""
-winter_quarters.py  –  handlers for cards 97-104
+"""Handlers for Winter-Quarters cards (97–104)."""
 
-Each Winter-Quarters card is single-sided.  We push its rule text into
-state["winter_q_effects"] so the Reset-Phase routine can execute them in
-year order.  That lets you finish the real end-of-year logic later
-without breaking tests today.
-"""
-from lod_ai.cards import register, CARD_REGISTRY
+from lod_ai.cards import register
+from lod_ai.cards.effects.shared import add_resource
+from lod_ai.board.pieces import remove_piece
 from lod_ai.util.history import push_history
+from lod_ai.victory import _summarize_board, _patriot_margin, _indian_margin
 
-# --------------------------------------------------------------------------- #
-# little helper so engine can find queued effects later
-# --------------------------------------------------------------------------- #
-def _queue(state, card_id: int, text: str) -> None:
-    state.setdefault("winter_q_effects", []).append((card_id, text))
-    push_history(state, f"Queued Winter-Quarters {card_id}")
+# ---------------------------------------------------------------------------
+# Helper to schedule a Reset-Phase effect
+# ---------------------------------------------------------------------------
 
-# --------------------------------------------------------------------------- #
-# lookup table taken verbatim from the reference
-# --------------------------------------------------------------------------- #
-_WQ_RULE = {
-    97: "Royals commit: If CRC > CBC, French Resources +5; "
-        "else British Resources +5 (Reset Phase).",
+def _queue_event(state, cid, func):
+    state["winter_card_event"] = func
+    push_history(state, f"Queued Winter-Quarters {cid}")
 
-    98: "Overconfident at home: If CRC > CBC, British Resources –3; "
-        "else French Resources –3 (Reset Phase).",
+# ---------------------------------------------------------------------------
+# Individual card effects executed during the Reset Phase
+# ---------------------------------------------------------------------------
 
-    99: "West Indies conflict goes the other way: Reduce the larger of "
-        "CRC or CBC by half the difference (rounding down) (Reset Phase).",
+def _royals_commit(state):
+    if state.get("crc", 0) > state.get("cbc", 0):
+        add_resource(state, "FRENCH", 5)
+        push_history(state, "Royals Commit – French Resources +5")
+    else:
+        add_resource(state, "BRITISH", 5)
+        push_history(state, "Royals Commit – British Resources +5")
 
-    100: "India conflict goes the other way: Reduce the larger of CRC or "
-         "CBC by half the difference (rounding down) (Reset Phase).",
 
-    101: "Floods shift the balance: If Patriots or Indians lead their 2nd "
-         "VC (§7.2), that Faction loses 2 Resources (Reset Phase).",
+def _overconfident(state):
+    if state.get("crc", 0) > state.get("cbc", 0):
+        add_resource(state, "BRITISH", -3)
+        push_history(state, "Overconfident – British Resources -3")
+    else:
+        add_resource(state, "FRENCH", -3)
+        push_history(state, "Overconfident – French Resources -3")
 
-    102: "War on the frontier: If Patriots or Indians lead their 2nd VC "
-         "(§7.2), that Faction removes 1 Fort or Village (Reset Phase).",
 
-    103: "Severe winter: If Patriots or Indians lead their 2nd VC (§7.2), "
-         "that Faction removes 1 Fort or Village (Reset Phase).",
+def _casualty_shift(state, label):
+    crc = state.get("crc", 0)
+    cbc = state.get("cbc", 0)
+    diff = abs(crc - cbc) // 2
+    if diff == 0:
+        return
+    if crc > cbc:
+        state["crc"] = max(0, crc - diff)
+        push_history(state, f"{label} – CRC reduced by {diff}")
+    else:
+        state["cbc"] = max(0, cbc - diff)
+        push_history(state, f"{label} – CBC reduced by {diff}")
 
-    104: "Hurricane hits the South: If Patriots or Indians lead their 2nd VC "
-         "(§7.2), that Faction loses 2 Resources (Reset Phase).",
-}
 
-# --------------------------------------------------------------------------- #
-# auto-register every WQ card
-# --------------------------------------------------------------------------- #
-for _cid, meta in CARD_REGISTRY.items():
-    if not getattr(meta, "winter_quarters", False):
-        continue
+def _second_vc_leader(state):
+    tallies = _summarize_board(state)
+    if _patriot_margin(tallies)[1] > 0:
+        return "PATRIOTS"
+    if _indian_margin(tallies)[1] > 0:
+        return "INDIANS"
+    return None
 
-    _text = _WQ_RULE[_cid]          # raise KeyError if JSON & table mismatch
 
-    @register(_cid)                 # closure; binds _cid/_text per loop
-    def _make_wq(state, shaded=False, _c=_cid, _t=_text):
-        _queue(state, _c, _t)
+def _lose_resources(state, label):
+    fac = _second_vc_leader(state)
+    if not fac:
+        return
+    add_resource(state, fac, -2)
+    push_history(state, f"{label} – {fac.title()} lose 2 Resources")
+
+
+def _lose_fort_or_village(state, label):
+    fac = _second_vc_leader(state)
+    if not fac:
+        return
+    target_tag = "Patriot_Fort" if fac == "PATRIOTS" else "Village"
+    for sid, sp in state["spaces"].items():
+        if sp.get(target_tag):
+            remove_piece(state, target_tag, sid, 1, to="available")
+            push_history(state, f"{label} – removed 1 {target_tag} from {sid}")
+            break
+
+# ---------------------------------------------------------------------------
+# Card handlers – each queues its Reset-Phase effect
+# ---------------------------------------------------------------------------
+
+@register(97)
+def evt_097(state, shaded=False):
+    _queue_event(state, 97, _royals_commit)
+
+
+@register(98)
+def evt_098(state, shaded=False):
+    _queue_event(state, 98, _overconfident)
+
+
+@register(99)
+def evt_099(state, shaded=False):
+    _queue_event(state, 99, lambda s: _casualty_shift(s, "West Indies conflict"))
+
+
+@register(100)
+def evt_100(state, shaded=False):
+    _queue_event(state, 100, lambda s: _casualty_shift(s, "India conflict"))
+
+
+@register(101)
+def evt_101(state, shaded=False):
+    _queue_event(state, 101, lambda s: _lose_resources(s, "Floods shift the balance"))
+
+
+@register(102)
+def evt_102(state, shaded=False):
+    _queue_event(state, 102, lambda s: _lose_fort_or_village(s, "War on the frontier"))
+
+
+@register(103)
+def evt_103(state, shaded=False):
+    _queue_event(state, 103, lambda s: _lose_fort_or_village(s, "Severe Winter"))
+
+
+@register(104)
+def evt_104(state, shaded=False):
+    _queue_event(state, 104, lambda s: _lose_resources(s, "Hurricane hits the South"))
+
+

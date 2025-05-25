@@ -604,7 +604,7 @@ def _reset_phase(state):
         push_history(state, f"Reset – revealed card {state['upcoming_card']['title']}")
 
     # Fire Winter‑Quarters Event, if provided
-    wq_event = state.get("winter_card_event")
+    wq_event = state.pop("winter_card_event", None)
     if callable(wq_event):
         wq_event(state)
         push_history(state, "Reset – Winter‑Quarters event executed")
