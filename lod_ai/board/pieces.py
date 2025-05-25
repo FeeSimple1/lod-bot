@@ -58,6 +58,36 @@ def remove_piece(state: Dict[str, Any], tag: str, loc: str | None,
     return qty - remaining
 
 # --------------------------------------------------------------------------- #
+# Add from Available pool respecting caps
+# --------------------------------------------------------------------------- #
+def add_piece(state: Dict[str, Any], tag: str, loc: str, qty: int = 1) -> int:
+    """Place up to *qty* pieces from the Available pool into *loc*.
+
+    The helper withdraws pieces from ``state['available']`` and delegates
+    placement to :func:`place_with_caps` so global limits are enforced.
+    Returns the number of pieces actually added.
+    """
+
+    if qty <= 0:
+        return 0
+
+    pool = state.setdefault("available", {})
+    available = pool.get(tag, 0)
+    if available <= 0:
+        push_history(state, f"(⛔ no {tag} available)")
+        return 0
+
+    to_place = min(qty, available)
+    placed = place_with_caps(state, tag, loc, to_place)
+    if placed:
+        pool[tag] = available - placed
+        if pool[tag] == 0:
+            del pool[tag]
+    if placed < qty:
+        push_history(state, f"(⛔ only {placed}/{qty} {tag} placed)")
+    return placed
+
+# --------------------------------------------------------------------------- #
 # cap-aware placement
 # --------------------------------------------------------------------------- #
 from lod_ai.rules_consts import (
