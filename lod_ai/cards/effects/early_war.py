@@ -497,16 +497,62 @@ def evt_086_stockbridge(state, shaded=False):
         sp["Patriot_Militia_A"] = sp.get("Patriot_Militia_A", 0) + flip
         push_history(state, f"Stockbridge flip {flip} Militia in {target}")
 
+
 # 90  “THE WORLD TURNED UPSIDE DOWN”
 @register(90)
 def evt_090_world_turned_upside_down(state, shaded=False):
-    return _todo(state)             # Place Fort/Village or remove Regulars
+    """Handle card #90, “The World Turned Upside Down.”"""
 
+    if shaded:
+        # Remove 2 British Regulars anywhere to Casualties.
+        remove_piece(state, "British_Regulars", None, 2, to="casualties")
+        return
+
+    # --- unshaded ---------------------------------------------------------
+    # Prefer to place an Indian Village in the first Reserve province.
+    reserve = next(
+        (
+            name
+            for name, info in state["spaces"].items()
+            if info.get("type") == "Reserve" or "Reserve" in name
+        ),
+        None,
+    )
+
+    placed = 0
+    if reserve:
+        placed = place_with_caps(state, "Indian_Village", reserve)
+
+    if placed == 0:
+        # No Village available/cap reached – place a Fort in Virginia instead.
+        place_with_caps(state, "British_Fort", "Virginia")
 
 # 91  INDIANS HELP BRITISH OUTSIDE COLONIES
 @register(91)
 def evt_091_indians_help(state, shaded=False):
-    return _todo(state)             # Village/War Party placement or removal
+    """Handle card #91, Indians Help British Outside Colonies."""
+
+    # Identify the first Reserve province on the map.
+    reserve = next(
+        (
+            name
+            for name, info in state["spaces"].items()
+            if info.get("type") == "Reserve" or "Reserve" in name
+        ),
+        None,
+    )
+
+    if not reserve:
+        return
+
+    if shaded:
+        sp = state["spaces"][reserve]
+        for tag in ("Indian_Village", "Indian_WarParties"):
+            if sp.get(tag, 0):
+                remove_piece(state, tag, reserve, 1)
+                break
+    else:
+        place_with_caps(state, "Indian_Village", reserve)
 
 
 # 92  CHEROKEES SUPPLIED BY THE BRITISH
