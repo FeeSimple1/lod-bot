@@ -43,12 +43,12 @@ def _remove_four_patriot_units(state):
 # 1  WAXHAWS MASSACRE
 from lod_ai.rules_consts import (
     REGULAR_BRI,          # British Regular cube tag
-    CONTINENTAL_PAT,      # Patriot Continental cube tag
-    PROP,                 # Propaganda marker tag
+    REGULAR_PAT,          # Patriot Continental cube tag
+    PROPAGANDA,           # Propaganda marker tag
     TORY,
     FORT_BRI,
     RAID,
-    WEST_INDIES_ID
+    WEST_INDIES_ID,
 )
 from lod_ai.util.history import push_history
 from lod_ai.util.free_ops import queue_free_op
@@ -85,14 +85,14 @@ def evt_001_waxhaws(state, shaded=False):
 
     if shaded:
         queue_free_op(state, "PATRIOTS", "march_battle", target)
-        place_marker(state, PROP, target, 2)
+        place_marker(state, PROPAGANDA, target, 2)
         shift_support(state, target, -1)     # toward Neutral
-        push_history(state, f"Waxhaws (shaded): March/Battle in {target}, +2 PROP, Support −1")
+        push_history(state, f"Waxhaws (shaded): March/Battle in {target}, +2 PROPAGANDA, Support −1")
     else:
-        remove_piece(state, CONTINENTAL_PAT, target, 2, to="casualties")
+        remove_piece(state, REGULAR_PAT, target, 2, to="casualties")
         shift_support(state, target, +1)     # toward Active Support
-        place_marker(state, PROP, target, 2)
-        push_history(state, f"Waxhaws (unshaded): −2 Continentals in {target}, Support +1, +2 PROP")
+        place_marker(state, PROPAGANDA, target, 2)
+        push_history(state, f"Waxhaws (unshaded): −2 Continentals in {target}, Support +1, +2 PROPAGANDA")
 
 # 7  JOHN PAUL JONES
 @register(7)
@@ -194,7 +194,7 @@ def evt_025_prison_ships(state, shaded=False):
         for city in ("New_York_City", "Charleston"):
             place_piece(state, "Patriot_Militia_U", city, 1)
             shift_support(state, city, -1)
-            place_marker(state, PROP, city)
+            place_marker(state, PROPAGANDA, city)
     else:
         for city in ("New_York_City", "Charleston"):
             shift_support(state, city, +1)
