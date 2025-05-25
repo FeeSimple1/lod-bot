@@ -1,6 +1,13 @@
 from lod_ai.cards import register
 from .shared import add_resource, shift_support
 from lod_ai.util.free_ops import queue_free_op
+from lod_ai.board.pieces import (
+    move_piece,
+    place_piece,
+    remove_piece,
+    place_marker,
+    place_with_caps,
+)
 
 # helper alias for “do nothing yet”
 def _todo(*_a, **_kw):            # noqa: D401
@@ -125,7 +132,20 @@ def evt_020_continental_marines(state, shaded=False):
 # 24  DECLARATION OF INDEPENDENCE
 @register(24)
 def evt_024_declaration(state, shaded=False):
-    return _todo(state)                      # large piece shifts + Propaganda
+    """Declaration of Independence."""
+    if shaded:
+        targets = list(state["spaces"])[:3]
+        for sid in targets:
+            place_piece(state, "Patriot_Militia_U", sid)
+            place_marker(state, "Propaganda", sid)
+        place_with_caps(state, "Patriot_Fort", targets[0])
+    else:
+        remove_piece(state, "Patriot_Continentals", None, 2, to="available")
+        remaining = 2
+        remaining -= remove_piece(state, "Patriot_Militia_U", None, remaining, to="available")
+        if remaining:
+            remove_piece(state, "Patriot_Militia_A", None, remaining, to="available")
+        remove_piece(state, "Patriot_Fort", None, 1, to="casualties")
 
 
 # 28  BATTLE OF MOORE’S CREEK BRIDGE
@@ -195,7 +215,22 @@ def evt_029_bancroft(state, shaded=False):
 # 30  HESSIANS
 @register(30)
 def evt_030_hessians(state, shaded=False):
-    return _todo(state)                      # Regular additions / removals
+    """Hessians deployment or settlement."""
+    def _pull_regulars(loc: str, qty: int = 2) -> None:
+        moved = move_piece(state, "British_Regulars", "available", loc, qty)
+        if moved < qty:
+            move_piece(state, "British_Regulars", "unavailable", loc, qty - moved)
+
+    if shaded:
+        total = sum(sp.get("British_Regulars", 0) for sp in state["spaces"].values())
+        remove_qty = total // 5
+        if remove_qty:
+            remove_piece(state, "British_Regulars", None, remove_qty, to="available")
+    else:
+        eligible = [n for n, sp in state["spaces"].items() if sp.get("British_Regulars")]
+        for loc in eligible[:3]:
+            _pull_regulars(loc, 2)
+        add_resource(state, "British", +2)
 
 
 # 32  RULE BRITANNIA!
@@ -312,7 +347,17 @@ def evt_043_russian_muskets(state, shaded=False):
     Shaded   – Ship sinks: British remove one in three Tories on map,
                rounding down (to Available).
     """
-    return _todo(state)          # implement when piece helpers are ready
+    if shaded:
+        total = sum(sp.get("British_Tories", 0) for sp in state["spaces"].values())
+        remove_qty = total // 3
+        if remove_qty:
+            remove_piece(state, "British_Tories", None, remove_qty, to="available")
+    else:
+        eligible = [n for n, sp in state["spaces"].items() if sp.get("British_Regulars", 0)]
+        for loc in eligible[:3]:
+            moved = move_piece(state, "British_Tories", "available", loc, 2)
+            if moved < 2:
+                move_piece(state, "British_Tories", "unavailable", loc, 2 - moved)
 
 
 # 46  EDMUND BURKE ON CONCILIATION
@@ -463,7 +508,15 @@ def evt_082_shawnee(state, shaded=False):
 # 83  GUY CARLETON & INDIANS NEGOTIATE
 @register(83)
 def evt_083_carleton_negotiates(state, shaded=False):
-    return _todo(state)             # Support shift + War Parties / pieces
+    if shaded:
+        loc = "Quebec"
+        place_piece(state, "Patriot_Militia_U", loc, 2)
+        place_with_caps(state, "Patriot_Fort", loc)
+    else:
+        city = "Quebec_City"
+        delta = 2 - state["support"].get(city, 0)
+        shift_support(state, city, delta)
+        place_piece(state, "Indian_WarParties", "Quebec", 2)
 
 
 # 84  SIX NATIONS AID THE WAR
