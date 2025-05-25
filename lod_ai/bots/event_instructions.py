@@ -17,6 +17,9 @@ BRITISH = {
 }
 
 # Other factions will be filled in as we implement their bots.
-PATRIOT: dict[int, str] = {}
+PATRIOT: dict[int, str] = {
+    2: "force",       # Common Sense
+    31: "ignore",     # Thomas Brown and the King’s Rangers
+}
 INDIAN:  dict[int, str] = {}
 FRENCH:  dict[int, str] = {}

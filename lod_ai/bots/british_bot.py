@@ -2,8 +2,9 @@
 from typing import Dict, List
 from lod_ai.bots.base_bot import BaseBot
 from lod_ai import rules_consts as C
-from lod_ai import dispatcher
 from lod_ai.board.control import refresh_control
+from lod_ai.commands import garrison, muster, march, battle
+from lod_ai.util.history import push_history
 import json
 from pathlib import Path
 
@@ -38,27 +39,79 @@ class BritishBot(BaseBot):
                 return
 
         # E. PASS
-        dispatcher.execute("PASS", self.faction, None, state)
+        push_history(state, "BRITISH PASS")
 
     # ---------------------------------------------------------
     # ---- Command executors  (stubs – fill bullets later) ----
     # ---------------------------------------------------------
     def _garrison(self, state: Dict) -> bool:
-        # call dispatcher.execute("GARRISON", ...)
-        # run Naval Pressure / Skirmish choice
-        return True        # return False if aborted
+        """Very simple Garrison: move one Regular to a rebel City."""
+        refresh_control(state)
+        target = None
+        for name in CITIES:
+            sp = state["spaces"].get(name, {})
+            if sp.get("control") == "REBELLION" and sp.get("Patriot_Fort", 0) == 0:
+                target = name
+                break
+        if not target:
+            return False
+
+        origins = [n for n, sp in state["spaces"].items()
+                   if sp.get("British_Regulars", 0) > 0 and n != target]
+        if not origins:
+            return False
+
+        move_map = {orig: {target: 1} for orig in origins[:2]}
+        garrison.execute(state, "BRITISH", {}, move_map)
+        return True
 
     def _muster(self, state: Dict) -> bool:
-        # follow eight-step bullets incl. Reward Loyalty & SA
+        """Place a Regular and Tory in the richest available space."""
+        spaces = sorted(state["spaces"].items(),
+                        key=lambda kv: kv[1].get("population", 0),
+                        reverse=True)
+        if not spaces:
+            return False
+        target = spaces[0][0]
+        selected = [target]
+        muster.execute(
+            state,
+            "BRITISH",
+            {},
+            selected,
+            regular_plan={"space": target, "n": 1},
+            tory_plan={target: 1},
+        )
         return True
 
     def _march(self, state: Dict) -> bool:
-        # bullets incl. Common Cause logic & SA fallback
-        return True
+        """Move one Regular from a random space to an adjacent one."""
+        for src, sp in state["spaces"].items():
+            if sp.get("British_Regulars", 0) > 0:
+                dests = sp.get("adj", [])
+                if dests:
+                    dst = dests[0]
+                    march.execute(
+                        state,
+                        "BRITISH",
+                        {},
+                        [src],
+                        [dst],
+                        bring_escorts=False,
+                        limited=True,
+                    )
+                    return True
+        return False
 
     def _battle(self, state: Dict) -> bool:
-        # select all battle spaces, resolve, SA fallback if needed
-        return True
+        """Battle in the first space where British outnumber rebels."""
+        refresh_control(state)
+        for name, sp in state["spaces"].items():
+            rebels = sp.get("Patriot_Continentals", 0) + sp.get("Patriot_Militia", 0)
+            if rebels >= 1 and sp.get("British_Regulars", 0) > rebels:
+                battle.execute(state, "BRITISH", {}, [name])
+                return True
+        return False
 
     # ---------------------------------------------------------
     # ---- Flow-chart pre-condition tests ---------------------
@@ -70,7 +123,24 @@ class BritishBot(BaseBot):
         return self._brit_event_conditions(state, card)
 
     def _brit_event_conditions(self, state: Dict, card: Dict) -> bool:
-        """Simplified check of B2 bullets. Currently always False."""
+        """Very rough implementation of the Event-or-Command bullets."""
+        text = (card.get("unshaded_event") or "")
+        support = sum(sp.get("Support", 0) for sp in state["spaces"].values())
+        opposition = sum(sp.get("Opposition", 0) for sp in state["spaces"].values())
+
+        if opposition > support and "Support" in text:
+            push_history(state, "BRITISH plays Event for support shift")
+            return True
+
+        keywords = ["Regular", "Tory", "Fort"]
+        if any(k in text for k in keywords):
+            push_history(state, "BRITISH plays Event for placement")
+            return True
+
+        if "remove" in text and any(k in text for k in ["Patriot", "Militia", "Continental"]):
+            push_history(state, "BRITISH plays Event for casualties")
+            return True
+
         return False
 
     def _can_garrison(self, state: Dict) -> bool:
