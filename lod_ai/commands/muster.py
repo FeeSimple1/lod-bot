@@ -28,7 +28,8 @@ other Commands such as :pymod:`lod_ai.commands.march`).
 from typing import Dict, List, Optional
 
 from lod_ai.util.history   import push_history
-from lod_ai.util.caps      import refresh_control, enforce_global_caps
+from lod_ai.board.control  import refresh_control
+from lod_ai.util.caps      import enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent
 from lod_ai.leaders        import apply_leader_modifiers
 from lod_ai.rules_consts import (

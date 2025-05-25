@@ -21,6 +21,7 @@ Local stacking
 
 from collections import defaultdict
 from typing import Dict, List
+from lod_ai.board.control import refresh_control
 
 from lod_ai.rules_consts import (
     MAX_BRI_FORTS,
