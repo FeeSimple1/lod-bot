@@ -88,6 +88,9 @@ LEADERS = [
     "LEADER_DRAGGING_CANOE",
 ]
 
+# Individual leader tags (for convenience)
+LEADER_ROCHAMBEAU = "LEADER_ROCHAMBEAU"
+
 # Leader-change progression (Rule 6.5.1)
 LEADER_CHAIN = {
     # British

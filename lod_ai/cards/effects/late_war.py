@@ -59,8 +59,6 @@ from lod_ai.board.pieces import (
     place_piece,
     place_with_caps,
 )
-from lod_ai.util.support import shift_support
-from lod_ai.events import register
 
 
 @register(1)
