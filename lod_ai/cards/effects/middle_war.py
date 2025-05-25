@@ -2,7 +2,7 @@
 middle_war.py – Event handlers for 1777-1778 cards
 --------------------------------------------------
 IDs covered (32): 3 5 8 9 11 12 14 17 26 27 34 38 42 44 47 50
-                  55 58 59 60 61 69 71 74 76 77 78 80 88 89 93
+                  55 58 59 60 61 63 69 71 74 76 77 78 80 88 89 93
 Replace each _todo with real logic once piece / marker helpers exist.
 """
 
@@ -295,19 +295,6 @@ def evt_050_destaing_arrives(state, shaded=False):
     if removed < 2:
         remove_piece(state, "French_Regulars", None, 2 - removed, to="available")
     state.setdefault("ineligible_next", set()).add("FRENCH")
-
-# 54  ANTOINE de SARTINE
-@register(54)
-def evt_054_antoine_sartine(state, shaded=False):
-    """
-    Unshaded – move 1 French Squadron from West Indies → Unavailable.
-    Shaded   – move 2 Squadrons/Blockades from Unavailable → West Indies.
-    """
-    tag = "French_Squadron"
-    if shaded:
-        move_piece(state, tag, "unavailable", "west_indies", 2)
-    else:
-        move_piece(state, tag, "west_indies", "unavailable", 1)
 
 # 55  FRENCH NAVY DOMINATES CARIBBEAN
 @register(55)
