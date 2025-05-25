@@ -19,4 +19,13 @@ BRITISH = {
 # Other factions will be filled in as we implement their bots.
 PATRIOT: dict[int, str] = {}
 INDIAN:  dict[int, str] = {}
-FRENCH:  dict[int, str] = {}
+FRENCH:  dict[int, str] = {
+    52: "force",   # French Fleet Arrives in the Wrong Spot
+    62: "force",   # Charles Michel de Langlade
+    70: "force",   # British Gain From French in India
+    73: "force",   # Sullivan Expedition vs Iroquois and Tories
+    83: "force",   # Guy Carleton and Indians Negotiate
+    88: "force",   # "If it hadn’t been so foggy…"
+    89: "force",   # War Damages Colonies’ Economy
+    95: "force",   # Ohio Country Frontier Erupts
+}
