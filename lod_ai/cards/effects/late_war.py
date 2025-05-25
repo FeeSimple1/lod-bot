@@ -7,7 +7,12 @@ IDs: 1 7 16 18 19 21 22 23 25 31 36 37 39 40
 """
 
 from lod_ai.cards import register
-from .shared import add_resource, shift_support, push_history
+from .shared import (
+    add_resource,
+    shift_support,
+    push_history,
+    adjust_fni,
+)
 
 # --------------------------------------------------------------------------- #
 # helper for un-implemented, piece-heavy events
@@ -16,15 +21,44 @@ def _todo(state):
     push_history(state, "TODO: late-war event not yet implemented")
 
 
+def _remove_four_patriot_units(state):
+    """Remove up to 4 Patriot Militia/Continentals from one Colony."""
+    for name, sp in state["spaces"].items():
+        pat_total = sp.get("Patriot_Militia_A", 0) + sp.get("Patriot_Militia_U", 0)
+        pat_total += sp.get("Patriot_Continental", 0)
+        if pat_total:
+            removed = 0
+            for tag in (
+                "Patriot_Militia_A",
+                "Patriot_Militia_U",
+                "Patriot_Continental",
+            ):
+                while sp.get(tag, 0) and removed < 4:
+                    remove_piece(state, tag, name, 1, to="available")
+                    removed += 1
+            push_history(state, f"Newburgh: removed {removed} Patriot units in {name}")
+            break
+
+
 # 1  WAXHAWS MASSACRE
 from lod_ai.rules_consts import (
     REGULAR_BRI,          # British Regular cube tag
     CONTINENTAL_PAT,      # Patriot Continental cube tag
-    PROP                  # Propaganda marker tag
+    PROP,                 # Propaganda marker tag
+    TORY,
+    FORT_BRI,
+    RAID,
+    WEST_INDIES_ID
 )
 from lod_ai.util.history import push_history
 from lod_ai.util.free_ops import queue_free_op
-from lod_ai.board.pieces import remove_piece, place_marker
+from lod_ai.board.pieces import (
+    remove_piece,
+    place_marker,
+    move_piece,
+    place_piece,
+    place_with_caps,
+)
 from lod_ai.util.support import shift_support
 from lod_ai.events import register
 
@@ -65,21 +99,26 @@ def evt_001_waxhaws(state, shaded=False):
 def evt_007_john_paul_jones(state, shaded=False):
     if shaded:
         add_resource(state, "Patriots", +5)
-        state["fni_level"] = min(4, state.get("fni_level", 0) + 1)
-    else:
-        add_resource(state, "British",  +3)
-        state["fni_level"] = max(0, state.get("fni_level", 0) - 1)
-    # TODO: move Regulars between pools & West Indies
+        adjust_fni(state, +1)
+        return
+
+    add_resource(state, "British", +3)
+    adjust_fni(state, -1)
+    moved = move_piece(state, REGULAR_BRI, "available", WEST_INDIES_ID, 2)
+    if moved:
+        push_history(state, f"John Paul Jones: {moved} Regulars to West Indies")
 
 
 # 16  MERCY WARREN’S “THE MOTLEY ASSEMBLY”
 @register(16)
 def evt_016_mercy_warren(state, shaded=False):
     if shaded:
-        city = "Boston"              # placeholder selection
-        shift_support(state, city, -1)
+        city = "Boston"  # deterministic choice
+        # set support to Passive Opposition
+        delta = -1 - state["support"].get(city, 0)
+        shift_support(state, city, delta)
     else:
-        _todo(state)                 # place 2 Tories anywhere
+        place_piece(state, TORY, "New_York_City", 2)
 
 
 # 18  “IF IT HADN’T BEEN SO STORMY…”
@@ -93,7 +132,7 @@ def evt_018_if_not_stormy(state, shaded=False):
 @register(19)
 def evt_019_nathan_hale(state, shaded=False):
     if shaded:
-        _todo(state)                 # place 3 Militia
+        place_piece(state, "Patriot_Militia_U", "Pennsylvania", 3)
         add_resource(state, "Patriots", +3)
     else:
         add_resource(state, "Patriots", -4)
@@ -130,14 +169,32 @@ def evt_022_newburgh_conspiracy(state, shaded=False):
 # 23  FRANCIS MARION
 @register(23)
 def evt_023_francis_marion(state, shaded=False):
-    _todo(state)
+    if shaded:
+        target = "South_Carolina"
+        mil = state["spaces"].get(target, {}).get("Patriot_Militia_U", 0) + \
+              state["spaces"].get(target, {}).get("Patriot_Militia_A", 0)
+        if mil:
+            removed = 0
+            removed += remove_piece(state, REGULAR_BRI, target, 4, to="casualties")
+            if removed < 4:
+                remove_piece(state, TORY, target, 4 - removed, to="casualties")
+    else:
+        src = "South_Carolina"
+        dst = "Georgia"
+        for tag in ("Patriot_Militia_A", "Patriot_Militia_U", "Patriot_Continental"):
+            qty = state["spaces"].get(src, {}).get(tag, 0)
+            if qty:
+                move_piece(state, tag, src, dst, qty)
 
 
 # 25  BRITISH PRISON SHIPS
 @register(25)
 def evt_025_prison_ships(state, shaded=False):
     if shaded:
-        _todo(state)                 # Militia + shift + propaganda
+        for city in ("New_York_City", "Charleston"):
+            place_piece(state, "Patriot_Militia_U", city, 1)
+            shift_support(state, city, -1)
+            place_marker(state, PROP, city)
     else:
         for city in ("New_York_City", "Charleston"):
             shift_support(state, city, +1)
@@ -146,24 +203,35 @@ def evt_025_prison_ships(state, shaded=False):
 # 31  THOMAS BROWN & KING’S RANGERS
 @register(31)
 def evt_031_kings_rangers(state, shaded=False):
-    _todo(state)
+    space = "South_Carolina"
+    if shaded:
+        place_piece(state, "Patriot_Militia_U", space, 2)
+        queue_free_op(state, "PATRIOTS", "partisans", space)
+    else:
+        place_with_caps(state, FORT_BRI, space)
+        place_piece(state, TORY, space, 2)
 
 
 # 36  NAVAL BATTLE IN WEST INDIES
 @register(36)
 def evt_036_naval_battle_wi(state, shaded=False):
-    _todo(state)                     # Regular moves & FNI shift
+    if shaded:
+        move_piece(state, REGULAR_BRI, WEST_INDIES_ID, "available", 4)
+    else:
+        move_piece(state, "French_Regulars", None, "available", 3)
+        adjust_fni(state, -1)
 
 
 # 37  THE ARMADA OF 1779
 @register(37)
 def evt_037_armada(state, shaded=False):
     if shaded:
-        _todo(state)                 # remove Regulars, FNI +1
+        remove_piece(state, REGULAR_BRI, None, 4, to="available")
+        adjust_fni(state, +1)
     else:
         add_resource(state, "Patriots", -2)
-        add_resource(state, "French",   -3)
-        state["fni_level"] = max(0, state.get("fni_level", 0) - 1)
+        add_resource(state, "French", -3)
+        adjust_fni(state, -1)
 
 
 # 39  “HIS MAJESTY, KING MOB” PROTESTS
@@ -206,7 +274,17 @@ def evt_048_god_save_king(state, shaded=False):
         queue_free_op(state, "BRITISH", "march",  target)
         queue_free_op(state, "BRITISH", "battle", target)
     else:
-        _todo(state)                 # relocation logic still pending
+        moved = 0
+        for name, sp in state["spaces"].items():
+            if moved == 3:
+                break
+            if sp.get(REGULAR_BRI, 0) and any(k.startswith("Patriot_") or k.startswith("French") or k.startswith("Indian") for k in sp):
+                for tag in list(sp.keys()):
+                    if tag.startswith("Patriot_") or tag.startswith("French") or tag.startswith("Indian"):
+                        qty = sp.get(tag, 0)
+                        if qty:
+                            move_piece(state, tag, name, "available", qty)
+                moved += 1
 
 
 # 52  FRENCH FLEET ARRIVES IN THE WRONG SPOT
@@ -236,23 +314,25 @@ def evt_052_fleet_wrong_spot(state, shaded=False):
 # 57  FRENCH FLEET SAILS FOR THE CARIBBEAN
 @register(57)
 def evt_057_french_caribbean(state, shaded=False):
-    _todo(state)
+    if shaded:
+        move_piece(state, REGULAR_BRI, None, WEST_INDIES_ID, 2)
+        state.setdefault("ineligible_next", set()).add("BRITISH")
+    else:
+        move_piece(state, "French_Regulars", "available", WEST_INDIES_ID, 2)
+        state.setdefault("ineligible_next", set()).add("FRENCH")
+        adjust_fni(state, -1)
 
 
 # 62  CHARLES MICHEL DE LANGLADE
 @register(62)
 def evt_062_langlade(state, shaded=False):
-    _todo(state)
+    if shaded:
+        place_piece(state, "French_Regulars", "Quebec", 3)
+    else:
+        place_piece(state, "Indian_WP_U", "Northwest", 3)
 
 
-# 45  ADAM SMITH – WEALTH OF NATIONS
-@register(45)
-def evt_045_adam_smith(state, shaded=False):
-    add_resource(state, "British", +6 if not shaded else -4)
-# 45  ADAM SMITH – WEALTH OF NATIONS
-@register(45)
-def evt_045_adam_smith(state, shaded=False):
-    add_resource(state, "British", +6 if not shaded else -4)
+
 
 # 64  AFFAIR OF FIELDING & BYLANDT
 @register(64)
@@ -279,70 +359,98 @@ def evt_066_don_bernardo(state, shaded=False):
     """
     from lod_ai.util.free_ops import queue_free_op
 
-    if not shaded:
-        return
-
-    fac = "FRENCH" if state.get("toa_played") else "PATRIOTS"
-    queue_free_op(state, fac, "march",       "Florida")
-    queue_free_op(state, fac, "battle_plus2","Florida")
+    if shaded:
+        fac = "FRENCH" if state.get("toa_played") else "PATRIOTS"
+        queue_free_op(state, fac, "march", "Florida")
+        queue_free_op(state, fac, "battle_plus2", "Florida")
+    else:
+        place_piece(state, REGULAR_BRI, "Florida", 6)
 
 
 # 67  DE GRASSE ARRIVES
 @register(67)
 def evt_067_de_grasse(state, shaded=False):
     """
-    Unshaded – French (or Patriots) free Rally *or* Muster in any 1 space.
-    Shaded   – (no free ops)
+    Unshaded – Lower FNI 1; move 3 French Regulars from West Indies to Available.
+    Shaded   – French (or Patriots) free Rally or Muster in 1 space and remain Eligible.
     """
     from lod_ai.util.free_ops import queue_free_op
     if shaded:
-        _todo(state)
-        return
-
-    fac = "FRENCH" if state.get("toa_played") else "PATRIOTS"
-    queue_free_op(state, fac, "rally")     # bot will choose Rally over Muster
+        fac = "FRENCH" if state.get("toa_played") else "PATRIOTS"
+        queue_free_op(state, fac, "rally")
+        state.setdefault("eligible_next", set()).add(fac)
+    else:
+        move_piece(state, "French_Regulars", WEST_INDIES_ID, "available", 3)
+        adjust_fni(state, -1)
 
 
 # 70  BRITISH GAIN FROM FRENCH IN INDIA
 @register(70)
 def evt_070_french_india(state, shaded=False):
     """
-    Unshaded – Executing Faction free Battle anywhere with +2 Force Level.
+    Unshaded – Remove 3 Regulars from map or West Indies to Available.
     Shaded   – (none)
     """
-    from lod_ai.util.free_ops import queue_free_op
     if shaded:
         return
-    queue_free_op(state, state["executing_faction"], "battle_plus2")
+    removed = remove_piece(state, REGULAR_BRI, None, 3, to="available")
+    if removed < 3:
+        remove_piece(state, "French_Regulars", None, 3 - removed, to="available")
 
 # 73  SULLIVAN EXPEDITION VS IROQUOIS
 @register(73)
 def evt_073_sullivan(state, shaded=False):
-    _todo(state)
+    # remove a Fort or Village in specified regions
+    for loc in ("New_York", "Northwest", "Quebec"):
+        if remove_piece(state, FORT_BRI, loc, 1, to="available"):
+            break
+        if remove_piece(state, "Indian_Village", loc, 1, to="available"):
+            break
 
 
 # 79  TUSCARORA & ONEIDA COME TO WASHINGTON
 @register(79)
 def evt_079_tuscarora_oneida(state, shaded=False):
-    _todo(state)
+    loc = "Pennsylvania"
+    if shaded:
+        remove_piece(state, "Indian_Village", loc, 1, to="available")
+        remove_piece(state, "Indian_WP_U", loc, 2, to="available")
+    else:
+        place_piece(state, "Indian_Village", loc, 1)
+        place_piece(state, "Indian_WP_U", loc, 2)
 
 
 # 81  CREEK & SEMINOLE ACTIVE IN SOUTH
 @register(81)
 def evt_081_creek_seminole(state, shaded=False):
-    _todo(state)
+    loc = "South_Carolina"
+    if shaded:
+        removed = remove_piece(state, "Indian_WP_U", loc, 2, to="available")
+        if removed < 2:
+            remove_piece(state, "Indian_WP_U", "Georgia", 2 - removed, to="available")
+    else:
+        place_piece(state, "Indian_WP_U", loc, 2)
+        place_marker(state, RAID, loc)
+        place_piece(state, "Indian_Village", loc, 1)
 
 
 # 85  INDIANS HELP BRITISH RAIDS ON MISSISSIPPI
 @register(85)
 def evt_085_mississippi_raids(state, shaded=False):
-    _todo(state)
+    loc = "Southwest"
+    if shaded:
+        place_piece(state, "Patriot_Militia_U", loc, 2)
+        place_piece(state, "French_Regulars", loc, 2)
+    else:
+        place_piece(state, REGULAR_BRI, loc, 3)
 
 
 # 87  PATRIOTS MASSACRE LENAPE INDIANS
 @register(87)
 def evt_087_lenape(state, shaded=False):
-    _todo(state)
+    if shaded:
+        return
+    remove_piece(state, "Indian_WP_U", "Pennsylvania", 1, to="available")
 
 
 # 94  HERKIMER’S RELIEF COLUMN
@@ -354,15 +462,21 @@ def evt_094_herkimer(state, shaded=False):
     """
     from lod_ai.util.free_ops import queue_free_op
     if shaded:
+        remove_piece(state, "Indian_WP_U", "Pennsylvania", 4, to="available")
         return
-    queue_free_op(state, "INDIANS",  "gather", "New_York")
-    queue_free_op(state, "BRITISH",  "muster", "New_York")
+    queue_free_op(state, "INDIANS", "gather", "New_York")
+    queue_free_op(state, "BRITISH", "muster", "New_York")
+    remove_piece(state, "Patriot_Militia_U", "New_York", 99, to="available")
+    remove_piece(state, "Patriot_Militia_A", "New_York", 99, to="available")
 
 
 # 95  OHIO COUNTRY FRONTIER ERUPTS
 @register(95)
 def evt_095_ohio_frontier(state, shaded=False):
-    _todo(state)
+    loc = "Northwest"
+    if remove_piece(state, FORT_BRI, loc, 1, to="available") == 0:
+        remove_piece(state, "Indian_Village", loc, 1, to="available")
+    place_piece(state, "Indian_WP_U", loc, 3)
 
 
 # 96  IROQUOIS CONFEDERACY
@@ -374,7 +488,8 @@ def evt_096_iroquois_confederacy(state, shaded=False):
     """
     from lod_ai.util.free_ops import queue_free_op
     if shaded:
-        return
-    for _ in range(2):
-        queue_free_op(state, "INDIANS", "gather")
-        queue_free_op(state, "INDIANS", "war_path")
+        remove_piece(state, "Indian_Village", None, 1, to="available")
+    else:
+        for _ in range(2):
+            queue_free_op(state, "INDIANS", "gather")
+            queue_free_op(state, "INDIANS", "war_path")
