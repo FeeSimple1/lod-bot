@@ -18,6 +18,15 @@ state["toa_played"] = True.  Flesh out the real engine logic later.
 
 from lod_ai.cards import register
 from lod_ai.util.history import push_history
+from lod_ai.util.free_ops import queue_free_op
+from lod_ai.util.naval import adjust_fni
+from lod_ai.board.pieces import move_piece, place_piece
+from lod_ai.rules_consts import (
+    REGULAR_BRI,
+    REGULAR_FRE,
+    WEST_INDIES_ID,
+    LEADER_ROCHAMBEAU,
+)
 
 # ------------------------------------------------ helper ------------------ #
 def _queue_bs(state, faction: str | None):
@@ -56,6 +65,26 @@ def evt_109_treaty_of_alliance(state, shaded=False):
     Queues a 'TOA' entry and marks treaty as played.
     """
     state["toa_played"] = True
+    state["treaty_of_alliance"] = True
+
+    # French free Muster in the West Indies and Rochambeau arrives there
+    queue_free_op(state, "FRENCH", "muster", WEST_INDIES_ID)
+    place_piece(state, LEADER_ROCHAMBEAU, WEST_INDIES_ID)
+    state.setdefault("leaders", {})["ROCHAMBEAU"] = WEST_INDIES_ID
+
+    # Shift FNI toward war
+    adjust_fni(state, +1)
+
+    # Reinforcements to West Indies: draw from Unavailable first
+    moved_fre = move_piece(state, REGULAR_FRE, "unavailable", WEST_INDIES_ID, 3)
+    if moved_fre < 3:
+        place_piece(state, REGULAR_FRE, WEST_INDIES_ID, 3 - moved_fre)
+
+    moved_bri = move_piece(state, REGULAR_BRI, "unavailable", WEST_INDIES_ID, 3)
+    if moved_bri < 3:
+        place_piece(state, REGULAR_BRI, WEST_INDIES_ID, 3 - moved_bri)
+
+    # Queue the special Brilliant Stroke so engine can finish resolution
     state.setdefault("bs_queue", []).append(("TOA", None))
     push_history(state, "Treaty of Alliance queued")
     state["ineligible_next"] = set()
