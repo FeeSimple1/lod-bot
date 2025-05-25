@@ -1,1 +1,6 @@
-
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0        # exact version of the hook collection
+    hooks:
+      - id: end-of-file-fixer   # ← adds 1 \n if it is missing
