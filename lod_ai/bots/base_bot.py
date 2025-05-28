@@ -7,6 +7,7 @@ from lod_ai.board import pieces
 from lod_ai.bots.random_spaces import iter_random_spaces
 from lod_ai.bots import event_instructions as EI
 from lod_ai import dispatcher
+from lod_ai.cards import CARD_HANDLERS
 
 class BaseBot:
     faction: str            # e.g. "BRITISH"
@@ -34,6 +35,14 @@ class BaseBot:
         }
         return tables[self.faction].get(card_id, "normal")
 
+    def _execute_event(self, card: Dict, state: Dict) -> None:
+        """Dispatch the effect function for *card* using proper shading."""
+        handler = CARD_HANDLERS.get(card["id"])
+        if not handler:
+            return
+        shaded = card.get("dual") and self.faction in {"PATRIOTS", "FRENCH"}
+        handler(state, shaded=shaded)
+
     #  REPLACE the placeholder method with this full version
     def _choose_event_vs_flowchart(self, state: Dict, card: Dict) -> bool:
         """Return True if the bot executes the Event, else False."""
@@ -47,7 +56,7 @@ class BaseBot:
             if directive == "ignore":
                 return False
             if directive == "force":
-                dispatcher.execute("EVENT", self.faction, None, state)
+                self._execute_event(card, state)
                 return True
             if directive.startswith("ignore_if_"):
                 # example for card 29:  'ignore_if_4_militia'
@@ -55,23 +64,46 @@ class BaseBot:
                     return False
                 # otherwise fall through to normal test
 
-        # 3. Ineffective-event test (Rule 8.3.3) – still TODO
-        #    if self._is_ineffective_event(card, state):
-        #        return False
+        # 3. Ineffective-event test (Rule 8.3.3)
+        if self._is_ineffective_event(card, state):
+            return False
 
         # 4. Flow-chart bullet list (British example in british_bot)
-        return self._faction_event_conditions(state, card)
+        if self._faction_event_conditions(state, card):
+            self._execute_event(card, state)
+            return True
+        return False
 
     # --- stubs for subclass override ---
     def _follow_flowchart(self, state: Dict) -> None:
         raise NotImplementedError
 
     def _condition_satisfied(self, directive: str, state: Dict, card: Dict) -> bool:
-        return False          # TODO: implement special cases (e.g., card 29)
+        """Evaluate conditional directives from the instruction sheet."""
+        if directive.startswith("ignore_if_") and "militia" in directive:
+            try:
+                threshold = int(directive.split("_")[2])
+            except (IndexError, ValueError):
+                return False
+            hidden = sum(sp.get("Patriot_Militia_U", 0) for sp in state["spaces"].values())
+            to_flip = hidden // 2
+            return to_flip < threshold
+        return False
 
     def _faction_event_conditions(self, state: Dict, card: Dict) -> bool:
         return False          # subclass will override
 
     # optional
     def _is_ineffective_event(self, card: Dict, state: Dict) -> bool:
-        return False          # full Rule 8.3.3 logic later
+        """Return True if executing *card* would change nothing."""
+        handler = CARD_HANDLERS.get(card["id"])
+        if not handler:
+            return True
+        from copy import deepcopy
+        before = deepcopy(state)
+        after = deepcopy(state)
+        shaded = card.get("dual") and self.faction in {"PATRIOTS", "FRENCH"}
+        handler(after, shaded=shaded)
+        before.pop("history", None)
+        after.pop("history", None)
+        return before == after

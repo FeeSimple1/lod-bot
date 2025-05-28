@@ -9,11 +9,6 @@ from lod_ai.board.pieces import (
     place_with_caps,
 )
 
-# helper alias for “do nothing yet”
-def _todo(*_a, **_kw):            # noqa: D401
-    """TODO: needs piece-placement helpers; stub for now."""
-    return
-
 
 def _pick_spaces_with_militia(state, max_spaces=4):
     """Return up to *max_spaces* IDs that contain Patriot Militia."""

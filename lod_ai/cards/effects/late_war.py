@@ -14,13 +14,6 @@ from .shared import (
     adjust_fni,
 )
 
-# --------------------------------------------------------------------------- #
-# helper for un-implemented, piece-heavy events
-# --------------------------------------------------------------------------- #
-def _todo(state):
-    push_history(state, "TODO: late-war event not yet implemented")
-
-
 def _remove_four_patriot_units(state):
     """Remove up to 4 Patriot Militia/Continentals from one Colony."""
     for name, sp in state["spaces"].items():
