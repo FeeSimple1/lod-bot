@@ -16,7 +16,11 @@ from lod_ai.board.control import refresh_control
 
 # Command / SA implementations
 from lod_ai.commands import march, rally, battle, gather, muster, scout, raid
-from lod_ai.special_activities import skirmish, war_path, partisans, common_cause
+from lod_ai.special_activities import skirmish, war_path, partisans, common_cause, trade
+from lod_ai.bots.british_bot import BritishBot
+from lod_ai.bots.patriot import PatriotBot
+from lod_ai.bots.french import FrenchBot
+from lod_ai.bots.indians import choose_command as indian_choose
 
 # ---------------------------------------------------------------------------
 class Engine:
@@ -75,9 +79,22 @@ class Engine:
                 self.state, faction, self.ctx, space_id=space_id, free=True
             )
         )
+        self.dispatcher.register_sa("trade",
+            lambda faction, space_id=None, **k: trade.execute(
+                self.state, faction, self.ctx, space_id=space_id, **k
+            )
+        )
+
+        # --- bot instances ---------------------------------------------------
+        self.bots = {
+            "BRITISH":  BritishBot(),
+            "PATRIOTS": PatriotBot(),
+            "FRENCH":   FrenchBot(),
+            "INDIANS":  indian_choose,
+        }
     # -------------------------------------------------------------------
 
-    def play_turn(self, faction: str) -> None:
+    def play_turn(self, faction: str, card: dict | None = None) -> None:
         """
         • Resolve Winter-Quarters if flagged.
         • If a free Command/SA is queued for *faction*, execute it and end turn.
@@ -94,5 +111,18 @@ class Engine:
             enforce_global_caps(self.state)
             return  # free action counts as the whole turn
 
-        # 2) No free Op: bot/UI decision would go here
-        raise NotImplementedError("Bot/UI selection not yet implemented")
+        # 2) Normal bot decision
+        faction = faction.upper()
+        bot = self.bots.get(faction)
+        if bot is None:
+            raise ValueError(f"Unknown faction: {faction}")
+
+        card = card or self.state.get("upcoming_card", {})
+        if faction == "INDIANS":
+            cmd, loc = bot(self.state)
+            self.dispatcher.execute(cmd.lower(), faction=faction, space=loc)
+        else:
+            bot.take_turn(self.state, card)
+
+        refresh_control(self.state)
+        enforce_global_caps(self.state)

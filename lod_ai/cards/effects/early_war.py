@@ -15,6 +15,17 @@ def _todo(*_a, **_kw):            # noqa: D401
     return
 
 
+def _pick_spaces_with_militia(state, max_spaces=4):
+    """Return up to *max_spaces* IDs that contain Patriot Militia."""
+    spaces = [
+        name
+        for name, sp in state["spaces"].items()
+        if sp.get("Patriot_Militia_U", 0) or sp.get("Patriot_Militia_A", 0)
+    ]
+    spaces.sort()
+    return spaces[:max_spaces]
+
+
 # 2  COMMON SENSE
 @register(2)
 def evt_002_common_sense(state, shaded=False):
