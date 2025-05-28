@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 build_map.py
-  • default      : read data/map_base.csv  →  write map.json
+  • default      : read data/map_base.csv  →  write lod_ai/map/data/map.json
   • --template   : recreate a blank CSV with correct headers
 """
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT       = Path(__file__).resolve().parent.parent
 CSV_PATH   = ROOT / "data" / "map_base.csv"
-JSON_PATH  = ROOT / "map.json"
+JSON_PATH  = ROOT / "lod_ai" / "map" / "data" / "map.json"
 
 # --------------------------------------------------------------------
 def _collect_space_names() -> list[str]:
