@@ -3,7 +3,6 @@ middle_war.py – Event handlers for 1777-1778 cards
 --------------------------------------------------
 IDs covered (32): 3 5 8 9 11 12 14 17 26 27 34 38 42 44 47 50
                   55 58 59 60 61 63 69 71 74 76 77 78 80 88 89 93
-Replace each _todo with real logic once piece / marker helpers exist.
 """
 
 from lod_ai.cards import register
@@ -19,13 +18,6 @@ from .shared import (
     adjust_fni,
 )
 from lod_ai.util.free_ops import queue_free_op
-
-
-# ---------------------------------------------------- helpers ------------ #
-
-def _todo(_state):
-    """Placeholder while piece-placement helpers are under construction."""
-    push_history(_state, "TODO: card effect not implemented yet")
 
 
 # 3  GEORGE ROGERS CLARK’S ILLINOIS CAMPAIGN
