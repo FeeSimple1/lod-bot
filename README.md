@@ -12,11 +12,13 @@ from lod_ai.state.setup_state import build_state
 from lod_ai.cards import CARD_REGISTRY
 
 state = build_state("long")            # load scenario
-engine = Engine(state)
+engine = Engine(state)                 # bot-driven
+# engine = Engine(state, use_cli=True)  # manual selection
 
 current_card = CARD_REGISTRY[1]         # pick a card
 engine.play_turn("BRITISH", card=current_card)
 ```
 
 The engine automatically handles Winter‑Quarters upkeep and refreshes
-control and caps after each action.
+control and caps after each action.  Pass `use_cli=True` to `Engine`
+to manually select Commands when no bot is available.
