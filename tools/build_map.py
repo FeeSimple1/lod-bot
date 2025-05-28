@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
 build_map.py
-  • default      : read data/map_base.csv  →  write lod_ai/map/data/map.json
-  • --template   : recreate a blank CSV with correct headers
+  • default      : validate lod_ai/map/data/map.json
+  • --template   : create data/map_template.csv with correct headers
 """
 
 import csv, glob, json, sys
 from pathlib import Path
 
-ROOT       = Path(__file__).resolve().parent.parent
-CSV_PATH   = ROOT / "data" / "map_base.csv"
-JSON_PATH  = ROOT / "lod_ai" / "map" / "data" / "map.json"
+ROOT        = Path(__file__).resolve().parent.parent
+JSON_PATH   = ROOT / "lod_ai" / "map" / "data" / "map.json"
+TEMPLATE_CSV = ROOT / "data" / "map_template.csv"
 
 # --------------------------------------------------------------------
 def _collect_space_names() -> list[str]:
@@ -20,50 +20,32 @@ def _collect_space_names() -> list[str]:
     return sorted(names)
 
 # --------------------------------------------------------------------
-def _parse_csv() -> dict[str, dict]:
-    if not CSV_PATH.exists():
-        sys.exit(f"ERROR: {CSV_PATH} not found")
+def _validate_json() -> dict[str, dict]:
+    if not JSON_PATH.exists():
+        sys.exit(f"ERROR: {JSON_PATH} not found")
 
-    spaces: dict[str, dict] = {}
-    with CSV_PATH.open(newline="", encoding="utf-8") as fh:
-        reader = csv.DictReader(fh)
+    spaces: dict[str, dict] = json.loads(JSON_PATH.read_text(encoding="utf-8"))
 
-        # Accept either 'space' or legacy 'name' as the first column
-        cols = set(reader.fieldnames or [])
-        if "space" not in cols and "name" in cols:
-            reader.fieldnames[reader.fieldnames.index("name")] = "space"
-            cols = set(reader.fieldnames)
+    required = {"type", "adj"}
+    for name, info in spaces.items():
+        if not required.issubset(info):
+            sys.exit(f"ERROR: {name} missing {sorted(required)}")
 
-        required = {"space", "type", "adj"}
-        if not required.issubset(cols):
-            sys.exit(f"ERROR: {CSV_PATH} must contain columns {sorted(required)}")
-
-        for row in reader:
-            name = row["space"].strip()
-            if not name:
-                continue
-            spaces[name] = {
-                "type": row["type"].strip(),
-                "adj": [n.strip() for n in row["adj"].replace(";", ",").split(",") if n.strip()],
-            }
+    print(f"✓ Validated {len(spaces)} spaces in {JSON_PATH.relative_to(ROOT)}")
     return spaces
 
 # --------------------------------------------------------------------
-def _write_json(spaces: dict):
-    JSON_PATH.write_text(json.dumps(spaces, indent=2))
-    print(f"✓ Wrote {len(spaces)} spaces to {JSON_PATH.relative_to(ROOT)}")
-
 def _write_template(names: list[str]):
-    with CSV_PATH.open("w", newline="", encoding="utf-8") as fp:
+    with TEMPLATE_CSV.open("w", newline="", encoding="utf-8") as fp:
         w = csv.writer(fp)
         w.writerow(["space", "type", "adj"])
         for n in names:
             w.writerow([n, "", ""])
-    print(f"✓ Created blank {CSV_PATH.relative_to(ROOT)} with {len(names)} rows")
+    print(f"✓ Created blank {TEMPLATE_CSV.relative_to(ROOT)} with {len(names)} rows")
 
 # --------------------------------------------------------------------
 if __name__ == "__main__":
     if "--template" in sys.argv:
         _write_template(_collect_space_names())
     else:
-        _write_json(_parse_csv())
+        _validate_json()

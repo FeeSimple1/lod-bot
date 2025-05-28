@@ -1,2 +1,3 @@
 __pycache__/
 *.pyc
+data/map_template.csv
