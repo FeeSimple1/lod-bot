@@ -145,8 +145,17 @@ def execute(
                         _move(state, TORY, tory_take, src, dst)
                     if wp_take:
                         _move(state, WARPARTY_A, wp_take, src, dst)
+                else:
+                    tory_take = 0
+                    wp_take = 0
 
-                # TODO: Activate one Militia per three cubes moved into Colonies
+                # Activate one Militia-U per three cubes moved into a Colony
+                if sp_dst.get("type") == "Colony":
+                    moved_total = reg + tory_take + wp_take
+                    flip = min(moved_total // 3, sp_dst.get(MILITIA_U, 0))
+                    if flip:
+                        sp_dst[MILITIA_U] -= flip
+                        sp_dst[MILITIA_A] = sp_dst.get(MILITIA_A, 0) + flip
 
             elif faction == "PATRIOTS":
                 # ── Move Continentals ──────────────────────────────────────
@@ -166,7 +175,15 @@ def execute(
                     if fr_take:
                         _move(state, REGULAR_FRE, fr_take, src, dst)
 
-                # TODO: War-Party activation & Militia-city rules
+                # War Parties moving with Patriots become Active on arrival
+                if sp_src.get(WARPARTY_U, 0) or sp_src.get(WARPARTY_A, 0):
+                    wp_u = sp_src.pop(WARPARTY_U, 0)
+                    wp_a = sp_src.pop(WARPARTY_A, 0)
+                    total_wp = wp_u + wp_a
+                    if total_wp:
+                        sp_dst[WARPARTY_A] = sp_dst.get(WARPARTY_A, 0) + total_wp
+
+                # Militia obey stacking and city restrictions via enforce_global_caps
 
             elif faction == "INDIANS":
                 # ── Move War Parties (all) and flip Active ────────────────
@@ -175,7 +192,7 @@ def execute(
                 total = wp_u + wp_a
                 if total:
                     sp_dst[WARPARTY_A] = sp_dst.get(WARPARTY_A, 0) + total
-                # TODO: Active-WP city control check
+                # City control from Indian pieces handled by refresh_control
 
             elif faction == "FRENCH":
                 # ── Move French Regulars ───────────────────────────────────

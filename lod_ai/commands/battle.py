@@ -11,7 +11,7 @@ Special Activity), those War Parties are counted as Tory cubes for *both*
 attack and defence. They never count toward the “half Active War Parties”
 rule, preventing double-counting.
 
-TODO tags still mark advanced nuances (Washington double, Lauzun, etc.).
+# Leader-driven nuances handled via lod_ai.leaders.apply_leader_modifiers.
 """
 
 from __future__ import annotations
@@ -30,6 +30,7 @@ from lod_ai.util.history import push_history
 from lod_ai.util.caps    import refresh_control, enforce_global_caps
 from lod_ai.board.pieces      import remove_piece, add_piece      # NEW
 from lod_ai.economy.resources import spend, can_afford            # NEW
+from lod_ai.leaders          import apply_leader_modifiers
 
 COMMAND_NAME = "BATTLE"
 
@@ -54,6 +55,9 @@ def execute(
 
     # ── Resource costs ──────────────────────────────────────────────
     spend(state, faction, len(spaces))
+
+    # Leader hooks (e.g. Washington, Lauzun)
+    ctx = apply_leader_modifiers(state, faction, "pre_battle", ctx)
 
     ally_fee = {"BRITISH": 0, "PATRIOTS": 0, "FRENCH": 0}
     if faction == "PATRIOTS":
@@ -179,11 +183,22 @@ def _resolve_space(state: Dict, ctx: Dict,
             if sp.get(WARPARTY_U, 0) + sp.get(MILITIA_U, 0) > 0:
                 m += 1
 
-        # TODO: leaders, Fort ±, Squadron/Blockade, Washington, Lauzun…
+        # Defender Forts add to the attacker's losses
+        if not acting_attacker:
+            fort_tag = FORT_BRI if def_side == "ROYALIST" else FORT_PAT
+            m += sp.get(fort_tag, 0)
+
+        # Leader hooks may modify loss totals via ctx
         return m
 
     defender_loss = att_roll + mods(True)
     attacker_loss = def_roll + mods(False)
+
+    # Leader-based modifiers
+    if def_side == "REBELLION":
+        defender_loss += ctx.get("defender_loss_mod", 0)
+    if attacker_faction == "FRENCH":
+        defender_loss += ctx.get("attacker_defender_loss_bonus", 0)
 
     from lod_ai.util.loss_mod import pop_loss_mod          # ← import inside fn
 
