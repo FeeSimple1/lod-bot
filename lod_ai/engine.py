@@ -2,9 +2,9 @@
 # ============================================================
 # Minimal driver to:
 #   • pop & execute queued free Ops
+#   • select a regular Command via bot logic or CLI
 #   • run Winter-Quarters upkeep
 #   • refresh Control and caps after every action
-# Normal bot/UI Command selection comes later.
 # ============================================================
 
 from lod_ai.dispatcher    import Dispatcher
@@ -24,10 +24,11 @@ from lod_ai.bots.indians import choose_command as indian_choose
 
 # ---------------------------------------------------------------------------
 class Engine:
-    def __init__(self, initial_state: dict):
+    def __init__(self, initial_state: dict, use_cli: bool = False):
         self.state       = initial_state
         self.ctx: dict   = {}          # scratch context per action
         self.dispatcher  = Dispatcher()
+        self.use_cli     = use_cli
 
         # ── core Command registrations ──────────────────────────────────
         self.dispatcher.register_cmd("march",  march.execute)
@@ -94,11 +95,34 @@ class Engine:
         }
     # -------------------------------------------------------------------
 
+    def _cli_select_command(self, faction: str) -> None:
+        """Simple interactive prompt to choose a Command and location."""
+        cmds = sorted(self.dispatcher._cmd.keys())
+        print(f"Manual turn for {faction}. Available commands:")
+        for idx, lbl in enumerate(cmds, 1):
+            print(f"  {idx}. {lbl}")
+        choice = input("Select command by number or name: ").strip()
+        if choice.isdigit():
+            idx = int(choice) - 1
+            cmd = cmds[idx] if 0 <= idx < len(cmds) else None
+        else:
+            cmd = choice
+        if not cmd:
+            print("Invalid command; skipping turn")
+            return
+        loc = input("Space id (blank for none): ").strip() or None
+        self.dispatcher.execute(cmd.lower(), faction=faction, space=loc)
+        push_history(self.state, f"{faction} manually executes {cmd}")
+    # -------------------------------------------------------------------
+
     def play_turn(self, faction: str, card: dict | None = None) -> None:
         """
-        • Resolve Winter-Quarters if flagged.
-        • If a free Command/SA is queued for *faction*, execute it and end turn.
-        • (Normal Command/Event selection comes in a later milestone.)
+        Execute one full turn for *faction*.
+
+        Steps:
+            1. Resolve Winter-Quarters upkeep if flagged.
+            2. Execute any queued free Command or SA and end the turn.
+            3. Otherwise run a normal Command chosen by a bot or via CLI.
         """
         # 0) Winter-Quarters upkeep (noop if no flag)
         resolve_year_end(self.state)
@@ -111,18 +135,19 @@ class Engine:
             enforce_global_caps(self.state)
             return  # free action counts as the whole turn
 
-        # 2) Normal bot decision
+        # 2) Normal Command via bot or CLI
         faction = faction.upper()
         bot = self.bots.get(faction)
-        if bot is None:
-            raise ValueError(f"Unknown faction: {faction}")
-
         card = card or self.state.get("upcoming_card", {})
-        if faction == "INDIANS":
-            cmd, loc = bot(self.state)
-            self.dispatcher.execute(cmd.lower(), faction=faction, space=loc)
+
+        if bot is not None and not self.use_cli:
+            if faction == "INDIANS":
+                cmd, loc = bot(self.state)
+                self.dispatcher.execute(cmd.lower(), faction=faction, space=loc)
+            else:
+                bot.take_turn(self.state, card)
         else:
-            bot.take_turn(self.state, card)
+            self._cli_select_command(faction)
 
         refresh_control(self.state)
         enforce_global_caps(self.state)
