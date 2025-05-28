@@ -18,7 +18,7 @@ Pieces that may move (Indian choice):
 After movement:
     • Flip **all** Militia in the destination space to Active.
     • Indians may, at their option, immediately Skirmish there using the
-      British Regulars (TODO: wire to special_activities.skirmish).
+      British Regulars via the Skirmish Special Activity.
 
 This module enforces adjacency, province-only restriction, piece counts,
 resource payments, and global caps.  Randomness is not used.
@@ -84,8 +84,8 @@ def execute(
     n_tories
         Number of Tory cubes to move (0 … n_regulars).
     skirmish
-        If True, attempt to Skirmish in *dst* after movement (raises
-        NotImplementedError until SA wired in).
+        If True, immediately Skirmish in *dst* after movement using
+        the British Regulars that moved.
     """
     if faction != "INDIANS":
         raise ValueError("Only INDIANS may execute the Scout command.")
@@ -145,8 +145,8 @@ def execute(
 
     # -------- Optional Skirmish ---------------------------------------------
     if skirmish:
-        # Stub—wire to SA when that module exists.
-        raise NotImplementedError("Skirmish after Scout not yet wired in.")
+        from lod_ai.special_activities import skirmish as sa_skirmish
+        ctx = sa_skirmish.execute(state, "BRITISH", ctx, dst)
 
     # -------- Final housekeeping --------------------------------------------
     refresh_control(state)
