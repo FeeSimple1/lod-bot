@@ -20,5 +20,8 @@ Repository Guidelines
 
 5. **Documentation**
    - Update the README if file paths or other usage details change.
+  
+6.  **Source of Truth**
+   - The documents in the Reference Documents folder are to be used as the source of truth.  All documents in the data and lod_ai folder must not conflict with them.
 
 Follow these guidelines for future contributions.
