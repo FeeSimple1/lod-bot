@@ -20,5 +20,3 @@ engine.play_turn("BRITISH", card=current_card)
 ```
 
 The engine automatically handles Winter‑Quarters upkeep and refreshes
-control and caps after each action.  Pass `use_cli=True` to `Engine`
-to manually select Commands when no bot is available.
