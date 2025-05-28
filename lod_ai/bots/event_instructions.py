@@ -15,11 +15,3 @@ BRITISH = {
     88: "force",                # “If it hadn’t been so foggy…”
     95: "force",                # Ohio Country Frontier Erupts
 }
-
-# Other factions will be filled in as we implement their bots.
-PATRIOT: dict[int, str] = {
-    2: "force",       # Common Sense
-    31: "ignore",     # Thomas Brown and the King’s Rangers
-}
-INDIAN:  dict[int, str] = {}
-FRENCH:  dict[int, str] = {}
