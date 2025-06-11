@@ -21,7 +21,7 @@ import re
 # -----------------------------------------------------------------------------#
 # Paths (relative to repo root)
 # -----------------------------------------------------------------------------#
-SRC = pathlib.Path("data/card reference.txt")
+SRC = pathlib.Path("Reference Documents/card reference full.txt")
 DEST = pathlib.Path("lod_ai/cards/data.json")
 ENC = "utf-8"                     # force UTF-8 so Windows won’t choke
 
