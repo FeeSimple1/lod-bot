@@ -1,0 +1,95 @@
+1778 to 1780; Short Duration
+Deck Preparation:
+The Treaty of Alliance card (#109) is considered played
+and is not available to the French. The remaining Brilliant
+Stroke cards are distributed.
+Prepare and stack the 1778, 1779, and 1780 Campaigns.
+
+Resources: British 6, Patriots 3, French 8, Indians 2
+Support: 17
+Opposition: 16
+Cumulative British Casualties: 10
+Cumulative Rebellion Casualties: 12
+French Preparations: 28 French at War side (but not necessary
+as the French have already played the Treaty of Alliance
+card (#109)).
+FNI: 0
+
+Available:
+British: 7 Regulars, 8 Tories, 3 Forts
+Patriots: 11 Continentals, 1 Militia, 2 Forts
+French: 8 Regulars
+Indians: 8 War Parties, 6 Villages
+
+Unavailable:
+British: none
+French: none
+
+Quebec City: British Control, Active Support
+British: 2 Regulars, 2 Tories
+
+Boston: Rebellion Control, Passive Opposition
+Patriots: 2 Continentals
+
+New York City: British Control, Active Support
+British: 5 Regulars, 3 Tories , 1 Fort, Clinton
+
+Philadelphia: British Control, Active Support
+British: 4 Regulars, 2 Tories
+
+Norfolk: Rebellion Control
+Patriots: 1 Militia
+
+Charles Town: Rebellion Control, Active Opposition
+Patriots: 2 Militia, 1 Fort
+
+Savannah: British Control, Passive Support
+British: 2 Tories
+
+Quebec: British Control
+British: 2 Regulars, 2 Tories, 1 Fort
+Indians: 1 War Party, 1 Village
+
+Northwest:
+Indians: 1 War Party, 1 Village, Cornplanter
+
+Southwest:
+Indians: 1 War Party, 1 Village
+Florida: British Control
+British: 1 Regular, 1 Fort
+Indians: 1 War Party, 1 Village
+
+New Hampshire: British Control, Active Support
+British: 2 Tories
+
+Massachusetts: Rebellion Control, Active Opposition
+Patriots: 1 Fort
+
+Connecticut-RI: Rebellion Control, Active Opposition
+British: 2 Tories
+Patriots: 1 Fort
+French: 4 Regulars, Rochambeau
+
+New York: British Control, Active Support
+British: 4 Regulars, 2 Tories
+Patriots: 1 Militia
+Indians: 1 War Party, 1 Village
+
+New Jersey: Rebellion Control, Passive Opposition
+Patriots: 2 Continentals, 4 Militia
+
+Pennsylvania: Rebellion Control, Passive Opposition
+Patriots: 5 Continentals, 2 Militia, 1 Fort, Washington
+Indians: 1 War Party
+
+Maryland-Delaware: Passive Support
+
+North Carolina: Rebellion Control, Passive Opposition
+Patriots: 2 Militia
+
+South Carolina:
+Patriot: 2 Militia
+Indians: 1 War Party, 1 Village
+
+West Indies: Rebellion Control
+French: 3 Regulars, 3 Squadrons

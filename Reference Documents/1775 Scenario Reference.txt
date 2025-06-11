@@ -1,0 +1,68 @@
+1775 to 1780; Long Duration
+Deck Preparation: The Treaty of Alliance Brilliant
+Stroke card (#109) has not been played and is available
+to the French. The remaining Brilliant Stroke cards are
+distributed.
+Prepare and stack the 1775, 1776, 1777, 1778, 1779 and 1780
+Campaigns.
+
+Resources: British 6, Patriots 3, French 5, Indians 0
+Support: 4
+Opposition: 4
+Cumulative British Casualties: 0
+Cumulative Rebellion Casualties: 0
+French Preparations: 0
+FNI: 0
+
+Available:
+British: 7 Regulars, 7 Tories, 3 Forts
+Patriots: 19 Continentals, 11 Militia, 5 Forts
+French: Rochambeau
+Indians: 9 War Parties, 12 Villages
+
+Unavailable:
+British: 12 Regulars, 12 Tories
+French: 15 Regulars, 3 Squadrons/Blockades
+
+British Release Date Schedule:
+First Winter Quarters Round (After 1775)
+• 6 Regulars, 6 Tories
+Second Winter Quarters Round (After 1776)
+• 6 Regulars, 6 Tories
+
+Quebec City: British Control, Passive Support
+British: 1 Regular, 1 Tory
+
+Boston: British Control, Passive Support
+British: 3 Regulars, 1 Fort, Gage
+
+New York City: British Control, Passive Support
+British: 1 Tory
+
+Philadelphia: Rebellion Control
+Patriots: 1 Militia
+
+Quebec: British Control
+British: 2 Tories, 1 Fort
+Indians: 1 War Party
+
+Northwest:
+Indians: 2 War Parties, Brant
+
+Southwest:
+Indians: 1 War Party
+
+Florida: British Control
+British: 1 Regular, 1 Fort
+Indians: 1 War Party
+
+Massachusetts: Rebellion Control, Active Opposition
+Patriots: 1 Continental, 1 Militia, 1 Fort, Washington
+
+New York: British Control
+British: 1 Regular, 2 Tories
+Patriots: 1 Militia
+Indians: 1 War Party
+
+Virginia: Rebellion Control
+Patriots: 1 Militia
