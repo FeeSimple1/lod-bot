@@ -22,6 +22,6 @@ Repository Guidelines
    - Update the README if file paths or other usage details change.
   
 6.  **Source of Truth**
-   - The documents in the Reference Documents folder are to be used as the source of truth.  All documents in the data and lod_ai folder must not conflict with them.  rules_consts.py is also a source of truth; all unit abbreviations must match those provided in rules_consts.py.  None of these files are to be changed; other files must be changed to be consistent with the files in the Reference Documents folder and with rules_consts.py.
+   - The documents in the Reference Documents folder are to be used as the source of truth.  All documents in the data and lod_ai folder must not conflict with them.  rules_consts.py is also a source of truth; all unit abbreviations must match those provided in rules_consts.py.  None of these files are to be changed; other files must be changed to be consistent with the files in the Reference Documents folder and with rules_consts.py.  No file in the Reference Documents folder may be deleted, even if it is a duplicate of files located elsewhere.
 
 Follow these guidelines for future contributions.
