@@ -138,7 +138,40 @@ def _card_from_id(value: int | str) -> dict:
     return CARD_REGISTRY[int(m.group(1))]
 
 
-def _init_deck(state: Dict[str, Any], scenario: Dict[str, Any]) -> None:
+def _build_deck_standard(cards: list[dict], rng: random.Random) -> list[dict]:
+    """Return *cards* shuffled for the Standard setup."""
+    rng.shuffle(cards)
+    return cards
+
+
+def _build_deck_historical(
+    cards: list[dict], start_year: int, rng: random.Random
+) -> list[dict]:
+    """Return cards ordered by earliest year with Winter Quarters inserted."""
+    wq_cards = [c for c in cards if c.get("winter_quarters")]
+    event_cards = [c for c in cards if not c.get("winter_quarters")]
+
+    groups: dict[int, list[dict]] = {}
+    for c in event_cards:
+        year = min(c.get("years") or [start_year])
+        groups.setdefault(year, []).append(c)
+
+    deck: list[dict] = []
+    wq_idx = 0
+    for year in sorted(groups):
+        group = sorted(groups[year], key=lambda d: d["id"])
+        deck.extend(group)
+        if wq_idx < len(wq_cards):
+            deck.append(wq_cards[wq_idx])
+            wq_idx += 1
+
+    deck.extend(wq_cards[wq_idx:])
+    return deck
+
+
+def _init_deck(
+    state: Dict[str, Any], scenario: Dict[str, Any], *, setup_method: str
+) -> None:
     """Populate state['deck'] and state['upcoming_card'] from *scenario*."""
     deck_ids = list(scenario.get("deck", []))
     upcoming = scenario.get("upcoming_event")
@@ -155,14 +188,22 @@ def _init_deck(state: Dict[str, Any], scenario: Dict[str, Any]) -> None:
     if upcoming_card:
         deck_cards = [c for c in deck_cards if c["id"] != upcoming_card["id"]]
 
-    state["rng"].shuffle(deck_cards)
+    if setup_method == "historical":
+        deck_cards = _build_deck_historical(
+            deck_cards, scenario.get("campaign_year", 1775), state["rng"]
+        )
+    else:
+        deck_cards = _build_deck_standard(deck_cards, state["rng"])
+
     state["deck"] = deck_cards
 
 # ----------------------------------------------------------------------- #
 # 5️⃣  TOP‑LEVEL BUILDER                                                   #
 # ----------------------------------------------------------------------- #
 
-def build_state(scenario: str = "long", *, seed: int = 1) -> Dict[str, Any]:
+def build_state(
+    scenario: str = "long", *, seed: int = 1, setup_method: str = "standard"
+) -> Dict[str, Any]:
     """Return a fully‑initialised *state* for the given scenario alias."""
     scen = load_scenario(scenario)
 
@@ -184,9 +225,10 @@ def build_state(scenario: str = "long", *, seed: int = 1) -> Dict[str, Any]:
         "rng_log":   [],
         "history":   [],
         "log":       [],
+        "setup_method": setup_method,
     }
 
     _apply_unavailable_block(state, scen)
     _reconcile_on_map(state)
-    _init_deck(state, scen)
+    _init_deck(state, scen, setup_method=setup_method)
     return state
