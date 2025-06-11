@@ -4,10 +4,18 @@
 MAX_RESOURCES = 50
 MIN_RESOURCES = 0
 MAX_FNI       = 3           # British French Naval Intercept, rule 1.9
-MAX_BRI_FORTS = 6
-MAX_PAT_FORTS = 6
-MAX_IND_VILLAGES = 12
+MAX_FORT_BRI  = 6
+MAX_FORT_PAT  = 6
+MAX_VILLAGE   = 12
 MAX_VP_DIFF   = 25          # auto-win margin
+
+# ---------------------------------------------------
+# Faction identifiers (canonical strings everywhere)
+BRITISH  = "BRITISH"
+PATRIOTS = "PATRIOTS"
+INDIANS  = "INDIANS"
+FRENCH   = "FRENCH"
+# ---------------------------------------------------
 
 # Support / Opposition levels
 ACTIVE_SUPPORT       =  2
@@ -16,13 +24,20 @@ NEUTRAL              =  0
 PASSIVE_OPPOSITION   = -1
 ACTIVE_OPPOSITION    = -2
 
-# Piece tags (add more later as you convert)
+# Piece tags (expanded)
 REGULAR_BRI    = "British_Regular"
+REGULAR_FRE    = "French_Regular"
 REGULAR_PAT    = "Patriot_Continental"
-TORY           = "Tory"
-MILITIA        = "Militia"
-FORT_BRI = "British_Fort"    
-FORT_PAT = "Patriot_Fort"     
+TORY           = "British_Tory"
+MILITIA_A      = "Patriot_Militia_A"   # Active
+MILITIA_U      = "Patriot_Militia_U"   # Underground
+WARPARTY_A     = "Indian_WP_A"
+WARPARTY_U     = "Indian_WP_U"
+FRENCH_UNAVAIL = "French_Regular_Unavailable"
+BRIT_UNAVAIL   = "British_Regular_Unavailable"
+TORY_UNAVAIL   = "British_Tory_Unavailable"
+FORT_BRI       = "British_Fort"    
+FORT_PAT       = "Patriot_Fort"     
 VILLAGE        = "Village"
 SQUADRON       = "Squadron"
 BLOCKADE       = "Blockade"
@@ -33,12 +48,12 @@ BRILLIANT_STROKE_CARDS = {105, 106, 107, 108, 109}  # also from reference
 # ---------------------------------------------------
 # NEW piece-cap constants (§ 1.2, Scenario Setup)
 # ---------------------------------------------------
-MAX_BRI_REGULARS      = 25
-MAX_BRI_TORIES        = 25
-MAX_FRENCH_REGULARS   = 15
-MAX_PAT_CONTINENTALS  = 20
-MAX_PAT_MILITIA       = 15
-MAX_IND_WAR_PARTIES   = 15
+MAX_REGULAR_BRI       = 25
+MAX_TORY              = 25
+MAX_REGULAR_FRE       = 15
+MAX_REGULAR_PAT       = 20
+MAX_MILITIA           = 15
+MAX_WAR_PARTY         = 15
 
 # --------------------------------------------------------------------------- #
 #  West Indies helpers                                                        #
@@ -55,18 +70,6 @@ MAX_RAID = 12            # §3.4.4 Raid
 RAID     = "Raid"
 BLOCKADE = "blockade"          # used in naval_pressure SA
 
-# Piece tags (expanded)
-REGULAR_BRI    = "British_Regular"
-REGULAR_FRE    = "French_Regular"
-REGULAR_PAT    = "Patriot_Continental"
-TORY           = "British_Tory"
-MILITIA_A      = "Patriot_Militia_A"   # Active
-MILITIA_U      = "Patriot_Militia_U"   # Underground
-WARPARTY_A     = "Indian_WP_A"
-WARPARTY_U     = "Indian_WP_U"
-FRENCH_UNAVAIL = "French_Regular_Unavailable"
-BRIT_UNAVAIL   = "British_Regular_Unavailable"
-TORY_UNAVAIL   = "British_Tory_Unavailable"
 
 # For flow-chart calls that say “Play Event” without specifying a side:
 DEFAULT_EVENT_SIDE = {
@@ -103,3 +106,4 @@ LEADER_CHAIN = {
     "LEADER_CORNPLANTER":     "LEADER_DRAGGING_CANOE",
     # Patriots have no changes
 }
+
