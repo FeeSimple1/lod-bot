@@ -24,9 +24,9 @@ from typing import Dict, List
 from lod_ai.board.control import refresh_control
 
 from lod_ai.rules_consts import (
-    MAX_BRI_FORTS,
-    MAX_PAT_FORTS,
-    MAX_IND_VILLAGES,
+    MAX_FORT_BRI,
+    MAX_FORT_PAT,
+    MAX_VILLAGE,
 )
 
 from lod_ai.board.pieces import remove_piece
@@ -37,9 +37,9 @@ from lod_ai.util.history import push_history
 # 1. GLOBAL-LIMIT ENFORCEMENT
 # ----------------------------------------------------------------------
 CAP_TABLE = {
-    "British_Fort":   MAX_BRI_FORTS,
-    "Patriot_Fort":   MAX_PAT_FORTS,
-    "Indian_Village": MAX_IND_VILLAGES,   # WP or converted Village
+    "British_Fort":   MAX_FORT_BRI,
+    "Patriot_Fort":   MAX_FORT_PAT,
+    "Indian_Village": MAX_VILLAGE,   # WP or converted Village
 }
 
 def _matches(tag: str, key: str) -> bool:

@@ -91,14 +91,14 @@ def add_piece(state: Dict[str, Any], tag: str, loc: str, qty: int = 1) -> int:
 # cap-aware placement
 # --------------------------------------------------------------------------- #
 from lod_ai.rules_consts import (
-    MAX_BRI_FORTS, MAX_PAT_FORTS, MAX_IND_VILLAGES,
+    MAX_FORT_BRI, MAX_FORT_PAT, MAX_VILLAGE,
     PROPAGANDA, MAX_PROPAGANDA,
 )
 
 _CAPS = {
-    "British_Fort":   MAX_BRI_FORTS,
-    "Patriot_Fort":   MAX_PAT_FORTS,
-    "Indian_Village": MAX_IND_VILLAGES,
+    "British_Fort":   MAX_FORT_BRI,
+    "Patriot_Fort":   MAX_FORT_PAT,
+    "Indian_Village": MAX_VILLAGE,
     PROPAGANDA:       MAX_PROPAGANDA,
 }
 
