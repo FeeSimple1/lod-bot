@@ -1,11 +1,11 @@
 {
-  "scenario": "1776\u201179 Medium \u2013 British Return to New York",
+  "scenario": "1776 to 1779; Medium Duration",
   "campaign_year": 1776,
   "resources": {
     "BRITISH": 5,
-    "PATRIOTS": 48,
-    "FRENCH": 7,
-    "INDIANS": 4
+    "PATRIOTS": 2,
+    "FRENCH": 5,
+    "INDIANS": 0
   },
   "fni_level": 0,
   "toa_played": false,
@@ -29,8 +29,8 @@
     "FRENCH": false
   },
   "casualties": {
-    "BRITISH": 0,
-    "PATRIOTS": 0
+    "BRITISH": 1,
+    "PATRIOTS": 3
   },
   "unavailable": {
     "FRENCH_REGULARS": 4,

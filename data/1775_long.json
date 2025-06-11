@@ -1,11 +1,11 @@
 {
-  "scenario": "1775\u201180 Long \u2013 Full War",
+  "scenario": "1775 to 1780; Long Duration",
   "campaign_year": 1775,
   "resources": {
-    "BRITISH": 1,
-    "PATRIOTS": 17,
-    "FRENCH": 28,
-    "INDIANS": 3
+    "BRITISH": 6,
+    "PATRIOTS": 3,
+    "FRENCH": 5,
+    "INDIANS": 0
   },
   "fni_level": 0,
   "toa_played": false,

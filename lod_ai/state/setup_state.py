@@ -63,10 +63,9 @@ def init_pools() -> Dict[str, int]:
 
 _DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 _ALIAS = {
-    "long":     "1775_long.json",
-    "short":    "1775_short.json",
-    "medium":   "1776_medium.json",
-    "southern": "1778_southern.json",
+    "long":   "1775_long.json",
+    "medium": "1776_medium.json",
+    "short":  "1778_short.json",
 }
 
 
