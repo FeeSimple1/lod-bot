@@ -8,7 +8,7 @@ def _id_from_val(val):
     return int(m.group(1)) if m else None
 
 
-def test_build_state_initial_deck(tmp_path, monkeypatch):
+def test_build_state_standard_deck(tmp_path, monkeypatch):
     scen = {
         "scenario": "Test",
         "spaces": {},
@@ -21,10 +21,30 @@ def test_build_state_initial_deck(tmp_path, monkeypatch):
     path.write_text(json.dumps(scen))
     monkeypatch.setattr(setup_state, "_DATA_DIR", tmp_path)
 
-    state = setup_state.build_state(path.name, seed=1)
+    state = setup_state.build_state(path.name, seed=1, setup_method="standard")
 
     assert state["upcoming_card"]["id"] == 2
     orig_order = [_id_from_val(c) for c in scen["deck"] if _id_from_val(c) != 2]
     deck_ids = [c["id"] for c in state["deck"]]
     assert deck_ids != orig_order
+    assert state["setup_method"] == "standard"
+
+
+def test_build_state_historical_deck(tmp_path, monkeypatch):
+    scen = {
+        "scenario": "Test",
+        "spaces": {},
+        "resources": {"BRITISH": 0, "PATRIOTS": 0, "FRENCH": 0, "INDIANS": 0},
+        "deck": ["Card_001", "Card_002", "Card_003", "Card_097", "Card_098"],
+        "campaign_year": 1775,
+    }
+    path = tmp_path / "scen_hist.json"
+    path.write_text(json.dumps(scen))
+    monkeypatch.setattr(setup_state, "_DATA_DIR", tmp_path)
+
+    state = setup_state.build_state(path.name, seed=1, setup_method="historical")
+
+    deck_ids = [c["id"] for c in state["deck"]]
+    assert deck_ids == [2, 97, 3, 98, 1]
+    assert state["setup_method"] == "historical"
 

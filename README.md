@@ -11,13 +11,16 @@ from lod_ai.engine import Engine
 from lod_ai.state.setup_state import build_state
 from lod_ai.cards import CARD_REGISTRY
 
-state = build_state("long")            # load scenario
+state = build_state("long", setup_method="standard")  # load scenario
 engine = Engine(state)                 # bot-driven
 # engine = Engine(state, use_cli=True)  # manual selection
 
 current_card = CARD_REGISTRY[1]         # pick a card
 engine.play_turn("BRITISH", card=current_card)
 ```
+
+Pass `setup_method="historical"` to `build_state` to stack the deck by Period
+Events instead of shuffling all event cards.
 
 The engine automatically handles Winter‑Quarters upkeep and refreshes
 control and available-piece counts after every action, so the state
