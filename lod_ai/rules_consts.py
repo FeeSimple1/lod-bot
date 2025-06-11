@@ -7,6 +7,11 @@ MAX_FNI       = 3           # British French Naval Intercept, rule 1.9
 MAX_FORT_BRI  = 6
 MAX_FORT_PAT  = 6
 MAX_VILLAGE   = 12
+
+# Aliases used throughout the codebase
+MAX_BRI_FORTS     = MAX_FORT_BRI
+MAX_PAT_FORTS     = MAX_FORT_PAT
+MAX_IND_VILLAGES  = MAX_VILLAGE
 MAX_VP_DIFF   = 25          # auto-win margin
 
 # ---------------------------------------------------
