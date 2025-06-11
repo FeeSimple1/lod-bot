@@ -73,7 +73,7 @@ MAX_PROPAGANDA = 12          # §3.3.4 Rabble-Rousing
 PROPAGANDA     = "Propaganda"
 MAX_RAID = 12            # §3.4.4 Raid
 RAID     = "Raid"
-BLOCKADE = "blockade"          # used in naval_pressure SA
+BLOCKADE = "Blockade"          # used in naval_pressure SA
 
 
 # For flow-chart calls that say “Play Event” without specifying a side:
