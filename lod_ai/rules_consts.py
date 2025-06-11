@@ -4,10 +4,15 @@
 MAX_RESOURCES = 50
 MIN_RESOURCES = 0
 MAX_FNI       = 3           # British French Naval Intercept, rule 1.9
-MAX_FORT_BRI  = 6
-MAX_FORT_PAT  = 6
-MAX_VILLAGE   = 12
+MAX_BRI_FORTS = 6
+MAX_PAT_FORTS = 6
+MAX_IND_VILLAGES = 12
 MAX_VP_DIFF   = 25          # auto-win margin
+
+# Backwards compatibility -------------------------------------------------
+MAX_FORT_BRI = MAX_BRI_FORTS
+MAX_FORT_PAT = MAX_PAT_FORTS
+MAX_VILLAGE  = MAX_IND_VILLAGES
 
 # ---------------------------------------------------
 # Faction identifiers (canonical strings everywhere)
@@ -40,7 +45,6 @@ FORT_BRI       = "British_Fort"
 FORT_PAT       = "Patriot_Fort"     
 VILLAGE        = "Village"
 SQUADRON       = "Squadron"
-BLOCKADE       = "Blockade"
 
 WINTER_QUARTERS_CARDS = {97, 98, 99, 100, 101, 102, 103, 104}
 BRILLIANT_STROKE_CARDS = {105, 106, 107, 108, 109}  # also from reference
