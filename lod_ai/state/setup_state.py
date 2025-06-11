@@ -10,6 +10,7 @@ marker pools inside the `state` literal returned by `build_state()`.
 
 import json
 import random
+import re
 from collections import Counter
 from pathlib import Path
 from typing import Dict, Any
@@ -17,8 +18,8 @@ from typing import Dict, Any
 # ── constants from rules_consts ──────────────────────────────────────────
 from lod_ai.rules_consts import (
     # pool caps
-    MAX_BRI_REGULARS, MAX_BRI_TORIES, MAX_FRENCH_REGULARS,
-    MAX_PAT_CONTINENTALS, MAX_PAT_MILITIA, MAX_IND_WAR_PARTIES,
+    MAX_REGULAR_BRI, MAX_TORY, MAX_REGULAR_FRE,
+    MAX_REGULAR_PAT, MAX_MILITIA, MAX_WAR_PARTY,
     # piece tags
     REGULAR_BRI, REGULAR_FRE, REGULAR_PAT,
     TORY, MILITIA_A, MILITIA_U, WARPARTY_A, WARPARTY_U,
@@ -29,6 +30,9 @@ from lod_ai.rules_consts import (
     RAID,
 )
 
+# deck helpers
+from lod_ai.cards import CARD_REGISTRY
+
 # ----------------------------------------------------------------------- #
 # 1️⃣  POOLS                                                               #
 # ----------------------------------------------------------------------- #
@@ -37,19 +41,19 @@ def init_pools() -> Dict[str, int]:
     """Return full counts for every piece family at game start."""
     return {
         # British
-        REGULAR_BRI:  MAX_BRI_REGULARS,
+        REGULAR_BRI:  MAX_REGULAR_BRI,
         BRIT_UNAVAIL: 0,
-        TORY:         MAX_BRI_TORIES,
+        TORY:         MAX_TORY,
         TORY_UNAVAIL: 0,
         # French
-        REGULAR_FRE:  MAX_FRENCH_REGULARS,
+        REGULAR_FRE:  MAX_REGULAR_FRE,
         FRENCH_UNAVAIL: 0,
         # Patriots
-        REGULAR_PAT:  MAX_PAT_CONTINENTALS,
-        MILITIA_A:    MAX_PAT_MILITIA,  # *available* militia start Active
+        REGULAR_PAT:  MAX_REGULAR_PAT,
+        MILITIA_A:    MAX_MILITIA,  # *available* militia start Active
         MILITIA_U:    0,                # underground militia are created later
         # Indians
-        WARPARTY_A:   MAX_IND_WAR_PARTIES,
+        WARPARTY_A:   MAX_WAR_PARTY,
         WARPARTY_U:   0,
     }
 
@@ -57,7 +61,7 @@ def init_pools() -> Dict[str, int]:
 # 2️⃣  SCENARIO FILES & ALIASES                                            #
 # ----------------------------------------------------------------------- #
 
-_DATA_DIR = Path(__file__).with_suffix("").parent / "data"
+_DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 _ALIAS = {
     "long":     "1775_long.json",
     "short":    "1775_short.json",
@@ -135,8 +139,44 @@ def _apply_unavailable_block(state: Dict[str, Any], scenario: Dict[str, Any]) ->
         pool[TORY]          -= bt
         pool[TORY_UNAVAIL]  += bt
 
+
 # ----------------------------------------------------------------------- #
-# 4️⃣  TOP‑LEVEL BUILDER                                                   #
+# 4️⃣  DECK INITIALISATION                                                 #
+# ----------------------------------------------------------------------- #
+
+_CARD_RX = re.compile(r"(?:Card_)?(\d{1,3})$")
+
+
+def _card_from_id(value: int | str) -> dict:
+    """Return CARD_REGISTRY entry for integer or 'Card_###' id."""
+    m = _CARD_RX.match(str(value).strip())
+    if not m:
+        raise ValueError(f"Unrecognised card id: {value}")
+    return CARD_REGISTRY[int(m.group(1))]
+
+
+def _init_deck(state: Dict[str, Any], scenario: Dict[str, Any]) -> None:
+    """Populate state['deck'] and state['upcoming_card'] from *scenario*."""
+    deck_ids = list(scenario.get("deck", []))
+    upcoming = scenario.get("upcoming_event")
+    current = scenario.get("current_event")
+
+    if current is not None:
+        state["current_card"] = _card_from_id(current)
+
+    upcoming_card = _card_from_id(upcoming) if upcoming is not None else None
+    if upcoming_card:
+        state["upcoming_card"] = upcoming_card
+
+    deck_cards = [_card_from_id(cid) for cid in deck_ids]
+    if upcoming_card:
+        deck_cards = [c for c in deck_cards if c["id"] != upcoming_card["id"]]
+
+    state["rng"].shuffle(deck_cards)
+    state["deck"] = deck_cards
+
+# ----------------------------------------------------------------------- #
+# 5️⃣  TOP‑LEVEL BUILDER                                                   #
 # ----------------------------------------------------------------------- #
 
 def build_state(scenario: str = "long", *, seed: int = 1) -> Dict[str, Any]:
@@ -165,4 +205,5 @@ def build_state(scenario: str = "long", *, seed: int = 1) -> Dict[str, Any]:
 
     _apply_unavailable_block(state, scen)
     _reconcile_on_map(state)
+    _init_deck(state, scen)
     return state
