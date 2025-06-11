@@ -50,7 +50,7 @@ class PatriotBot(BaseBot):
 
     def _rally_continentals(self, state: Dict) -> bool:
         for name, sp in state["spaces"].items():
-            if sp.get("Patriot_Continentals", 0) < 4:
+            if sp.get(C.REGULAR_PAT, 0) < 4:
                 rally.execute(state, self.faction, {}, [name])
                 return True
         return False
@@ -71,9 +71,9 @@ class PatriotBot(BaseBot):
             patriots = (
                 sp.get("Patriot_Militia_A", 0)
                 + sp.get("Patriot_Militia_U", 0)
-                + sp.get("Patriot_Continentals", 0)
+                + sp.get(C.REGULAR_PAT, 0)
             )
-            crown = sp.get("British_Regulars", 0) + sp.get("British_Tory", 0)
+            crown = sp.get(C.REGULAR_BRI, 0) + sp.get("British_Tory", 0)
             if patriots >= 1 and patriots > crown:
                 battle.execute(state, self.faction, {}, [name])
                 return True

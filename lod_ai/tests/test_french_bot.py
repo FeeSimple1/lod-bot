@@ -10,13 +10,15 @@ def simple_state():
     return {
         "spaces": {
             "Quebec": {"adj": ["New_York"], "support": 0},
-            "New_York": {"British_Regulars": 1, "adj": ["Quebec"], "support": 0},
+            "New_York": {"British_Regular": 1, "adj": ["Quebec"], "support": 0},
         },
         "resources": {"BRITISH": 5, "PATRIOTS": 5, "FRENCH": 5, "INDIANS": 5},
-        "available": {"French_Regulars": 4},
+        "available": {"French_Regular": 4},
         "rng": __import__('random').Random(1),
         "history": [],
         "toa_played": True,
+        "support": {"Quebec": 0, "New_York": 0},
+        "casualties": {},
     }
 
 

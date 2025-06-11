@@ -27,6 +27,12 @@ from lod_ai.rules_consts import (
     MAX_FORT_BRI,
     MAX_FORT_PAT,
     MAX_VILLAGE,
+    REGULAR_BRI,
+    REGULAR_FRE,
+    FORT_BRI,
+    FORT_PAT,
+    VILLAGE,
+    SQUADRON,
 )
 
 from lod_ai.board.pieces import remove_piece
@@ -37,14 +43,12 @@ from lod_ai.util.history import push_history
 # 1. GLOBAL-LIMIT ENFORCEMENT
 # ----------------------------------------------------------------------
 CAP_TABLE = {
-    "British_Fort":   MAX_FORT_BRI,
-    "Patriot_Fort":   MAX_FORT_PAT,
-    "Indian_Village": MAX_VILLAGE,   # WP or converted Village
+    FORT_BRI: MAX_FORT_BRI,
+    FORT_PAT: MAX_FORT_PAT,
+    VILLAGE:  MAX_VILLAGE,  # WP or converted Village
 }
 
 def _matches(tag: str, key: str) -> bool:
-    if key.endswith("Village"):
-        return tag.startswith(key)     # match both A & U sides
     return tag == key
 
 
@@ -54,15 +58,15 @@ def _matches(tag: str, key: str) -> bool:
 MAX_FORT_VIL_PER_SPACE = 2
 
 WEST_INDIES_ALLOWED = {
-    "British_Regular",
-    "French_Regular",
-    "British_Fort",
-    "French_Squadron",
+    REGULAR_BRI,
+    REGULAR_FRE,
+    FORT_BRI,
+    SQUADRON,
 }
 
 def _fort_vil_tags(space: Dict) -> List[str]:
     """Return list of Fort/Village tags present in *space*."""
-    return [t for t in space if t.endswith("_Fort") or t.startswith("Indian_Village")]
+    return [t for t in space if t.endswith("_Fort") or t == VILLAGE]
 
 def _indian_tag(tag: str) -> bool:
     return tag.startswith("Indian_")

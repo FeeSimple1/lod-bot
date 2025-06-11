@@ -71,20 +71,20 @@ class FrenchBot(BaseBot):
     def _can_muster(self, state: Dict) -> bool:
         if not state.get("toa_played"):
             return False
-        return state["available"].get("French_Regulars", 0) > 0
+        return state["available"].get(C.REGULAR_FRE, 0) > 0
 
     def _can_battle(self, state: Dict) -> bool:
         if not state.get("toa_played"):
             return False
         for sp in state["spaces"].values():
-            if sp.get("French_Regulars", 0) and sp.get("British_Regulars", 0):
+            if sp.get(C.REGULAR_FRE, 0) and sp.get(C.REGULAR_BRI, 0):
                 return True
         return False
 
     def _can_march(self, state: Dict) -> bool:
         if not state.get("toa_played"):
             return False
-        return any(sp.get("French_Regulars", 0) for sp in state["spaces"].values())
+        return any(sp.get(C.REGULAR_FRE, 0) for sp in state["spaces"].values())
 
     # ---------------------------------------------------------
     # ---- Command executors (minimal implementations) ---------
@@ -105,7 +105,7 @@ class FrenchBot(BaseBot):
         return True
 
     def _muster(self, state: Dict) -> bool:
-        spaces = [n for n in state["spaces"] if state["spaces"][n].get("French_Regulars", 0) < 4]
+        spaces = [n for n in state["spaces"] if state["spaces"][n].get(C.REGULAR_FRE, 0) < 4]
         if not spaces:
             return False
         target = spaces[0]
@@ -114,7 +114,7 @@ class FrenchBot(BaseBot):
 
     def _march(self, state: Dict) -> bool:
         for src, sp in state["spaces"].items():
-            if sp.get("French_Regulars", 0) > 0 and sp.get("adj"):
+            if sp.get(C.REGULAR_FRE, 0) > 0 and sp.get("adj"):
                 dst = sp["adj"][0]
                 march.execute(state, "FRENCH", {}, [src], [dst], bring_escorts=False, limited=True)
                 return True
@@ -123,7 +123,7 @@ class FrenchBot(BaseBot):
     def _battle(self, state: Dict) -> bool:
         refresh_control(state)
         for sid, sp in state["spaces"].items():
-            if sp.get("French_Regulars", 0) and sp.get("British_Regulars", 0):
+            if sp.get(C.REGULAR_FRE, 0) and sp.get(C.REGULAR_BRI, 0):
                 battle.execute(state, "FRENCH", {}, [sid])
                 return True
         return False
