@@ -7,8 +7,7 @@ Repository Guidelines
    - Add a `.gitignore` in the project root that excludes `__pycache__/` and `*.pyc`.
 
 2. **Deduplicate reference materials**
-   - Only keep a single copy of files such as `map_base.csv` and `rules_consts.py`.  
-     Decide whether to use `data/` or `Reference Documents/` as the canonical location.
+   - Only keep a single copy of files such as `map_base.csv` and `rules_consts.py`. Files in the Reference Documents folder do not count as duplicates.
 
 3. **Clean up stray artifacts**
    - Search for `:contentReference[` and lines containing shell prompts (e.g. `root@...`) in source files.  
