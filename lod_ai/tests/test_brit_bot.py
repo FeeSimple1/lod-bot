@@ -9,13 +9,15 @@ from lod_ai.bots.british_bot import BritishBot
 def simple_state():
     return {
         "spaces": {
-            "Boston": {"British_Regulars": 2, "Patriot_Militia_A": 1, "adj": ["New_York"]},
-            "New_York": {"British_Regulars": 1, "adj": ["Boston"]},
+            "Boston": {"British_Regular": 2, "Patriot_Militia_A": 1, "adj": ["New_York"]},
+            "New_York": {"British_Regular": 1, "adj": ["Boston"]},
         },
         "resources": {"BRITISH": 5, "PATRIOTS": 5, "FRENCH": 5, "INDIANS": 5},
-        "available": {"British_Regulars": 5, "Tory": 5},
+        "available": {"British_Regular": 5, "Tory": 5},
         "rng": __import__('random').Random(1),
         "history": [],
+        "support": {"Boston": 0, "New_York": 0},
+        "casualties": {},
     }
 
 

@@ -82,22 +82,6 @@ def load_scenario(name: str) -> Dict[str, Any]:
 # 3️⃣  MAP‑TAG → POOL‑TAG & RECONCILE                                      #
 # ----------------------------------------------------------------------- #
 
-TAG_TO_POOL = {
-    # British / French / Patriot / Indian tags that appear in scenario JSON
-    "British_Regulars":      REGULAR_BRI,
-    "British_Tory":          TORY,
-    "French_Regulars":       REGULAR_FRE,
-    "Patriot_Continentals":  REGULAR_PAT,
-    # Militia sometimes encoded in two ways
-    "_Militia_A":            MILITIA_A,
-    "_Militia_U":            MILITIA_U,
-    "Patriot_Militia":       MILITIA_A,  # legacy key
-    # War Parties
-    "_WP_A":                 WARPARTY_A,
-    "_WP_U":                 WARPARTY_U,
-}
-
-
 def _reconcile_on_map(state: Dict[str, Any]) -> None:
     """Subtract pieces already seated on the map from each pool."""
     pool, spaces = state["pool"], state["spaces"]
@@ -105,8 +89,8 @@ def _reconcile_on_map(state: Dict[str, Any]) -> None:
 
     for sp in spaces.values():
         for tag, n in sp.items():
-            if n and tag in TAG_TO_POOL:
-                used[TAG_TO_POOL[tag]] += n
+            if n and tag in pool:
+                used[tag] += n
 
     for pool_tag, n_used in used.items():
         pool[pool_tag] -= n_used

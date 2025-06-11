@@ -57,7 +57,7 @@ class BritishBot(BaseBot):
             return False
 
         origins = [n for n, sp in state["spaces"].items()
-                   if sp.get("British_Regulars", 0) > 0 and n != target]
+                   if sp.get(C.REGULAR_BRI, 0) > 0 and n != target]
         if not origins:
             return False
 
@@ -87,7 +87,7 @@ class BritishBot(BaseBot):
     def _march(self, state: Dict) -> bool:
         """Move one Regular from a random space to an adjacent one."""
         for src, sp in state["spaces"].items():
-            if sp.get("British_Regulars", 0) > 0:
+            if sp.get(C.REGULAR_BRI, 0) > 0:
                 dests = sp.get("adj", [])
                 if dests:
                     dst = dests[0]
@@ -107,8 +107,8 @@ class BritishBot(BaseBot):
         """Battle in the first space where British outnumber rebels."""
         refresh_control(state)
         for name, sp in state["spaces"].items():
-            rebels = sp.get("Patriot_Continentals", 0) + sp.get("Patriot_Militia", 0)
-            if rebels >= 1 and sp.get("British_Regulars", 0) > rebels:
+            rebels = sp.get(C.REGULAR_PAT, 0) + sp.get(C.MILITIA_A, 0)
+            if rebels >= 1 and sp.get(C.REGULAR_BRI, 0) > rebels:
                 battle.execute(state, "BRITISH", {}, [name])
                 return True
         return False
@@ -145,7 +145,7 @@ class BritishBot(BaseBot):
 
     def _can_garrison(self, state: Dict) -> bool:
         refresh_control(state)
-        regs = sum(sp.get("British_Regulars", 0) for sp in state["spaces"].values())
+        regs = sum(sp.get(C.REGULAR_BRI, 0) for sp in state["spaces"].values())
         if regs < 10:
             return False
         for name in CITIES:
@@ -155,18 +155,18 @@ class BritishBot(BaseBot):
         return False
 
     def _can_muster(self, state: Dict) -> bool:
-        avail = state.get("available", {}).get("British_Regulars", 0)
+        avail = state.get("available", {}).get(C.REGULAR_BRI, 0)
         import random
         return avail > random.randint(1, 6)
 
     def _can_battle(self, state: Dict) -> bool:
         refresh_control(state)
         for sp in state["spaces"].values():
-            rebels = sp.get("Patriot_Continentals", 0) + sp.get("Patriot_Militia", 0)
-            if rebels >= 2 and sp.get("British_Regulars", 0) > rebels:
+            rebels = sp.get(C.REGULAR_PAT, 0) + sp.get(C.MILITIA_A, 0)
+            if rebels >= 2 and sp.get(C.REGULAR_BRI, 0) > rebels:
                 return True
         return False
 
     def _can_march(self, state: Dict) -> bool:
         # Assume March is always possible if any British Regulars exist
-        return any(sp.get("British_Regulars", 0) for sp in state["spaces"].values())
+        return any(sp.get(C.REGULAR_BRI, 0) for sp in state["spaces"].values())
