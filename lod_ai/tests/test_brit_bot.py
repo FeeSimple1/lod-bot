@@ -23,7 +23,8 @@ def simple_state():
 
 def test_british_bot_turn():
     state = simple_state()
-    card = json.loads(open('lod_ai/cards/data.json').read())[0]
+    card_path = Path(__file__).resolve().parents[2] / 'lod_ai' / 'cards' / 'data.json'
+    card = json.loads(open(card_path).read())[0]
     bot = BritishBot()
     bot.take_turn(state, card)
     assert state.get("history")
