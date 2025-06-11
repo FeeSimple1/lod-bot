@@ -20,3 +20,23 @@ engine.play_turn("BRITISH", card=current_card)
 ```
 
 The engine automatically handles Winter‑Quarters upkeep and refreshes
+control and available-piece counts after every action, so the state
+stays consistent.
+
+### Running the Engine
+
+Execute the above snippet in a Python interpreter or include it in a
+script. Set `use_cli=True` when creating the `Engine` to manually select
+commands instead of relying on the built‑in bot logic.
+
+### Tests
+
+Install the test requirements and run the suite:
+
+```bash
+pip install -r requirements-dev.txt
+pytest -q
+```
+
+This runs the small suite under `lod_ai/tests` to verify that the bots
+and core engine logic load correctly.
