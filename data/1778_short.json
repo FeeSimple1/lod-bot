@@ -1,11 +1,11 @@
 {
-  "scenario": "1778‑80 Short – Southern Campaign",
+  "scenario": "1778 to 1780; Short Duration",
   "campaign_year": 1778,
 
   "resources": { "BRITISH": 6, "PATRIOTS": 3, "FRENCH": 8, "INDIANS": 2 },
   "fni_level": 0,
 
-  "toa_played": false,
+  "toa_played": true,
 
 "leaders": {
   "WASHINGTON":      "Pennsylvania",
@@ -22,7 +22,7 @@
 },
 
   "bs_played": { "BRITISH": false, "PATRIOTS": false, "INDIANS": false, "FRENCH": false },
-  "casualties": { "BRITISH": 0, "PATRIOTS": 0 },
+  "casualties": { "BRITISH": 10, "PATRIOTS": 12 },
 
   "british_casualties": 0,
   "patriot_casualties": 0,
