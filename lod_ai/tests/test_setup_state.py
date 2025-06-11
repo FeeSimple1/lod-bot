@@ -1,6 +1,6 @@
 import json
 import re
-from lod_ai.state import setup_state
+from lod_ai.state import setup_state, map_loader
 
 
 def _id_from_val(val):
@@ -47,4 +47,11 @@ def test_build_state_historical_deck(tmp_path, monkeypatch):
     deck_ids = [c["id"] for c in state["deck"]]
     assert deck_ids == [2, 97, 3, 98, 1]
     assert state["setup_method"] == "historical"
+
+
+def test_load_map_default_path():
+    mp = map_loader.load_map()
+    assert isinstance(mp, dict)
+    assert "Boston" in mp
+    assert len(mp) >= 22
 

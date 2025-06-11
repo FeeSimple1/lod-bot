@@ -8,6 +8,6 @@ def load_map():
     """Return the canonical 22-space map dict (cached)."""
     global _MAP
     if _MAP is None:
-        path = Path(__file__).with_name("map.json")
+        path = Path(__file__).resolve().parents[1] / "map" / "data" / "map.json"
         _MAP = json.loads(path.read_text(encoding="utf-8"))
     return _MAP
