@@ -23,9 +23,9 @@ from typing import Any, Dict, List
 # ----------------------------------------------------------------------
 #  Project helpers
 # ----------------------------------------------------------------------
-from map_loader import load_map
+from lod_ai.state.map_loader import load_map
 from tools.clean_scenario import clean_scenario
-import rules_consts as C          # holds MAX_* constants per Milestone-0
+from lod_ai import rules_consts as C          # holds MAX_* constants per Milestone-0
 
 MAP         = load_map()          # 22-space dict
 MAP_SPACES  = set(MAP.keys())
