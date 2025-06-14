@@ -3,7 +3,8 @@
 from importlib import import_module
 from pathlib import Path
 import json
-from typing import Callable, Dict
+from typing import Callable, Dict, List
+from lod_ai import rules_consts
 
 # ---------------------------------------------------------------------------
 # Data registry loaded from data.json
@@ -37,4 +38,35 @@ def _autodiscover() -> None:
 
 _autodiscover()
 
-__all__ = ["CARD_REGISTRY", "CARD_HANDLERS", "register"]
+_ICON_MAP = {
+    "P": rules_consts.PATRIOTS,
+    "B": rules_consts.BRITISH,
+    "F": rules_consts.FRENCH,
+    "I": rules_consts.INDIANS,
+}
+
+
+def get_faction_order(card: dict) -> List[str]:
+    """Return the order that factions act on this card.
+
+    Parameters
+    ----------
+    card : dict
+        Card entry as stored in :data:`CARD_REGISTRY`.
+
+    Returns
+    -------
+    list[str]
+        Sequence of faction identifiers from :mod:`rules_consts`.
+    """
+
+    icons = card.get("order_icons", "") or ""
+    return [_ICON_MAP[c] for c in icons if c in _ICON_MAP]
+
+
+__all__ = [
+    "CARD_REGISTRY",
+    "CARD_HANDLERS",
+    "register",
+    "get_faction_order",
+]
