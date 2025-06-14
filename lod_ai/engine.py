@@ -151,3 +151,9 @@ class Engine:
 
         refresh_control(self.state)
         enforce_global_caps(self.state)
+
+        # mark faction ineligible for remainder of card and queue for next card
+        elig = self.state.setdefault("eligible", {})
+        elig[faction] = False
+        self.state.setdefault("eligible_next", set()).discard(faction)
+        self.state.setdefault("ineligible_next", set()).add(faction)

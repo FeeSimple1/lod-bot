@@ -28,6 +28,10 @@ from lod_ai.rules_consts import (
     # new marker support
     PROPAGANDA,
     RAID,
+    BRITISH,
+    PATRIOTS,
+    FRENCH,
+    INDIANS,
 )
 
 # deck helpers
@@ -226,6 +230,12 @@ def build_state(
         "history":   [],
         "log":       [],
         "setup_method": setup_method,
+        "eligible": {
+            BRITISH: True,
+            PATRIOTS: True,
+            FRENCH: True,
+            INDIANS: True,
+        },
     }
 
     _apply_unavailable_block(state, scen)
