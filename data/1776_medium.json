@@ -103,12 +103,6 @@
     "Card_103",
     "Card_104"
   ],
-  "eligible_order": [
-    "PATRIOTS",
-    "INDIANS",
-    "BRITISH",
-    "FRENCH"
-  ],
   "spaces": {
     "Quebec_City": {
       "British_Tory": 2,

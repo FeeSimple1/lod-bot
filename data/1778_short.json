@@ -61,12 +61,6 @@
     "Card_022",
     "Card_023"
   ],
-  "eligible_order": [
-    "PATRIOTS",
-    "INDIANS",
-    "BRITISH",
-    "FRENCH"
-  ],
   "spaces": {
     "Quebec_City": {
       "British_Regular": 2,
