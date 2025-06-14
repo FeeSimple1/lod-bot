@@ -61,3 +61,33 @@ def test_engine_turn_marks_ineligible(tmp_path, monkeypatch):
     assert state["eligible"][C.BRITISH] is False
     assert C.BRITISH in state.get("ineligible_next", set())
 
+
+def test_play_card_orders_and_skips(monkeypatch):
+    card = {"order_icons": "PBFI"}
+    state = {
+        "spaces": {},
+        "resources": {C.BRITISH: 5, C.PATRIOTS: 5, C.FRENCH: 5, C.INDIANS: 5},
+        "eligible": {
+            C.BRITISH: True,
+            C.PATRIOTS: True,
+            C.FRENCH: True,
+            C.INDIANS: True,
+        },
+        "ineligible_next": {C.PATRIOTS},
+    }
+    engine = Engine(state)
+
+    calls = []
+
+    def stub_turn(self, faction, card=None):
+        calls.append(faction)
+        self.state["eligible"][faction] = False
+
+    monkeypatch.setattr(Engine, "play_turn", stub_turn)
+    engine.play_card(card)
+
+    assert calls == [C.BRITISH, C.FRENCH]
+    assert state["eligible"][C.BRITISH] is False
+    assert state["eligible"][C.FRENCH] is False
+    assert state.get("ineligible_next", set()) == set()
+

@@ -9,6 +9,7 @@
 
 from lod_ai.dispatcher    import Dispatcher
 from lod_ai.util.free_ops import pop_free_ops
+from lod_ai.cards import determine_eligible_factions
 from lod_ai.util.year_end import resolve as resolve_year_end
 from lod_ai.util.history  import push_history
 from lod_ai.util.caps     import enforce_global_caps
@@ -93,6 +94,26 @@ class Engine:
             "FRENCH":   FrenchBot(),
             "INDIANS":  indian_choose,
         }
+
+    # -------------------------------------------------------------------
+    def _start_card(self, card: dict) -> tuple[str | None, str | None]:
+        """Prepare eligibility and return acting factions for *card*."""
+        elig = self.state.setdefault("eligible", {})
+        for fac in self.state.pop("eligible_next", set()):
+            elig[fac] = True
+        for fac in self.state.pop("ineligible_next", set()):
+            elig[fac] = False
+        order = determine_eligible_factions(self.state, card)
+        self.state["current_card"] = card
+        self.state["card_order"] = order
+        return order
+
+    def play_card(self, card: dict) -> None:
+        """Execute all eligible turns for *card*."""
+        first, second = self._start_card(card)
+        for fac in (first, second):
+            if fac and self.state.get("eligible", {}).get(fac, True):
+                self.play_turn(fac, card=card)
     # -------------------------------------------------------------------
 
     def _cli_select_command(self, faction: str) -> None:
