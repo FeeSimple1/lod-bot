@@ -21,7 +21,7 @@ import json, re, sys, pathlib, argparse, copy
 from typing import Any, Dict, List
 
 # ----------------------------------------------------------------------
-#  Map loader  – uses the helper we already added in lod_ai_helper_m1to3
+#  Map loader – use lod_ai.state.map_loader.load_map
 # ----------------------------------------------------------------------
 from lod_ai.state.map_loader import load_map
 CANON_SPACES = list(load_map().keys())           # 22 space names, stable order
