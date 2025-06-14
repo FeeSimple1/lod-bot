@@ -3,7 +3,7 @@
 from importlib import import_module
 from pathlib import Path
 import json
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Any
 from lod_ai import rules_consts
 
 # ---------------------------------------------------------------------------
@@ -64,9 +64,29 @@ def get_faction_order(card: dict) -> List[str]:
     return [_ICON_MAP[c] for c in icons if c in _ICON_MAP]
 
 
+def determine_eligible_factions(state: Dict[str, Any], card: dict) -> tuple[str | None, str | None]:
+    """Return the first and second eligible factions for *card*.
+
+    Factions marked False in ``state['eligible']`` are skipped.
+    """
+    order = get_faction_order(card)
+    elig = state.get("eligible", {})
+    first = second = None
+    for fac in order:
+        if not elig.get(fac, True):
+            continue
+        if first is None:
+            first = fac
+        else:
+            second = fac
+            break
+    return first, second
+
+
 __all__ = [
     "CARD_REGISTRY",
     "CARD_HANDLERS",
     "register",
     "get_faction_order",
+    "determine_eligible_factions",
 ]
