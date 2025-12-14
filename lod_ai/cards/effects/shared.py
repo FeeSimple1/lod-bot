@@ -79,8 +79,20 @@ def adjust_fni(state, delta: int) -> None:
     state["fni_level"] = max(0, min(MAX_FNI, before + delta))
     push_history(state, f"FNI {before} → {state['fni_level']}")
 
-def pick_two_cities(state):
-    """Return two City IDs; for now pick the first two alphabetically."""
+def pick_cities(state, count: int = 1):
+    """Return up to *count* City IDs sorted alphabetically."""
     cities = [n for n, info in state["spaces"].items() if info.get("type") == "City"]
     cities.sort()
-    return cities[:2]            # deterministic for tests
+    return cities[:count]
+
+
+def pick_two_cities(state):
+    """Return two City IDs; for now pick the first two alphabetically."""
+    return pick_cities(state, 2)            # deterministic for tests
+
+
+def pick_colonies(state, count: int = 1):
+    """Return up to *count* Colony IDs sorted alphabetically."""
+    colonies = [n for n, info in state["spaces"].items() if info.get("type") == "Colony"]
+    colonies.sort()
+    return colonies[:count]
