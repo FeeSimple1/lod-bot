@@ -1,5 +1,5 @@
 from lod_ai.cards import register
-from .shared import add_resource, shift_support, adjust_fni
+from .shared import add_resource, shift_support, adjust_fni, pick_cities, pick_colonies
 from lod_ai.util.free_ops import queue_free_op
 from lod_ai.board.pieces import (
     move_piece,
@@ -8,6 +8,7 @@ from lod_ai.board.pieces import (
     place_marker,
     place_with_caps,
 )
+from lod_ai.util.history import push_history
 
 from lod_ai.rules_consts import (
     REGULAR_BRI, REGULAR_PAT, REGULAR_FRE, TORY,
@@ -37,11 +38,14 @@ def evt_002_common_sense(state, shaded=False):
                2 Propaganda in each.
     """
     if shaded:
-        for city in ("New_York_City", "Philadelphia"):
+        for city in pick_cities(state, 2):
             shift_support(state, city, -1)
             place_marker(state, PROPAGANDA, city, 2)
     else:
-        city = "Boston"
+        cities = pick_cities(state, 1)
+        if not cities:
+            return
+        city = cities[0]
         place_piece(state, REGULAR_BRI, city, 2)
         place_piece(state, TORY,   city, 2)
         place_marker(state, PROPAGANDA, city, 2)
@@ -73,18 +77,35 @@ def evt_006_benedict_arnold(state, shaded=False):
                Colony (to Casualties/Available).
     Shaded   – Heroic: remove 1 British Fort + 2 British cubes from *one* space
                (to Casualties).
-    (For now we deterministically pick Virginia; later the bot/engine can choose.)
     """
-    target = "Virginia"
+    spaces_sorted = sorted(state["spaces"])
+
     if shaded:
+        candidates = [
+            sid for sid in spaces_sorted
+            if state["spaces"][sid].get(FORT_BRI)
+            or state["spaces"][sid].get(REGULAR_BRI)
+            or state["spaces"][sid].get(TORY)
+        ]
+        target = candidates[0] if candidates else (spaces_sorted[0] if spaces_sorted else None)
+        if not target:
+            return
         remove_piece(state, FORT_BRI,     target, 1, to="casualties")
         removed = remove_piece(state, REGULAR_BRI, target, 2, to="casualties")
         if removed < 2:
             # top up with Tories if Regulars insufficient
             remove_piece(state, TORY, target, 2-removed, to="casualties")
-    else:
-        remove_piece(state, FORT_PAT,     target, 1, to="casualties")
-        remove_piece(state, MILITIA_U, target, 2, to="available")
+        return
+
+    colony_choices = pick_colonies(state, 1)
+    if not colony_choices:
+        return
+
+    target = colony_choices[0]
+    remove_piece(state, FORT_PAT,     target, 1, to="casualties")
+    removed = remove_piece(state, MILITIA_U, target, 2, to="available")
+    if removed < 2:
+        remove_piece(state, MILITIA_A, target, 2 - removed, to="available")
 
 # 10  BENJAMIN FRANKLIN TRAVELS TO FRANCE
 @register(10)   # Benjamin Franklin Travels to France
@@ -149,21 +170,19 @@ def evt_020_continental_marines(state, shaded=False):
 def evt_024_declaration(state, shaded=False):
     """Declaration of Independence."""
     if shaded:
-        targets = list(state["spaces"])[:3]
+        targets = sorted(state["spaces"])[:3]
         for sid in targets:
-            place_piece(state, REGULAR_PAT, sid)
-            place_marker(state, PROPAGANDA, sid)
-        place_with_caps(state, FORT_PAT, targets[0])
-    else:
-        # Patriots place 1 Fort anywhere and up to 3 Militia with Propaganda
-        candidates = [sid for sid, sp in state["spaces"].items()
-                      if sp.get("type") in ("City", "Colony")]
-        targets = candidates[:3]  # deterministic selection
-        for t in targets:
-            place_piece(state, MILITIA_U, t, 1)
-            place_marker(state, PROPAGANDA, t, 1)
+            place_piece(state, MILITIA_U, sid, 1)
+            place_marker(state, PROPAGANDA, sid, 1)
         if targets:
             place_with_caps(state, FORT_PAT, targets[0])
+        return
+
+    removed_continentals = remove_piece(state, REGULAR_PAT, None, 2, to="casualties")
+    removed_militia = remove_piece(state, MILITIA_U, None, 2, to="available")
+    if removed_militia < 2:
+        remove_piece(state, MILITIA_A, None, 2 - removed_militia, to="available")
+    remove_piece(state, FORT_PAT, None, 1, to="casualties")
 
 # 28  BATTLE OF MOORE’S CREEK BRIDGE
 @register(28)
@@ -174,8 +193,16 @@ def evt_028_moores_creek(state, shaded=False):
     Shaded   – “Patriots win”: In any one space, replace **every Tory** with
                 **two Patriot Militia** each.
     """
-target = "North_Carolina"
-sp = state["spaces"][target]
+    targets = state.get("spaces", {})
+    if not targets:
+        return
+    preferred = [
+        sid for sid, sp in targets.items()
+        if (sp.get(TORY) and shaded) or ((sp.get(MILITIA_U) or sp.get(MILITIA_A)) and not shaded)
+    ]
+    target_list = sorted(preferred or targets)
+    target = target_list[0]
+    sp = state["spaces"].get(target, {})
 
     if shaded:
         # Replace every Tory with twice as many Underground Militia
@@ -199,32 +226,41 @@ sp = state["spaces"][target]
 @register(29)
 def evt_029_bancroft(state, shaded=False):
     """
-    Unshaded – Activate half of the Patriot underground Militia (rounded down).
-               British Resources +2.
-    Shaded   – Patriot Resources +3 (no activation).
-    """
-    # flip half of underground militia everywhere
-    hidden_tag = "Patriot_Militia_U"
-    active_tag = "Patriot_Militia_A"
-    ...
-    add_resource(state, "British", +2)
-    push_history(state, f"Bancroft flips {flipped} Militia (half of {total_hidden})")
-
-After:
-
-# 29  EDWARD BANCROFT, BRITISH SPY
-@register(29)
-def evt_029_bancroft(state, shaded=False):
-    """
     Unshaded only – Patriots or Indians must Activate their Militia or
     War Parties until 1/2 of them are Active (rounded down).
     """
-    # Deterministic: target Patriots (per Bots’ guidance).
-    hidden_tag = MILITIA_U
-    active_tag = MILITIA_A
+    if shaded:
+        return
+
+    def _pick_target_faction() -> str:
+        explicit = state.get("card29_target") or state.get("bancroft_target")
+        if explicit:
+            choice = str(explicit).upper()
+            if choice in {"PATRIOTS", "INDIANS"}:
+                return choice
+
+        militia_total = sum(
+            sp.get(MILITIA_U, 0) + sp.get(MILITIA_A, 0)
+            for sp in state["spaces"].values()
+        )
+        warparty_total = sum(
+            sp.get(WARPARTY_U, 0) + sp.get(WARPARTY_A, 0)
+            for sp in state["spaces"].values()
+        )
+        return "INDIANS" if warparty_total > militia_total else "PATRIOTS"
+
+    target_faction = _pick_target_faction()
+    hidden_tag, active_tag = (
+        (MILITIA_U, MILITIA_A)
+        if target_faction == "PATRIOTS"
+        else (WARPARTY_U, WARPARTY_A)
+    )
 
     total = sum(sp.get(hidden_tag, 0) + sp.get(active_tag, 0)
                 for sp in state["spaces"].values())
+    if total == 0:
+        return
+
     target_active = total // 2
     cur_active = sum(sp.get(active_tag, 0) for sp in state["spaces"].values())
     need = max(0, target_active - cur_active)
@@ -243,6 +279,11 @@ def evt_029_bancroft(state, shaded=False):
                 del sp[hidden_tag]
             sp[active_tag] = sp.get(active_tag, 0) + take
             flipped += take
+
+    push_history(
+        state,
+        f"Bancroft activates {flipped} for {target_faction} (to reach {target_active} Active)",
+    )
 
 # 30  HESSIANS
 @register(30)
@@ -271,10 +312,10 @@ def evt_032_rule_britannia(state, shaded=False):
     """
     Unshaded – “Rule, Britannia! rule the waves”:
         Place up to 2 British Regulars *and* 2 Tories from Unavailable or
-        Available into any one Colony (we choose Virginia).
+        Available into any one Colony.
     Shaded   – “Thy cities shall with commerce shine”:
         Any faction gains Resources equal to half the number of Cities that
-        are under British Control (rounded down).  We grant them to Patriots.
+        are under British Control (rounded down).
     """
     # ---- helper to grab from available first, then unavailable -------------
     def _pull_from_pools(tag, qty):
@@ -287,11 +328,19 @@ def evt_032_rule_britannia(state, shaded=False):
             n for n, sp in state["spaces"].items()
             if sp.get("British_Control") and sp.get("type") == "City"
         ]
-        add_resource(state, "Patriots", len(british_cities) // 2)
+        recipient = state.get("rule_britannia_recipient", "British")
+        add_resource(state, recipient, len(british_cities) // 2)
         return
 
     # ---- unshaded: place pieces in one Colony ------------------------------
-    target = "Virginia"                    # deterministic choice for now
+    colony_choices = state.get("rule_britannia_colony")
+    if colony_choices:
+        target = str(colony_choices)
+    else:
+        colonies = pick_colonies(state, 1)
+        if not colonies:
+            return
+        target = colonies[0]
     _pull_from_pools(REGULAR_BRI, 2)
     _pull_from_pools(TORY,   2)
 
