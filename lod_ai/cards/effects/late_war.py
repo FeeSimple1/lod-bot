@@ -42,6 +42,7 @@ from lod_ai.rules_consts import (
     TORY,
     FORT_BRI,
     RAID,
+    WARPARTY_U,
     WEST_INDIES_ID,
     VILLAGE,
 )
@@ -324,7 +325,7 @@ def evt_062_langlade(state, shaded=False):
     if shaded:
         place_piece(state, REGULAR_FRE, "Quebec", 3)
     else:
-        place_piece(state, "Indian_WP_U", "Northwest", 3)
+        place_piece(state, WARPARTY_U, "Northwest", 3)
 
 
 
@@ -409,10 +410,10 @@ def evt_079_tuscarora_oneida(state, shaded=False):
     loc = "Pennsylvania"
     if shaded:
         remove_piece(state, VILLAGE, loc, 1, to="available")
-        remove_piece(state, "Indian_WP_U", loc, 2, to="available")
+        remove_piece(state, WARPARTY_U, loc, 2, to="available")
     else:
         place_piece(state, VILLAGE, loc, 1)
-        place_piece(state, "Indian_WP_U", loc, 2)
+        place_piece(state, WARPARTY_U, loc, 2)
 
 
 # 81  CREEK & SEMINOLE ACTIVE IN SOUTH
@@ -420,11 +421,11 @@ def evt_079_tuscarora_oneida(state, shaded=False):
 def evt_081_creek_seminole(state, shaded=False):
     loc = "South_Carolina"
     if shaded:
-        removed = remove_piece(state, "Indian_WP_U", loc, 2, to="available")
+        removed = remove_piece(state, WARPARTY_U, loc, 2, to="available")
         if removed < 2:
-            remove_piece(state, "Indian_WP_U", "Georgia", 2 - removed, to="available")
+            remove_piece(state, WARPARTY_U, "Georgia", 2 - removed, to="available")
     else:
-        place_piece(state, "Indian_WP_U", loc, 2)
+        place_piece(state, WARPARTY_U, loc, 2)
         place_marker(state, RAID, loc)
         place_piece(state, VILLAGE, loc, 1)
 
@@ -445,7 +446,7 @@ def evt_085_mississippi_raids(state, shaded=False):
 def evt_087_lenape(state, shaded=False):
     if shaded:
         return
-    remove_piece(state, "Indian_WP_U", "Pennsylvania", 1, to="available")
+    remove_piece(state, WARPARTY_U, "Pennsylvania", 1, to="available")
 
 
 # 94  HERKIMER’S RELIEF COLUMN
@@ -457,7 +458,7 @@ def evt_094_herkimer(state, shaded=False):
     """
     from lod_ai.util.free_ops import queue_free_op
     if shaded:
-        remove_piece(state, "Indian_WP_U", "Pennsylvania", 4, to="available")
+        remove_piece(state, WARPARTY_U, "Pennsylvania", 4, to="available")
         return
     queue_free_op(state, "INDIANS", "gather", "New_York")
     queue_free_op(state, "BRITISH", "muster", "New_York")
@@ -471,7 +472,7 @@ def evt_095_ohio_frontier(state, shaded=False):
     loc = "Northwest"
     if remove_piece(state, FORT_BRI, loc, 1, to="available") == 0:
         remove_piece(state, VILLAGE, loc, 1, to="available")
-    place_piece(state, "Indian_WP_U", loc, 3)
+    place_piece(state, WARPARTY_U, loc, 3)
 
 
 # 96  IROQUOIS CONFEDERACY

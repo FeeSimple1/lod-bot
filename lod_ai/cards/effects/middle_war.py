@@ -71,9 +71,9 @@ def evt_005_lord_stirling(state, shaded=False):
 def evt_008_culpeper_ring(state, shaded=False):
     """Handle Culpeper Spy Ring event."""
     if shaded:
-        removed = remove_piece(state, "British_Regular", None, 3, to="casualties")
+        removed = remove_piece(state, REGULAR_BRI, None, 3, to="casualties")
         if removed < 3:
-            remove_piece(state, "British_Tory", None, 3 - removed, to="casualties")
+            remove_piece(state, TORY, None, 3 - removed, to="casualties")
     else:
         # Activate three Patriot Militia anywhere
         flipped = 0
