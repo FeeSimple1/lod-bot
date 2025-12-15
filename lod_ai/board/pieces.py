@@ -104,14 +104,14 @@ def add_piece(state: Dict[str, Any], tag: str, loc: str, qty: int = 1) -> int:
 # --------------------------------------------------------------------------- #
 from lod_ai.rules_consts import (
     MAX_FORT_BRI, MAX_FORT_PAT, MAX_VILLAGE,
-    PROPAGANDA, MAX_PROPAGANDA,
+    PROPAGANDA, MAX_PROPAGANDA, VILLAGE,
 )
 
 _CAPS = {
-    "British_Fort":   MAX_FORT_BRI,
-    "Patriot_Fort":   MAX_FORT_PAT,
-    "Indian_Village": MAX_VILLAGE,
-    PROPAGANDA:       MAX_PROPAGANDA,
+    "British_Fort": MAX_FORT_BRI,
+    "Patriot_Fort": MAX_FORT_PAT,
+    VILLAGE:         MAX_VILLAGE,
+    PROPAGANDA:      MAX_PROPAGANDA,
 }
 
 def place_with_caps(state: Dict[str, Any], tag: str, loc: str, qty: int = 1) -> int:
