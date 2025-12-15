@@ -1,5 +1,5 @@
 from lod_ai.cards import register
-from .shared import add_resource, shift_support, adjust_fni, pick_cities, pick_colonies
+from .shared import add_resource, shift_support, adjust_fni, pick_cities, pick_colonies, pick_two_cities
 from lod_ai.util.free_ops import queue_free_op
 from lod_ai.board.pieces import (
     move_piece,
@@ -14,7 +14,7 @@ from lod_ai.rules_consts import (
     REGULAR_BRI, REGULAR_PAT, REGULAR_FRE, TORY,
     MILITIA_A, MILITIA_U, WARPARTY_A, WARPARTY_U,
     FORT_BRI, FORT_PAT, VILLAGE,
-    PROPAGANDA, BLOCKADE, WEST_INDIES_ID
+    PROPAGANDA, RAID, BLOCKADE, WEST_INDIES_ID
 )
 
 def _pick_spaces_with_militia(state, max_spaces=4):
@@ -633,12 +633,28 @@ def evt_072_french_settlers(state, shaded=False):
 @register(75)
 def evt_075_speech_six_nations(state, shaded=False):
     """
-    Unshaded – Indians free Gather in 3 spaces, then free War Path.
-    Shaded   – (no free ops)
+    Unshaded – Indians free Gather in three Indian Reserve Provinces then free War Path in one of those spaces.
+    Shaded   – Remove three Indian pieces from Northwest (Villages last).
     """
-    from lod_ai.util.free_ops import queue_free_op
     if shaded:
+        target = "Northwest"
+        remaining = 3
+
+        # Remove War Parties first (either status), then Villages.
+        removed = remove_piece(state, WARPARTY_U, target, remaining, to="available")
+        remaining -= removed
+        if remaining:
+            removed = remove_piece(state, WARPARTY_A, target, remaining, to="available")
+            remaining -= removed
+        if remaining:
+            remove_piece(state, VILLAGE, target, remaining, to="available")
+
+        push_history(state, "Speech to Six Nations: removed 3 Indian pieces from Northwest (Villages last)")
         return
+
+    from lod_ai.util.free_ops import queue_free_op
+
+    # Existing bot placeholder behavior preserved
     for _ in range(3):
         queue_free_op(state, "INDIANS", "gather")
     queue_free_op(state, "INDIANS", "war_path")
@@ -647,16 +663,32 @@ def evt_075_speech_six_nations(state, shaded=False):
 @register(82)
 def evt_082_shawnee(state, shaded=False):
     provs = ("Virginia", "Georgia", "North_Carolina", "South_Carolina")
+
     if shaded:
-        removed = 3
+        # RULES: Indian pieces cannot go to Casualties (Manual 1.4.1).
+        remaining = 3
         for p in provs:
-            removed -= remove_piece(state, "Indian_WP", p, removed, to="casualties")
-            if removed == 0:
+            if remaining == 0:
                 break
-    else:
-        for p in provs:
-            place_piece(state, "Indian_WP", p)
-            place_marker(state, "Raid", p)
+
+            removed = remove_piece(state, WARPARTY_U, p, remaining, to="available")
+            remaining -= removed
+            if remaining:
+                removed = remove_piece(state, WARPARTY_A, p, remaining, to="available")
+                remaining -= removed
+            if remaining:
+                removed = remove_piece(state, VILLAGE, p, remaining, to="available")
+                remaining -= removed
+
+        push_history(state, "Frustrated Shawnee Warriors Attack (shaded): removed 3 Indian pieces (Villages last)")
+        return
+
+    # Unshaded: place 1 War Party (must be Underground per 1.4.3) and 1 Raid marker in each space.
+    for p in provs:
+        place_piece(state, WARPARTY_U, p, 1)
+        place_marker(state, RAID, p, 1)
+
+    push_history(state, "Frustrated Shawnee Warriors Attack (unshaded): placed War Parties + Raid markers")
 
 # 83  GUY CARLETON & INDIANS NEGOTIATE
 @register(83)
@@ -669,18 +701,22 @@ def evt_083_carleton_negotiates(state, shaded=False):
         city = "Quebec_City"
         delta = 2 - state["support"].get(city, 0)
         shift_support(state, city, delta)
-        place_piece(state, "Indian_WP", "Quebec", 2)
+
+        # New War Parties must be placed Underground (Manual 1.4.3).
+        place_piece(state, WARPARTY_U, "Quebec", 2)
 
 
 # 84  SIX NATIONS AID THE WAR
 @register(84)
 def evt_084_six_nations(state, shaded=False):
     """
-    Unshaded – Indians free Gather in 2 Colonies.
-    Shaded   – (no free ops)
+    Unshaded – Indians free Gather in two Colonies.
+    Shaded   – Patriots remove one Village.
     """
     from lod_ai.util.free_ops import queue_free_op
     if shaded:
+        removed = remove_piece(state, VILLAGE, None, 1, to="available")
+        push_history(state, f"Merciless Indian Savages (shaded): removed {removed} Village")
         return
     queue_free_op(state, "INDIANS", "gather")
     queue_free_op(state, "INDIANS", "gather")
@@ -738,27 +774,33 @@ def evt_090_world_turned_upside_down(state, shaded=False):
 def evt_091_indians_help(state, shaded=False):
     """Handle card #91, Indians Help British Outside Colonies."""
 
-    # Identify the first Reserve province on the map.
-    reserve = next(
-        (
-            name
-            for name, info in state["spaces"].items()
-            if info.get("type") == "Reserve" or "Reserve" in name
-        ),
-        None,
-    )
-
-    if not reserve:
-        return
+    reserve_spaces = [
+        name for name, info in state["spaces"].items()
+        if info.get("type") == "Reserve" or "Reserve" in name
+    ]
+    reserve_spaces.sort()
 
     if shaded:
-        sp = state["spaces"][reserve]
-        for tag in (VILLAGE, "Indian_WP"):
-            if sp.get(tag, 0):
-                remove_piece(state, tag, reserve, 1)
-                break
-    else:
-        place_with_caps(state, VILLAGE, reserve)
+        # Shaded: Remove one Village in one Indian Reserve Province.
+        target = next((n for n in reserve_spaces if state["spaces"][n].get(VILLAGE, 0)), None)
+        if target:
+            remove_piece(state, VILLAGE, target, 1, to="available")
+            push_history(state, f"Indians Help British Outside Colonies (shaded): removed 1 Village in {target}")
+        else:
+            push_history(state, "Indians Help British Outside Colonies (shaded): no Reserve Province has a Village")
+        return
+
+    # Unshaded: Place one Village and two War Parties in one Indian Reserve Province.
+    if not reserve_spaces:
+        return
+
+    target = reserve_spaces[0]
+    place_with_caps(state, VILLAGE, target)
+
+    # New War Parties must be placed Underground (Manual 1.4.3).
+    place_piece(state, WARPARTY_U, target, 2)
+
+    push_history(state, f"Indians Help British Outside Colonies (unshaded): placed 1 Village + 2 War Parties in {target}")
 
 
 # 92  CHEROKEES SUPPLIED BY THE BRITISH

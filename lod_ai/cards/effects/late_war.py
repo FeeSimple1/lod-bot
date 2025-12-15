@@ -37,11 +37,13 @@ def _remove_four_patriot_units(state):
 from lod_ai.rules_consts import (
     REGULAR_BRI,          # British Regular cube tag
     REGULAR_PAT,          # Patriot Continental cube tag
+    REGULAR_FRE,
     PROPAGANDA,           # Propaganda marker tag
     TORY,
     FORT_BRI,
     RAID,
     WEST_INDIES_ID,
+    VILLAGE,
 )
 from lod_ai.util.history import push_history
 from lod_ai.util.free_ops import queue_free_op
@@ -211,7 +213,7 @@ def evt_036_naval_battle_wi(state, shaded=False):
     if shaded:
         move_piece(state, REGULAR_BRI, WEST_INDIES_ID, "available", 4)
     else:
-        remove_piece(state, "French_Regulars", None, 3, to="available")
+        remove_piece(state, REGULAR_FRE, None, 3, to="available")
         adjust_fni(state, -1)
 
 
@@ -297,9 +299,9 @@ def evt_052_fleet_wrong_spot(state, shaded=False):
     for name, sp in state["spaces"].items():
         if removed == 4:
             break
-        here = sp.get("French_Regulars", 0)
+        here = sp.get(REGULAR_FRE, 0)
         if here:
-            move_piece(state, "French_Regulars", name, "available", min(here, 4 - removed))
+            move_piece(state, REGULAR_FRE, name, "available", min(here, 4 - removed))
             removed += min(here, 4 - removed)
 
     queue_free_op(state, "FRENCH", "battle_plus2")     # anywhere
@@ -311,7 +313,7 @@ def evt_057_french_caribbean(state, shaded=False):
         move_piece(state, REGULAR_BRI, None, WEST_INDIES_ID, 2)
         state.setdefault("ineligible_next", set()).add("BRITISH")
     else:
-        move_piece(state, "French_Regulars", "available", WEST_INDIES_ID, 2)
+        move_piece(state, REGULAR_FRE, "available", WEST_INDIES_ID, 2)
         state.setdefault("ineligible_next", set()).add("FRENCH")
         adjust_fni(state, -1)
 
@@ -320,7 +322,7 @@ def evt_057_french_caribbean(state, shaded=False):
 @register(62)
 def evt_062_langlade(state, shaded=False):
     if shaded:
-        place_piece(state, "French_Regulars", "Quebec", 3)
+        place_piece(state, REGULAR_FRE, "Quebec", 3)
     else:
         place_piece(state, "Indian_WP_U", "Northwest", 3)
 
@@ -373,7 +375,7 @@ def evt_067_de_grasse(state, shaded=False):
         queue_free_op(state, fac, "rally")
         state.setdefault("eligible_next", set()).add(fac)
     else:
-        move_piece(state, "French_Regulars", WEST_INDIES_ID, "available", 3)
+        move_piece(state, REGULAR_FRE, WEST_INDIES_ID, "available", 3)
         adjust_fni(state, -1)
 
 
@@ -388,7 +390,7 @@ def evt_070_french_india(state, shaded=False):
         return
     removed = remove_piece(state, REGULAR_BRI, None, 3, to="available")
     if removed < 3:
-        remove_piece(state, "French_Regulars", None, 3 - removed, to="available")
+        remove_piece(state, REGULAR_FRE, None, 3 - removed, to="available")
 
 # 73  SULLIVAN EXPEDITION VS IROQUOIS
 @register(73)
@@ -397,7 +399,7 @@ def evt_073_sullivan(state, shaded=False):
     for loc in ("New_York", "Northwest", "Quebec"):
         if remove_piece(state, FORT_BRI, loc, 1, to="available"):
             break
-        if remove_piece(state, "Indian_Village", loc, 1, to="available"):
+        if remove_piece(state, VILLAGE, loc, 1, to="available"):
             break
 
 
@@ -406,10 +408,10 @@ def evt_073_sullivan(state, shaded=False):
 def evt_079_tuscarora_oneida(state, shaded=False):
     loc = "Pennsylvania"
     if shaded:
-        remove_piece(state, "Indian_Village", loc, 1, to="available")
+        remove_piece(state, VILLAGE, loc, 1, to="available")
         remove_piece(state, "Indian_WP_U", loc, 2, to="available")
     else:
-        place_piece(state, "Indian_Village", loc, 1)
+        place_piece(state, VILLAGE, loc, 1)
         place_piece(state, "Indian_WP_U", loc, 2)
 
 
@@ -424,7 +426,7 @@ def evt_081_creek_seminole(state, shaded=False):
     else:
         place_piece(state, "Indian_WP_U", loc, 2)
         place_marker(state, RAID, loc)
-        place_piece(state, "Indian_Village", loc, 1)
+        place_piece(state, VILLAGE, loc, 1)
 
 
 # 85  INDIANS HELP BRITISH RAIDS ON MISSISSIPPI
@@ -433,7 +435,7 @@ def evt_085_mississippi_raids(state, shaded=False):
     loc = "Southwest"
     if shaded:
         place_piece(state, "Patriot_Militia_U", loc, 2)
-        place_piece(state, "French_Regulars", loc, 2)
+        place_piece(state, REGULAR_FRE, loc, 2)
     else:
         place_piece(state, REGULAR_BRI, loc, 3)
 
@@ -468,7 +470,7 @@ def evt_094_herkimer(state, shaded=False):
 def evt_095_ohio_frontier(state, shaded=False):
     loc = "Northwest"
     if remove_piece(state, FORT_BRI, loc, 1, to="available") == 0:
-        remove_piece(state, "Indian_Village", loc, 1, to="available")
+        remove_piece(state, VILLAGE, loc, 1, to="available")
     place_piece(state, "Indian_WP_U", loc, 3)
 
 
@@ -481,7 +483,7 @@ def evt_096_iroquois_confederacy(state, shaded=False):
     """
     from lod_ai.util.free_ops import queue_free_op
     if shaded:
-        remove_piece(state, "Indian_Village", None, 1, to="available")
+        remove_piece(state, VILLAGE, None, 1, to="available")
     else:
         for _ in range(2):
             queue_free_op(state, "INDIANS", "gather")
