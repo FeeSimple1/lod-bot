@@ -20,18 +20,19 @@ from lod_ai.rules_consts import (
     # pool caps
     MAX_REGULAR_BRI, MAX_TORY, MAX_REGULAR_FRE,
     MAX_REGULAR_PAT, MAX_MILITIA, MAX_WAR_PARTY,
+    MAX_FORT_BRI, MAX_FORT_PAT, MAX_VILLAGE,
+    MAX_PROPAGANDA, MAX_RAID,
+
     # piece tags
     REGULAR_BRI, REGULAR_FRE, REGULAR_PAT,
     TORY, MILITIA_A, MILITIA_U, WARPARTY_A, WARPARTY_U,
-    # unavailable tags
-    BRIT_UNAVAIL, FRENCH_UNAVAIL, TORY_UNAVAIL,
-    # new marker support
-    PROPAGANDA,
-    RAID,
-    BRITISH,
-    PATRIOTS,
-    FRENCH,
-    INDIANS,
+    FORT_BRI, FORT_PAT, VILLAGE,
+
+    # marker tags
+    PROPAGANDA, RAID, BLOCKADE,
+
+    # factions
+    BRITISH, PATRIOTS, FRENCH, INDIANS,
 )
 
 # deck helpers
@@ -50,25 +51,33 @@ except Exception:
 # 1️⃣  POOLS                                                               #
 # ----------------------------------------------------------------------- #
 
-def init_pools() -> Dict[str, int]:
-    """Return full counts for every piece family at game start."""
+def init_available() -> Dict[str, int]:
+    """Return full counts for every piece family in the Available box at game start."""
     return {
         # British
-        REGULAR_BRI:  MAX_REGULAR_BRI,
-        BRIT_UNAVAIL: 0,
-        TORY:         MAX_TORY,
-        TORY_UNAVAIL: 0,
+        REGULAR_BRI: MAX_REGULAR_BRI,
+        TORY:        MAX_TORY,
+        FORT_BRI:    MAX_FORT_BRI,
+
         # French
-        REGULAR_FRE:  MAX_REGULAR_FRE,
-        FRENCH_UNAVAIL: 0,
+        REGULAR_FRE: MAX_REGULAR_FRE,
+
         # Patriots
-        REGULAR_PAT:  MAX_REGULAR_PAT,
-        MILITIA_A:    MAX_MILITIA,  # *available* militia start Active
-        MILITIA_U:    0,                # underground militia are created later
+        REGULAR_PAT: MAX_REGULAR_PAT,
+        MILITIA_U:   MAX_MILITIA,
+        MILITIA_A:   0,
+
         # Indians
-        WARPARTY_A:   MAX_WAR_PARTY,
-        WARPARTY_U:   0,
+        WARPARTY_U:  MAX_WAR_PARTY,
+        WARPARTY_A:  0,
+        VILLAGE:     MAX_VILLAGE,
+
+        # forts
+        FORT_PAT:    MAX_FORT_PAT,
     }
+
+# Backwards compatibility for any older callers
+init_pools = init_available
 
 # ----------------------------------------------------------------------- #
 # 2️⃣  SCENARIO FILES & ALIASES                                            #
@@ -102,44 +111,77 @@ def load_scenario(name: str) -> Dict[str, Any]:
 # ----------------------------------------------------------------------- #
 
 def _reconcile_on_map(state: Dict[str, Any]) -> None:
-    """Subtract pieces already seated on the map from each pool."""
-    pool, spaces = state["pool"], state["spaces"]
+    """Subtract pieces already seated on the map from Available counts.
+
+    Note: Active/Underground variants draw from the same physical pool,
+    so MILITIA_A consumes MILITIA_U capacity and WARPARTY_A consumes WARPARTY_U.
+    """
+    available, spaces = state["available"], state["spaces"]
     used: Counter[str] = Counter()
+
+    pool_family = {
+        MILITIA_A: MILITIA_U,
+        MILITIA_U: MILITIA_U,
+        WARPARTY_A: WARPARTY_U,
+        WARPARTY_U: WARPARTY_U,
+    }
 
     for sp in spaces.values():
         for tag, n in sp.items():
-            if n and tag in pool:
-                used[tag] += n
+            if not isinstance(n, int) or n <= 0:
+                continue
+            pool_tag = pool_family.get(tag, tag)
+            if pool_tag in available:
+                used[pool_tag] += n
 
-    for pool_tag, n_used in used.items():
-        pool[pool_tag] -= n_used
-        if pool[pool_tag] < 0:
+    for tag, n_used in used.items():
+        available[tag] -= n_used
+        if available[tag] < 0:
             raise ValueError(
-                f"Scenario overdraw: {-pool[pool_tag]} extra {pool_tag} pieces on map"
+                f"Scenario overdraw: {-available[tag]} extra {tag} pieces on map"
             )
+        if available[tag] == 0:
+            del available[tag]
 
 
 def _apply_unavailable_block(state: Dict[str, Any], scenario: Dict[str, Any]) -> None:
-    """Move counts from scenario['unavailable'] into the dedicated *unavailable* pools."""
+    """Move counts from scenario['unavailable'] into state['unavailable']."""
     unavail = scenario.get("unavailable", {})
-    pool = state["pool"]
+    available = state["available"]
+    unavailable = state["unavailable"]
 
-    # French unavailable Regulars/Squadrons
+    # French unavailable Regulars
     if fr := unavail.get("FRENCH_REGULARS"):
-        pool[REGULAR_FRE]    -= fr
-        pool[FRENCH_UNAVAIL] += fr
+        if available.get(REGULAR_FRE, 0) < fr:
+            raise ValueError(f"Scenario unavailable overdraw: {fr} {REGULAR_FRE} requested")
+        available[REGULAR_FRE] -= fr
+        if available[REGULAR_FRE] == 0:
+            del available[REGULAR_FRE]
+        unavailable[REGULAR_FRE] = unavailable.get(REGULAR_FRE, 0) + fr
+
+    # French unavailable Squadrons/Blockades (logged only for now)
     if sq := unavail.get("FRENCH_SQUADRONS"):
         state.setdefault("log", []).append(
-            f"(setup) {sq} French Squadrons unavailable in port"
+            f"(setup) {sq} French Squadrons/Blockades unavailable in port"
         )
 
-    # British unavailable blocks
+    # British unavailable Regulars
     if br := unavail.get("BRITISH_REGULARS"):
-        pool[REGULAR_BRI]   -= br
-        pool[BRIT_UNAVAIL]  += br
+        if available.get(REGULAR_BRI, 0) < br:
+            raise ValueError(f"Scenario unavailable overdraw: {br} {REGULAR_BRI} requested")
+        available[REGULAR_BRI] -= br
+        if available[REGULAR_BRI] == 0:
+            del available[REGULAR_BRI]
+        unavailable[REGULAR_BRI] = unavailable.get(REGULAR_BRI, 0) + br
+
+    # British unavailable Tories
     if bt := unavail.get("BRITISH_TORIES"):
-        pool[TORY]          -= bt
-        pool[TORY_UNAVAIL]  += bt
+        if available.get(TORY, 0) < bt:
+            raise ValueError(f"Scenario unavailable overdraw: {bt} {TORY} requested")
+        available[TORY] -= bt
+        if available[TORY] == 0:
+            del available[TORY]
+        unavailable[TORY] = unavailable.get(TORY, 0) + bt
 
 
 # ----------------------------------------------------------------------- #
@@ -256,12 +298,15 @@ def build_state(
         "resources": scen["resources"],
         "treaty":    scen.get("treaty", 3),   # Treaty of Alliance step marker
         "leaders":   scen.get("leaders", {}),
-        "pool":      init_pools(),
+        "available":    init_available(),
+        "unavailable":  {},
+        "casualties":   {},
         # 🔹 Marker pools -------------------------------------------------
         "markers":   {
-            PROPAGANDA: set(),   # Rabble‑Rousing populates these
-            RAID: set()
-            # add further marker families (Raid, Fort‑destroyed, etc.) here
+            PROPAGANDA: {"pool": MAX_PROPAGANDA},
+            RAID:       {"pool": MAX_RAID},
+            BLOCKADE:   {"pool": 0},
+            # add further marker families here
         },
         # ---------------------------------------------------------------
         "rng":       random.Random(seed),
