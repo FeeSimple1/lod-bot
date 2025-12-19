@@ -23,6 +23,7 @@ from lod_ai.util.history import push_history
 from lod_ai.util.caps    import enforce_global_caps, refresh_control
 from lod_ai.economy.resources import add as add_res      # NEW
 from lod_ai.rules_consts import BLOCKADE_KEY, WEST_INDIES_ID
+from lod_ai.cards.effects.shared import adjust_fni
 
 SA_NAME = "NAVAL_PRESSURE"      # auto-registered by special_activities/__init__.py
 
@@ -112,14 +113,14 @@ def _exec_british(state: Dict, ctx: Dict, city_choice: str | None) -> None:
         return
 
     # After TOA
-    if state["fni_level"] == 0:
+    if state.get("fni_level", 0) == 0:
         gain = _roll_d3(state)
         _add_resources(state, "BRITISH", gain)
         state.setdefault("log", []).append(f"BRITISH Naval Pressure +{gain}£ (FNI=0)")
         return
 
     # FNI > 0: lower FNI one, remove a city Blockade to W.I.
-    state["fni_level"] -= 1
+    adjust_fni(state, -1)
 
     if not city_choice:
         cities = _cities_with_blockade(state)
@@ -150,9 +151,9 @@ def _exec_french(
     # Raise FNI but cap at # markers in W.I.
     wi_blks = state["spaces"]["West_Indies"].get("blockade", 0)
     max_fni = wi_blks
-    if state["fni_level"] + 1 > max_fni:
+    if state.get("fni_level", 0) + 1 > max_fni:
         raise ValueError(f"Cannot raise FNI above {max_fni} (limited by markers).")
-    state["fni_level"] += 1
+    adjust_fni(state, +1)
 
     if wi_blks:   # Option A: move one marker from W.I. to a city
         if not city_choice:

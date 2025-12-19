@@ -137,7 +137,7 @@ def _apply_unavailable_block(state: Dict[str, Any], scenario: Dict[str, Any]) ->
     if br := unavail.get("BRITISH_REGULARS"):
         pool[REGULAR_BRI]   -= br
         pool[BRIT_UNAVAIL]  += br
-        if bt := unavail.get("BRITISH_TORIES"):
+    if bt := unavail.get("BRITISH_TORIES"):
         pool[TORY]          -= bt
         pool[TORY_UNAVAIL]  += bt
 

@@ -17,13 +17,13 @@ from .shared import (
 def _remove_four_patriot_units(state):
     """Remove up to 4 Patriot Militia/Continentals from one Colony."""
     for name, sp in state["spaces"].items():
-        pat_total = sp.get("Patriot_Militia_A", 0) + sp.get("Patriot_Militia_U", 0)
+        pat_total = sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0)
         pat_total += sp.get("Patriot_Continental", 0)
         if pat_total:
             removed = 0
             for tag in (
-                "Patriot_Militia_A",
-                "Patriot_Militia_U",
+                MILITIA_A,
+                MILITIA_U,
                 "Patriot_Continental",
             ):
                 while sp.get(tag, 0) and removed < 4:
@@ -41,10 +41,18 @@ from lod_ai.rules_consts import (
     PROPAGANDA,           # Propaganda marker tag
     TORY,
     FORT_BRI,
+    FORT_PAT,
+    MILITIA_A,
+    MILITIA_U,
     RAID,
     WARPARTY_U,
+    WARPARTY_A,
     WEST_INDIES_ID,
     VILLAGE,
+    PATRIOTS,
+    FRENCH,
+    BRITISH,
+    INDIANS,
 )
 from lod_ai.util.history import push_history
 from lod_ai.util.free_ops import queue_free_op
@@ -127,7 +135,7 @@ def evt_018_if_not_stormy(state, shaded=False):
 @register(19)
 def evt_019_nathan_hale(state, shaded=False):
     if shaded:
-        place_piece(state, "Patriot_Militia_U", "Pennsylvania", 3)
+        place_piece(state, MILITIA_U, "Pennsylvania", 3)
         add_resource(state, "Patriots", +3)
     else:
         add_resource(state, "Patriots", -4)
@@ -167,8 +175,8 @@ def evt_022_newburgh_conspiracy(state, shaded=False):
 def evt_023_francis_marion(state, shaded=False):
     if shaded:
         target = "South_Carolina"
-        mil = state["spaces"].get(target, {}).get("Patriot_Militia_U", 0) + \
-              state["spaces"].get(target, {}).get("Patriot_Militia_A", 0)
+        mil = state["spaces"].get(target, {}).get(MILITIA_U, 0) + \
+              state["spaces"].get(target, {}).get(MILITIA_A, 0)
         if mil:
             removed = 0
             removed += remove_piece(state, REGULAR_BRI, target, 4, to="casualties")
@@ -177,7 +185,7 @@ def evt_023_francis_marion(state, shaded=False):
     else:
         src = "South_Carolina"
         dst = "Georgia"
-        for tag in ("Patriot_Militia_A", "Patriot_Militia_U", "Patriot_Continental"):
+        for tag in (MILITIA_A, MILITIA_U, "Patriot_Continental"):
             qty = state["spaces"].get(src, {}).get(tag, 0)
             if qty:
                 move_piece(state, tag, src, dst, qty)
@@ -188,7 +196,7 @@ def evt_023_francis_marion(state, shaded=False):
 def evt_025_prison_ships(state, shaded=False):
     if shaded:
         for city in ("New_York_City", "Charleston"):
-            place_piece(state, "Patriot_Militia_U", city, 1)
+            place_piece(state, MILITIA_U, city, 1)
             shift_support(state, city, -1)
             place_marker(state, PROPAGANDA, city)
     else:
@@ -201,7 +209,7 @@ def evt_025_prison_ships(state, shaded=False):
 def evt_031_kings_rangers(state, shaded=False):
     space = "South_Carolina"
     if shaded:
-        place_piece(state, "Patriot_Militia_U", space, 2)
+        place_piece(state, MILITIA_U, space, 2)
         queue_free_op(state, "PATRIOTS", "partisans", space)
     else:
         place_with_caps(state, FORT_BRI, space)
@@ -244,9 +252,9 @@ def evt_039_king_mob(state, shaded=False):
 @register(40)
 def evt_040_chesapeake(state, shaded=False):
     if shaded:
-        state["fni_level"] = 3
+        adjust_fni(state, 3 - state.get("fni_level", 0))
     else:
-        state["fni_level"] = 0
+        adjust_fni(state, -state.get("fni_level", 0))
         add_resource(state, "British", +2)
 
 
@@ -435,7 +443,7 @@ def evt_081_creek_seminole(state, shaded=False):
 def evt_085_mississippi_raids(state, shaded=False):
     loc = "Southwest"
     if shaded:
-        place_piece(state, "Patriot_Militia_U", loc, 2)
+        place_piece(state, MILITIA_U, loc, 2)
         place_piece(state, REGULAR_FRE, loc, 2)
     else:
         place_piece(state, REGULAR_BRI, loc, 3)
@@ -462,17 +470,57 @@ def evt_094_herkimer(state, shaded=False):
         return
     queue_free_op(state, "INDIANS", "gather", "New_York")
     queue_free_op(state, "BRITISH", "muster", "New_York")
-    remove_piece(state, "Patriot_Militia_U", "New_York", 99, to="available")
-    remove_piece(state, "Patriot_Militia_A", "New_York", 99, to="available")
+    remove_piece(state, MILITIA_U, "New_York", 99, to="available")
+    remove_piece(state, MILITIA_A, "New_York", 99, to="available")
 
 
 # 95  OHIO COUNTRY FRONTIER ERUPTS
 @register(95)
 def evt_095_ohio_frontier(state, shaded=False):
     loc = "Northwest"
-    if remove_piece(state, FORT_BRI, loc, 1, to="available") == 0:
-        remove_piece(state, VILLAGE, loc, 1, to="available")
-    place_piece(state, WARPARTY_U, loc, 3)
+    executor = str(state.get("active", "")).upper()
+    patriot_side = executor in (PATRIOTS, FRENCH)
+
+    enemy_fort = FORT_BRI if patriot_side else FORT_PAT
+    enemy_alt = VILLAGE if patriot_side else None
+
+    removed = remove_piece(state, enemy_fort, loc, 1, to="available")
+    if removed == 0 and enemy_alt:
+        remove_piece(state, enemy_alt, loc, 1, to="available")
+
+    ally_map = {
+        PATRIOTS: FRENCH,
+        FRENCH: PATRIOTS,
+        BRITISH: INDIANS,
+        INDIANS: BRITISH,
+    }
+    coalition_units = {
+        PATRIOTS: (MILITIA_U, MILITIA_A, REGULAR_PAT),
+        FRENCH: (REGULAR_FRE,),
+        BRITISH: (REGULAR_BRI, TORY),
+        INDIANS: (WARPARTY_U, WARPARTY_A),
+    }
+
+    ordered_factions = [executor]
+    ally = ally_map.get(executor)
+    if ally:
+        ordered_factions.append(ally)
+
+    friendly_order = tuple(tag for fac in ordered_factions for tag in coalition_units.get(fac, ()))
+
+    placed = 0
+    while placed < 3:
+        added_any = False
+        for tag in friendly_order:
+            if placed >= 3:
+                break
+            added = place_piece(state, tag, loc, 1)
+            if added:
+                placed += added
+                added_any = True
+                break
+        if not added_any:
+            break
 
 
 # 96  IROQUOIS CONFEDERACY

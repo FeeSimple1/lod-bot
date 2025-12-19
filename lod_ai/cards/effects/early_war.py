@@ -14,7 +14,8 @@ from lod_ai.rules_consts import (
     REGULAR_BRI, REGULAR_PAT, REGULAR_FRE, TORY,
     MILITIA_A, MILITIA_U, WARPARTY_A, WARPARTY_U,
     FORT_BRI, FORT_PAT, VILLAGE,
-    PROPAGANDA, RAID, BLOCKADE, WEST_INDIES_ID
+    PROPAGANDA, RAID, BLOCKADE, WEST_INDIES_ID,
+    BRITISH, PATRIOTS, FRENCH, INDIANS,
 )
 
 def _pick_spaces_with_militia(state, max_spaces=4):
@@ -22,7 +23,7 @@ def _pick_spaces_with_militia(state, max_spaces=4):
     spaces = [
         name
         for name, sp in state["spaces"].items()
-        if sp.get("Patriot_Militia_U", 0) or sp.get("Patriot_Militia_A", 0)
+        if sp.get(MILITIA_U, 0) or sp.get(MILITIA_A, 0)
     ]
     spaces.sort()
     return spaces[:max_spaces]
@@ -60,8 +61,16 @@ def evt_004_penobscot(state, shaded=False):
                in Massachusetts (respecting Fort cap).
     """
     if shaded:
-        place_with_caps(state, FORT_PAT, "Massachusetts")
-        place_piece(state, MILITIA_U, "Massachusetts", 3)
+        executor = str(state.get("active", "")).upper()
+        target = "Massachusetts"
+        if executor in (PATRIOTS, FRENCH):
+            place_with_caps(state, FORT_PAT, target)
+            place_piece(state, MILITIA_U, target, 3)
+        elif executor in (BRITISH, INDIANS):
+            place_with_caps(state, VILLAGE, target)
+            place_piece(state, WARPARTY_U, target, 3)
+        else:
+            push_history(state, "Penobscot shaded: no executing faction; no pieces placed")
     else:
         add_resource(state, "Patriots", -2)
         # Remove 3 Militia anywhere on the map, preferring Underground
@@ -365,7 +374,7 @@ def evt_033_burning_falmouth(state, shaded=False):
         # Patriots choose any two Militia cubes (Active or Underground)
         cubes_needed = 2
         for sid, sp in state["spaces"].items():
-            for militia_type in ("Patriot_Militia_U", "Patriot_Militia_A"):
+            for militia_type in (MILITIA_U, MILITIA_A):
                 here = sp.get(militia_type, 0)
                 if here:
                     taken = min(here, cubes_needed)
@@ -710,29 +719,80 @@ def evt_083_carleton_negotiates(state, shaded=False):
         sp = state["spaces"].get(space, {})
         return sp.get(FORT_BRI, 0) + sp.get(FORT_PAT, 0) + sp.get(VILLAGE, 0)
 
-    def _can_place_any(space: str) -> bool:
-        available_pool = state.get("available", {})
-        has_wp = available_pool.get(WARPARTY_U, 0) > 0
-        has_village_slot = (
-            available_pool.get(VILLAGE, 0) > 0 and _fort_village_total(space) < 2
-        )
-        return has_wp or has_village_slot
+    def _space_piece_total(space: str) -> int:
+        sp = state["spaces"].get(space, {})
+        return sum(v for v in sp.values() if isinstance(v, int))
+
+    def _pick_target() -> str | None:
+        options = [sid for sid in ("Quebec", "Quebec_City") if sid in state.get("spaces", {})]
+        if not options:
+            return None
+        options.sort()
+        options.sort(key=_space_piece_total)
+        return options[0]
 
     if shaded:
-        targets = ["Quebec", "Quebec_City"]
-        target = next((name for name in targets if _can_place_any(name)), targets[0])
+        executor = str(state.get("active", "")).upper()
+        coalition = {
+            BRITISH: (BRITISH, INDIANS),
+            INDIANS: (INDIANS, BRITISH),
+            PATRIOTS: (PATRIOTS, FRENCH),
+            FRENCH: (FRENCH, PATRIOTS),
+        }
+        factions = coalition.get(executor, (executor,))
+
+        target = _pick_target()
+        if not target:
+            push_history(state, "Carleton negotiates (shaded): no Quebec space found")
+            return
 
         placed = 0
-        if _fort_village_total(target) < 2 and state.get("available", {}).get(VILLAGE, 0):
-            placed += place_with_caps(state, VILLAGE, target)
+
+        # Optionally place one Fort/Village if none present yet
+        if _fort_village_total(target) == 0:
+            fort_choice = {
+                BRITISH: FORT_BRI,
+                INDIANS: VILLAGE,
+                PATRIOTS: FORT_PAT,
+                FRENCH: FORT_PAT,
+            }
+            for fac in factions:
+                tag = fort_choice.get(fac)
+                if not tag:
+                    continue
+                added = place_with_caps(state, tag, target)
+                placed += added
+                if added:
+                    break
+
+        # Fill remaining slots with units (no forts/villages)
+        unit_priority = {
+            BRITISH: (REGULAR_BRI, TORY),
+            INDIANS: (WARPARTY_U, WARPARTY_A),
+            PATRIOTS: (MILITIA_U, MILITIA_A, REGULAR_PAT),
+            FRENCH: (REGULAR_FRE,),
+        }
 
         while placed < 3:
-            added = place_piece(state, WARPARTY_U, target, 1)
-            if not added:
+            added_any = False
+            for fac in factions:
+                for tag in unit_priority.get(fac, ()): 
+                    if placed >= 3:
+                        break
+                    added = place_piece(state, tag, target, 1)
+                    if added:
+                        placed += added
+                        added_any = True
+                        break
+                if placed >= 3:
+                    break
+            if not added_any:
                 break
-            placed += added
 
-        push_history(state, f"Carleton negotiates (shaded): placed {placed} Indian pieces in {target}")
+        if placed == 0:
+            push_history(state, f"Carleton negotiates (shaded): no pieces available for {target}")
+        else:
+            push_history(state, f"Carleton negotiates (shaded): placed {placed} pieces in {target}")
         return
 
     # Unshaded
@@ -774,10 +834,10 @@ def evt_086_stockbridge(state, shaded=False):
     target = "Massachusetts"
     sp = state["spaces"][target]
     if shaded:
-        place_piece(state, "Patriot_Militia_U", target, 3)
+        place_piece(state, MILITIA_U, target, 3)
     else:
-        flip = sp.pop("Patriot_Militia_U", 0)
-        sp["Patriot_Militia_A"] = sp.get("Patriot_Militia_A", 0) + flip
+        flip = sp.pop(MILITIA_U, 0)
+        sp[MILITIA_A] = sp.get(MILITIA_A, 0) + flip
         push_history(state, f"Stockbridge flip {flip} Militia in {target}")
 
 
@@ -792,23 +852,23 @@ def evt_090_world_turned_upside_down(state, shaded=False):
         return
 
     # --- unshaded ---------------------------------------------------------
-    # Prefer to place an Indian Village in the first Reserve province.
-    reserve = next(
-        (
-            name
-            for name, info in state["spaces"].items()
-            if info.get("type") == "Reserve" or "Reserve" in name
-        ),
-        None,
-    )
+    executor = str(state.get("active", "")).upper()
+    patriot_side = executor in (PATRIOTS, FRENCH)
 
-    placed = 0
-    if reserve:
-        placed = place_with_caps(state, VILLAGE, reserve)
+    if patriot_side:
+        colonies = pick_colonies(state, 1)
+        if colonies:
+            place_with_caps(state, FORT_PAT, colonies[0])
+        return
+
+    reserve_order = ["Quebec", "Northwest", "Southwest", "Florida"]
+    reserve = next((name for name in reserve_order if name in state.get("spaces", {})), None)
+    placed = place_with_caps(state, VILLAGE, reserve) if reserve else 0
 
     if placed == 0:
-        # No Village available/cap reached – place a Fort in Virginia instead.
-        place_with_caps(state, FORT_BRI, "Virginia")
+        colonies = pick_colonies(state, 1)
+        if colonies:
+            place_with_caps(state, FORT_BRI, colonies[0])
 
 # 91  INDIANS HELP BRITISH OUTSIDE COLONIES
 @register(91)

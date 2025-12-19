@@ -26,6 +26,7 @@ from lod_ai.rules_consts import (
     REGULAR_FRE,
     WEST_INDIES_ID,
     LEADER_ROCHAMBEAU,
+    BLOCKADE,
 )
 
 # ------------------------------------------------ helper ------------------ #
@@ -64,6 +65,15 @@ def evt_109_treaty_of_alliance(state, shaded=False):
     Treaty of Alliance – special Brilliant Stroke (card #109)
     Queues a 'TOA' entry and marks treaty as played.
     """
+    available = state.get("available", {})
+    blockade_pool = state.get("spaces", {}).get(WEST_INDIES_ID, {}).get(BLOCKADE, 0)
+    blockade_pool += state.get("markers", {}).get(BLOCKADE, {}).get("pool", 0)
+    preparations = available.get(REGULAR_FRE, 0) + blockade_pool + state.get("cbc", 0)
+
+    if preparations <= 15:
+        push_history(state, "Treaty of Alliance not legal (preparations ≤ 15)")
+        return
+
     state["toa_played"] = True
     state["treaty_of_alliance"] = True
 
@@ -72,7 +82,7 @@ def evt_109_treaty_of_alliance(state, shaded=False):
     place_piece(state, LEADER_ROCHAMBEAU, WEST_INDIES_ID)
     state.setdefault("leaders", {})["ROCHAMBEAU"] = WEST_INDIES_ID
 
-    # Shift FNI toward war
+    # Shift FNI toward war (after TOA flag so Rule 1.9 does not block)
     adjust_fni(state, +1)
 
     # Reinforcements to West Indies: draw from Unavailable first
@@ -88,3 +98,5 @@ def evt_109_treaty_of_alliance(state, shaded=False):
     state.setdefault("bs_queue", []).append(("TOA", None))
     push_history(state, "Treaty of Alliance queued")
     state["ineligible_next"] = set()
+    state.setdefault("eligible_next", set()).clear()
+    state["eligible"] = {fac: True for fac in ("BRITISH", "PATRIOTS", "INDIANS", "FRENCH")}

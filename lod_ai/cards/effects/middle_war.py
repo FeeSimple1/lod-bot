@@ -43,11 +43,11 @@ def evt_003_illinois_campaign(state, shaded=False):
 
     for prov in ("Northwest", "Southwest"):
         if shaded:
-            place_piece(state, "Patriot_Militia_U", prov, 2)
+            place_piece(state, MILITIA_U, prov, 2)
             queue_free_op(state, "PATRIOTS", "partisans", prov)
         else:
             # Remove all Patriot pieces: Militia (A/U), Continentals, and Forts.
-            for tag in ("Patriot_Militia_A", "Patriot_Militia_U", "Patriot_Continental", "Patriot_Fort"):
+            for tag in (MILITIA_A, MILITIA_U, "Patriot_Continental", "Patriot_Fort"):
                 remove_piece(state, tag, prov, 99, to="available")
 
 # 5  WILLIAM ALEXANDER, LORD STIRLING
@@ -80,9 +80,9 @@ def evt_008_culpeper_ring(state, shaded=False):
         for name, sp in state["spaces"].items():
             if flipped == 3:
                 break
-            if sp.get("Patriot_Militia_U", 0):
-                sp["Patriot_Militia_U"] -= 1
-                sp["Patriot_Militia_A"] = sp.get("Patriot_Militia_A", 0) + 1
+            if sp.get(MILITIA_U, 0):
+                sp[MILITIA_U] -= 1
+                sp[MILITIA_A] = sp.get(MILITIA_A, 0) + 1
                 push_history(state, f"Activated Militia in {name}")
                 flipped += 1
 
@@ -193,7 +193,7 @@ def evt_027_queens_rangers(state, shaded=False):
         cities = [n for n, sp in state["spaces"].items() if sp.get("type") == "City"]
         for name in cities[:2]:
             shift_support(state, name, -1)
-            place_piece(state, "Patriot_Militia_U", name, 1)
+            place_piece(state, MILITIA_U, name, 1)
         push_history(state, "Queen's Rangers suppressed by Patriot rallies")
     else:
         targets = [n for n, sp in state["spaces"].items()
@@ -214,14 +214,14 @@ def evt_034_lord_sandwich(state, shaded=False):
     else:
         add_resource(state, "British", +6)
         shift = -1
-    state["fni_level"] = max(0, min(4, state.get("fni_level", 0) + shift))
+    adjust_fni(state, shift)
 
 
 # 38  JOHNSON’S ROYAL GREENS
 @register(38)
 def evt_038_johnsons_royal_greens(state, shaded=False):
     if shaded:
-        place_piece(state, "Patriot_Militia_U", "New_York", 3)
+        place_piece(state, MILITIA_U, "New_York", 3)
         push_history(state, "Johnson's Royal Greens countered by local militia")
         return
 
@@ -242,7 +242,7 @@ def evt_038_johnsons_royal_greens(state, shaded=False):
 @register(42)
 def evt_042_attack_danbury(state, shaded=False):
     if shaded:
-        place_piece(state, "Patriot_Militia_U", "Connecticut", 3)
+        place_piece(state, MILITIA_U, "Connecticut", 3)
         place_piece(state, REGULAR_PAT, "Connecticut", 1)
         push_history(state, "Battle of Ridgefield bolsters Connecticut")
     else:
@@ -271,7 +271,7 @@ def evt_047_tories_tested(state, shaded=False):
         tories = state["spaces"][target].get(TORY, 0)
         if tories:
             remove_piece(state, TORY, target, tories, to="available")
-            place_piece(state, "Patriot_Militia_U", target, tories)
+            place_piece(state, MILITIA_U, target, tories)
         place_marker(state, PROPAGANDA, target, 2)
     else:
         place_piece(state, TORY, target, 3)
@@ -402,10 +402,10 @@ def evt_063_gibraltar(state, shaded=False):
 @register(69)
 def evt_069_suffren(state, shaded=False):
     if shaded:
-        state["fni_level"] = min(4, state.get("fni_level", 0) + 1)
+        adjust_fni(state, +1)
         add_resource(state, "French", +3)
     else:
-        state["fni_level"] = max(0, state.get("fni_level", 0) - 2)
+        adjust_fni(state, -2)
         add_resource(state, "British", +2)
 
 
@@ -484,7 +484,7 @@ def evt_076_edward_hand(state, shaded=False):
 
     # pick first Province with ≥3 Militia
     target = next((n for n,sp in state["spaces"].items()
-                   if sp.get("Patriot_Militia_U",0)+sp.get("Patriot_Militia_A",0) >= 3), None)
+                   if sp.get(MILITIA_U,0)+sp.get(MILITIA_A,0) >= 3), None)
     if not target:
         return
 
@@ -537,18 +537,18 @@ def evt_078_cherry_valley(state, shaded=False):
             if added == 4:
                 break
             if sp.get(TORY) or sp.get(WARPARTY_A) or sp.get(WARPARTY_U) or sp.get(VILLAGE):
-                place_piece(state, "Patriot_Militia_U", name, 1)
+                place_piece(state, MILITIA_U, name, 1)
                 added += 1
         push_history(state, "Cherry Valley: militia rally")
     else:
         total = 0
         for sp in list(state["spaces"].keys()):
-            for tag in (REGULAR_PAT, "Patriot_Militia_U", "Patriot_Militia_A"):
+            for tag in (REGULAR_PAT, MILITIA_U, MILITIA_A):
                 count = state["spaces"][sp].get(tag, 0)
                 if count and total < 1e9:  # just ensure iteration
                     pass
         removed_total = 0
-        pat_tags = (REGULAR_PAT, "Patriot_Militia_U", "Patriot_Militia_A")
+        pat_tags = (REGULAR_PAT, MILITIA_U, MILITIA_A)
         total_pieces = sum(sp.get(t, 0) for sp in state["spaces"].values() for t in pat_tags)
         to_remove = total_pieces // 4
         for name, sp in state["spaces"].items():
@@ -590,10 +590,10 @@ def evt_088_foggy(state, shaded=False):
     for name, sp in list(state["spaces"].items()):
         if moved == 2:
             break
-        if sp.get(REGULAR_BRI) and (sp.get("Patriot_Militia_U") or sp.get("Patriot_Militia_A") or sp.get(REGULAR_PAT)):
+        if sp.get(REGULAR_BRI) and (sp.get(MILITIA_U) or sp.get(MILITIA_A) or sp.get(REGULAR_PAT)):
             total = move_piece(state, REGULAR_PAT, name, "available", sp.get(REGULAR_PAT, 0))
-            total += move_piece(state, "Patriot_Militia_U", name, "available", sp.get("Patriot_Militia_U", 0))
-            total += move_piece(state, "Patriot_Militia_A", name, "available", sp.get("Patriot_Militia_A", 0))
+            total += move_piece(state, MILITIA_U, name, "available", sp.get(MILITIA_U, 0))
+            total += move_piece(state, MILITIA_A, name, "available", sp.get(MILITIA_A, 0))
             push_history(state, f"Foggy withdrawal from {name} ({total} pieces)")
             moved += 1
 
@@ -610,7 +610,7 @@ def evt_089_war_damages(state, shaded=False):
             if qty:
                 n = min(qty, 3 - replaced)
                 remove_piece(state, TORY, name, n, to="available")
-                place_piece(state, "Patriot_Militia_U", name, n)
+                place_piece(state, MILITIA_U, name, n)
                 replaced += n
         push_history(state, f"War damages: replaced {replaced} Tories with militia")
     else:
@@ -618,7 +618,7 @@ def evt_089_war_damages(state, shaded=False):
         for name, sp in state["spaces"].items():
             if replaced == 4:
                 break
-            for tag in ("Patriot_Militia_U", "Patriot_Militia_A", REGULAR_PAT):
+            for tag in (MILITIA_U, MILITIA_A, REGULAR_PAT):
                 qty = sp.get(tag, 0)
                 if qty:
                     n = min(qty, 4 - replaced)
