@@ -25,6 +25,7 @@ def normalize_state(state: Dict[str, Any]) -> None:
 
     # --- 2) Treaty flag expected by victory module -------------------------
     # victory.check() looks for "treaty_of_alliance", not "toa_played".
+    state.setdefault("toa_played", bool(state.get("treaty_of_alliance", False)))
     state.setdefault("treaty_of_alliance", bool(state.get("toa_played", False)))
 
     # --- 3) Casualty tallies expected by victory module --------------------
@@ -36,6 +37,8 @@ def normalize_state(state: Dict[str, Any]) -> None:
         crc = cas.get("PATRIOTS", state.get("patriot_casualties", 0)) + cas.get("FRENCH", 0)
         state.setdefault("cbc", int(cbc))
         state.setdefault("crc", int(crc))
+    state.setdefault("cbc", 0)
+    state.setdefault("crc", 0)
 
     # --- 4) Marker pools for Propaganda/Raid used by card effects ----------
     def _ensure_pool(tag: str, cap: int) -> None:
@@ -46,7 +49,14 @@ def normalize_state(state: Dict[str, Any]) -> None:
     _ensure_pool(C.PROPAGANDA, C.MAX_PROPAGANDA)
     _ensure_pool(C.RAID,        C.MAX_RAID)
 
-    # --- 5) Leader counters (convert simple 'leaders' mapping into pieces) --
+    # --- 5) FNI and eligibility defaults -----------------------------------
+    state.setdefault("fni_level", 0)
+    if not state.get("toa_played"):
+        state["fni_level"] = 0
+    state["ineligible_next"] = set(state.get("ineligible_next", set()))
+    state["eligible_next"] = set(state.get("eligible_next", set()))
+
+    # --- 6) Leader counters (convert simple 'leaders' mapping into pieces) --
     leaders = state.get("leaders")
     if isinstance(leaders, dict):
         for short, loc in leaders.items():

@@ -74,8 +74,18 @@ def shift_support(state, space_id: str, delta: int) -> None:
 # French Navy Index clamp
 # --------------------------------------------------------------------------- #
 def adjust_fni(state, delta: int) -> None:
-    """Add *delta* (±) to French Navy Index and clamp to 0-MAX_FNI."""
+    """
+    Add *delta* (±) to French Navy Index and clamp to 0-MAX_FNI.
+
+    Rule 1.9: Ignore any FNI change before Treaty of Alliance (FNI stays 0).
+    """
     before = state.get("fni_level", 0)
+
+    if not state.get("toa_played", False):
+        state["fni_level"] = 0
+        push_history(state, "FNI remains 0 (Treaty of Alliance not yet played)")
+        return
+
     state["fni_level"] = max(0, min(MAX_FNI, before + delta))
     push_history(state, f"FNI {before} → {state['fni_level']}")
 
