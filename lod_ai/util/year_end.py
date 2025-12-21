@@ -45,7 +45,7 @@ from lod_ai.rules_consts import (
     TORY, VILLAGE, WARPARTY_A, WARPARTY_U,
     BRITISH, PATRIOTS, FRENCH, INDIANS,
     FORT_BRI, FORT_PAT,
-    BLOCKADE_KEY, WEST_INDIES_ID,
+    BLOCKADE, BLOCKADE_KEY, WEST_INDIES_ID,
     LEADER_CHAIN,
     RAID, PROPAGANDA
 )
@@ -247,7 +247,7 @@ def _resource_income(state):
         # British-controlled, non-Blockaded *Cities* → pop to British
         if (sp.get("type") == "City"
                 and sp.get("British_Control")
-                and not sp.get(BLOCKADE, 0)):
+                and not sp.get(BLOCKADE_KEY, 0)):
             british_income += sp.get("pop", 0)
 
         # Rebellion-controlled spaces (skip West Indies)
@@ -269,7 +269,7 @@ def _resource_income(state):
         french_income += state.get("fni_box", 0)
     else:
         # Before ToA: ignore city pop, earn 2× Blockades in W.I.
-        french_income = wi.get(BLOCKADE, 0) * 2
+        french_income = wi.get(BLOCKADE_KEY, 0) * 2
 
     # West Indies bonuses
     if wi.get("British_Control"):
@@ -338,8 +338,8 @@ def _support_phase(state):
             push_history(state, f"British removed Raid in {sid} (6.4.1)")
             shifted[sid] += 1
             continue
-        if sp.get(PROP):
-            remove_piece(state, PROP, sid, 1, to="available")
+        if sp.get(PROPAGANDA):
+            remove_piece(state, PROPAGANDA, sid, 1, to="available")
             push_history(state, f"British removed Propaganda in {sid} (6.4.1)")
             shifted[sid] += 1
             continue
@@ -470,8 +470,10 @@ def _fni_drift(state):
         push_history(state, "FNI drift – box shifts 1 toward War (6.5.4)")
     # Remove one Blockade from West Indies if present
     wi = state["spaces"][WEST_INDIES_ID]
-    if wi.get(BLOCKADE, 0):
-        wi[BLOCKADE] -= 1
+    if wi.get(BLOCKADE_KEY, 0) > 0:
+        wi[BLOCKADE_KEY] -= 1
+        state.setdefault("unavailable", {}).setdefault(BLOCKADE, 0)
+        state["unavailable"][BLOCKADE] += 1
         push_history(state, "French remove one Blockade in West Indies (6.5.4)")
 
         # French choose not to rearrange the remaining Blockade markers
@@ -583,7 +585,7 @@ def _reset_phase(state):
     # Remove all Raid & Propaganda markers
     for sp in state["spaces"].values():
         sp.pop(RAID, None)
-        sp.pop(PROP, None)
+        sp.pop(PROPAGANDA, None)
 
     # Mark all factions Eligible
     state["eligible"] = {BRITISH: True, PATRIOTS: True, FRENCH: True, INDIANS: True}
