@@ -230,10 +230,11 @@ def _resolve_space(
     def _shift(winner: str, loser_removed: int):
         shifts = min(3, loser_removed // 2)
         for _ in range(shifts):
-            if winner == "ROYALIST" and sp["support"] > ACTIVE_OPPOSITION:
-                sp["support"] -= 1
-            elif winner == "REBELLION" and sp["support"] < ACTIVE_SUPPORT:
-                sp["support"] += 1
+            cur = state.get("support", {}).get(sid, NEUTRAL)
+            if winner == "ROYALIST" and cur > ACTIVE_OPPOSITION:
+                state.setdefault("support", {})[sid] = cur - 1
+            elif winner == "REBELLION" and cur < ACTIVE_SUPPORT:
+                state.setdefault("support", {})[sid] = cur + 1
 
     winner = None
     if pieces_att_lost != pieces_def_lost:

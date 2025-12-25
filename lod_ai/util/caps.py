@@ -22,6 +22,7 @@ Local stacking
 from collections import defaultdict
 from typing import Dict, List
 from lod_ai.board.control import refresh_control
+from lod_ai.map import adjacency as map_adj
 
 from lod_ai.rules_consts import (
     MAX_FORT_BRI,
@@ -33,6 +34,7 @@ from lod_ai.rules_consts import (
     FORT_PAT,
     VILLAGE,
     SQUADRON,
+    WEST_INDIES_ID,
 )
 
 from lod_ai.board.pieces import remove_piece
@@ -112,20 +114,22 @@ def enforce_global_caps(state: Dict) -> None:
         fort_vil_tags = _fort_vil_tags(sp)
         total_fv = sum(sp[t] for t in fort_vil_tags)
         while total_fv > MAX_FORT_VIL_PER_SPACE:
-            tag = fort_vil_tags.pop()    # remove last counted tag
-            remove_piece(state, tag, sid, 1, to="available")
-            push_history(state, f"Stacking – removed 1 {tag} from {sid} (>2 Fort/Village)")
+            removable = next((t for t in fort_vil_tags if sp.get(t, 0) > 0), None)
+            if not removable:
+                break
+            remove_piece(state, removable, sid, 1, to="available")
+            push_history(state, f"Stacking – removed 1 {removable} from {sid} (>2 Fort/Village)")
             total_fv -= 1
 
         # B. West Indies restrictions
-        if sid == "West_Indies":
+        if sid == WEST_INDIES_ID:
             for tag, qty in list(sp.items()):
                 if tag not in WEST_INDIES_ALLOWED:
                     remove_piece(state, tag, sid, qty, to="available")
                     push_history(state, f"Stacking – removed {qty} {tag} from West Indies (not allowed)")
 
         # C. Indians may not occupy a City space (assuming space meta flag)
-        if sp.get("is_city"):
+        if map_adj.is_city(sid):
             for tag, qty in list(sp.items()):
                 if _indian_tag(tag):
                     remove_piece(state, tag, sid, qty, to="available")

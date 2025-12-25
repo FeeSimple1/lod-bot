@@ -86,6 +86,9 @@ def _preparer_la_guerre(state: Dict, post_treaty: bool) -> bool:
 class FrenchBot(BaseBot):
     faction = "FRENCH"
 
+    def _support_level(self, state: Dict, sid: str) -> int:
+        return state.get("support", {}).get(sid, 0)
+
     # ===================================================================
     #  FLOW‑CHART DRIVER
     # ===================================================================
@@ -246,7 +249,7 @@ class FrenchBot(BaseBot):
         if state.get("toa_played"):
             return False
         return any(
-            state["spaces"].get(p) and state["spaces"][p].get("support", 0) != C.ACTIVE_SUPPORT
+            state["spaces"].get(p) and self._support_level(state, p) != C.ACTIVE_SUPPORT
             for p in _VALID_PROVINCES
         )
 
@@ -342,8 +345,9 @@ class FrenchBot(BaseBot):
     # ===================================================================
     def _faction_event_conditions(self, state: Dict, card: Dict) -> bool:
         text = card.get("unshaded_event", "")
-        sup = sum(max(0, sp.get("support", 0)) for sp in state["spaces"].values())
-        opp = sum(max(0, -sp.get("support", 0)) for sp in state["spaces"].values())
+        support_map = state.get("support", {})
+        sup = sum(max(0, lvl) for lvl in support_map.values())
+        opp = sum(max(0, -lvl) for lvl in support_map.values())
 
         # • Support > Opposition and Event shifts toward Rebels
         if sup > opp and any(k in text for k in ("Support", "Opposition")):

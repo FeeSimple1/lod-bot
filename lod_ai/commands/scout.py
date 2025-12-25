@@ -36,6 +36,7 @@ from lod_ai.rules_consts import (
 from lod_ai.util.history import push_history
 from lod_ai.util.caps import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent
+from lod_ai.map import adjacency as map_adj
 from lod_ai.board.pieces      import remove_piece, add_piece        # NEW
 from lod_ai.economy.resources import spend                          # NEW
 
@@ -45,9 +46,9 @@ COMMAND_NAME = "SCOUT"          # auto-registered by commands/__init__.py
 # --------------------------------------------------------------------------- #
 # Helpers                                                                     #
 # --------------------------------------------------------------------------- #
-def _is_city(space: Dict) -> bool:
+def _is_city(space_id: str) -> bool:
     """Return True if the map space is a City (heuristic)."""
-    return space.get("city", False) or space.get("type") == "City"
+    return map_adj.space_type(space_id) == "City"
 
 
 def _move(state: Dict, tag: str, n: int, src_id: str, dst_id: str) -> None:
@@ -91,8 +92,8 @@ def execute(
         raise ValueError("Only INDIANS may execute the Scout command.")
 
     # -------- Basic spatial checks ------------------------------------------
-    if _is_city(state["spaces"][src]):  raise ValueError("Source must be a Province.")
-    if _is_city(state["spaces"][dst]):  raise ValueError("Destination must be a Province.")
+    if _is_city(src):  raise ValueError("Source must be a Province.")
+    if _is_city(dst):  raise ValueError("Destination must be a Province.")
     if not is_adjacent(src, dst):
         raise ValueError(f"{src} is not adjacent to {dst}.")
 

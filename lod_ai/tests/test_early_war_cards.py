@@ -20,7 +20,9 @@ def _base_state():
         "spaces": {},
         "available": {},
         "casualties": {},
-        "markers": {PROPAGANDA: {"pool": 10}},
+        "markers": {PROPAGANDA: {"pool": 10, "on_map": set()}},
+        "support": {},
+        "control": {},
         "resources": {"BRITISH": 0, "PATRIOTS": 0, "INDIANS": 0, "FRENCH": 0},
     }
 
@@ -36,7 +38,8 @@ def test_card2_common_sense_any_city_selection():
 
     assert state["spaces"]["Boston"].get(REGULAR_BRI) == 2
     assert state["spaces"]["Boston"].get(TORY) == 2
-    assert state["spaces"]["Boston"].get(PROPAGANDA) == 2
+    assert "Boston" in state["markers"][PROPAGANDA]["on_map"]
+    assert state["markers"][PROPAGANDA]["pool"] == 8
     assert state["resources"]["BRITISH"] == 4
 
 
@@ -51,11 +54,11 @@ def test_card2_common_sense_any_two_cities():
 
     early_war.evt_002_common_sense(state, shaded=True)
 
-    assert state["spaces"]["Boston"]["support"] == -1
-    assert state["spaces"]["New_York_City"]["support"] == -1
-    assert state["spaces"]["Philadelphia"].get("support", 0) == 0
-    assert state["spaces"]["Boston"].get(PROPAGANDA) == 2
-    assert state["spaces"]["New_York_City"].get(PROPAGANDA) == 2
+    assert state["support"]["Boston"] == -1
+    assert state["support"]["New_York_City"] == -1
+    assert state["support"].get("Philadelphia", 0) == 0
+    assert "Boston" in state["markers"][PROPAGANDA]["on_map"]
+    assert "New_York_City" in state["markers"][PROPAGANDA]["on_map"]
 
 
 def test_card6_benedict_arnold_any_colony_and_militia_activation():
@@ -113,9 +116,8 @@ def test_card24_declaration_shaded_places_militia_and_fort():
     assert state["spaces"]["Albany"].get(MILITIA_U) == 1
     assert state["spaces"]["Cambridge"].get(MILITIA_U) == 1
     assert state["spaces"]["Boston"].get(MILITIA_U) == 1
-    assert state["spaces"]["Boston"].get(PROPAGANDA) == 1
-    assert state["spaces"]["Albany"].get(PROPAGANDA) == 1
-    assert state["spaces"]["Cambridge"].get(PROPAGANDA) == 1
+    on_map = state["markers"][PROPAGANDA]["on_map"]
+    assert {"Boston", "Albany", "Cambridge"} <= on_map
     assert state["spaces"]["Boston"].get(FORT_PAT) == 1
 
 

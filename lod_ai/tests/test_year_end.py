@@ -18,7 +18,13 @@ def basic_state():
         "spaces": {},
         "resources": {C.BRITISH: 0, C.PATRIOTS: 0, C.FRENCH: 0, C.INDIANS: 0},
         "support": {},
+        "control": {},
         "available": {},
+        "markers": {
+            C.RAID: {"pool": 0, "on_map": set()},
+            C.PROPAGANDA: {"pool": 0, "on_map": set()},
+            C.BLOCKADE: {"pool": 0, "on_map": set()},
+        },
         "history": [],
         "leaders": {},
         "deck": [],
@@ -56,11 +62,13 @@ def test_supply_removes_if_cannot_pay(monkeypatch):
 def test_resource_income_simple():
     state = basic_state()
     state["spaces"] = {
-        "A": {"type": "City", "pop": 3, "British_Control": True, C.FORT_BRI: 1},
-        "B": {"type": "Colony", "Patriot_Control": True, C.FORT_PAT: 1},
+        "A": {"type": "City", "pop": 3, C.FORT_BRI: 1},
+        "B": {"type": "Colony", C.FORT_PAT: 1},
         "C": {C.VILLAGE: 3},
-        C.WEST_INDIES_ID: {C.BLOCKADE: 1},
+        C.WEST_INDIES_ID: {},
     }
+    state["control"] = {"A": "BRITISH", "B": "REBELLION", "C": None, C.WEST_INDIES_ID: None}
+    state["markers"][C.BLOCKADE]["pool"] = 1
     year_end._resource_income(state)
 
     assert state["resources"][C.BRITISH] == 4
@@ -74,17 +82,15 @@ def test_support_phase_shifts_levels():
     state["resources"][C.PATRIOTS] = 1
     state["spaces"] = {
         "CityA": {
-            "type": "City",
-            "British_Control": True,
             C.REGULAR_BRI: 1,
             C.TORY: 1,
         },
         "ColB": {
-            "Patriot_Control": True,
             C.MILITIA_A: 1,
         },
     }
     state["support"] = {"CityA": 0, "ColB": 0}
+    state["control"] = {"CityA": "BRITISH", "ColB": "REBELLION"}
 
     year_end._support_phase(state)
 
@@ -113,11 +119,13 @@ def test_reset_phase_cleans_up(monkeypatch):
     state = basic_state()
     state["spaces"] = {
         "S": {
-            C.RAID: 1,
-            C.PROPAGANDA: 1,
             C.MILITIA_A: 1,
             C.WARPARTY_A: 1,
         }
+    }
+    state["markers"] = {
+        C.RAID: {"pool": 0, "on_map": {"S"}},
+        C.PROPAGANDA: {"pool": 0, "on_map": {"S"}},
     }
     state["deck"] = [{"title": "Next"}]
     state["winter_card_event"] = lambda s: s.setdefault("event", True)
@@ -129,11 +137,13 @@ def test_reset_phase_cleans_up(monkeypatch):
     year_end._reset_phase(state)
 
     sp = state["spaces"]["S"]
-    assert C.RAID not in sp and C.PROPAGANDA not in sp
     assert sp.get(C.MILITIA_U) == 1 and sp.get(C.MILITIA_A, 0) == 0
     assert sp.get(C.WARPARTY_U) == 1 and sp.get(C.WARPARTY_A, 0) == 0
+    assert not state["markers"][C.RAID]["on_map"]
+    assert not state["markers"][C.PROPAGANDA]["on_map"]
+    assert state["markers"][C.RAID]["pool"] == 1
+    assert state["markers"][C.PROPAGANDA]["pool"] == 1
     assert state["eligible"][C.BRITISH]
     assert state.get("upcoming_card", {}).get("title") == "Next"
     assert state.get("event") is True
     assert lifted.get("done") is True
-

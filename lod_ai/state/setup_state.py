@@ -14,6 +14,7 @@ import re
 from collections import Counter
 from pathlib import Path
 from typing import Dict, Any
+from lod_ai.util.normalize_state import normalize_state
 
 # ── constants from rules_consts ──────────────────────────────────────────
 from lod_ai.rules_consts import (
@@ -196,9 +197,11 @@ def _normalize_support(state: Dict[str, Any]) -> None:
     sup: Dict[str, int] = {}
     for sid, sp in state.get("spaces", {}).items():
         if "Support" in sp:
-            sup[sid] = int(sp.get("Support", 0))
+            sup[sid] = int(sp.pop("Support", 0))
         elif "Opposition" in sp:
-            sup[sid] = -int(sp.get("Opposition", 0))
+            sup[sid] = -int(sp.pop("Opposition", 0))
+        elif "support" in sp:
+            sup[sid] = int(sp.pop("support", 0))
         else:
             sup[sid] = 0
     state["support"] = sup
@@ -303,9 +306,9 @@ def build_state(
         "casualties":   {},
         # 🔹 Marker pools -------------------------------------------------
         "markers":   {
-            PROPAGANDA: {"pool": MAX_PROPAGANDA},
-            RAID:       {"pool": MAX_RAID},
-            BLOCKADE:   {"pool": 0},
+            PROPAGANDA: {"pool": MAX_PROPAGANDA, "on_map": set()},
+            RAID:       {"pool": MAX_RAID, "on_map": set()},
+            BLOCKADE:   {"pool": 0, "on_map": set()},
             # add further marker families here
         },
         # ---------------------------------------------------------------
@@ -326,4 +329,5 @@ def build_state(
     _apply_unavailable_block(state, scen)
     _reconcile_on_map(state)
     _init_deck(state, scen, setup_method=setup_method)
+    normalize_state(state)
     return state

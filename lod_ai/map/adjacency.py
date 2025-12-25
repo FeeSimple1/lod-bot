@@ -8,8 +8,9 @@ JSON file path (relative to this module):
 """
 
 import json
+from collections import deque
 from pathlib import Path
-from typing import Dict, Set
+from typing import Dict, Iterable, List, Set
 
 
 # ----------------------------------------------------------------------
@@ -47,3 +48,39 @@ def space_type(space_id: str) -> str | None:
 def is_city(space_id: str) -> bool:
     """True if *space_id* is a City space."""
     return _TYPE.get(space_id) == "City"
+
+
+def space_meta(space_id: str) -> Dict | None:
+    """Return the raw map metadata for *space_id* or ``None`` if unknown."""
+    return _RAW_MAP.get(space_id)
+
+
+def all_space_ids() -> Iterable[str]:
+    """Return an iterable of all valid space identifiers."""
+    return _RAW_MAP.keys()
+
+
+def shortest_path(start: str, goal: str) -> List[str]:
+    """
+    Return the shortest path (as a list of space ids) between *start* and *goal*.
+    Returns an empty list if no path exists or either space is unknown.
+    """
+    if start == goal:
+        return [start]
+    if start not in _ADJ or goal not in _ADJ:
+        return []
+
+    visited = {start}
+    queue: deque[tuple[str, List[str]]] = deque([(start, [start])])
+
+    while queue:
+        node, path = queue.popleft()
+        for nbr in _ADJ.get(node, set()):
+            if nbr in visited:
+                continue
+            next_path = path + [nbr]
+            if nbr == goal:
+                return next_path
+            visited.add(nbr)
+            queue.append((nbr, next_path))
+    return []

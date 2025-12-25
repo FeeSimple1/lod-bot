@@ -62,12 +62,10 @@ def shift_support(state, space_id: str, delta: int) -> None:
     Shift Support in *space_id* by *delta* steps (+ = toward Patriots,
     – = toward Opposition).  Result is clamped to ±2.
     """
-    # be defensive if state["support"] wasn't initialised earlier
-    cur0 = state.get("support", {}).get(space_id, state["spaces"][space_id].get("support", 0))
-    new  = max(MIN_SUPPORT, min(MAX_SUPPORT, cur0 + delta))
+    cur0 = state.get("support", {}).get(space_id, 0)
+    new = max(MIN_SUPPORT, min(MAX_SUPPORT, cur0 + delta))
     if new != cur0:
         state.setdefault("support", {})[space_id] = new
-        state["spaces"][space_id]["support"] = new            # keep per-space copy in sync
         push_history(state, f"Support shift in {space_id}: {cur0:+d} → {new:+d}")
 
 # --------------------------------------------------------------------------- #

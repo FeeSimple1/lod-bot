@@ -44,10 +44,11 @@ OPPOSITION_ONLY = {ACTIVE_OPPOSITION, PASSIVE_OPPOSITION}
 # ────────────────────────────────────────────────────────────────────
 # helpers
 # ────────────────────────────────────────────────────────────────────
-def _shift_one_toward_neutral(space: Dict) -> None:
+def _shift_one_toward_neutral(state: Dict, space_id: str) -> None:
     """Increase support value by +1, but never above Neutral (0)."""
-    if space["support"] < NEUTRAL:
-        space["support"] += 1
+    cur = state.get("support", {}).get(space_id, NEUTRAL)
+    if cur < NEUTRAL:
+        state.setdefault("support", {})[space_id] = cur + 1
 
 
 def _move_one_wp(state: Dict, src: Dict, dst: Dict, src_id: str, dst_id: str) -> None:
@@ -90,7 +91,8 @@ def execute(
 
     for space_id in selected:
         sp = state["spaces"][space_id]
-        if sp["support"] not in OPPOSITION_ONLY:
+        support_level = state.get("support", {}).get(space_id, NEUTRAL)
+        if support_level not in OPPOSITION_ONLY:
             raise ValueError(f"{space_id} not at Opposition.")
         # must have an Underground WP locally or adjacent
         local_u = sp.get(WARPARTY_U, 0)
@@ -123,7 +125,7 @@ def execute(
                      state["spaces"][src], state["spaces"][dst],
                      src, dst)
 
-    raids_pool: Set[str] = state["markers"][RAID]
+    raids_state = state.setdefault("markers", {}).setdefault(RAID, {"pool": 0, "on_map": set()})
 
     for prov in selected:
         sp = state["spaces"][prov]
@@ -135,10 +137,11 @@ def execute(
         sp[WARPARTY_A] = sp.get(WARPARTY_A, 0) + 1
 
         # Place marker if pool available
-        if len(raids_pool) < MAX_RAID:
-            raids_pool.add(prov)    # idempotent if duplicated
+        if raids_state.get("pool", 0) > 0:
+            raids_state["pool"] -= 1
+            raids_state.setdefault("on_map", set()).add(prov)
         # shift Opposition one step toward Neutral
-        _shift_one_toward_neutral(sp)
+        _shift_one_toward_neutral(state, prov)
 
     # bookkeeping
     refresh_control(state)

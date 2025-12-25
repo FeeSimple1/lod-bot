@@ -27,6 +27,7 @@ from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.board.pieces      import remove_piece, add_piece
 from lod_ai.economy.resources import add as add_res
+from lod_ai.map import adjacency as map_adj
 
 SA_NAME = "PERSUASION"      # auto-registered by special_activities/__init__.py
 
@@ -54,7 +55,8 @@ def execute(
 
     push_history(state, f"PATRIOTS PERSUASION {spaces}")
 
-    marks_pool: set[str] = state["markers"][PROPAGANDA]
+    marker_state = state.setdefault("markers", {}).setdefault(PROPAGANDA, {"pool": 0, "on_map": set()})
+    marks_pool: set[str] = marker_state.setdefault("on_map", set())
     added_resources = 0
     added_markers   = 0
 
@@ -62,11 +64,11 @@ def execute(
         sp = state["spaces"][sid]
 
         # ---- Eligibility checks -----------------------------------------
-        if sp.get("control") != "REBELLION":
+        if state.get("control", {}).get(sid) != "REBELLION":
             raise ValueError(f"{sid}: not Rebellion-controlled.")
         if sp.get(MILITIA_U, 0) == 0:
             raise ValueError(f"{sid}: no Underground Militia to Activate.")
-        if sp.get("type") not in ("Colony", "City"):
+        if map_adj.space_type(sid) not in ("Colony", "City"):
             raise ValueError(f"{sid}: Persuasion only in Colonies/Cities.")
 
         # ---- Flip exactly one Underground Militia ----------------------
@@ -79,8 +81,9 @@ def execute(
 
 
         # ---- Place Propaganda marker if pool available -----------------
-        if len(marks_pool) < MAX_PROPAGANDA:
-            marks_pool.add(sid)
+        if marker_state.get("pool", 0) > 0 and len(marks_pool) < MAX_PROPAGANDA:
+            marker_state["pool"] -= 1
+            marker_state["on_map"].add(sid)
             added_markers += 1
 
     refresh_control(state)

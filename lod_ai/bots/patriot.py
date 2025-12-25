@@ -45,6 +45,9 @@ class PatriotBot(BaseBot):
     """Full non‑player Patriot AI."""
     faction = "PATRIOTS"             # canonical faction key
 
+    def _support_level(self, state: Dict, sid: str) -> int:
+        return state.get("support", {}).get(sid, 0)
+
     def _event_directive(self, card_id: int) -> str:
         """
         Patriots use the existing Brown‑Bess instruction table keyed as 'PATRIOT'.
@@ -275,12 +278,12 @@ class PatriotBot(BaseBot):
     def _execute_rabble(self, state: Dict) -> bool:
         spaces = [
             sid for sid, sp in state["spaces"].items()
-            if sp.get("support", 0) > C.ACTIVE_OPPOSITION
+            if self._support_level(state, sid) > C.ACTIVE_OPPOSITION
         ]
         if not spaces:
             return False
         # active‑support first, higher pop
-        spaces.sort(key=lambda n: (-state["spaces"][n]["support"], -_MAP_DATA[n]["population"]))
+        spaces.sort(key=lambda n: (-self._support_level(state, n), -_MAP_DATA[n].get("population", 0)))
         rabble_rousing.execute(state, self.faction, {}, spaces[:4])
         return True
 
@@ -347,8 +350,8 @@ class PatriotBot(BaseBot):
 
     def _rabble_possible(self, state: Dict) -> bool:
         return any(
-            sp.get("support", 0) > C.ACTIVE_OPPOSITION
-            for sp in state["spaces"].values()
+            self._support_level(state, sid) > C.ACTIVE_OPPOSITION
+            for sid in state["spaces"]
         )
 
     # ===================================================================
@@ -356,8 +359,9 @@ class PatriotBot(BaseBot):
     # ===================================================================
     def _faction_event_conditions(self, state: Dict, card: Dict) -> bool:
         text = card.get("unshaded_event", "")
-        sup = sum(max(0, sp.get("support", 0)) for sp in state["spaces"].values())
-        opp = sum(max(0, -sp.get("support", 0)) for sp in state["spaces"].values())
+        support_map = state.get("support", {})
+        sup = sum(max(0, lvl) for lvl in support_map.values())
+        opp = sum(max(0, -lvl) for lvl in support_map.values())
 
         # • Support > Opposition & event shifts Support/Opposition
         if sup > opp and any(k in text for k in ("Support", "Opposition")):

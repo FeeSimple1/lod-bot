@@ -8,7 +8,7 @@ undo-friendly way.
 
 from typing import Dict, Any
 from lod_ai.util.history import push_history
-from lod_ai.rules_consts import LEADERS, WEST_INDIES_ID
+from lod_ai.rules_consts import LEADERS, WEST_INDIES_ID, PROPAGANDA, RAID, BLOCKADE
 
 # Accept older plural tag spellings used in some card/effect code
 _TAG_ALIAS = {
@@ -20,6 +20,8 @@ _TAG_ALIAS = {
 
 def _norm(tag: str) -> str:
     return _TAG_ALIAS.get(tag, tag)
+
+_MARKERS = {PROPAGANDA, RAID, BLOCKADE}
 
 # --------------------------------------------------------------------------- #
 # internal utils
@@ -59,6 +61,24 @@ def place_piece(state: Dict[str, Any], tag: str, loc: str, qty: int = 1) -> int:
 def remove_piece(state: Dict[str, Any], tag: str, loc: str | None,
                  qty: int = 1, to: str = "available") -> int:
     tag = _norm(tag)
+    if tag in _MARKERS:
+        markers = state.setdefault("markers", {}).setdefault(tag, {"pool": 0, "on_map": set()})
+        removed = 0
+        on_map = markers.setdefault("on_map", set())
+        if loc:
+            if loc in on_map and removed < qty:
+                on_map.discard(loc)
+                markers["pool"] = markers.get("pool", 0) + 1
+                removed = 1
+                push_history(state, f"{tag} removed from {loc}")
+            return removed
+        while removed < qty and on_map:
+            sid = on_map.pop()
+            markers["pool"] = markers.get("pool", 0) + 1
+            removed += 1
+            push_history(state, f"{tag} removed from {sid}")
+        return removed
+
     if loc:
         return move_piece(state, tag, loc, to, qty)
 
@@ -136,14 +156,12 @@ def place_marker(state, marker_tag: str, loc: str, qty: int = 1) -> int:
     Place up to *qty* markers in *loc* respecting caps.
     Assumes markers are unlimited on-map but drawn from a pool in state["markers"].
     """
-    pool = state.setdefault("markers", {}).setdefault(marker_tag, {"pool": 0})
-    on_map = _space_dict(state, loc)
-
-    available = pool["pool"]
+    markers = state.setdefault("markers", {}).setdefault(marker_tag, {"pool": 0, "on_map": set()})
+    available = markers.get("pool", 0)
     placed = min(qty, available)
     if placed:
-        pool["pool"] -= placed
-        on_map[marker_tag] = on_map.get(marker_tag, 0) + placed
+        markers["pool"] = available - placed
+        markers.setdefault("on_map", set()).add(loc)
         push_history(state, f"{placed} {marker_tag} placed in {loc}")
     return placed
 

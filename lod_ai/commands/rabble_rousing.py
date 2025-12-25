@@ -58,15 +58,15 @@ def _pay_cost(state: Dict, n_spaces: int):
     spend(state, "PATRIOTS", n_spaces)
 
 
-def _shift_toward_active_opposition(sp: Dict):
+def _shift_toward_active_opposition(state: Dict, space_id: str):
     """Move support marker one step toward *Active Opposition*."""
-    cur = sp.get("support", NEUTRAL)
+    cur = state.get("support", {}).get(space_id, NEUTRAL)
     try:
         idx = _SUPPORT_ORDER.index(cur)
     except ValueError:
         idx = 2  # treat unknown as NEUTRAL
     if idx < len(_SUPPORT_ORDER) - 1:
-        sp["support"] = _SUPPORT_ORDER[idx + 1]
+        state.setdefault("support", {})[space_id] = _SUPPORT_ORDER[idx + 1]
 
 
 def _has_patriot_piece(sp: Dict) -> bool:
@@ -110,9 +110,8 @@ def execute(
     _pay_cost(state, len(selected))
 
     # Ensure Propaganda pool exists in state
-    prop_pool: set = state.setdefault("markers", {}).setdefault(PROPAGANDA, set())
-    if not isinstance(prop_pool, set):
-        raise TypeError("state['markers'][PROPAGANDA] must be a set of space IDs")
+    prop_state = state.setdefault("markers", {}).setdefault(PROPAGANDA, {"pool": 0, "on_map": set()})
+    prop_state.setdefault("on_map", set())
 
     push_history(state, f"PATRIOTS RABBLE_ROUSING {selected}")
 
@@ -126,13 +125,14 @@ def execute(
             raise ValueError(f"{space_id} is not eligible for Rabble‑Rousing.")
 
         # Place a Propaganda marker if any remain
-        if len(prop_pool) < 12:
-            prop_pool.add(space_id)
+        if prop_state.get("pool", 0) > 0:
+            prop_state["pool"] -= 1
+            prop_state["on_map"].add(space_id)
 
         # Shift support one level toward Active Opposition
-        before_support = sp.get("support", NEUTRAL)
-        _shift_toward_active_opposition(sp)
-        after_support = sp["support"]
+        before_support = state.get("support", {}).get(space_id, NEUTRAL)
+        _shift_toward_active_opposition(state, space_id)
+        after_support = state.get("support", {}).get(space_id, NEUTRAL)
 
         # Activate 1 Underground Militia unless Rebellion Control w/ Patriot piece
         if not (rebellion_control and _has_patriot_piece(sp)) and sp.get(MILITIA_U, 0) > 0:
@@ -141,7 +141,7 @@ def execute(
         # Log per‑space details (optional)
         state.setdefault("log", []).append(
             f" PAT Rabble ({space_id})  support: {before_support}→{after_support}  "
-            f"prop: {'yes' if space_id in prop_pool else 'no'}  "
+            f"prop: {'yes' if space_id in prop_state.get('on_map', set()) else 'no'}  "
             f"militia_flip: {('yes' if not (rebellion_control and _has_patriot_piece(sp)) else 'no')}"
         )
 

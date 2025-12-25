@@ -35,6 +35,7 @@ from lod_ai.rules_consts import (
 from lod_ai.util.history     import push_history
 from lod_ai.util.caps        import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency   import is_adjacent
+from lod_ai.map import adjacency as map_adj
 from lod_ai.leaders          import apply_leader_modifiers
 from lod_ai.board.pieces      import remove_piece, add_piece          # NEW
 from lod_ai.economy.resources import spend, can_afford               # NEW
@@ -55,8 +56,8 @@ def _move(state: Dict,
     remove_piece(state, tag, src_id, n)
     add_piece(state,    tag, dst_id, n)
 
-def _is_city(space: Dict) -> bool:
-    return space.get("city", False) or space.get("type") == "City"
+def _is_city(space_id: str) -> bool:
+    return map_adj.space_type(space_id) == "City"
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -138,7 +139,7 @@ def execute(
                     wp_take   = min(cc_avail, max_escort - tory_take)
 
                     # WP may not enter a City
-                    if wp_take and _is_city(sp_dst):
+                    if wp_take and _is_city(dst):
                         raise ValueError("Common-Cause War Parties may not move into Cities.")
 
                     if tory_take:

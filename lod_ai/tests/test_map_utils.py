@@ -25,16 +25,5 @@ def test_refresh_control_assignment():
     }
     refresh_control(state)
 
-    assert state["spaces"]["A"]["control"] == "REBELLION"
-    assert state["spaces"]["A"]["British_Control"] is False
-    assert state["spaces"]["A"]["Patriot_Control"] is True
-
-    assert state["spaces"]["B"]["control"] == "BRITISH"
-    assert state["spaces"]["B"]["British_Control"] is True
-    assert state["spaces"]["B"]["Patriot_Control"] is False
-
-    assert state["spaces"]["C"]["control"] is None
-    assert state["spaces"]["C"]["British_Control"] is False
-    assert state["spaces"]["C"]["Patriot_Control"] is False
-
+    assert state["control"] == {"A": "REBELLION", "B": "BRITISH", "C": None}
     assert state["control_map"] == {"A": "REBELLION", "B": "BRITISH", "C": None}
