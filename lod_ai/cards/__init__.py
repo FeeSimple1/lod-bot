@@ -15,6 +15,7 @@ This module also auto-imports the per-era handler modules so their
 from __future__ import annotations
 from typing import Callable, Dict, Iterable, Optional, Tuple
 import importlib
+from lod_ai import rules_consts as C
 
 # ---------------------------------------------------------------------------
 # Global registry of card-id -> handler(state, shaded=False)
@@ -105,4 +106,21 @@ def _ensure_handlers_imported() -> None:
 # Import at module load so registry is ready for bots/engine.
 _ensure_handlers_imported()
 
-__all__ = ["CARD_HANDLERS", "register", "determine_eligible_factions"]
+__all__ = ["CARD_HANDLERS", "register", "determine_eligible_factions", "get_faction_order"]
+
+
+# ---------------------------------------------------------------------------
+# Order-icon helper used by tests and setup tools
+# ---------------------------------------------------------------------------
+_ICON_MAP = {
+    "P": C.PATRIOTS,
+    "B": C.BRITISH,
+    "F": C.FRENCH,
+    "I": C.INDIANS,
+}
+
+
+def get_faction_order(card: dict) -> list[str]:
+    """Return the turn order encoded in a card's ``order_icons`` field."""
+    icons = str(card.get("order_icons", "") or "").strip()
+    return [_ICON_MAP[ch] for ch in icons if ch in _ICON_MAP]

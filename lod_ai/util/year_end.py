@@ -84,7 +84,9 @@ def _supply_phase(state):
             continue
         if sp.get(REGULAR_BRI, 0) + sp.get(TORY, 0) == 0:
             continue
-        if sp.get(FORT_BRI) or (sp.get("type") == "City" and sp.get("British_Control")):
+        meta = map_adj.space_meta(sid) or {}
+        space_type = meta.get("type") or sp.get("type")
+        if sp.get(FORT_BRI) or (space_type == "City" and state.get("control", {}).get(sid) == "BRITISH"):
             continue
         if _pay(BRITISH, sid, "British Supply"):
             continue
@@ -102,7 +104,9 @@ def _supply_phase(state):
         total = sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0) + sp.get(REGULAR_PAT, 0)
         if not total:
             continue
-        if sp.get(FORT_PAT) or ((sp.get("type") in ("Colony", "City")) and sp.get("Patriot_Control")):
+        meta = map_adj.space_meta(sid) or {}
+        space_type = meta.get("type") or sp.get("type")
+        if sp.get(FORT_PAT) or ((space_type in ("Colony", "City")) and state.get("control", {}).get(sid) == "REBELLION"):
             continue
         if _pay(PATRIOTS, sid, "Patriot Supply"):
             continue
@@ -229,9 +233,16 @@ def _resource_income(state):
     french_income    = 0
     indian_income    = 0
     rebellion_spaces = 0                    # exclude West Indies
+    control_map = state.get("control", {})
+    blockade_state = state.get("markers", {}).get(BLOCKADE, {"pool": 0, "on_map": set()})
+    blockaded_cities = blockade_state.get("on_map", set())
 
     # ---------------  map sweep  --------------------------------
     for sid, sp in state["spaces"].items():
+        meta = map_adj.space_meta(sid) or {}
+        space_type = meta.get("type") or sp.get("type")
+        pop = meta.get("population", sp.get("pop", 0))
+        ctrl = control_map.get(sid)
 
         # British Forts
         if sp.get(FORT_BRI):
@@ -245,36 +256,36 @@ def _resource_income(state):
         indian_income += sp.get(VILLAGE, 0)
 
         # British-controlled, non-Blockaded *Cities* → pop to British
-        if (sp.get("type") == "City"
-                and sp.get("British_Control")
-                and not sp.get(BLOCKADE_KEY, 0)):
-            british_income += sp.get("pop", 0)
+        if (space_type == "City"
+                and ctrl == "BRITISH"
+                and sid not in blockaded_cities):
+            british_income += pop
 
         # Rebellion-controlled spaces (skip West Indies)
-        if sid != WEST_INDIES_ID and sp.get("Patriot_Control"):
+        if sid != WEST_INDIES_ID and ctrl == "REBELLION":
             rebellion_spaces += 1
 
         # City population *not* British-Controlled (for French after ToA)
-        if sp.get("type") == "City" and not sp.get("British_Control"):
-            french_income += sp.get("pop", 0)      # kept only post-ToA
+        if space_type == "City" and ctrl != "BRITISH":
+            french_income += pop      # kept only post-ToA
 
     # ---------------  derive totals  ----------------------------
     indian_income //= 2                         # ⌊Villages / 2⌋
     patriot_income += rebellion_spaces // 2     # ⌊spaces / 2⌋
 
-    wi = state["spaces"][WEST_INDIES_ID]
+    wi_ctrl = control_map.get(WEST_INDIES_ID)
 
     if state.get("treaty_of_alliance", False):
         # After ToA: keep city pop and add FNI box level
-        french_income += state.get("fni_box", 0)
+        french_income += state.get("fni_level", 0)
     else:
-        # Before ToA: ignore city pop, earn 2× Blockades in W.I.
-        french_income = wi.get(BLOCKADE_KEY, 0) * 2
+        # Before ToA: ignore city pop, earn 2× Blockades in W.I. pool
+        french_income = blockade_state.get("pool", 0) * 2
 
     # West Indies bonuses
-    if wi.get("British_Control"):
+    if wi_ctrl == "BRITISH":
         british_income += 5
-    if wi.get("Patriot_Control"):
+    if wi_ctrl == "REBELLION":
         french_income += 5
 
     # ---------------  apply & log  ------------------------------
@@ -314,6 +325,7 @@ def _support_phase(state):
     from collections import defaultdict
 
     shifted = defaultdict(int)      # how many times each space has shifted
+    control_map = state.get("control", {})
 
     # ---------------------------------------------------------------
     # 6.4.1  Reward Loyalty  (British)
@@ -325,7 +337,7 @@ def _support_phase(state):
             continue
 
         # must be British-controlled City/Colony and contain both Regulars & Tories
-        if not (sp.get("British_Control") and sp.get(REGULAR_BRI) and sp.get(TORY)):
+        if not (control_map.get(sid) == "BRITISH" and sp.get(REGULAR_BRI) and sp.get(TORY)):
             continue
 
         level = state["support"].get(sid, 0)
@@ -364,7 +376,7 @@ def _support_phase(state):
             continue
 
         # must be Rebellion-controlled and contain Patriot pieces
-        if not (sp.get("Patriot_Control") and (sp.get(MILITIA_A) or sp.get(MILITIA_U) or sp.get(REGULAR_PAT))):
+        if not (control_map.get(sid) == "REBELLION" and (sp.get(MILITIA_A) or sp.get(MILITIA_U) or sp.get(REGULAR_PAT))):
             continue
 
         level = state["support"].get(sid, 0)
@@ -465,13 +477,13 @@ def _fni_drift(state):
     if not state.get("treaty_of_alliance", False):
         return  # only after ToA
     # Lower FNI one box if > 0
-    if state.get("fni_box", 0) > 0:
+    if state.get("fni_level", 0) > 0:
         adjust_fni(state, -1)
         push_history(state, "FNI drift – box shifts 1 toward War (6.5.4)")
     # Remove one Blockade from West Indies if present
-    wi = state["spaces"][WEST_INDIES_ID]
-    if wi.get(BLOCKADE_KEY, 0) > 0:
-        wi[BLOCKADE_KEY] -= 1
+    bloc = state.setdefault("markers", {}).setdefault(BLOCKADE, {"pool": 0, "on_map": set()})
+    if bloc.get("pool", 0) > 0:
+        bloc["pool"] -= 1
         state.setdefault("unavailable", {}).setdefault(BLOCKADE, 0)
         state["unavailable"][BLOCKADE] += 1
         push_history(state, "French remove one Blockade in West Indies (6.5.4)")
@@ -583,9 +595,12 @@ def _reset_phase(state):
     """Rule 6.7 – prepare map & deck for the next card."""
 
     # Remove all Raid & Propaganda markers
-    for sp in state["spaces"].values():
-        sp.pop(RAID, None)
-        sp.pop(PROPAGANDA, None)
+    markers = state.setdefault("markers", {})
+    for tag in (RAID, PROPAGANDA):
+        entry = markers.setdefault(tag, {"pool": 0, "on_map": set()})
+        on_map = entry.get("on_map", set())
+        entry["pool"] = entry.get("pool", 0) + len(on_map)
+        entry["on_map"] = set()
 
     # Mark all factions Eligible
     state["eligible"] = {BRITISH: True, PATRIOTS: True, FRENCH: True, INDIANS: True}

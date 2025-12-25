@@ -24,7 +24,7 @@ from typing import Dict
 from lod_ai.rules_consts import REGULAR_FRE, FRENCH_UNAVAIL, BLOCKADE, WEST_INDIES_ID
 from lod_ai.util.history  import push_history
 from lod_ai.util.caps     import refresh_control, enforce_global_caps
-from lod_ai.board.pieces      import remove_piece, add_piece
+from lod_ai.board.pieces      import remove_piece
 from lod_ai.economy.resources import add as add_res
 
 SA_NAME = "PREPARER"        # auto-discovered by special_activities/__init__.py
@@ -36,7 +36,8 @@ _BLOCKADE_CAP = 3           # total markers that exist in the game
 # helpers
 # ---------------------------------------------------------------------------
 def _count_all_blockades(state: Dict) -> int:
-    return sum(sp.get(BLOCKADE, 0) for sp in state["spaces"].values())
+    bloc = state.setdefault("markers", {}).setdefault(BLOCKADE, {"pool": 0, "on_map": set()})
+    return bloc.get("pool", 0) + len(bloc.get("on_map", set()))
 
 # ---------------------------------------------------------------------------
 # public entry
@@ -70,18 +71,16 @@ def execute(
     push_history(state, f"FRENCH PREPARER choice={choice}")
 
     if choice == "BLOCKADE":
+        markers = state.setdefault("markers", {}).setdefault(BLOCKADE, {"pool": 0, "on_map": set()})
         total = _count_all_blockades(state)
         if total >= _BLOCKADE_CAP:
             raise ValueError("No unused Blockade markers remain to add.")
-        # add one to West Indies pool
-        wi = state["spaces"][WEST_INDIES_ID]
-        wi[BLOCKADE] = wi.get(BLOCKADE, 0) + 1
-        state.setdefault("log", []).append("FRENCH Préparer: +1 Blockade to West Indies")
+        markers["pool"] = markers.get("pool", 0) + 1
+        state.setdefault("log", []).append("FRENCH Préparer: +1 Blockade to West Indies pool")
 
     elif choice == "REGULARS":
         # Move 3 Regulars from Unavailable → Available
         remove_piece(state, REGULAR_FRE, "unavailable", 3)
-        add_piece(state,    REGULAR_FRE, "available",    3) 
 
     else:  # RESOURCES
         add_res(state, "FRENCH", 2)

@@ -185,7 +185,7 @@ def execute(
         if sp_city.get("Patriot_Fort", 0):
             raise ValueError("Cannot displace from a City with a Patriot Fort")
         # British Control check (1.7)
-        if not sp_city.get("British_Control"):
+        if state.get("control", {}).get(displace_city) != "BRITISH":
             raise ValueError("Displace city must be under British Control")
         _displace_rebellion(displace_city, displace_target, state)
 

@@ -49,6 +49,9 @@ def _adjacent(space: str) -> List[str]:
 class IndianBot(BaseBot):
     faction = "INDIANS"
 
+    def _support_level(self, state: Dict, sid: str) -> int:
+        return state.get("support", {}).get(sid, 0)
+
     # ==================================================================
     #  FLOW‑CHART DRIVER
     # ==================================================================
@@ -58,8 +61,9 @@ class IndianBot(BaseBot):
         by BaseBot._choose_event_vs_flowchart().
         """
         # ---------- I3 test  (Support+1D6) > Opposition -----------------
-        support = sum(max(0, sp.get("support", 0)) for sp in state["spaces"].values())
-        opposition = sum(max(0, -sp.get("support", 0)) for sp in state["spaces"].values())
+        support_map = state.get("support", {})
+        support = sum(max(0, lvl) for lvl in support_map.values())
+        opposition = sum(max(0, -lvl) for lvl in support_map.values())
         roll = state["rng"].randint(1, 6)
         state.setdefault("rng_log", []).append(("Support test 1D6", roll))
 
@@ -146,7 +150,7 @@ class IndianBot(BaseBot):
     def _opposition_colonies(self, state: Dict) -> List[str]:
         return [
             sid for sid, sp in state["spaces"].items()
-            if _MAP_DATA[sid]["type"] == "Colony" and sp.get("support", 0) <= C.PASSIVE_OPPOSITION
+            if _MAP_DATA[sid]["type"] == "Colony" and self._support_level(state, sid) <= C.PASSIVE_OPPOSITION
         ]
 
     def _raid_targets(self, state: Dict) -> List[str]:
@@ -309,7 +313,7 @@ class IndianBot(BaseBot):
         _, origin = max(origins)
         for dst in _adjacent(origin):
             dsp = state["spaces"][dst]
-            if dsp.get("support", 0) <= C.PASSIVE_OPPOSITION and dsp.get(C.VILLAGE, 0) == 0:
+            if self._support_level(state, dst) <= C.PASSIVE_OPPOSITION and dsp.get(C.VILLAGE, 0) == 0:
                 march.execute(state, "INDIAN", {}, [origin], [dst], bring_escorts=False, limited=True)
                 return True
         return False
@@ -365,8 +369,9 @@ class IndianBot(BaseBot):
         Apply the unshaded‑event bullets from node I2.
         """
         text = card.get("unshaded_event", "")
-        support = sum(max(0, sp.get("support", 0)) for sp in state["spaces"].values())
-        opposition = sum(max(0, -sp.get("support", 0)) for sp in state["spaces"].values())
+        support_map = state.get("support", {})
+        support = sum(max(0, lvl) for lvl in support_map.values())
+        opposition = sum(max(0, -lvl) for lvl in support_map.values())
 
         # • Opposition > Support and Event shifts toward Royalists
         if opposition > support and any(k in text for k in ("Support", "Opposition")):
@@ -377,5 +382,24 @@ class IndianBot(BaseBot):
         # • Removes a Patriot Fort
         if "Fort" in text and "Patriot" in text and "remove" in text.lower():
             return True
-        # • Ineffective die‑roll rule (handled by BaseBot already)
+        # • Ineffective die-roll rule (handled by BaseBot already)
         return False
+
+
+# ----------------------------------------------------------------------
+# Legacy helper expected by tests
+# ----------------------------------------------------------------------
+def choose_command(state: Dict) -> tuple[str, str | None]:
+    """
+    Minimal command selector used by legacy tests.
+    Priorities:
+        1) SCOUT if any space has both WP_U and British Regulars
+        2) WAR_PATH if any space has WP_U and Patriot Regulars
+        3) otherwise GATHER
+    """
+    for sid, sp in state.get("spaces", {}).items():
+        if sp.get(C.WARPARTY_U, 0) and sp.get(C.REGULAR_BRI, 0):
+            return "SCOUT", sid
+        if sp.get(C.WARPARTY_U, 0) and sp.get(C.REGULAR_PAT, 0):
+            return "WAR_PATH", sid
+    return "GATHER", None

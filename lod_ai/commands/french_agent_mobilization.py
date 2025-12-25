@@ -89,7 +89,7 @@ def execute(
     if sp is None:
         raise KeyError(f"Space {province} not found in state['spaces'].")
 
-    if sp.get("support") == ACTIVE_SUPPORT:
+    if state.get("support", {}).get(province, NEUTRAL) == ACTIVE_SUPPORT:
         raise ValueError("Cannot mobilize agents in a province at Active Support.")
 
     # Resource cost ----------------------------------------------------------

@@ -77,10 +77,9 @@ COMMAND_NAME = "RALLY"  # auto‑registered by commands/__init__.py
 # Internal helpers                                                            
 # ---------------------------------------------------------------------------
 
-def _support_value(sp: Dict) -> int:
+def _support_value(state: Dict, space_id: str) -> int:
     """Return numeric support level using constants from rules_consts."""
-    lvl = sp.get("support", NEUTRAL)
-    return lvl
+    return state.get("support", {}).get(space_id, NEUTRAL)
 
 
 def _is_indian_reserve(sp: Dict) -> bool:
@@ -192,8 +191,7 @@ def execute(
 
     # Preload West Indies / reserve flags for validation
     for space_id in selected:
-        sp = state["spaces"][space_id]
-        if _support_value(sp) == ACTIVE_SUPPORT:
+        if _support_value(state, space_id) == ACTIVE_SUPPORT:
             raise ValueError(f"{space_id} has Active Support; cannot Rally there.")
 
     # --- Phase 1: apply per‑space actions -----------------------------------

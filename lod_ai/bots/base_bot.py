@@ -2,12 +2,12 @@
 import random
 from typing import Dict, List, Tuple, Optional
 from lod_ai import rules_consts as C
-from lod_ai.util import free_ops
 from lod_ai.board import pieces
 from lod_ai.bots.random_spaces import iter_random_spaces
 from lod_ai.bots import event_instructions as EI
 from lod_ai import dispatcher
 from lod_ai.cards import CARD_HANDLERS
+from lod_ai.util.history import push_history
 
 class BaseBot:
     faction: str            # e.g. "BRITISH"
@@ -19,7 +19,7 @@ class BaseBot:
             return                      # Event executed
 
         if state["resources"][self.faction] <= 0:
-            free_ops.push_history(state, f"{self.faction} PASS (no Resources)")
+            push_history(state, f"{self.faction} PASS (no Resources)")
             return
 
         self._follow_flowchart(state)   # implemented by subclass

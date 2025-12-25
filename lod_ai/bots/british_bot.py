@@ -45,6 +45,12 @@ def _adjacent(space: str) -> List[str]:
 class BritishBot(BaseBot):
     faction = "BRITISH"
 
+    def _support_level(self, state: Dict, sid: str) -> int:
+        return state.get("support", {}).get(sid, 0)
+
+    def _control(self, state: Dict, sid: str):
+        return state.get("control", {}).get(sid)
+
     # =======================================================================
     #  MAIN FLOW‑CHART DRIVER  (§8.4 nodes B4 → B13)
     # =======================================================================
@@ -157,11 +163,11 @@ class BritishBot(BaseBot):
         if not target:
             return False  # nothing to do → flow‑chart directs to MUSTER
 
-        # ----- step 2: build move‑map respecting “leave 2 more pieces” -----
+        # ----- step 2: build move-map respecting “leave 2 more pieces” -----
         move_map: Dict[str, Dict[str, int]] = {}
         moved_cubes = 0
         for sid, sp in state["spaces"].items():
-            if sid == target or sp.get("control") != "BRITISH":
+            if sid == target or self._control(state, sid) != "BRITISH":
                 continue
             brit_units = (
                 sp.get(C.REGULAR_BRI, 0)
@@ -211,7 +217,7 @@ class BritishBot(BaseBot):
         candidates: List[Tuple[int, str]] = []
         for name in CITIES:
             sp = state["spaces"].get(name, {})
-            if sp.get("control") == "BRITISH" or sp.get("Patriot_Fort", 0):
+            if self._control(state, name) == "BRITISH" or sp.get("Patriot_Fort", 0):
                 continue
             rebels = (
                 sp.get(C.REGULAR_PAT, 0)
@@ -238,9 +244,10 @@ class BritishBot(BaseBot):
         for sid, sp in state["spaces"].items():
             if _MAP_DATA[sid]["type"] != "Province":
                 continue
-            opp = max(0, -sp.get("support", 0))
-            sup = max(0, sp.get("support", 0))
-            pop = sp.get("population", 0)
+            support_level = self._support_level(state, sid)
+            opp = max(0, -support_level)
+            sup = max(0, support_level)
+            pop = _MAP_DATA[sid].get("population", 0)
             key = (opp, -sup, -pop)
             if key > best_key:
                 best_key = key
@@ -267,7 +274,7 @@ class BritishBot(BaseBot):
             if sid == WEST_INDIES or _MAP_DATA[sid]["type"] == "Province":
                 continue
             # Neutral or Passive
-            if sp.get("support", 0) in (C.NEUTRAL, C.PASSIVE_OPPOSITION):
+            if self._support_level(state, sid) in (C.NEUTRAL, C.PASSIVE_OPPOSITION):
                 regular_destinations.append(sid)
 
         # fallback random
@@ -310,19 +317,21 @@ class BritishBot(BaseBot):
         die = state["rng"].randint(1, 3)
         state.setdefault("rng_log", []).append(("1D3", die))
         # Opposition > Support + 1D3 ?
-        total_support = sum(max(0, sp.get("support", 0)) for sp in state["spaces"].values())
-        total_opp = sum(max(0, -sp.get("support", 0)) for sp in state["spaces"].values())
+        support_map = state.get("support", {})
+        total_support = sum(max(0, lvl) for lvl in support_map.values())
+        total_opp = sum(max(0, -lvl) for lvl in support_map.values())
         if total_opp > total_support + die or state["available"].get(C.FORT_BRI, 0) == 0:
             # pick RL space
             rl_candidates = [
                 sid
-                for sid, sp in state["spaces"].items()
-                if sp.get("support", 0) <= C.PASSIVE_OPPOSITION
+                for sid in state["spaces"].keys()
+                if self._support_level(state, sid) <= C.PASSIVE_OPPOSITION
             ]
             if rl_candidates:
+                raid_on_map = state.get("markers", {}).get(C.RAID, {}).get("on_map", set())
                 chosen_rl_space = max(
                     rl_candidates,
-                    key=lambda n: (_MAP_DATA[n]["population"], -state["spaces"][n].get("raid", 0)),
+                    key=lambda n: (_MAP_DATA[n].get("population", 0), -(1 if n in raid_on_map else 0)),
                 )
                 reward_levels = 1
         if chosen_rl_space is None and state["available"].get(C.FORT_BRI, 0):
@@ -379,7 +388,7 @@ class BritishBot(BaseBot):
         # Helper: ensure we lose no British Control in origin
         def can_leave(sid: str) -> bool:
             sp = state["spaces"][sid]
-            if sp.get("control") != "BRITISH":
+            if self._control(state, sid) != "BRITISH":
                 return False
             cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
             rebel = (
@@ -399,8 +408,7 @@ class BritishBot(BaseBot):
             for dst in _adjacent(sid):
                 if dst in target_spaces:
                     continue
-                dsp = state["spaces"][dst]
-                if dsp.get("control") == "REBELLION":
+                if state.get("control", {}).get(dst) == "REBELLION":
                     target_spaces.append(dst)
         # Fallback – Pop 1+ spaces not at Active Support
         if not target_spaces:
@@ -408,8 +416,7 @@ class BritishBot(BaseBot):
                 for dst in _adjacent(sid):
                     if dst in target_spaces:
                         continue
-                    dsp = state["spaces"][dst]
-                    if dsp.get("support", 0) != C.ACTIVE_SUPPORT and dsp.get("population", 0) >= 1:
+                    if self._support_level(state, dst) != C.ACTIVE_SUPPORT and _MAP_DATA[dst].get("population", 0) >= 1:
                         target_spaces.append(dst)
                         if len(target_spaces) >= 2:
                             break
@@ -506,7 +513,7 @@ class BritishBot(BaseBot):
             return False
         for name in CITIES:
             sp = state["spaces"][name]
-            if sp.get("control") == "REBELLION" and sp.get("Patriot_Fort", 0) == 0:
+            if self._control(state, name) == "REBELLION" and sp.get("Patriot_Fort", 0) == 0:
                 return True
         return False
 

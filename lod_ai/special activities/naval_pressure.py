@@ -11,8 +11,7 @@ This SA mutates two top-level state fields assumed to exist:
 
     • state["resources"]      – dict by faction.
     • state["fni_level"]      – int 0-3.  (0 = none, 3 = max)
-    • state["spaces"][sid][BLOCKADE] – int count of Sqn/Blockade markers
-      present in that space.  The West_Indies space is the marker “pool”.
+    • state["markers"]["Blockade"]   – {"pool": int, "on_map": set[str]}
 
 If your schema differs, adapt the helper functions at the top.
 """
@@ -22,7 +21,7 @@ from typing import Dict
 from lod_ai.util.history import push_history
 from lod_ai.util.caps    import enforce_global_caps, refresh_control
 from lod_ai.economy.resources import add as add_res      # NEW
-from lod_ai.rules_consts import BLOCKADE_KEY, WEST_INDIES_ID
+from lod_ai.rules_consts import BLOCKADE, WEST_INDIES_ID
 from lod_ai.cards.effects.shared import adjust_fni
 
 SA_NAME = "NAVAL_PRESSURE"      # auto-registered by special_activities/__init__.py
@@ -41,26 +40,25 @@ def _roll_d3(state: Dict) -> int:
 
 
 def _cities_with_blockade(state: Dict) -> list[str]:
-    return [sid for sid, sp in state["spaces"].items()
-            if sid != WEST_INDIES_ID and sp.get(BLOCKADE, 0) > 0]
+    bloc = state.setdefault("markers", {}).setdefault(BLOCKADE, {"pool": 0, "on_map": set()})
+    return [sid for sid in bloc.get("on_map", set()) if sid != WEST_INDIES_ID]
 
 def _remove_blockade_from_city_to_wi(state: Dict, city_id: str) -> None:
-    wi = state["spaces"]["West_Indies"]
-    city = state["spaces"][city_id]
-    if city.get("blockade", 0) == 0:
+    bloc = state.setdefault("markers", {}).setdefault(BLOCKADE, {"pool": 0, "on_map": set()})
+    on_map = bloc.setdefault("on_map", set())
+    if city_id not in on_map:
         raise ValueError(f"{city_id} has no Blockade to remove.")
-    city["blockade"] -= 1
-    wi["blockade"]   = wi.get("blockade", 0) + 1
+    on_map.discard(city_id)
+    bloc["pool"] = bloc.get("pool", 0) + 1
 
 
 def _place_blockade_from_wi(state: Dict, city_id: str) -> None:
-    wi = state["spaces"][WEST_INDIES_ID]
-    if wi.get(BLOCKADE, 0) == 0:
+    bloc = state.setdefault("markers", {}).setdefault(BLOCKADE, {"pool": 0, "on_map": set()})
+    pool = bloc.get("pool", 0)
+    if pool <= 0:
         raise ValueError("No Blockade markers in West Indies to place.")
-    wi[BLOCKADE]   -= 1
-    state["spaces"][city_id][BLOCKADE] = (
-        state["spaces"][city_id].get(BLOCKADE, 0) + 1
-    )
+    bloc["pool"] = pool - 1
+    bloc.setdefault("on_map", set()).add(city_id)
 
 # ---------------------------------------------------------------------------
 # Public entry point
@@ -148,8 +146,11 @@ def _exec_french(
         raise ValueError("French Naval Pressure requires Treaty of Alliance.")
 
     push_history(state, "FRENCH NAVAL_PRESSURE")
+    bloc = state.setdefault("markers", {}).setdefault(BLOCKADE, {"pool": 0, "on_map": set()})
+    bloc.setdefault("on_map", set())
+
     # Raise FNI but cap at # markers in W.I.
-    wi_blks = state["spaces"]["West_Indies"].get("blockade", 0)
+    wi_blks = bloc.get("pool", 0)
     max_fni = wi_blks
     if state.get("fni_level", 0) + 1 > max_fni:
         raise ValueError(f"Cannot raise FNI above {max_fni} (limited by markers).")
@@ -167,14 +168,10 @@ def _exec_french(
         if not rearrange_map:
             raise ValueError("No markers in W.I.; supply rearrange_map.")
         # Clear all city blockades then re-add per map
-        current_cities = _cities_with_blockade(state)
-        for c in current_cities:
-            removed = state["spaces"][c].pop("blockade")
-            state["spaces"][c]["blockade_removed"] = removed  # stash to reuse
+        bloc["on_map"].clear()
         for city_id, n in rearrange_map.items():
-            state["spaces"][city_id]["blockade"] = (
-                state["spaces"][city_id].get("blockade", 0) + n
-            )
+            if n > 0:
+                bloc["on_map"].add(city_id)
         state.setdefault("log", []).append(
             f"FRENCH Naval Pressure: FNI→{state['fni_level']}, blockades rearranged"
         )

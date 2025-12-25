@@ -38,6 +38,8 @@ from lod_ai.rules_consts import (
     # support levels
     ACTIVE_SUPPORT, PASSIVE_SUPPORT, NEUTRAL,
     PASSIVE_OPPOSITION, ACTIVE_OPPOSITION,
+    # markers
+    PROPAGANDA, RAID,
 )
 from lod_ai.board.pieces      import add_piece, remove_piece
 from lod_ai.economy.resources import spend, can_afford
@@ -53,15 +55,15 @@ SUPPORT_ENUM = [ACTIVE_OPPOSITION, PASSIVE_OPPOSITION, NEUTRAL,
 SUPPORT_TO_IDX = {lvl: i for i, lvl in enumerate(SUPPORT_ENUM)}
 
 
-def _support_value(sp: Dict) -> int:
-    """Return the integer support level stored on space *sp* (default NEUTRAL)."""
-    return sp.get("support", NEUTRAL)
+def _support_value(state: Dict, sid: str) -> int:
+    """Return the integer support level stored for *sid* (default NEUTRAL)."""
+    return state.get("support", {}).get(sid, NEUTRAL)
 
 
-def _set_support(sp: Dict, val: int) -> None:
+def _set_support(state: Dict, sid: str, val: int) -> None:
     """Write *val* back clamped to the enum range."""
     lo, hi = SUPPORT_ENUM[0], SUPPORT_ENUM[-1]
-    sp["support"] = max(min(val, hi), lo)
+    state.setdefault("support", {})[sid] = max(min(val, hi), lo)
 
 
 # ---------------------------------------------------------------------------
@@ -106,15 +108,17 @@ def _reward_loyalty(state: Dict, sp: Dict, space_id: str, levels: int) -> None:
     # Checks – Regulars, Tories, Control
     if (sp.get(REGULAR_BRI, 0) == 0) or (sp.get(TORY, 0) == 0):
         raise ValueError("Reward Loyalty requires ≥1 British Regular and ≥1 Tory in space.")
-    if not sp.get("control", "NONE").startswith("BRITISH"):
+    if state.get("control", {}).get(space_id) != "BRITISH":
         raise ValueError("British must Control the space to Reward Loyalty.")
 
     # Calculate cost: levels + marker penalties
     cost = levels
-    for marker in ("propaganda", "raid"):
-        if sp.get(marker):
+    for marker in (PROPAGANDA, RAID):
+        marker_state = state.setdefault("markers", {}).setdefault(marker, {"pool": 0, "on_map": set()})
+        if space_id in marker_state.get("on_map", set()):
             cost += 1
-            sp.pop(marker)
+            marker_state["on_map"].discard(space_id)
+            marker_state["pool"] = marker_state.get("pool", 0) + 1
 
     if state["resources"]["BRITISH"] < cost:
         raise ValueError("Not enough Resources to Reward Loyalty.")
@@ -122,13 +126,13 @@ def _reward_loyalty(state: Dict, sp: Dict, space_id: str, levels: int) -> None:
     spend(state, "BRITISH", cost)
 
     # Apply shift
-    current = _support_value(sp)
+    current = _support_value(state, space_id)
     target  = current + levels
-    _set_support(sp, target)
+    _set_support(state, space_id, target)
 
     # Log
     state.setdefault("log", []).append(
-        f"BRITISH reward loyalty in {space_id}: {current} → {_support_value(sp)} (cost={cost})"
+        f"BRITISH reward loyalty in {space_id}: {current} → {_support_value(state, space_id)} (cost={cost})"
     )
 
 
@@ -153,7 +157,8 @@ def _is_adjacent_to_brit_power(state: Dict, space_id: str) -> bool:
         return True
     return any(
         state["spaces"][nbr].get(REGULAR_BRI, 0) > 0 or state["spaces"][nbr].get(FORT_BRI, 0) > 0
-        for nbr in state["spaces"][space_id]["adjacent"]
+        for nbr in state["spaces"]
+        if is_adjacent(space_id, nbr)
     )
 
 
@@ -202,12 +207,12 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
             for sp_id, n in tory_plan.items():
                 if sp_id not in selected or sp_id == "West_Indies":
                     continue
-                sp = state["spaces"][sp_id]
-                if sp.get("support", ACTIVE_OPPOSITION) == ACTIVE_OPPOSITION:
+                support_level = state.get("support", {}).get(sp_id, NEUTRAL)
+                if support_level == ACTIVE_OPPOSITION:
                     continue  # skip Active Opp
                 if not _is_adjacent_to_brit_power(state, sp_id):
                     continue
-                max_tories = 1 if sp.get("support", NEUTRAL) == PASSIVE_OPPOSITION else 2
+                max_tories = 1 if support_level == PASSIVE_OPPOSITION else 2
                 place = min(n, max_tories)
                 place = _draw_from_pool(state, TORY, place)
                 add_piece(state, TORY, sp_id, place)

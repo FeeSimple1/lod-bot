@@ -110,7 +110,8 @@ def execute(
         sp = state["spaces"][prov]
 
         # Support level gate
-        if sp["support"] not in SUPPORT_OK:
+        support_level = state.get("support", {}).get(prov, NEUTRAL)
+        if support_level not in SUPPORT_OK:
             raise ValueError(f"{prov} not at an eligible support level.")
 
         # One free reserve detection
