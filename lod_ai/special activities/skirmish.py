@@ -28,12 +28,13 @@ from typing import Dict
 
 from lod_ai.rules_consts import (
     REGULAR_BRI, REGULAR_FRE, REGULAR_PAT,
-    TORY, MILITIA_A,
+    TORY, MILITIA_A, MILITIA_U,
     FORT_BRI, FORT_PAT,
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import enforce_global_caps, refresh_control
 from lod_ai.board.pieces      import remove_piece, add_piece
+from lod_ai.leaders          import apply_leader_modifiers
 
 SA_NAME = "SKIRMISH"          # auto-registered by special_activities/__init__.py
 
@@ -65,6 +66,7 @@ def execute(
     if option not in (1, 2, 3):
         raise ValueError("option must be 1, 2, or 3.")
 
+    ctx = apply_leader_modifiers(state, faction, "pre_skirmish", ctx)
     sp = state["spaces"][space_id]
 
     # Determine own and enemy tags per faction
@@ -136,6 +138,15 @@ def execute(
         # remove Fort + 1 own regular
         remove_piece(state, enemy_fort_side_tag, space_id, 1, to="available")
         remove_piece(state, own_tag,           space_id, 1, to="casualties")
+
+    extra_militia = ctx.get("skirmish_extra_militia", 0) if faction == "BRITISH" else 0
+    while extra_militia and (sp.get(MILITIA_A, 0) or sp.get(MILITIA_U, 0)):
+        if sp.get(MILITIA_A, 0):
+            remove_piece(state, MILITIA_A, space_id, 1, to="available")
+        else:
+            remove_piece(state, MILITIA_U, space_id, 1, to="available")
+        extra_militia -= 1
+        push_history(state, "Clinton present - removed one additional Patriot Militia in Skirmish")
 
     refresh_control(state)
     enforce_global_caps(state)

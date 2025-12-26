@@ -31,6 +31,7 @@ from lod_ai.rules_consts import (
     REGULAR_BRI, REGULAR_FRE, REGULAR_PAT,
     TORY, MILITIA_A, MILITIA_U,
     WARPARTY_A, WARPARTY_U,
+    INDIANS,
 )
 from lod_ai.util.history     import push_history
 from lod_ai.util.caps        import refresh_control, enforce_global_caps
@@ -120,6 +121,9 @@ def execute(
             if not is_adjacent(src, dst):
                 raise ValueError(f"{src} is not adjacent to {dst}.")
             sp_dst = state["spaces"][dst]
+
+            if faction == INDIANS and _is_city(dst):
+                raise ValueError("Indians cannot occupy a City space.")
 
             if faction == "BRITISH":
                 # ── Move Regulars ───────────────────────────────────────────

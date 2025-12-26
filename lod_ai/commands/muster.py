@@ -34,7 +34,7 @@ from lod_ai.util.adjacency import is_adjacent
 from lod_ai.leaders        import apply_leader_modifiers
 from lod_ai.rules_consts import (
     # pieces
-    REGULAR_BRI, REGULAR_FRE, TORY, FORT_BRI, FORT_PAT,
+    REGULAR_BRI, REGULAR_FRE, TORY, FORT_BRI, FORT_PAT, VILLAGE,
     # support levels
     ACTIVE_SUPPORT, PASSIVE_SUPPORT, NEUTRAL,
     PASSIVE_OPPOSITION, ACTIVE_OPPOSITION,
@@ -81,10 +81,15 @@ def _draw_from_pool(state: Dict, tag: str, n: int) -> int:
 
 def _make_fort(state: Dict, space_id: str) -> None:
     """Swap any three British cubes for 1 Fort using centralized helpers."""
+    space = state["spaces"][space_id]
+    base_total = space.get(FORT_BRI, 0) + space.get(FORT_PAT, 0) + space.get(VILLAGE, 0)
+    if base_total >= 2:
+        raise ValueError("Cannot build a Fort; stacking limit reached.")
+
     tags = (REGULAR_BRI, TORY)
     removed = 0
     for tag in tags:
-        avail = state["spaces"][space_id].get(tag, 0)
+        avail = space.get(tag, 0)
         take  = min(3 - removed, avail)
         if take:
             remove_piece(state, tag, space_id, take)

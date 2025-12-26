@@ -22,7 +22,7 @@ All bookkeeping (history, caps, control) is handled here.
 from __future__ import annotations
 from typing import Dict
 
-from lod_ai.rules_consts import WARPARTY_U, WARPARTY_A, VILLAGE
+from lod_ai.rules_consts import WARPARTY_U, WARPARTY_A, VILLAGE, MAX_RESOURCES, INDIANS, BRITISH
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.board.pieces      import remove_piece, add_piece
@@ -73,10 +73,13 @@ def execute(
 
     # Resource transfer
     if transfer > 0:
-        spend(state, "BRITISH", transfer)
-        add_res(state, "INDIANS", transfer)
+        spend(state, BRITISH, transfer)
+        add_res(state, INDIANS, transfer)
     else:           # transfer == 0
-        add_res(state, "INDIANS", 1)
+        gain = state["rng"].randint(1, 3)
+        state.setdefault("rng_log", []).append(("Trade D3", gain))
+        state["resources"][INDIANS] = min(MAX_RESOURCES, state["resources"][INDIANS] + gain)
+        push_history(state, f"Indians Trade: +{gain} Resources (to {state['resources'][INDIANS]})")
 
     # Activate exactly one WP
     remove_piece(state, WARPARTY_U, space_id, 1)

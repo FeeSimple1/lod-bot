@@ -63,7 +63,7 @@ from typing import Dict, List, Set, Tuple
 
 from lod_ai.rules_consts import (
     ACTIVE_SUPPORT, PASSIVE_SUPPORT, NEUTRAL, PASSIVE_OPPOSITION,
-    REGULAR_PAT, MILITIA_A, MILITIA_U, FORT_PAT,
+    REGULAR_PAT, MILITIA_A, MILITIA_U, FORT_PAT, FORT_BRI, VILLAGE,
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
@@ -103,10 +103,15 @@ def _replace_with_fort(state: Dict, space_id: str):
     using centralized helpers.
     Priority for removal: Underground → Active → Continentals.
     """
+    sp = state["spaces"][space_id]
+    base_total = sp.get(FORT_PAT, 0) + sp.get(FORT_BRI, 0) + sp.get(VILLAGE, 0)
+    if base_total >= 2:
+        raise ValueError("Cannot build Fort; stacking limit reached.")
+
     tags_priority = (MILITIA_U, MILITIA_A, REGULAR_PAT)
     removed = 0
     for tag in tags_priority:
-        avail = state["spaces"][space_id].get(tag, 0)
+        avail = sp.get(tag, 0)
         if avail == 0:
             continue
         take = min(2 - removed, avail)

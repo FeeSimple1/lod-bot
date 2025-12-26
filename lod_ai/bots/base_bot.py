@@ -85,7 +85,7 @@ class BaseBot:
                 threshold = int(directive.split("_")[2])
             except (IndexError, ValueError):
                 return False
-            hidden = sum(sp.get("Patriot_Militia_U", 0) for sp in state["spaces"].values())
+            hidden = sum(sp.get(C.MILITIA_U, 0) for sp in state["spaces"].values())
             to_flip = hidden // 2
             return to_flip < threshold
         return False

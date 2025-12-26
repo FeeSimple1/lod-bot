@@ -8,6 +8,7 @@ undo-friendly way.
 
 from typing import Dict, Any
 from lod_ai.util.history import push_history
+from lod_ai import rules_consts as C
 from lod_ai.rules_consts import LEADERS, WEST_INDIES_ID, PROPAGANDA, RAID, BLOCKADE
 
 # Accept older plural tag spellings used in some card/effect code
@@ -22,6 +23,31 @@ def _norm(tag: str) -> str:
     return _TAG_ALIAS.get(tag, tag)
 
 _MARKERS = {PROPAGANDA, RAID, BLOCKADE}
+_BASE_TAGS = {C.FORT_BRI, C.FORT_PAT, C.VILLAGE}
+
+_POOL_FAMILY = {
+    C.MILITIA_A: C.MILITIA_U,
+    C.WARPARTY_A: C.WARPARTY_U,
+}
+
+_POOL_VARIANTS = {
+    C.MILITIA_U: (C.MILITIA_U, C.MILITIA_A),
+    C.MILITIA_A: (C.MILITIA_A, C.MILITIA_U),
+    C.WARPARTY_U: (C.WARPARTY_U, C.WARPARTY_A),
+    C.WARPARTY_A: (C.WARPARTY_A, C.WARPARTY_U),
+}
+
+_RECLAIM_ELIGIBLE = {
+    C.TORY,
+    C.TORY_UNAVAIL,
+    C.FORT_BRI,
+    C.FORT_PAT,
+    C.VILLAGE,
+    C.MILITIA_U,
+    C.MILITIA_A,
+    C.WARPARTY_U,
+    C.WARPARTY_A,
+}
 
 # --------------------------------------------------------------------------- #
 # internal utils
@@ -34,6 +60,70 @@ def _space_dict(state: Dict[str, Any], loc: str) -> Dict[str, int]:
     if loc == WEST_INDIES_ID or str(loc).lower() == "west_indies":
         return state["spaces"][WEST_INDIES_ID]
     raise ValueError(f"Unknown location '{loc}'")
+
+
+def _pool_tag(tag: str) -> str:
+    """Return the Available-pool tag family for *tag* (Militia/WP share pools)."""
+    return _POOL_FAMILY.get(tag, tag)
+
+
+def _pool_variants(tag: str) -> tuple[str, ...]:
+    """Return variant tags that draw from the same pool as *tag*."""
+    base = _pool_tag(tag)
+    return _POOL_VARIANTS.get(base, (base,))
+
+
+def _normalize_available_entry(state: Dict[str, Any], tag: str) -> None:
+    """Merge any variant tags in Available back to their pool tag."""
+    pool_tag = _pool_tag(tag)
+    if pool_tag == tag:
+        return
+    pool = state.setdefault("available", {})
+    qty = pool.pop(tag, 0)
+    if qty:
+        pool[pool_tag] = pool.get(pool_tag, 0) + qty
+
+
+def _reclaim_one_from_map(state: Dict[str, Any], pool_tag: str) -> bool:
+    """Remove one on-map piece of *pool_tag* (or its variants) to Available."""
+    variants = _pool_variants(pool_tag)
+    candidates: list[tuple[int, str, str]] = []
+    for sid, sp in state.get("spaces", {}).items():
+        for vtag in variants:
+            qty = sp.get(vtag, 0)
+            if qty:
+                candidates.append((qty, sid, vtag))
+    if not candidates:
+        return False
+    candidates.sort(key=lambda t: (-t[0], t[1], variants.index(t[2]) if t[2] in variants else 0))
+    _, sid, chosen_tag = candidates[0]
+    remove_piece(state, chosen_tag, sid, 1, to="available")
+    _normalize_available_entry(state, chosen_tag)
+    push_history(state, f"Removed one {pool_tag} from {sid} to Available to fulfill placement")
+    return True
+
+
+def _ensure_available(state: Dict[str, Any], tag: str, qty: int) -> None:
+    """Ensure at least *qty* of *tag* exist in Available, reclaiming from map if needed."""
+    if qty <= 0:
+        return
+    pool_tag = _pool_tag(tag)
+    if pool_tag not in _RECLAIM_ELIGIBLE:
+        return
+    pool = state.setdefault("available", {})
+    while pool.get(pool_tag, 0) < qty:
+        if not _reclaim_one_from_map(state, pool_tag):
+            break
+        pool = state.setdefault("available", {})
+
+
+def _available_base_slots(state: Dict[str, Any], loc: str) -> int:
+    """Return remaining Fort/Village slots in *loc* respecting the global stack limit (2)."""
+    if loc in ("available", "unavailable", "casualties"):
+        return 2
+    sp = _space_dict(state, loc)
+    total_bases = sum(sp.get(tag, 0) for tag in _BASE_TAGS)
+    return max(0, 2 - total_bases)
 
 # --------------------------------------------------------------------------- #
 # public primitive movers
@@ -55,6 +145,14 @@ def move_piece(state: Dict[str, Any], tag: str, src: str, dst: str, qty: int = 1
     return moved
 
 def place_piece(state: Dict[str, Any], tag: str, loc: str, qty: int = 1) -> int:
+    if tag in _BASE_TAGS:
+        slots = _available_base_slots(state, loc)
+        if slots <= 0:
+            push_history(state, f"(⛔ stacking limit: cannot add base to {loc})")
+            return 0
+        qty = min(qty, slots)
+
+    _ensure_available(state, tag, qty)
     return move_piece(state, tag, "available", loc, qty)
 
 
@@ -104,7 +202,9 @@ def add_piece(state: Dict[str, Any], tag: str, loc: str, qty: int = 1) -> int:
         return 0
 
     pool = state.setdefault("available", {})
-    available = pool.get(tag, 0)
+    _ensure_available(state, tag, qty)
+    pool_tag = _pool_tag(tag)
+    available = pool.get(pool_tag, 0)
     if available <= 0:
         push_history(state, f"(⛔ no {tag} available)")
         return 0
@@ -112,9 +212,9 @@ def add_piece(state: Dict[str, Any], tag: str, loc: str, qty: int = 1) -> int:
     to_place = min(qty, available)
     placed = place_with_caps(state, tag, loc, to_place)
     if placed:
-        pool[tag] = available - placed
-        if pool[tag] == 0:
-            del pool[tag]
+        pool[pool_tag] = available - placed
+        if pool[pool_tag] == 0:
+            del pool[pool_tag]
     if placed < qty:
         push_history(state, f"(⛔ only {placed}/{qty} {tag} placed)")
     return placed
