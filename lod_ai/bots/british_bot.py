@@ -172,15 +172,12 @@ class BritishBot(BaseBot):
             brit_units = (
                 sp.get(C.REGULAR_BRI, 0)
                 + sp.get(C.TORY, 0)
-                + sp.get(C.WARPARTY_A, 0)
-                + sp.get(C.WARPARTY_U, 0)
             )
             rebel_units = (
                 sp.get(C.REGULAR_PAT, 0)
                 + sp.get(C.REGULAR_FRE, 0)
                 + sp.get(C.MILITIA_A, 0)
                 + sp.get(C.MILITIA_U, 0)
-                + sp.get(C.WARPARTY_A, 0)
             )
             # must leave 2 more Crown than Rebel pieces
             must_leave = max(0, rebel_units) + 2
@@ -217,7 +214,7 @@ class BritishBot(BaseBot):
         candidates: List[Tuple[int, str]] = []
         for name in CITIES:
             sp = state["spaces"].get(name, {})
-            if self._control(state, name) == "BRITISH" or sp.get("Patriot_Fort", 0):
+            if self._control(state, name) == "BRITISH" or sp.get(C.FORT_PAT, 0):
                 continue
             rebels = (
                 sp.get(C.REGULAR_PAT, 0)
