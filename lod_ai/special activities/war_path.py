@@ -25,14 +25,15 @@ from lod_ai.rules_consts import (
     # Indian pieces
     WARPARTY_U, WARPARTY_A, VILLAGE,
     # Rebellion pieces
-    REGULAR_PAT, REGULAR_FRE, MILITIA_A,
+    REGULAR_PAT, REGULAR_FRE, MILITIA_A, MILITIA_U,
     FORT_PAT,
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.board.pieces      import remove_piece, add_piece
+from lod_ai.leaders          import apply_leader_modifiers
 
-REB_CUBE_TAGS = (MILITIA_A, REGULAR_PAT, REGULAR_FRE)
+REB_CUBE_TAGS = (MILITIA_A, MILITIA_U, REGULAR_PAT, REGULAR_FRE)
 
 SA_NAME = "WAR_PATH"       # auto-registered by special_activities/__init__.py
 
@@ -60,6 +61,7 @@ def execute(
     if option not in (1, 2, 3):
         raise ValueError("option must be 1, 2, or 3.")
 
+    ctx = apply_leader_modifiers(state, faction, "pre_war_path", ctx)
     sp = state["spaces"][space_id]
 
     if sp.get(WARPARTY_U, 0) == 0:
@@ -84,7 +86,7 @@ def execute(
         add_piece(state,    WARPARTY_A, space_id, 1)
 
         # remove 1 Rebellion piece (priority order)
-        for tag in (MILITIA_A, REGULAR_PAT, REGULAR_FRE, FORT_PAT):
+        for tag in (MILITIA_A, MILITIA_U, REGULAR_PAT, REGULAR_FRE, FORT_PAT):
             if sp.get(tag, 0):
                 box = "available" if tag == FORT_PAT else "casualties"
                 remove_piece(state, tag, space_id, 1, to=box)
@@ -100,7 +102,7 @@ def execute(
 
         # remove 2 Rebellion pieces
         removed = 0
-        for tag in (MILITIA_A, REGULAR_PAT, REGULAR_FRE, FORT_PAT):
+        for tag in (MILITIA_A, MILITIA_U, REGULAR_PAT, REGULAR_FRE, FORT_PAT):
             while sp.get(tag, 0) and removed < 2:
                 box = "available" if tag == FORT_PAT else "casualties"
                 remove_piece(state, tag, space_id, 1, to=box)
@@ -113,6 +115,17 @@ def execute(
 
         remove_piece(state, WARPARTY_A, space_id, 1, to="available")
         remove_piece(state, FORT_PAT,        space_id, 1, to="available")
+
+    # Base War Path militia removal (plus Brant capability)
+    extra_militia = 1 + ctx.get("war_path_extra_militia", 0)
+    while extra_militia and (sp.get(MILITIA_A, 0) or sp.get(MILITIA_U, 0)):
+        if sp.get(MILITIA_A, 0):
+            remove_piece(state, MILITIA_A, space_id, 1, to="casualties")
+        else:
+            remove_piece(state, MILITIA_U, space_id, 1, to="casualties")
+        extra_militia -= 1
+        if ctx.get("war_path_extra_militia", 0):
+            push_history(state, "Brant present - War Path removes an additional Militia.")
 
     refresh_control(state)
     enforce_global_caps(state)

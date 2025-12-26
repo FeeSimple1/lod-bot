@@ -357,7 +357,7 @@ class IndianBot(BaseBot):
         for dst in _adjacent(origin):
             dsp = state["spaces"][dst]
             if self._support_level(state, dst) <= C.PASSIVE_OPPOSITION and dsp.get(C.VILLAGE, 0) == 0:
-                march.execute(state, "INDIAN", {}, [origin], [dst], bring_escorts=False, limited=True)
+                march.execute(state, C.INDIANS, {}, [origin], [dst], bring_escorts=False, limited=True)
                 return True
         return False
 
@@ -392,7 +392,7 @@ class IndianBot(BaseBot):
         if not dests:
             return False
         target = dests[0]
-        scout.execute(state, "INDIAN", {}, origin, target)
+        scout.execute(state, C.INDIANS, {}, origin, target)
         return True
 
     # ------------------------------------------------------------------

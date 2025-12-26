@@ -21,6 +21,7 @@ from lod_ai.util.history import push_history
 from lod_ai.util.free_ops import queue_free_op
 from lod_ai.cards.effects.shared import adjust_fni
 from lod_ai.board.pieces import move_piece, place_piece
+from lod_ai import rules_consts as C
 from lod_ai.rules_consts import (
     REGULAR_BRI,
     REGULAR_FRE,
@@ -38,6 +39,45 @@ def _queue_bs(state, faction: str | None):
     key = "bs_queue"
     state.setdefault(key, []).append(("BS", faction))
     push_history(state, f"Brilliant Stroke queued for {faction or 'Treaty'}")
+
+
+def maybe_play_brilliant_stroke(state, faction_has_card: dict[str, bool], faction: str) -> str | None:
+    """
+    Return the faction that should play Brilliant Stroke after checking trump order.
+    Mutates *faction_has_card* to clear the trumped faction if another supersedes it.
+    """
+    priority = {
+        C.PATRIOTS: 1,
+        C.BRITISH: 2,
+        C.FRENCH: 3,
+        C.INDIANS: 4,
+    }
+    fac = faction.upper()
+    if not faction_has_card.get(fac):
+        return None
+    for other, has_card in faction_has_card.items():
+        other_fac = other.upper()
+        if other_fac == fac or not has_card:
+            continue
+        if priority.get(other_fac, 0) > priority.get(fac, 0):
+            push_history(state, f"{other_fac} trump {fac}'s Brilliant Stroke!")
+            faction_has_card[fac] = False
+            return other_fac
+    return fac
+
+
+def apply_reward_loyalty_cost(state, faction: str, loyalty_shift_levels: int) -> None:
+    """
+    Deduct Resources for Reward Loyalty executed inside a Brilliant Stroke sequence.
+    Costs are not waived during BS; clamp at zero if insufficient Resources.
+    """
+    if loyalty_shift_levels <= 0:
+        return
+    fac = faction.upper()
+    current = state.setdefault("resources", {}).get(fac, 0)
+    cost = max(0, loyalty_shift_levels)
+    state["resources"][fac] = max(0, current - cost)
+    push_history(state, f"{fac} Reward Loyalty during Brilliant Stroke - paid {cost} Resources")
 
 # ------------------------------------------------ 105-108 ------------------ #
 _BS_FACTION = {

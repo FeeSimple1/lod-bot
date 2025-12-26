@@ -185,6 +185,14 @@ def _apply_unavailable_block(state: Dict[str, Any], scenario: Dict[str, Any]) ->
         unavailable[TORY] = unavailable.get(TORY, 0) + bt
 
 
+def _default_to_underground(spaces: Dict[str, Dict[str, int]]) -> None:
+    """Convert any generic Militia/WP tags in *spaces* to their Underground state."""
+    for sp in spaces.values():
+        for src, dst in (("Patriot_Militia", MILITIA_U), ("Indian_War_Party", WARPARTY_U)):
+            if src in sp:
+                sp[dst] = sp.get(dst, 0) + int(sp.pop(src) or 0)
+
+
 # ----------------------------------------------------------------------- #
 # Support normalisation (derive state['support'] from per‑space fields)    #
 # ----------------------------------------------------------------------- #
@@ -294,6 +302,7 @@ def build_state(
 ) -> Dict[str, Any]:
     """Return a fully‑initialised *state* for the given scenario alias."""
     scen = load_scenario(scenario)
+    _default_to_underground(scen.get("spaces", {}))
 
     state: Dict[str, Any] = {
         "scenario":  scen["scenario"],

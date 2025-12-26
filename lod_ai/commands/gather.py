@@ -24,7 +24,7 @@ from typing import Dict, List, Set, Tuple
 
 from lod_ai.rules_consts import (
     # piece & marker tags
-    WARPARTY_U, WARPARTY_A, VILLAGE,
+    WARPARTY_U, WARPARTY_A, VILLAGE, FORT_BRI, FORT_PAT,
     # support enums
     ACTIVE_SUPPORT, ACTIVE_OPPOSITION,
     PASSIVE_SUPPORT, PASSIVE_OPPOSITION, NEUTRAL,
@@ -139,6 +139,10 @@ def execute(
         if prov in build_village:
             if _wp_total(sp) < 2:
                 raise ValueError(f"{prov}: need 2 WP to build a Village.")
+
+            base_total = sp.get(VILLAGE, 0) + sp.get(FORT_BRI, 0) + sp.get(FORT_PAT, 0)
+            if base_total >= 2:
+                raise ValueError(f"{prov}: stacking limit reached for bases.")
 
             # Remove 2 War-Parties (Underground preferred)
             take_u = min(2, sp.get(WARPARTY_U, 0))

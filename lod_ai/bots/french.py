@@ -10,7 +10,7 @@ Flow covered (nodes F1‑F17):
                                         or Battle / March alternatives
   • Loop logic  ...................... F12 Skirmish → F15 Préparer → F17 Naval → F12
 
-Reference: “french bot flowchart and reference.txt” :contentReference[oaicite:1]{index=1}
+Reference: “french bot flowchart and reference.txt”
 """
 
 from __future__ import annotations
