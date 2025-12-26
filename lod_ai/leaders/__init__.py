@@ -20,6 +20,8 @@ state["leaders"] must be structured as:
 
 from typing import Dict, Callable, Any
 
+from lod_ai.map import adjacency as map_adj
+
 # ---------------------------------------------------------------------------
 # Type aliases
 # ---------------------------------------------------------------------------
@@ -124,3 +126,46 @@ def apply_leader_modifiers(state: State, faction: str, hook: str, ctx: Context) 
         if modifier:
             modifier(state, ctx)
     return ctx
+
+
+_LEADER_ALIASES = {
+    "WASHINGTON": {"WASHINGTON", "LEADER_WASHINGTON"},
+    "ROCHAMBEAU": {"ROCHAMBEAU", "LEADER_ROCHAMBEAU"},
+    "LAUZUN": {"LAUZUN", "LEADER_LAUZUN"},
+    "GAGE": {"GAGE", "LEADER_GAGE"},
+    "HOWE": {"HOWE", "LEADER_HOWE"},
+    "CLINTON": {"CLINTON", "LEADER_CLINTON"},
+    "BRANT": {"BRANT", "LEADER_BRANT"},
+    "CORNPLANTER": {"CORNPLANTER", "LEADER_CORNPLANTER"},
+    "DRAGGING_CANOE": {"DRAGGING_CANOE", "LEADER_DRAGGING_CANOE"},
+}
+
+
+def _leader_keys(leader_id: str) -> set[str]:
+    base = leader_id.replace("LEADER_", "")
+    return _LEADER_ALIASES.get(base, {leader_id, base})
+
+
+def leader_location(state: State, leader_id: str) -> str | None:
+    """
+    Best-effort lookup for the current location of *leader_id*.
+    Supports either state['leader_locs'] or state['leaders'] storing locations.
+    """
+    valid_spaces = set(map_adj.all_space_ids())
+    for key in _leader_keys(leader_id):
+        # explicit location map
+        loc = state.get("leader_locs", {}).get(key)
+        if isinstance(loc, str) and loc in valid_spaces:
+            return loc
+        # scenario-style leaders dict mapping leader -> location
+        loc = state.get("leaders", {}).get(key)
+        if isinstance(loc, str) and loc in valid_spaces:
+            return loc
+    # fall back to scanning spaces for leader token
+    for key in _leader_keys(leader_id):
+        for sid, sp in state.get("spaces", {}).items():
+            if sp.get(key, 0):
+                return sid
+            if sp.get("leader") == key:
+                return sid
+    return None
