@@ -34,7 +34,7 @@ from lod_ai.rules_consts import (
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import enforce_global_caps, refresh_control
 from lod_ai.board.pieces      import remove_piece, add_piece
-from lod_ai.leaders          import apply_leader_modifiers
+from lod_ai.leaders          import apply_leader_modifiers, leader_location
 
 SA_NAME = "SKIRMISH"          # auto-registered by special_activities/__init__.py
 
@@ -139,13 +139,21 @@ def execute(
         remove_piece(state, enemy_fort_side_tag, space_id, 1, to="available")
         remove_piece(state, own_tag,           space_id, 1, to="casualties")
 
-    extra_militia = ctx.get("skirmish_extra_militia", 0) if faction == "BRITISH" else 0
+    clinton_here = (faction == "BRITISH") and (leader_location(state, "LEADER_CLINTON") == space_id)
+    extra_militia = (ctx.get("skirmish_extra_militia", 0) if faction == "BRITISH" else 0)
+    if clinton_here:
+        extra_militia += 1
+
+    removed_bonus = 0
     while extra_militia and (sp.get(MILITIA_A, 0) or sp.get(MILITIA_U, 0)):
         if sp.get(MILITIA_A, 0):
             remove_piece(state, MILITIA_A, space_id, 1, to="available")
         else:
             remove_piece(state, MILITIA_U, space_id, 1, to="available")
         extra_militia -= 1
+        removed_bonus += 1
+
+    if clinton_here and removed_bonus:
         push_history(state, "Clinton present - removed one additional Patriot Militia in Skirmish")
 
     refresh_control(state)

@@ -398,8 +398,16 @@ class IndianBot(BaseBot):
     # ------------------------------------------------------------------
     # TRADE  (Special Activity)  ---------------------------------------
     def _trade(self, state: Dict) -> bool:
+        spaces = [
+            sid for sid, sp in state.get("spaces", {}).items()
+            if sp.get(C.WARPARTY_U, 0) > 0 and sp.get(C.VILLAGE, 0) > 0
+        ]
+        if not spaces:
+            return False
+
+        target = spaces[0]
         try:
-            trade.execute(state, "INDIANS", {})
+            trade.execute(state, C.INDIANS, {}, target, transfer=0)
             return True
         except Exception:
             return False
