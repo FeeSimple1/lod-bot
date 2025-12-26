@@ -8,7 +8,7 @@ def load_map():
     """Return the canonical map dict (cached)."""
     global _MAP
     if _MAP is None:
-        path = Path(__file__).resolve().parent / "data" / "map.json"
+        path = Path(__file__).resolve().parents[1] / "map" / "data" / "map.json"
         with path.open("r", encoding="utf-8") as fh:
             _MAP = json.load(fh)
     return _MAP

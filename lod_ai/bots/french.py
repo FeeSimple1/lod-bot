@@ -61,17 +61,18 @@ def _preparer_la_guerre(state: Dict, post_treaty: bool) -> bool:
     Return True if *anything* was done.
     """
     moved = False
-    if state["unavailable"].get(C.BLOCKADE_FRE, 0) > 0:
-        state["unavailable"][C.BLOCKADE_FRE] -= 1
-        state["spaces"][WEST_INDIES][C.BLOCKADE_FRE] = (
-            state["spaces"][WEST_INDIES].get(C.BLOCKADE_FRE, 0) + 1
-        )
+    unavail = state.setdefault("unavailable", {})
+    avail_pool = state.setdefault("available", {})
+    wi_space = state.setdefault("spaces", {}).setdefault(WEST_INDIES, {})
+    if unavail.get(C.BLOCKADE, 0) > 0:
+        unavail[C.BLOCKADE] -= 1
+        wi_space[C.BLOCKADE] = wi_space.get(C.BLOCKADE, 0) + 1
         push_history(state, "Préparer la Guerre: Blockade to West Indies")
         moved = True
-    elif state["unavailable"].get(C.REGULAR_FRE, 0) > 0:
-        avail = min(3, state["unavailable"][C.REGULAR_FRE])
-        state["unavailable"][C.REGULAR_FRE] -= avail
-        state["available"][C.REGULAR_FRE] += avail
+    elif unavail.get(C.REGULAR_FRE, 0) > 0:
+        avail = min(3, unavail[C.REGULAR_FRE])
+        unavail[C.REGULAR_FRE] -= avail
+        avail_pool[C.REGULAR_FRE] = avail_pool.get(C.REGULAR_FRE, 0) + avail
         push_history(state, f"Préparer la Guerre: {avail} Regulars to Available")
         moved = True
 
@@ -191,8 +192,8 @@ class FrenchBot(BaseBot):
           – Remove Fort first, else most British cubes
         """
         # 1) West Indies
-        sp = state["spaces"][WEST_INDIES]
-        if sp.get(C.REGULAR_FRE, 0) and sp.get(C.REGULAR_BRI, 0):
+        sp = state["spaces"].get(WEST_INDIES)
+        if sp and sp.get(C.REGULAR_FRE, 0) and sp.get(C.REGULAR_BRI, 0):
             try:
                 skirmish.execute(state, "FRENCH", {}, WEST_INDIES, option=2)
                 return True
@@ -266,15 +267,16 @@ class FrenchBot(BaseBot):
     # ----- Muster (F10) ----------------------------------------
     def _muster(self, state: Dict) -> bool:
         # Destination selection per bullet list
-        if state["spaces"][WEST_INDIES].get("control") == "REBELLION" or \
-           state["available"].get(C.REGULAR_FRE, 0) >= 4:
+        west_indies = state["spaces"].get(WEST_INDIES)
+        west_rebel = bool(west_indies and west_indies.get("control") == "REBELLION")
+        if west_rebel or state["available"].get(C.REGULAR_FRE, 0) >= 4:
             # With Rebel Control somewhere – look for Colony/City with Continentals
             targets = [
                 sid for sid, sp in state["spaces"].items()
                 if (sp.get(C.REGULAR_PAT, 0) > 0) and sp.get("control") == "REBELLION"
             ]
         else:
-            targets = [WEST_INDIES]
+            targets = [WEST_INDIES] if west_indies else []
 
         if not targets:
             return False

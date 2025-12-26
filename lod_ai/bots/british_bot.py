@@ -278,8 +278,13 @@ class BritishBot(BaseBot):
                 regular_destinations.append(sid)
 
         # fallback random
-        while len(regular_destinations) < 4 and avail_regs:
-            sid = random.choice(list(state["spaces"]))
+        all_spaces = list(state["spaces"])
+        while (
+            len(regular_destinations) < 4
+            and avail_regs
+            and len(regular_destinations) < len(all_spaces)
+        ):
+            sid = random.choice(all_spaces)
             if sid not in regular_destinations:
                 regular_destinations.append(sid)
 
@@ -358,7 +363,6 @@ class BritishBot(BaseBot):
             tory_plan=tory_plan,
             reward_levels=reward_levels,
             build_fort=bool(build_fort),
-            fort_spaces=build_fort,
         )
 
         if not did_something:
