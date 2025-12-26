@@ -1,1379 +1,2748 @@
 [
   {
-  "id": 1,
-  "title": "Waxhaws Massacre",
-  "years": [1779, 1780],
-  "order_icons": "PBFI",
-  "ops_icon": null,
-  "winter_quarters": false,
-  "type": "EVENT",
-  "dual": true,
-  "unshaded_event": "Tarleton's quarter: In one space with British, remove two Continentals to Casualties, shift one level toward Active Support. Place two Propaganda there.",
-  "shaded_event": "Patriot rage: Patriots free March to and free Battle in one space. Place two Propaganda there. Shift one level toward Neutral."
+    "id": 1,
+    "title": "Waxhaws Massacre",
+    "type": "EVENT",
+    "years": [
+      1779,
+      1780
+    ],
+    "order_icons": "PBFI",
+    "order": [
+      "PATRIOTS",
+      "BRITISH",
+      "FRENCH",
+      "INDIANS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
+    "winter_quarters": false,
+    "dual": true,
+    "unshaded_event": "Tarleton's quarter: In one space with British, remove two Continentals to Casualties, shift one level toward Active Support. Place two Propaganda there.",
+    "shaded_event": "Patriot rage: Patriots free March to and free Battle in one space. Place two Propaganda there. Shift one level toward Neutral.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 2,
     "title": "Common Sense",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "PBFI",
-    "ops_icon": null,
+    "order": [
+      "PATRIOTS",
+      "BRITISH",
+      "FRENCH",
+      "INDIANS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "British organize a backlash: British may place two British Regulars and two Tories in any one City. Place two Propaganda markers there. British Resources +4.",
+    "shaded_event": "Impact of the writings of Thomas Paine: Shift two Cities one level each toward Active Opposition. Place two Propaganda markers in each.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 3,
     "title": "George Rogers Clark's Illinois Campaign",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "PBFI",
-    "ops_icon": null,
+    "order": [
+      "PATRIOTS",
+      "BRITISH",
+      "FRENCH",
+      "INDIANS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Indian retaliation raids succeed: Remove all Patriot pieces in Northwest and Southwest.",
+    "shaded_event": "Patriot offensive succeeds: Patriots may place two Militia and free Partisans in both Northwest and Southwest.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 4,
     "title": "The Penobscot Expedition",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "PBFI",
-    "ops_icon": "I – Musket",
+    "order": [
+      "PATRIOTS",
+      "BRITISH",
+      "FRENCH",
+      "INDIANS"
+    ],
+    "faction_icons": {
+      "INDIANS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Expedition fails and ships scuttled: Remove three Patriot Militia. Patriot Resources –2.",
+    "shaded_event": "Expedition is a success: Place one Fort or Village and three Militia or War Parties in Massachusetts.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 5,
     "title": "William Alexander, Lord Stirling",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "PBIF",
-    "ops_icon": null,
+    "order": [
+      "PATRIOTS",
+      "BRITISH",
+      "INDIANS",
+      "FRENCH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Captured at Long Island: Patriots Ineligible through the next card.",
+    "shaded_event": "…bravest man in America: Patriots may free March to and free Battle in one space.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 6,
     "title": "Benedict Arnold",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "PBIF",
-    "ops_icon": null,
+    "order": [
+      "PATRIOTS",
+      "BRITISH",
+      "INDIANS",
+      "FRENCH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Treachery undermines the Patriot cause: Remove one Patriot Fort to Casualties and two Patriot Militia to Available from one Colony.",
+    "shaded_event": "Shows great leadership and resourcefulness: Remove one British Fort and two British cubes from one space to Casualties.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 7,
     "title": "John Paul Jones",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "PBIF",
-    "ops_icon": null,
+    "order": [
+      "PATRIOTS",
+      "BRITISH",
+      "INDIANS",
+      "FRENCH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Limited impact: British Resources +3. Lower FNI one level. Move up to two British Regulars from Available to West Indies or any City.",
+    "shaded_event": "Significant benefit: Patriot Resources +5. Raise FNI one level.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 8,
     "title": "Culpeper Spy Ring",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "PBIF",
-    "ops_icon": "P – Musket",
+    "order": [
+      "PATRIOTS",
+      "BRITISH",
+      "INDIANS",
+      "FRENCH"
+    ],
+    "faction_icons": {
+      "PATRIOTS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Hercules Mulligan arrested: Activate three Patriot Militia anywhere.",
+    "shaded_event": "Spies reduce British effectiveness: Remove three British cubes to Casualties.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 9,
     "title": "Friedrich Wilhelm von Steuben",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "PFBI",
-    "ops_icon": "I – Sword",
+    "order": [
+      "PATRIOTS",
+      "FRENCH",
+      "BRITISH",
+      "INDIANS"
+    ],
+    "faction_icons": {
+      "INDIANS": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Patriots do not listen: British may Skirmish in up to three spaces.",
+    "shaded_event": "Patriots more effective: Patriots may Skirmish in up to three spaces.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 10,
     "title": "Benjamin Franklin Travels to France",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "PFBI",
-    "ops_icon": null,
+    "order": [
+      "PATRIOTS",
+      "FRENCH",
+      "BRITISH",
+      "INDIANS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Franklin is ineffective in France: Shift any two Cities each one level toward Active Support.",
+    "shaded_event": "Franklin takes France by storm: French Resources +3. Patriot Resources +2.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 11,
     "title": "Thaddeus Kosciuszko, Expert Engineer",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "PFBI",
-    "ops_icon": null,
+    "order": [
+      "PATRIOTS",
+      "FRENCH",
+      "BRITISH",
+      "INDIANS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Patriots ignore: Patriots remove any two Patriot Forts.",
+    "shaded_event": "Patriots embrace: In each of two Patriot Controlled spaces, Patriots may remove one Patriot piece and add one Patriot Fort.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 12,
     "title": "Martha Washington to Valley Forge",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "PFBI",
-    "ops_icon": null,
+    "order": [
+      "PATRIOTS",
+      "FRENCH",
+      "BRITISH",
+      "INDIANS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "No Bread – No Soldiers: Execute Patriot Desertion as per Winter Quarters Round.",
+    "shaded_event": "Women step in to bolster support and raise money: Patriot Resources +5.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 13,
     "title": "\"...the origin of all our misfortunes\"",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "PFIB",
-    "ops_icon": null,
+    "order": [
+      "PATRIOTS",
+      "FRENCH",
+      "INDIANS",
+      "BRITISH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Soldiers leave: Execute Patriot Desertion as per Winter Quarters Round.",
+    "shaded_event": "Patriots strengthen commitment: In up to four spaces with Militia, Patriots may add an Active Militia.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 14,
     "title": "Overmountain Men Fight for North Carolina",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "PFIB",
-    "ops_icon": null,
+    "order": [
+      "PATRIOTS",
+      "FRENCH",
+      "INDIANS",
+      "BRITISH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Trouble in North Carolina: Indians free Scout or March to North Carolina or Southwest, then Indians War Path or British free Battle in that space.",
+    "shaded_event": "Overmountain Men make trouble: Patriots free March to and free Battle in North Carolina or Southwest.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 15,
     "title": "Morgan’s Rifles",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "PFIB",
-    "ops_icon": null,
+    "order": [
+      "PATRIOTS",
+      "FRENCH",
+      "INDIANS",
+      "BRITISH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Virginians unhappy their Militia was sent to New England: Shift Virginia two levels toward Active Support. Place two Tories there.",
+    "shaded_event": "Elite light-infantry unit commanded by Daniel Morgan is deployed: Patriots perform free March to any one Colony, then free Battle, then Partisans there.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 16,
     "title": "Mercy Warren’s “The Motley Assembly”",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "PFIB",
-    "ops_icon": "I – Sword",
+    "order": [
+      "PATRIOTS",
+      "FRENCH",
+      "INDIANS",
+      "BRITISH"
+    ],
+    "faction_icons": {
+      "INDIANS": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Anger rallies the Tories: Place two Tories anywhere.",
+    "shaded_event": "Rallies the Patriots: Shift one City to Passive Opposition.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 17,
     "title": "Jane McCrea Murdered by Indians",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "PIBF",
-    "ops_icon": "F – Sword",
+    "order": [
+      "PATRIOTS",
+      "INDIANS",
+      "BRITISH",
+      "FRENCH"
+    ],
+    "faction_icons": {
+      "FRENCH": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Indian Country fears: Remove one Patriot Fort from one Indian Reserve Province.",
+    "shaded_event": "Backlash against Indians: Remove one Indian Village.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 18,
     "title": "“If it hadn’t been so stormy…”",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "PIBF",
-    "ops_icon": "P – Musket, I – Musket, B – Musket, F – Sword",
+    "order": [
+      "PATRIOTS",
+      "INDIANS",
+      "BRITISH",
+      "FRENCH"
+    ],
+    "faction_icons": {
+      "BRITISH": "MUSKET",
+      "FRENCH": "SWORD",
+      "INDIANS": "MUSKET",
+      "PATRIOTS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Murphy’s Law in application: Any one Faction Ineligible through the next card.",
+    "shaded_event": "(none)",
+    "effect": null,
+    "note": null
   },
   {
     "id": 19,
     "title": "Legend of Nathan Hale",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "PIBF",
-    "ops_icon": null,
+    "order": [
+      "PATRIOTS",
+      "INDIANS",
+      "BRITISH",
+      "FRENCH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Poor information gathering plagues the Patriots: Patriot Resources –4.",
+    "shaded_event": "The legend grows and Patriots respond: Place three Patriot Militia anywhere. Patriot Resources +3.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 20,
     "title": "Continental Marines",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "PIBF",
-    "ops_icon": null,
+    "order": [
+      "PATRIOTS",
+      "INDIANS",
+      "BRITISH",
+      "FRENCH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Deployed to Louisiana to block British: Patriots remove four Continentals from map to Available.",
+    "shaded_event": "Deployed to defend New Jersey: Patriots place four Continentals in New Jersey.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 21,
     "title": "The Gamecock Thomas Sumter",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "PIFB",
-    "ops_icon": "I – Musket",
+    "order": [
+      "PATRIOTS",
+      "INDIANS",
+      "FRENCH",
+      "BRITISH"
+    ],
+    "faction_icons": {
+      "INDIANS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "British pressure the Gamecock: Shift South Carolina or Georgia two levels toward Active Support.",
+    "shaded_event": "“My greatest plague”: Patriots free March to and free Battle in South Carolina or Georgia.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 22,
     "title": "The Newburgh Conspiracy",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "PIFB",
-    "ops_icon": "I – Musket",
+    "order": [
+      "PATRIOTS",
+      "INDIANS",
+      "FRENCH",
+      "BRITISH"
+    ],
+    "faction_icons": {
+      "INDIANS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Patriot officers threaten to revolt: Remove four Patriot Militia and/or Continentals in any one Colony.",
+    "shaded_event": "Tories revolt over lack of support: Immediately execute Tory Desertion as per Winter Quarters Round.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 23,
     "title": "Lieutenant Colonel Francis Marion",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "PIFB",
-    "ops_icon": "B – Musket",
+    "order": [
+      "PATRIOTS",
+      "INDIANS",
+      "FRENCH",
+      "BRITISH"
+    ],
+    "faction_icons": {
+      "BRITISH": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "“Damned old fox” breaks an ankle: British or Indians move all Patriot units in North Carolina or South Carolina into an adjacent Province.",
+    "shaded_event": "With Liberty or Death on his cap: If Militia occupy North Carolina or South Carolina, remove four British units from that space.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 24,
     "title": "Declaration of Independence",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "PIFB",
-    "ops_icon": null,
+    "order": [
+      "PATRIOTS",
+      "INDIANS",
+      "FRENCH",
+      "BRITISH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Patriots stay fractured: Remove two Continentals, two Militia and one Patriot Fort.",
+    "shaded_event": "Patriots come together: Place up to three Militia anywhere, one Propaganda with each. Place one Fort anywhere.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 25,
     "title": "British Prison Ships",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "BPFI",
-    "ops_icon": null,
+    "order": [
+      "BRITISH",
+      "PATRIOTS",
+      "FRENCH",
+      "INDIANS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "British efficiently deal with prisoners: Shift two Cities one level each toward Passive Support.",
+    "shaded_event": "British reputation damaged: In two Cities place one Militia and shift each one level toward Passive Opposition. Place one Propaganda in each.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 26,
     "title": "Josiah Martin, NC Royal Governor, Plots",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "BPFI",
-    "ops_icon": "I – Sword",
+    "order": [
+      "BRITISH",
+      "PATRIOTS",
+      "FRENCH",
+      "INDIANS"
+    ],
+    "faction_icons": {
+      "INDIANS": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "North Carolina Tories rise up: Place one British Fort or two Tories in North Carolina.",
+    "shaded_event": "North Carolina Tories targeted: Patriots may free March to then free Battle in North Carolina.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 27,
     "title": "The Queen’s Rangers Show for Battle",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "BPFI",
-    "ops_icon": "I – Sword",
+    "order": [
+      "BRITISH",
+      "PATRIOTS",
+      "FRENCH",
+      "INDIANS"
+    ],
+    "faction_icons": {
+      "INDIANS": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Reporting for duty: Place two Tories from Unavailable or Available in each of two Colonies with British Control.",
+    "shaded_event": "Patriots rally against the Queen’s Rangers: Shift two Cities one level each toward Active Opposition and place one Militia in each.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 28,
     "title": "Battle of Moore’s Creek Bridge",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "BPFI",
-    "ops_icon": null,
+    "order": [
+      "BRITISH",
+      "PATRIOTS",
+      "FRENCH",
+      "INDIANS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Tories win: In any one space, replace every one Militia with two Tories.",
+    "shaded_event": "Patriots win: In any one space, replace every one Tory with two Militia.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 29,
     "title": "Edward Bancroft, British Spy",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "BPIF",
-    "ops_icon": "B – Musket, P – Musket, I – Musket, F – Sword",
+    "order": [
+      "BRITISH",
+      "PATRIOTS",
+      "INDIANS",
+      "FRENCH"
+    ],
+    "faction_icons": {
+      "BRITISH": "MUSKET",
+      "FRENCH": "SWORD",
+      "INDIANS": "MUSKET",
+      "PATRIOTS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Critical plans leaked: Patriots or Indians must Activate their Militia or War Parties until ½ of them are Active, rounding down.",
+    "shaded_event": "(none)",
+    "effect": null,
+    "note": null
   },
   {
     "id": 30,
     "title": "Hessians",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "BPIF",
-    "ops_icon": "B – Musket",
+    "order": [
+      "BRITISH",
+      "PATRIOTS",
+      "INDIANS",
+      "FRENCH"
+    ],
+    "faction_icons": {
+      "BRITISH": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Hessians are a force multiplier: In each of up to three British Controlled spaces with British Regulars, place up to two British Regulars from Available or Unavailable. British Resources +2.",
+    "shaded_event": "Hessians settle in Colonies: British remove one in five British Regulars from the map, rounding down.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 31,
     "title": "Thomas Brown and the King’s Rangers",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "BPIF",
-    "ops_icon": null,
+    "order": [
+      "BRITISH",
+      "PATRIOTS",
+      "INDIANS",
+      "FRENCH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Tom Brown supports Tories in the South: Place one British Fort and two Tories in South Carolina or Georgia.",
+    "shaded_event": "Sons of Liberty rally against: Patriots place two Militia in South Carolina or Georgia and may Partisans there.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 32,
     "title": "Rule Britannia!",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "BPIF",
-    "ops_icon": "I – Musket",
+    "order": [
+      "BRITISH",
+      "PATRIOTS",
+      "INDIANS",
+      "FRENCH"
+    ],
+    "faction_icons": {
+      "INDIANS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "“Rule, Britannia! rule the waves”: Place up to two British Regulars and two Tories from Unavailable or Available to any Colony.",
+    "shaded_event": "“Thy cities shall with commerce shine”: Any Faction may add one Resource for half the Cities under British Control, rounding down.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 33,
     "title": "The Burning of Falmouth",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "BFIP",
-    "ops_icon": null,
+    "order": [
+      "BRITISH",
+      "FRENCH",
+      "INDIANS",
+      "PATRIOTS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Intimidated Patriots: Patriot Resources –3. Patriots remove two Militia.",
+    "shaded_event": "Patriots outraged over aggressive actions: Free Rally in two spaces adjacent to Massachusetts. Patriot Resources +3.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 34,
     "title": "Lord Sandwich, First Lord of the Admiralty",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "BFIP",
-    "ops_icon": null,
+    "order": [
+      "BRITISH",
+      "FRENCH",
+      "INDIANS",
+      "PATRIOTS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Captain James Cook sponsored by Sandwich provides know-how: British Resources +6. Lower FNI one level.",
+    "shaded_event": "British lack ships to execute in America: Raise FNI one level. British Ineligible through next card.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 35,
     "title": "Tryon Plot",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "BFIP",
-    "ops_icon": null,
+    "order": [
+      "BRITISH",
+      "FRENCH",
+      "INDIANS",
+      "PATRIOTS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Governor Tryon’s work results in destruction of critical magazines: Remove two Patriot pieces in New York or New York City. All Militia there are Activated.",
+    "shaded_event": "Plot foiled: Remove all Tories in New York or in one adjacent space.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 36,
     "title": "Naval Battle in West Indies",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "BFIP",
-    "ops_icon": null,
+    "order": [
+      "BRITISH",
+      "FRENCH",
+      "INDIANS",
+      "PATRIOTS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "British Victory at Battle of the Saintes: French remove three French Regulars on map or West Indies to Available. Lower FNI one level.",
+    "shaded_event": "French hold their own in the Battle de la Dominique: British remove four British Regulars from West Indies to Available.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 37,
     "title": "The Armada of 1779",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "BFPI",
-    "ops_icon": null,
+    "order": [
+      "BRITISH",
+      "FRENCH",
+      "PATRIOTS",
+      "INDIANS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "French finances impact Patriots: Patriot Resources –2. French Resources –3. Lower FNI one level.",
+    "shaded_event": "British forces distracted from the Colonies: Remove four British Regulars from the map to Available. Raise FNI one level.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 38,
     "title": "Johnson’s Royal Greens",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "BFPI",
-    "ops_icon": "I – Musket",
+    "order": [
+      "BRITISH",
+      "FRENCH",
+      "PATRIOTS",
+      "INDIANS"
+    ],
+    "faction_icons": {
+      "INDIANS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Ready for action: British may place four British cubes in either Quebec or New York from Unavailable or Available. British Eligible.",
+    "shaded_event": "Guerrillas rally to answer the Greens: Place three Militia or three War Parties in New York.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 39,
     "title": "“His Majesty, King Mob” Protests",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "BFPI",
-    "ops_icon": null,
+    "order": [
+      "BRITISH",
+      "FRENCH",
+      "PATRIOTS",
+      "INDIANS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Anti-Catholic protests in England damage reputation: Shift three Cities one level toward Neutral.",
+    "shaded_event": "(none)",
+    "effect": null,
+    "note": null
   },
   {
     "id": 40,
     "title": "Battle of the Chesapeake",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "BFPI",
-    "ops_icon": null,
+    "order": [
+      "BRITISH",
+      "FRENCH",
+      "PATRIOTS",
+      "INDIANS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "British assert their naval dominance: FNI to 0. British Resources +2.",
+    "shaded_event": "British fleet distracted from Cities: FNI to 3.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 41,
     "title": "William Pitt: America Can’t Be Conquered",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "BIPF",
-    "ops_icon": null,
+    "order": [
+      "BRITISH",
+      "INDIANS",
+      "PATRIOTS",
+      "FRENCH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Colonists worry as Pitt’s warning is ignored: Shift two Colonies two levels each toward Passive Support.",
+    "shaded_event": "Patriots take heart: Shift two Colonies two levels each toward Passive Opposition.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 42,
     "title": "British Attack Danbury",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "BIPF",
-    "ops_icon": null,
+    "order": [
+      "BRITISH",
+      "INDIANS",
+      "PATRIOTS",
+      "FRENCH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "British take out supply depot: Patriot Resources –3. British place one Tory in Connecticut.",
+    "shaded_event": "Battle of Ridgefield: Patriots place three Militia and one Continental in Connecticut.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 43,
     "title": "HMS Russian Merchant with 4,000 Muskets",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "BIPF",
-    "ops_icon": null,
+    "order": [
+      "BRITISH",
+      "INDIANS",
+      "PATRIOTS",
+      "FRENCH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "HMS Russian Merchant arrives in Charles Town: In up to three spaces with a British Regular, the British may add up to two Tories per space from Available or Unavailable.",
+    "shaded_event": "Transport sinks before arrival: British remove one in three Tories, rounding down.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 44,
     "title": "Earl of Mansfield Recalled From Paris",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "BIPF",
-    "ops_icon": "B – Musket, I – Musket, P – Musket, F – Sword",
+    "order": [
+      "BRITISH",
+      "INDIANS",
+      "PATRIOTS",
+      "FRENCH"
+    ],
+    "faction_icons": {
+      "BRITISH": "MUSKET",
+      "FRENCH": "SWORD",
+      "INDIANS": "MUSKET",
+      "PATRIOTS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Chaos amongst the diplomats: Any one Faction Ineligible through the next card.",
+    "shaded_event": "(none)",
+    "effect": null,
+    "note": null
   },
   {
     "id": 45,
     "title": "Adam Smith ~ Wealth of Nations",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "BIFP",
-    "ops_icon": null,
+    "order": [
+      "BRITISH",
+      "INDIANS",
+      "FRENCH",
+      "PATRIOTS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "British intellectuals advance economy: British Resources +6.",
+    "shaded_event": "Adam Smith’s economic case against Imperialism: British Resources –4.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 46,
     "title": "Edmund Burke on Conciliation",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "BIFP",
-    "ops_icon": null,
+    "order": [
+      "BRITISH",
+      "INDIANS",
+      "FRENCH",
+      "PATRIOTS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "“Americans were descended largely from Englishmen”: Place one Tory from Unavailable or Available in each of three spaces.",
+    "shaded_event": "“…they bear the burthens of unlimited monopoly”: Shift two Cities one level each toward Passive Opposition.”",
+    "effect": null,
+    "note": null
   },
   {
     "id": 47,
     "title": "Tories Tested",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "BIFP",
-    "ops_icon": null,
+    "order": [
+      "BRITISH",
+      "INDIANS",
+      "FRENCH",
+      "PATRIOTS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Tories thrive: Place three Tories in one Colony with British Control.",
+    "shaded_event": "Tories flee: Replace Tories in one Colony with Militia. Place two Propaganda there.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 48,
     "title": "God Save the King",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "BIFP",
-    "ops_icon": "I – Sword, F – Sword, P – Sword",
+    "order": [
+      "BRITISH",
+      "INDIANS",
+      "FRENCH",
+      "PATRIOTS"
+    ],
+    "faction_icons": {
+      "FRENCH": "SWORD",
+      "INDIANS": "SWORD",
+      "PATRIOTS": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "“Scatter his enemies”: British free March to one space and may free Battle there.",
+    "shaded_event": "“But be God’s mercies known”: A non-British Faction moves units from three spaces containing British Regulars into any adjacent spaces.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 49,
     "title": "Claude Louis, Comte de Saint-Germain",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "FPBI",
-    "ops_icon": null,
+    "order": [
+      "FRENCH",
+      "PATRIOTS",
+      "BRITISH",
+      "INDIANS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Reforms opposed: Move 5 French Regulars from Available to Unavailable.",
+    "shaded_event": "Reorganizes Army: Move 5 French Regulars from Unavailable to Available.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 50,
     "title": "Admiral d’Estaing, French Fleet Arrives",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "FPBI",
-    "ops_icon": null,
+    "order": [
+      "FRENCH",
+      "PATRIOTS",
+      "BRITISH",
+      "INDIANS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "French poorly coordinate: French are Ineligible and remain Ineligible through next card. Remove two French Regulars from West Indies or map to Available.",
+    "shaded_event": "Well-coordinated French: Place two Continentals and two French Regulars (from Available or West Indies) in any one Colony.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 51,
     "title": "Bermuda Gunpowder Plot",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "FPBI",
-    "ops_icon": "F – Sword, P – Musket, B – Musket, I – Sword",
+    "order": [
+      "FRENCH",
+      "PATRIOTS",
+      "BRITISH",
+      "INDIANS"
+    ],
+    "faction_icons": {
+      "BRITISH": "MUSKET",
+      "FRENCH": "SWORD",
+      "INDIANS": "SWORD",
+      "PATRIOTS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Gunpowder shortage: British free March to then free Battle in one space. –2 to Attacker’s Loss Level.",
+    "shaded_event": "Gunpowder aplenty: Patriots free March to then free Battle in one space. +2 to Defender’s Loss Level.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 52,
     "title": "French Fleet Arrives in the Wrong Spot",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "FPBI",
-    "ops_icon": "F – Musket, P – Musket, B – Musket, I – Sword",
+    "order": [
+      "FRENCH",
+      "PATRIOTS",
+      "BRITISH",
+      "INDIANS"
+    ],
+    "faction_icons": {
+      "BRITISH": "MUSKET",
+      "FRENCH": "MUSKET",
+      "INDIANS": "SWORD",
+      "PATRIOTS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Coordination with the French is a challenge: Remove up to four French Regulars from the map to Available. Free Battle anywhere with +2 Force Level.",
+    "shaded_event": "(none)",
+    "effect": null,
+    "note": null
   },
   {
     "id": 53,
     "title": "French Ports Accept Patriot’s Ships",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "FPIB",
-    "ops_icon": null,
+    "order": [
+      "FRENCH",
+      "PATRIOTS",
+      "INDIANS",
+      "BRITISH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Backlash against French: British Resources +3. Lower FNI two levels.",
+    "shaded_event": "Extended range of privateers impacts shipping: British Resources –2. Patriot Resources +2. Raise FNI one level.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 54,
     "title": "Antoine de Sartine, Secretary of the Navy",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "FPIB",
-    "ops_icon": null,
+    "order": [
+      "FRENCH",
+      "PATRIOTS",
+      "INDIANS",
+      "BRITISH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Fuels establishment push back: Move one Squadron/Blockade from West Indies to Unavailable.",
+    "shaded_event": "Rationalizes the French Navy: Move two Squadrons/Blockades from Unavailable to West Indies.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 55,
     "title": "French Navy Dominates Caribbean",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "FPIB",
-    "ops_icon": null,
+    "order": [
+      "FRENCH",
+      "PATRIOTS",
+      "INDIANS",
+      "BRITISH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "French reinforce their success: Move three French Regulars from map to West Indies. French may free Battle in West Indies. Lower FNI one level.",
+    "shaded_event": "British fight back: Move any four British Regulars from map to West Indies. British must free Battle there.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 56,
     "title": "Jacques Turgot’s Economic Liberalism",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "FPIB",
-    "ops_icon": null,
+    "order": [
+      "FRENCH",
+      "PATRIOTS",
+      "INDIANS",
+      "BRITISH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "As minister of the Navy, opposed support for Patriots: Patriot Resources –3.",
+    "shaded_event": "Believes in the virtue of the American cause: Patriot Resources +3.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 57,
     "title": "French Fleet Sails for the Caribbean",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "FBIP",
-    "ops_icon": null,
+    "order": [
+      "FRENCH",
+      "BRITISH",
+      "INDIANS",
+      "PATRIOTS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "French focus away from the Colonies: Move two French Regulars from Available to the West Indies. French Ineligible through the next card. Lower FNI one level.",
+    "shaded_event": "French battle in Grenada: Move two British Regulars from map to West Indies. British Ineligible through the next card.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 58,
     "title": "Marquis de Lafayette Arrives in Colonies",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "FBIP",
-    "ops_icon": null,
+    "order": [
+      "FRENCH",
+      "BRITISH",
+      "INDIANS",
+      "PATRIOTS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Lafayette’s arrival upsets King Louis XVI: Patriot Resources –4.",
+    "shaded_event": "Lafayette leads Patriots North: In New York, Quebec and Northwest replace Tories with Patriot Militia.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 59,
     "title": "Tronson de Coudray Arrives in America",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "FBIP",
-    "ops_icon": null,
+    "order": [
+      "FRENCH",
+      "BRITISH",
+      "INDIANS",
+      "PATRIOTS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Arrogance damages coordination: Remove two Continentals and two French Regulars from one space to Available.",
+    "shaded_event": "Drowns in the Schuylkill River: Patriot Resources +3.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 60,
     "title": "Comte d’Orvilliers Builds a Fleet at Brest",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "FBIP",
-    "ops_icon": null,
+    "order": [
+      "FRENCH",
+      "BRITISH",
+      "INDIANS",
+      "PATRIOTS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "British are prepared: Lower FNI two levels. French Resources –4.",
+    "shaded_event": "Challenges British naval dominance: Raise FNI one level. British Resources –3.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 61,
     "title": "Minister Comte de Vergennes",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "FBPI",
-    "ops_icon": null,
+    "order": [
+      "FRENCH",
+      "BRITISH",
+      "PATRIOTS",
+      "INDIANS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Patriots distracted by French priorities: Patriots Ineligible through the next card.",
+    "shaded_event": "Minister favors the Colonies: Patriot Resources +3. French Resources +2.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 62,
     "title": "Charles Michel de Langlade",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "FBPI",
-    "ops_icon": "F – Musket, B – Musket",
+    "order": [
+      "FRENCH",
+      "BRITISH",
+      "PATRIOTS",
+      "INDIANS"
+    ],
+    "faction_icons": {
+      "BRITISH": "MUSKET",
+      "FRENCH": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Assists the British: Place three War Parties or three Tories in New York, Quebec or Northwest.",
+    "shaded_event": "Patriots and French rally to fight: Place three French Regulars in Quebec or three Militia in Northwest.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 63,
     "title": "French and Spanish Besiege Gibraltar",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "FBPI",
-    "ops_icon": null,
+    "order": [
+      "FRENCH",
+      "BRITISH",
+      "PATRIOTS",
+      "INDIANS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "British weather the storm: British Resources +1. Lower FNI one level. Remove two British Regulars from West Indies to Available.",
+    "shaded_event": "British struggle to defend: British Resources –5.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 64,
     "title": "The Affair of Fielding and Bylandt",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "FBPI",
-    "ops_icon": null,
+    "order": [
+      "FRENCH",
+      "BRITISH",
+      "PATRIOTS",
+      "INDIANS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "British seize Dutch contraband: British Resources +3. Lower FNI one level.",
+    "shaded_event": "Dutch avoid seizure and provide resources to Patriots: Patriot Resources +5.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 65,
     "title": "Jacques Necker, Finance Minister",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "FIBP",
-    "ops_icon": null,
+    "order": [
+      "FRENCH",
+      "INDIANS",
+      "BRITISH",
+      "PATRIOTS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "War is expensive for French: French Resources –4.",
+    "shaded_event": "War is pricey but resources allocated to America: French Resources +3.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 66,
     "title": "Don Bernardo Takes Pensacola",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "FIBP",
-    "ops_icon": "B – Sword",
+    "order": [
+      "FRENCH",
+      "INDIANS",
+      "BRITISH",
+      "PATRIOTS"
+    ],
+    "faction_icons": {
+      "BRITISH": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "British reinforce the lower Mississippi River Valley: Place six British cubes in either Florida or Southwest.",
+    "shaded_event": "Led Spanish forces against the British: French or Patriots free March to and free Battle in Florida with a +2 Force Level.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 67,
     "title": "De Grasse Arrives with the French Fleet",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "FIBP",
-    "ops_icon": null,
+    "order": [
+      "FRENCH",
+      "INDIANS",
+      "BRITISH",
+      "PATRIOTS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Balances effort in West Indies: Lower FNI one level. Remove three French Regulars from West Indies to Available.",
+    "shaded_event": "French coordination in North America: French or Patriots free Rally or Muster in one space and remain or become Eligible.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 68,
     "title": "French in America Want Canada",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "FIBP",
-    "ops_icon": "F – Sword, I – Sword, B – Sword",
+    "order": [
+      "FRENCH",
+      "INDIANS",
+      "BRITISH",
+      "PATRIOTS"
+    ],
+    "faction_icons": {
+      "BRITISH": "SWORD",
+      "FRENCH": "SWORD",
+      "INDIANS": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Invasion Canada: Relocate up to six of the executing Faction’s cubes on map to Quebec and place one friendly Fort there from Available.",
+    "shaded_event": "(none)",
+    "effect": null,
+    "note": null
   },
   {
     "id": 69,
     "title": "Admiral Pierre André de Suffren",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "FIPB",
-    "ops_icon": null,
+    "order": [
+      "FRENCH",
+      "INDIANS",
+      "PATRIOTS",
+      "BRITISH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Sent to India to assist: Lower FNI two levels. British Resources +2.",
+    "shaded_event": "Squadron isolation strategy has great success: Raise FNI one level. French Resources +3.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 70,
     "title": "British Gain From French in India",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "FIPB",
-    "ops_icon": "P – Musket, B – Musket, F – Musket, I – Musket",
+    "order": [
+      "FRENCH",
+      "INDIANS",
+      "PATRIOTS",
+      "BRITISH"
+    ],
+    "faction_icons": {
+      "BRITISH": "MUSKET",
+      "FRENCH": "MUSKET",
+      "INDIANS": "MUSKET",
+      "PATRIOTS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Conflict in India impacts the war: Remove three Regulars from map or West Indies to Available.",
+    "shaded_event": "(none)",
+    "effect": null,
+    "note": null
   },
   {
     "id": 71,
     "title": "Treaty of Amity and Commerce",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "FIPB",
-    "ops_icon": "I – Sword, P – Musket, B – Sword",
+    "order": [
+      "FRENCH",
+      "INDIANS",
+      "PATRIOTS",
+      "BRITISH"
+    ],
+    "faction_icons": {
+      "BRITISH": "SWORD",
+      "INDIANS": "SWORD",
+      "PATRIOTS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Patriots receive financial benefit: Add population of Cities under Rebellion Control to Patriot Resources.",
+    "shaded_event": "French benefit economically from commercial treaty with the Colonies: French Resources +5.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 72,
     "title": "French Settlers Help",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "FIPB",
-    "ops_icon": "I – Musket, B – Sword",
+    "order": [
+      "FRENCH",
+      "INDIANS",
+      "PATRIOTS",
+      "BRITISH"
+    ],
+    "faction_icons": {
+      "BRITISH": "SWORD",
+      "INDIANS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "French settlers impact the war: Place one friendly Fort or Village and three friendly Militia, War Parties or cubes in any one Indian Reserve Province.",
+    "shaded_event": "(none)",
+    "effect": null,
+    "note": null
   },
   {
     "id": 73,
     "title": "Sullivan Expedition vs. Iroquois and Tories",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "IPBF",
-    "ops_icon": "F – Musket",
+    "order": [
+      "INDIANS",
+      "PATRIOTS",
+      "BRITISH",
+      "FRENCH"
+    ],
+    "faction_icons": {
+      "FRENCH": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Raids: Remove one Fort or Village in New York, Northwest or Quebec.",
+    "shaded_event": "(none)",
+    "effect": null,
+    "note": null
   },
   {
     "id": 74,
     "title": "Chickasaw Ally with the British",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "IPBF",
-    "ops_icon": "F – Sword",
+    "order": [
+      "INDIANS",
+      "PATRIOTS",
+      "BRITISH",
+      "FRENCH"
+    ],
+    "faction_icons": {
+      "FRENCH": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Benefit from the alliance: Indians or British add one Resource for every two Indian Villages on map.",
+    "shaded_event": "Battles in the back country: In each of two spaces, remove one War Party and two Militia or one Militia and two War Parties.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 75,
     "title": "Congress’ Speech to the Six Nations",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "IPBF",
-    "ops_icon": "F – Sword",
+    "order": [
+      "INDIANS",
+      "PATRIOTS",
+      "BRITISH",
+      "FRENCH"
+    ],
+    "faction_icons": {
+      "FRENCH": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Take up hatchets for King’s Troops: Indians free Gather in three Indian Reserve Provinces then free War Path in one of those spaces.",
+    "shaded_event": "Colonial backlash: Remove three Indian pieces from Northwest (Villages last).",
+    "effect": null,
+    "note": null
   },
   {
     "id": 76,
     "title": "Edward Hand Raids into Indian Country",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "IPBF",
-    "ops_icon": "F – Sword",
+    "order": [
+      "INDIANS",
+      "PATRIOTS",
+      "BRITISH",
+      "FRENCH"
+    ],
+    "faction_icons": {
+      "FRENCH": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Three key lieutenants defect: British replace three Militia with three Tories in one Province.",
+    "shaded_event": "“Squaw Campaign” Patriots intimidate Indians: British remove two Villages.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 77,
     "title": "General Burgoyne Cracks Down",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "IPFB",
-    "ops_icon": "F – Sword",
+    "order": [
+      "INDIANS",
+      "PATRIOTS",
+      "FRENCH",
+      "BRITISH"
+    ],
+    "faction_icons": {
+      "FRENCH": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Indians respond positively: Indians place one Village in one space with British and Indian pieces. All War Parties on the map to Underground.",
+    "shaded_event": "Indian backlash: Remove one British piece in three Provinces shared with Indians (Forts last). Place one Raid marker in each space.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 78,
     "title": "Cherry Valley Destroyed by Tories",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "IPFB",
-    "ops_icon": null,
+    "order": [
+      "INDIANS",
+      "PATRIOTS",
+      "FRENCH",
+      "BRITISH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Patriots intimidated: Patriots remove 1/4 of their total units on map, rounding down.",
+    "shaded_event": "Patriots rally against Tories and Indians: Add one Patriot Militia in four spaces with a Tory or Indian piece.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 79,
     "title": "Tuscarora and Oneida Come to Washington",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "IPFB",
-    "ops_icon": "F – Sword, B – Sword",
+    "order": [
+      "INDIANS",
+      "PATRIOTS",
+      "FRENCH",
+      "BRITISH"
+    ],
+    "faction_icons": {
+      "BRITISH": "SWORD",
+      "FRENCH": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Rally with the Patriots: Place one Village and two War Parties in one Colony.",
+    "shaded_event": "Other tribes rally against: Remove one Village and two War Parties in one Colony.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 80,
     "title": "Confusion Allows Slaves to Escape",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "IPFB",
-    "ops_icon": "I – Musket, P – Musket, F – Sword, B – Musket",
+    "order": [
+      "INDIANS",
+      "PATRIOTS",
+      "FRENCH",
+      "BRITISH"
+    ],
+    "faction_icons": {
+      "BRITISH": "MUSKET",
+      "FRENCH": "SWORD",
+      "INDIANS": "MUSKET",
+      "PATRIOTS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Change in the midst of chaos: Select one Faction. That Faction must remove two of its own pieces in each of two spaces.",
+    "shaded_event": "(none)",
+    "effect": null,
+    "note": null
   },
   {
     "id": 81,
     "title": "Creek and Seminole Active in South",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "IBPF",
-    "ops_icon": null,
+    "order": [
+      "INDIANS",
+      "BRITISH",
+      "PATRIOTS",
+      "FRENCH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Increased Indian activity: Place two War Parties, one Raid marker, and one Village in South Carolina or Georgia.",
+    "shaded_event": "Indians challenged: Remove two War Parties total in South Carolina and/or Georgia.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 82,
     "title": "Frustrated Shawnee Warriors Attack",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "IBPF",
-    "ops_icon": null,
+    "order": [
+      "INDIANS",
+      "BRITISH",
+      "PATRIOTS",
+      "FRENCH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Raiding parties in the South: Indians place a War Party and Raid marker in VA, GA, NC and SC.",
+    "shaded_event": "Colonies backlash: Remove three Indian pieces total from VA, GA, NC and/or SC (Villages last).",
+    "effect": null,
+    "note": null
   },
   {
     "id": 83,
     "title": "Guy Carleton and Indians Negotiate",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "IBPF",
-    "ops_icon": "I – Musket, P – Musket, F – Musket",
+    "order": [
+      "INDIANS",
+      "BRITISH",
+      "PATRIOTS",
+      "FRENCH"
+    ],
+    "faction_icons": {
+      "FRENCH": "MUSKET",
+      "INDIANS": "MUSKET",
+      "PATRIOTS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Quebec alignment: Shift Quebec City to Active Support. Place two War Parties in Quebec.",
+    "shaded_event": "Quebec chaos: Place up to three pieces (no more than one Fort or Village) in either Quebec or Quebec City.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 84,
     "title": "“Merciless Indian Savages”",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "IBPF",
-    "ops_icon": "F – Sword",
+    "order": [
+      "INDIANS",
+      "BRITISH",
+      "PATRIOTS",
+      "FRENCH"
+    ],
+    "faction_icons": {
+      "FRENCH": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Indians encroach on the Colonies: Indians free Gather in two Colonies.",
+    "shaded_event": "Indians are attacked after the Declaration of Independence: Patriots remove one Village.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 85,
     "title": "Indians Help British Raids on Mississippi",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "IBFP",
-    "ops_icon": "B – Sword",
+    "order": [
+      "INDIANS",
+      "BRITISH",
+      "FRENCH",
+      "PATRIOTS"
+    ],
+    "faction_icons": {
+      "BRITISH": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Increases force level: British place a total of three British Regulars and/or Tories in Southwest.",
+    "shaded_event": "Patriots rally against British and Indians: Place two Militia or Continentals and two French Regulars in Southwest.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 86,
     "title": "Stockbridge Indians",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "IBFP",
-    "ops_icon": "P – Musket",
+    "order": [
+      "INDIANS",
+      "BRITISH",
+      "FRENCH",
+      "PATRIOTS"
+    ],
+    "faction_icons": {
+      "PATRIOTS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Fight the Colonists: Activate all Militia in Massachusetts or in any one space with an Indian piece.",
+    "shaded_event": "Join the Colonists: Add three Militia in Massachusetts or any one space with an Indian piece.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 87,
     "title": "Patriots Massacre Lenape Indians",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "IBFP",
-    "ops_icon": null,
+    "order": [
+      "INDIANS",
+      "BRITISH",
+      "FRENCH",
+      "PATRIOTS"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Gnadenhütten Massacre: Remove one piece in Pennsylvania. Remain Eligible.",
+    "shaded_event": "(none)",
+    "effect": null,
+    "note": null
   },
   {
     "id": 88,
     "title": "“If it hadn’t been so foggy…”",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "IBFP",
-    "ops_icon": "I – Musket, B – Musket, F – Musket, P – Musket",
+    "order": [
+      "INDIANS",
+      "BRITISH",
+      "FRENCH",
+      "PATRIOTS"
+    ],
+    "faction_icons": {
+      "BRITISH": "MUSKET",
+      "FRENCH": "MUSKET",
+      "INDIANS": "MUSKET",
+      "PATRIOTS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Fog allows disengagement: Select one Faction. Move any own units sharing a space with that Faction to adjacent spaces.",
+    "shaded_event": "(none)",
+    "effect": null,
+    "note": null
   },
   {
     "id": 89,
     "title": "War Damages Colonies’ Economy",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "IFBP",
-    "ops_icon": "I – Musket, F – Musket",
+    "order": [
+      "INDIANS",
+      "FRENCH",
+      "BRITISH",
+      "PATRIOTS"
+    ],
+    "faction_icons": {
+      "FRENCH": "MUSKET",
+      "INDIANS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Patriots turn against the Continental Congress: Replace any four Militia or Continentals with Tories.",
+    "shaded_event": "Patriots hunker down and redouble efforts to support war: Replace any three Tories with Patriot Militia.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 90,
     "title": "“The World Turned Upside Down”",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "IFBP",
-    "ops_icon": "I – Musket, P – Musket",
+    "order": [
+      "INDIANS",
+      "FRENCH",
+      "BRITISH",
+      "PATRIOTS"
+    ],
+    "faction_icons": {
+      "INDIANS": "MUSKET",
+      "PATRIOTS": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "“Till then upon Ararat’s hill”: Place one friendly Fort or Village.",
+    "shaded_event": "British surrender anthem: Remove two British Regulars on map to Casualties.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 91,
     "title": "Indians Help British Outside Colonies",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "IFBP",
-    "ops_icon": "F – Sword",
+    "order": [
+      "INDIANS",
+      "FRENCH",
+      "BRITISH",
+      "PATRIOTS"
+    ],
+    "faction_icons": {
+      "FRENCH": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Indians assisted: Place one Village and two War Parties in one Indian Reserve Province.",
+    "shaded_event": "Indians need assistance: Remove one Village in one Indian Reserve Province.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 92,
     "title": "Cherokees Supplied by the British",
+    "type": "EVENT",
     "years": [
       1775,
       1776
     ],
     "order_icons": "IFBP",
-    "ops_icon": "B – Sword",
+    "order": [
+      "INDIANS",
+      "FRENCH",
+      "BRITISH",
+      "PATRIOTS"
+    ],
+    "faction_icons": {
+      "BRITISH": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Grow in strength: Place a second Fort or Village in a space where you have one.",
+    "shaded_event": "(none)",
+    "effect": null,
+    "note": null
   },
   {
     "id": 93,
     "title": "Wyoming Massacre",
+    "type": "EVENT",
     "years": [
       1777,
       1778
     ],
     "order_icons": "IFPB",
-    "ops_icon": null,
+    "order": [
+      "INDIANS",
+      "FRENCH",
+      "PATRIOTS",
+      "BRITISH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Indians intimidate on the frontier: Shift up to three Colonies adjacent to an Indian Reserve Province one level toward Neutral. Place one Raid marker in each.",
+    "shaded_event": "(none)",
+    "effect": null,
+    "note": null
   },
   {
     "id": 94,
     "title": "Herkimer’s Relief Column",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "IFPB",
-    "ops_icon": null,
+    "order": [
+      "INDIANS",
+      "FRENCH",
+      "PATRIOTS",
+      "BRITISH"
+    ],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Tories and Indians ambush: Indians free Gather and Tories free Muster in New York. Remove all Militia from New York.",
+    "shaded_event": "Patriot backlash: Remove four War Parties in or adjacent to Pennsylvania.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 95,
     "title": "Ohio Country Frontier Erupts",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "IFPB",
-    "ops_icon": "F – Musket, B – Musket",
+    "order": [
+      "INDIANS",
+      "FRENCH",
+      "PATRIOTS",
+      "BRITISH"
+    ],
+    "faction_icons": {
+      "BRITISH": "MUSKET",
+      "FRENCH": "MUSKET"
+    },
+    "musket": true,
+    "sword": false,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Attacks and backlash: In Northwest, remove any one enemy Fort or Village and place three friendly units.",
+    "shaded_event": "(none)",
+    "effect": null,
+    "note": null
   },
   {
     "id": 96,
     "title": "Iroquois Confederacy",
+    "type": "EVENT",
     "years": [
       1779,
       1780
     ],
     "order_icons": "IFPB",
-    "ops_icon": "F – Sword, B – Sword",
+    "order": [
+      "INDIANS",
+      "FRENCH",
+      "PATRIOTS",
+      "BRITISH"
+    ],
+    "faction_icons": {
+      "BRITISH": "SWORD",
+      "FRENCH": "SWORD"
+    },
+    "musket": false,
+    "sword": true,
     "winter_quarters": false,
-    "type": "EVENT",
-    "dual": true
+    "dual": true,
+    "unshaded_event": "Iroquois Confederacy reconstitutes: Indians free Gather and War Path in two Indian Reserve Provinces.",
+    "shaded_event": "Iroquois Confederacy shatters: Remove one Indian Village.",
+    "effect": null,
+    "note": null
   },
   {
     "id": 97,
     "title": "Winter Quarters – Royals Commit",
+    "type": "EVENT",
     "years": [],
     "order_icons": "",
-    "ops_icon": null,
+    "order": [],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": true,
-    "type": "EVENT",
-    "dual": false
+    "dual": false,
+    "unshaded_event": null,
+    "shaded_event": null,
+    "effect": "Royals commit: If CRC > CBC, French Resources +5, else British Resources +5 during Reset Phase.",
+    "note": null
   },
   {
     "id": 98,
     "title": "Winter Quarters – Overconfident at Home",
+    "type": "EVENT",
     "years": [],
     "order_icons": "",
-    "ops_icon": null,
+    "order": [],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": true,
-    "type": "EVENT",
-    "dual": false
+    "dual": false,
+    "unshaded_event": null,
+    "shaded_event": null,
+    "effect": "Overconfident at home: If CRC > CBC, British Resources –3, else French Resources –3 during Reset Phase.",
+    "note": null
   },
   {
     "id": 99,
     "title": "Winter Quarters – West Indies Conflict Goes the Other Way",
+    "type": "EVENT",
     "years": [],
     "order_icons": "",
-    "ops_icon": null,
+    "order": [],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": true,
-    "type": "EVENT",
-    "dual": false
+    "dual": false,
+    "unshaded_event": null,
+    "shaded_event": null,
+    "effect": "West Indies conflict goes the other way: Reduce the larger of CRC or CBC by half the difference (rounding down) during Reset Phase.",
+    "note": null
   },
   {
     "id": 100,
     "title": "Winter Quarters – India Conflict Goes the Other Way",
+    "type": "EVENT",
     "years": [],
     "order_icons": "",
-    "ops_icon": null,
+    "order": [],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": true,
-    "type": "EVENT",
-    "dual": false
+    "dual": false,
+    "unshaded_event": null,
+    "shaded_event": null,
+    "effect": "India conflict goes the other way: Reduce the larger of CRC or CBC by half the difference (rounding down) during Reset Phase.",
+    "note": null
   },
   {
     "id": 101,
     "title": "Winter Quarters – Floods Shift the Balance",
+    "type": "EVENT",
     "years": [],
     "order_icons": "",
-    "ops_icon": null,
+    "order": [],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": true,
-    "type": "EVENT",
-    "dual": false
+    "dual": false,
+    "unshaded_event": null,
+    "shaded_event": null,
+    "effect": "Floods shift the balance: If Patriots or Indians are ahead in their second victory condition (§7.2), that Faction loses two Resources during Reset Phase.",
+    "note": null
   },
   {
     "id": 102,
     "title": "Winter Quarters – War on the Frontier",
+    "type": "EVENT",
     "years": [],
     "order_icons": "",
-    "ops_icon": null,
+    "order": [],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": true,
-    "type": "EVENT",
-    "dual": false
+    "dual": false,
+    "unshaded_event": null,
+    "shaded_event": null,
+    "effect": "War on the frontier: If Patriots or Indians are ahead in their second victory condition (§7.2), that Faction removes one of its Forts or Villages during Reset Phase.",
+    "note": null
   },
   {
     "id": 103,
     "title": "Winter Quarters – Severe Winter",
+    "type": "EVENT",
     "years": [],
     "order_icons": "",
-    "ops_icon": null,
+    "order": [],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": true,
-    "type": "EVENT",
-    "dual": false
+    "dual": false,
+    "unshaded_event": null,
+    "shaded_event": null,
+    "effect": "Severe Winter: If Patriots or Indians are ahead in their second victory condition (§7.2), that Faction removes one of its Forts or Villages during Reset Phase.",
+    "note": null
   },
   {
     "id": 104,
     "title": "Winter Quarters – Hurricane Hits the South",
+    "type": "EVENT",
     "years": [],
     "order_icons": "",
-    "ops_icon": null,
+    "order": [],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": true,
-    "type": "EVENT",
-    "dual": false
+    "dual": false,
+    "unshaded_event": null,
+    "shaded_event": null,
+    "effect": "Hurricane hits the South: If Patriots or Indians are ahead in their second victory condition (§7.2), that Faction loses two Resources during Reset Phase.",
+    "note": null
   },
   {
     "id": 105,
     "title": "Brilliant Stroke! (Patriots)",
+    "type": "BRILLIANT_STROKE",
     "years": [],
     "order_icons": "",
-    "ops_icon": null,
+    "order": [],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "BRILLIANT_STROKE",
-    "dual": false
+    "dual": false,
+    "unshaded_event": null,
+    "shaded_event": null,
+    "effect": "Execute two free Limited Commands and one Special Activity in any order. Leader must be involved in at least one of the Limited Commands.\nAll Factions to Eligible.",
+    "note": null
   },
   {
     "id": 106,
     "title": "Brilliant Stroke! (British)",
+    "type": "BRILLIANT_STROKE",
     "years": [],
     "order_icons": "",
-    "ops_icon": null,
+    "order": [],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "BRILLIANT_STROKE",
-    "dual": false
+    "dual": false,
+    "unshaded_event": null,
+    "shaded_event": null,
+    "effect": "Execute two free Limited Commands and one Special Activity in any order. Leader must be involved in at least one of the Limited Commands. Note: Reward Loyalty is **not** free.\nBritish may Trump Patriot “Brilliant Stroke!”\nAll Factions to Eligible.",
+    "note": null
   },
   {
     "id": 107,
     "title": "Brilliant Stroke! (French)",
+    "type": "BRILLIANT_STROKE",
     "years": [],
     "order_icons": "",
-    "ops_icon": null,
+    "order": [],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "BRILLIANT_STROKE",
-    "dual": false
+    "dual": false,
+    "unshaded_event": null,
+    "shaded_event": null,
+    "effect": "Execute two free Limited Commands and one Special Activity in any order. Leader must be involved in at least one of the Limited Commands.\nFrench may Trump Patriot or British “Brilliant Stroke!”\nAll Factions to Eligible.",
+    "note": null
   },
   {
     "id": 108,
     "title": "Brilliant Stroke! (Indians)",
+    "type": "BRILLIANT_STROKE",
     "years": [],
     "order_icons": "",
-    "ops_icon": null,
+    "order": [],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "BRILLIANT_STROKE",
-    "dual": false
+    "dual": false,
+    "unshaded_event": null,
+    "shaded_event": null,
+    "effect": "Execute two free Limited Commands and one Special Activity in any order. Leader must be involved in at least one of the Limited Commands.\nIndians may Trump Patriot, British or French “Brilliant Stroke!”\nAll Factions to Eligible.",
+    "note": null
   },
   {
     "id": 109,
     "title": "Brilliant Stroke! – Treaty of Alliance",
+    "type": "BRILLIANT_STROKE",
     "years": [],
     "order_icons": "",
-    "ops_icon": null,
+    "order": [],
+    "faction_icons": {},
+    "musket": false,
+    "sword": false,
     "winter_quarters": false,
-    "type": "BRILLIANT_STROKE",
-    "dual": false
+    "dual": false,
+    "unshaded_event": null,
+    "shaded_event": null,
+    "effect": "\"If French Preparation (French pieces Available + Blockades Available + CBC) > 15, French may choose to enter the war:\n• French free Muster and place Rochambeau there.\n• Raise FNI one level.\n• Place three French and three British Regulars (Unavailable first, then Available) in West Indies.\n• May Trump any “Brilliant Stroke!”\n• All Factions to Eligible.",
+    "note": "When executed, this card should set `state[\"toa_played\"] = True` so that later VP checks allow French and Patriots to win (helper already respects this flag).\""
   }
 ]

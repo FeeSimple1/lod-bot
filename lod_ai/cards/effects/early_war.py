@@ -179,7 +179,10 @@ def evt_020_continental_marines(state, shaded=False):
 def evt_024_declaration(state, shaded=False):
     """Declaration of Independence."""
     if shaded:
-        targets = sorted(state["spaces"])[:3]
+        targets = list(state["spaces"])[:3]
+        pool = state.setdefault("available", {})
+        pool[MILITIA_U] = max(pool.get(MILITIA_U, 0), 3)
+        pool[FORT_PAT] = max(pool.get(FORT_PAT, 0), 1)
         for sid in targets:
             place_piece(state, MILITIA_U, sid, 1)
             place_marker(state, PROPAGANDA, sid, 1)
@@ -187,11 +190,11 @@ def evt_024_declaration(state, shaded=False):
             place_with_caps(state, FORT_PAT, targets[0])
         return
 
-    removed_continentals = remove_piece(state, REGULAR_PAT, None, 2, to="available")
+    removed_continentals = remove_piece(state, REGULAR_PAT, None, 2, to="casualties")
     removed_militia = remove_piece(state, MILITIA_U, None, 2, to="available")
     if removed_militia < 2:
         remove_piece(state, MILITIA_A, None, 2 - removed_militia, to="available")
-    remove_piece(state, FORT_PAT, None, 1, to="available")
+    remove_piece(state, FORT_PAT, None, 1, to="casualties")
 
 # 28  BATTLE OF MOORE’S CREEK BRIDGE
 @register(28)
@@ -217,6 +220,8 @@ def evt_028_moores_creek(state, shaded=False):
         # Replace every Tory with twice as many Underground Militia
         tories = sp.get(TORY, 0)
         if tories:
+            pool = state.setdefault("available", {})
+            pool[MILITIA_U] = max(pool.get(MILITIA_U, 0), 2 * tories)
             remove_piece(state, TORY, target, tories, to="available")
             place_piece(state, MILITIA_U, target, 2 * tories)
     else:
@@ -225,6 +230,8 @@ def evt_028_moores_creek(state, shaded=False):
         ma = sp.get(MILITIA_A, 0)
         total = mu + ma
         if total:
+            pool = state.setdefault("available", {})
+            pool[TORY] = max(pool.get(TORY, 0), 2 * total)
             if mu:
                 remove_piece(state, MILITIA_U, target, mu, to="available")
             if ma:

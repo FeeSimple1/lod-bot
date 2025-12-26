@@ -59,6 +59,8 @@ def determine_eligible_factions(state: dict, card: dict) -> Tuple[Optional[str],
     # 1) Preferred: explicit order on the card
     if isinstance(card.get("order"), (list, tuple)) and card["order"]:
         base_order = [str(f).upper() for f in card["order"]]
+    elif card.get("order_icons"):
+        base_order = get_faction_order(card)
     else:
         # 2) Common alternates
         first = (card.get("first") or card.get("first_faction"))
