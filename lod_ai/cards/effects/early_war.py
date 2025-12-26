@@ -29,6 +29,28 @@ def _pick_spaces_with_militia(state, max_spaces=4):
     return spaces[:max_spaces]
 
 
+def _filter_targets(state, raw_targets, required_type=None, limit=None):
+    """
+    Normalize *raw_targets* to a list of space IDs, optionally filtering by
+    ``required_type`` (e.g., "City" or "Colony").  Invalid entries are dropped.
+    """
+    if raw_targets is None:
+        return []
+    if isinstance(raw_targets, (str, bytes)):
+        raw_targets = [raw_targets]
+    targets = []
+    for sid in raw_targets:
+        sp = state.get("spaces", {}).get(sid)
+        if not sp:
+            continue
+        if required_type and sp.get("type") != required_type:
+            continue
+        targets.append(sid)
+        if limit and len(targets) >= limit:
+            break
+    return targets
+
+
 # 2  COMMON SENSE
 @register(2)
 def evt_002_common_sense(state, shaded=False):
@@ -38,12 +60,16 @@ def evt_002_common_sense(state, shaded=False):
     Shaded   – Shift 2 Cities 1 level toward Active Opposition and place
                2 Propaganda in each.
     """
+    def _select_cities(state, key, count):
+        explicit = _filter_targets(state, state.get(key), required_type="City", limit=count)
+        return explicit or pick_cities(state, count)
+
     if shaded:
-        for city in pick_cities(state, 2):
+        for city in _select_cities(state, "common_sense_cities", 2):
             shift_support(state, city, -1)
             place_marker(state, PROPAGANDA, city, 2)
     else:
-        cities = pick_cities(state, 1)
+        cities = _select_cities(state, "common_sense_city", 1)
         if not cities:
             return
         city = cities[0]
@@ -90,13 +116,17 @@ def evt_006_benedict_arnold(state, shaded=False):
     spaces_sorted = sorted(state["spaces"])
 
     if shaded:
-        candidates = [
-            sid for sid in spaces_sorted
-            if state["spaces"][sid].get(FORT_BRI)
-            or state["spaces"][sid].get(REGULAR_BRI)
-            or state["spaces"][sid].get(TORY)
-        ]
-        target = candidates[0] if candidates else (spaces_sorted[0] if spaces_sorted else None)
+        explicit = _filter_targets(state, state.get("benedict_arnold_space"), limit=1)
+        if explicit:
+            target = explicit[0]
+        else:
+            candidates = [
+                sid for sid in spaces_sorted
+                if state["spaces"][sid].get(FORT_BRI)
+                or state["spaces"][sid].get(REGULAR_BRI)
+                or state["spaces"][sid].get(TORY)
+            ]
+            target = candidates[0] if candidates else (spaces_sorted[0] if spaces_sorted else None)
         if not target:
             return
         remove_piece(state, FORT_BRI,     target, 1, to="casualties")
@@ -106,7 +136,9 @@ def evt_006_benedict_arnold(state, shaded=False):
             remove_piece(state, TORY, target, 2-removed, to="casualties")
         return
 
-    colony_choices = pick_colonies(state, 1)
+    colony_choices = _filter_targets(state, state.get("benedict_arnold_colony"), required_type="Colony", limit=1)
+    if not colony_choices:
+        colony_choices = pick_colonies(state, 1)
     if not colony_choices:
         return
 
@@ -179,15 +211,18 @@ def evt_020_continental_marines(state, shaded=False):
 def evt_024_declaration(state, shaded=False):
     """Declaration of Independence."""
     if shaded:
-        targets = list(state["spaces"])[:3]
-        pool = state.setdefault("available", {})
-        pool[MILITIA_U] = max(pool.get(MILITIA_U, 0), 3)
-        pool[FORT_PAT] = max(pool.get(FORT_PAT, 0), 1)
-        for sid in targets:
+        militia_targets = _filter_targets(
+            state, state.get("declaration_militia_targets"), limit=3
+        ) or list(state.get("spaces", {}))[:3]
+        for sid in militia_targets:
             place_piece(state, MILITIA_U, sid, 1)
             place_marker(state, PROPAGANDA, sid, 1)
-        if targets:
-            place_with_caps(state, FORT_PAT, targets[0])
+
+        fort_targets = _filter_targets(
+            state, state.get("declaration_fort_target") or militia_targets, limit=1
+        ) or list(state.get("spaces", {}))[:1]
+        if fort_targets:
+            place_with_caps(state, FORT_PAT, fort_targets[0])
         return
 
     removed_continentals = remove_piece(state, REGULAR_PAT, None, 2, to="casualties")
@@ -205,15 +240,19 @@ def evt_028_moores_creek(state, shaded=False):
     Shaded   – “Patriots win”: In any one space, replace **every Tory** with
                 **two Patriot Militia** each.
     """
-    targets = state.get("spaces", {})
-    if not targets:
+    all_spaces = state.get("spaces", {})
+    if not all_spaces:
         return
-    preferred = [
-        sid for sid, sp in targets.items()
-        if (sp.get(TORY) and shaded) or ((sp.get(MILITIA_U) or sp.get(MILITIA_A)) and not shaded)
-    ]
-    target_list = sorted(preferred or targets)
-    target = target_list[0]
+    explicit = _filter_targets(state, state.get("moores_creek_target"), limit=1)
+    if explicit:
+        target = explicit[0]
+    else:
+        preferred = [
+            sid for sid, sp in all_spaces.items()
+            if (sp.get(TORY) and shaded) or ((sp.get(MILITIA_U) or sp.get(MILITIA_A)) and not shaded)
+        ]
+        target_list = sorted(preferred or all_spaces)
+        target = target_list[0]
     sp = state["spaces"].get(target, {})
 
     if shaded:
@@ -339,6 +378,12 @@ def evt_032_rule_britannia(state, shaded=False):
         if moved < qty:
             move_piece(state, tag, "unavailable", target, qty - moved)
 
+    def _qty(key, fallback):
+        try:
+            return int(state.get(key, fallback))
+        except (TypeError, ValueError):
+            return fallback
+
     if shaded:
         british_cities = [
             n for n, sp in state["spaces"].items()
@@ -357,8 +402,10 @@ def evt_032_rule_britannia(state, shaded=False):
         if not colonies:
             return
         target = colonies[0]
-    _pull_from_pools(REGULAR_BRI, 2)
-    _pull_from_pools(TORY,   2)
+    reg_qty = min(2, max(0, _qty("rule_britannia_regulars", 2)))
+    tory_qty = min(2, max(0, _qty("rule_britannia_tories", 2)))
+    _pull_from_pools(REGULAR_BRI, reg_qty)
+    _pull_from_pools(TORY,   tory_qty)
 
 # 33  THE BURNING OF FALMOUTH
 @register(33)
