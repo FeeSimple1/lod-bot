@@ -55,8 +55,9 @@ def maybe_play_brilliant_stroke(state, faction_has_card: dict[str, bool], factio
     fac = faction.upper()
     if not faction_has_card.get(fac):
         return None
+
     for other, has_card in faction_has_card.items():
-        other_fac = other.upper()
+        other_fac = str(other).upper()
         if other_fac == fac or not has_card:
             continue
         if priority.get(other_fac, 0) > priority.get(fac, 0):
@@ -74,9 +75,11 @@ def apply_reward_loyalty_cost(state, faction: str, loyalty_shift_levels: int) ->
     if loyalty_shift_levels <= 0:
         return
     fac = faction.upper()
+    if fac not in (C.BRITISH, C.FRENCH):
+        return
     current = state.setdefault("resources", {}).get(fac, 0)
     cost = max(0, loyalty_shift_levels)
-    state["resources"][fac] = max(0, current - cost)
+    state["resources"][fac] = max(C.MIN_RESOURCES, current - cost)
     push_history(state, f"{fac} Reward Loyalty during Brilliant Stroke - paid {cost} Resources")
 
 # ------------------------------------------------ 105-108 ------------------ #

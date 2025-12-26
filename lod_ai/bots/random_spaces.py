@@ -2,29 +2,62 @@
 """
 Random Spaces table (Rule 8.2).
 
-RANDOM_SPACES[row][col]  where
+The table is indexed as RANDOM_SPACES_TABLE[row][col] where
     row = 0-5   → result of 1D6 − 1
     col = 0-2   → result of 1D3 − 1
-Each cell is a list; try the names in order, then follow arrows
-(continue downward in the same column, wrap to next column, and
-finally from Massachusetts to Quebec City).
+Entries containing “A / B” represent two candidate spaces for that cell.
 """
-
-RANDOM_SPACES = [
-    # 1D3 = 1           2                       3
-    [["Quebec_City"],   ["Northwest", "Maryland-Delaware"], ["North_Carolina"]],
-    [["Quebec", "New_York"], ["Philadelphia"],            ["Savannah"]],
-    [["New_Hampshire"], ["Pennsylvania"],                   ["Florida", "South_Carolina"]],
-    [["Connecticut", "Rhode_Island"], ["Norfolk"],          ["Georgia"]],
-    [["New_York_City"], ["Southwest", "Virginia"],          ["Boston"]],
-    [["New_Jersey"],    ["Charles_Town"],                   ["Massachusetts"]],
-]
 
 import random
 
+from lod_ai.map import adjacency as map_adj
 
-def _roll(rng, sides: int) -> int:
-    return rng.randint(1, sides)
+RANDOM_SPACES_TABLE = [
+    # 1D3 = 1                     2                               3
+    ["Quebec City",               "Northwest / Maryland-Delaware", "North Carolina"],
+    ["Quebec / New York",         "Philadelphia",                  "Savannah"],
+    ["New Hampshire",             "Pennsylvania",                  "Florida / South Carolina"],
+    ["Connecticut / Rhode Island","Norfolk",                       "Georgia"],
+    ["New York City",             "Southwest / Virginia",          "Boston"],
+    ["New Jersey",                "Charles Town",                  "Massachusetts"],
+]
+
+
+def _roll_d3(rng) -> int:
+    return rng.randint(1, 3)
+
+
+def _roll_d6(rng) -> int:
+    return rng.randint(1, 6)
+
+
+def _normalize_label(label: str) -> str:
+    return label.replace("_", " ").replace("-", " ").replace("/", " ").lower().strip()
+
+
+_SPACE_LOOKUP = {_normalize_label(sid): sid for sid in map_adj.all_space_ids()}
+_SPACE_ALIASES = {
+    "connecticut": "Connecticut_Rhode_Island",
+    "rhode island": "Connecticut_Rhode_Island",
+    "connecticut rhode island": "Connecticut_Rhode_Island",
+}
+
+
+def _label_to_ids(label: str) -> list[str]:
+    ids: list[str] = []
+    for token in label.split("/"):
+        name = token.strip()
+        key = _normalize_label(name)
+        alias = _SPACE_ALIASES.get(key)
+        if alias:
+            ids.append(alias)
+            continue
+        match = _SPACE_LOOKUP.get(key)
+        if match:
+            ids.append(match)
+            continue
+        ids.append(name.replace(" ", "_"))
+    return ids
 
 
 def choose_random_space(candidates):
@@ -37,31 +70,29 @@ def choose_random_space(candidates):
     if not candidates:
         return None
     rng = random
-    col = _roll(rng, 3)  # 1-3
-    row = _roll(rng, 6)  # 1-6
-    start = (row, col)
-    visited = 0
-    while visited < 18:  # 3 columns × 6 rows
-        entry = RANDOM_SPACES[row - 1][col - 1]
-        for name in entry:
-            if name in candidates:
-                return name
+    remaining = set(candidates)
+    col = _roll_d3(rng)  # 1-3
+    row = _roll_d6(rng)  # 1-6
+    for _ in range(18):  # 3 columns × 6 rows
+        entry = RANDOM_SPACES_TABLE[row - 1][col - 1]
+        for space_id in _label_to_ids(entry):
+            if space_id in remaining:
+                return space_id
         if row < 6:
             row += 1
         else:
             row = 1
             col = 1 if col == 3 else col + 1
-        visited += 1
     return None
 
 
 def iter_random_spaces():
     """Yield an infinite stream of spaces following the 8.2 arrow rules."""
     rng = random
-    col = _roll(rng, 3)  # 1-3
-    row = _roll(rng, 6)  # 1-6
+    col = _roll_d3(rng)  # 1-3
+    row = _roll_d6(rng)  # 1-6
     while True:
-        for space in RANDOM_SPACES[row - 1][col - 1]:
+        for space in _label_to_ids(RANDOM_SPACES_TABLE[row - 1][col - 1]):
             yield space
         if row < 6:
             row += 1

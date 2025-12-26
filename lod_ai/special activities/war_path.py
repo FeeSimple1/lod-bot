@@ -31,7 +31,7 @@ from lod_ai.rules_consts import (
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.board.pieces      import remove_piece, add_piece
-from lod_ai.leaders          import apply_leader_modifiers
+from lod_ai.leaders          import apply_leader_modifiers, leader_location
 
 REB_CUBE_TAGS = (MILITIA_A, MILITIA_U, REGULAR_PAT, REGULAR_FRE)
 
@@ -117,15 +117,22 @@ def execute(
         remove_piece(state, FORT_PAT,        space_id, 1, to="available")
 
     # Base War Path militia removal (plus Brant capability)
+    brant_here = leader_location(state, "LEADER_BRANT") == space_id
     extra_militia = 1 + ctx.get("war_path_extra_militia", 0)
+    if brant_here:
+        extra_militia += 1
+
+    removed_bonus = 0
     while extra_militia and (sp.get(MILITIA_A, 0) or sp.get(MILITIA_U, 0)):
         if sp.get(MILITIA_A, 0):
             remove_piece(state, MILITIA_A, space_id, 1, to="casualties")
         else:
             remove_piece(state, MILITIA_U, space_id, 1, to="casualties")
         extra_militia -= 1
-        if ctx.get("war_path_extra_militia", 0):
-            push_history(state, "Brant present - War Path removes an additional Militia.")
+        removed_bonus += 1
+
+    if brant_here and removed_bonus:
+        push_history(state, "Brant present - War Path removes an additional Militia.")
 
     refresh_control(state)
     enforce_global_caps(state)

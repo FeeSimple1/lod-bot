@@ -193,6 +193,18 @@ def _default_to_underground(spaces: Dict[str, Dict[str, int]]) -> None:
                 sp[dst] = sp.get(dst, 0) + int(sp.pop(src) or 0)
 
 
+def _force_start_underground(spaces: Dict[str, Dict[str, int]]) -> None:
+    """
+    Ensure all Militia and War Parties begin Underground during scenario setup.
+    Any Active counts are shifted into their Underground variants.
+    """
+    for sp in spaces.values():
+        if sp.get(MILITIA_A, 0):
+            sp[MILITIA_U] = sp.get(MILITIA_U, 0) + sp.pop(MILITIA_A, 0)
+        if sp.get(WARPARTY_A, 0):
+            sp[WARPARTY_U] = sp.get(WARPARTY_U, 0) + sp.pop(WARPARTY_A, 0)
+
+
 # ----------------------------------------------------------------------- #
 # Support normalisation (derive state['support'] from per‑space fields)    #
 # ----------------------------------------------------------------------- #
@@ -303,6 +315,7 @@ def build_state(
     """Return a fully‑initialised *state* for the given scenario alias."""
     scen = load_scenario(scenario)
     _default_to_underground(scen.get("spaces", {}))
+    _force_start_underground(scen.get("spaces", {}))
 
     state: Dict[str, Any] = {
         "scenario":  scen["scenario"],

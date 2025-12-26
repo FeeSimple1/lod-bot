@@ -32,6 +32,7 @@ from lod_ai.rules_consts import (
     WARPARTY_U, WARPARTY_A,
     REGULAR_BRI, TORY,
     MILITIA_U, MILITIA_A,
+    INDIANS,
 )
 from lod_ai.util.history import push_history
 from lod_ai.util.caps import refresh_control, enforce_global_caps
@@ -88,7 +89,7 @@ def execute(
         If True, immediately Skirmish in *dst* after movement using
         the British Regulars that moved.
     """
-    if faction != "INDIANS":
+    if faction != INDIANS:
         raise ValueError("Only INDIANS may execute the Scout command.")
 
     # -------- Basic spatial checks ------------------------------------------
