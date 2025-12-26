@@ -17,7 +17,7 @@ RANDOM_SPACES_TABLE = [
     ["Quebec City",               "Northwest / Maryland-Delaware", "North Carolina"],
     ["Quebec / New York",         "Philadelphia",                  "Savannah"],
     ["New Hampshire",             "Pennsylvania",                  "Florida / South Carolina"],
-    ["Connecticut / Rhode Island","Norfolk",                       "Georgia"],
+    ["Connecticut_Rhode_Island",  "Rhode_Island",                  "Norfolk"],
     ["New York City",             "Southwest / Virginia",          "Boston"],
     ["New Jersey",                "Charles Town",                  "Massachusetts"],
 ]
@@ -71,31 +71,28 @@ def choose_random_space(candidates):
         return None
     rng = random
     remaining = set(candidates)
-    col = _roll_d3(rng)  # 1-3
-    row = _roll_d6(rng)  # 1-6
-    for _ in range(18):  # 3 columns × 6 rows
-        entry = RANDOM_SPACES_TABLE[row - 1][col - 1]
-        for space_id in _label_to_ids(entry):
-            if space_id in remaining:
-                return space_id
-        if row < 6:
-            row += 1
-        else:
-            row = 1
-            col = 1 if col == 3 else col + 1
+    start_col = _roll_d3(rng)  # 1-3
+    start_row = _roll_d6(rng)  # 1-6
+    order_rows = list(range(start_row, 7)) + list(range(1, start_row))
+    order_cols = list(range(start_col, 4)) + list(range(1, start_col))
+    for c in order_cols:
+        for r in order_rows:
+            entry = RANDOM_SPACES_TABLE[r - 1][c - 1]
+            for space_id in _label_to_ids(entry):
+                if space_id in remaining:
+                    return space_id
     return None
 
 
 def iter_random_spaces():
     """Yield an infinite stream of spaces following the 8.2 arrow rules."""
     rng = random
-    col = _roll_d3(rng)  # 1-3
-    row = _roll_d6(rng)  # 1-6
+    start_col = _roll_d3(rng)  # 1-3
+    start_row = _roll_d6(rng)  # 1-6
+    order_rows = list(range(start_row, 7)) + list(range(1, start_row))
+    order_cols = list(range(start_col, 4)) + list(range(1, start_col))
     while True:
-        for space in _label_to_ids(RANDOM_SPACES_TABLE[row - 1][col - 1]):
-            yield space
-        if row < 6:
-            row += 1
-        else:
-            row = 1
-            col = 1 if col == 3 else col + 1
+        for c in order_cols:
+            for r in order_rows:
+                for space in _label_to_ids(RANDOM_SPACES_TABLE[r - 1][c - 1]):
+                    yield space
