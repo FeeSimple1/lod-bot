@@ -1,1 +1,1 @@
-"""Top level package for the Lords of Destiny bot."""
+"""Top level package for the Liberty or Death bot."""
