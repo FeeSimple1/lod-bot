@@ -31,9 +31,11 @@ from lod_ai.rules_consts import (
     # support enums
     ACTIVE_OPPOSITION, PASSIVE_OPPOSITION, NEUTRAL,
 )
+from lod_ai.leaders import leader_location
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent
+from lod_ai.map.adjacency import shortest_path
 from lod_ai.board.pieces      import remove_piece, add_piece      # NEW
 from lod_ai.economy.resources import spend                       # NEW
 
@@ -84,6 +86,10 @@ def execute(
         raise ValueError("Raid selects 1-3 Provinces.")
 
     move_plan = move_plan or []
+    dragging_canoe_loc = leader_location(state, "LEADER_DRAGGING_CANOE") or leader_location(state, "DRAGGING_CANOE")
+    initial_wp = {sid: sp.get(WARPARTY_U, 0) for sid, sp in state["spaces"].items()}
+    dc_pool = initial_wp.get(dragging_canoe_loc, 0) if dragging_canoe_loc else 0
+    dc_used = 0
 
     # ═══ validation ════════════════════════════════════════════════════════
     selected_set = set(selected)
@@ -100,7 +106,11 @@ def execute(
             state["spaces"][nbr].get(WARPARTY_U, 0) > 0
             for nbr in state["spaces"] if is_adjacent(space_id, nbr)
         )
-        if (local_u == 0) and not adj_u:
+        dc_reach = False
+        if dragging_canoe_loc and initial_wp.get(dragging_canoe_loc, 0) > 0:
+            path = shortest_path(dragging_canoe_loc, space_id)
+            dc_reach = bool(path) and (len(path) - 1) <= 2
+        if (local_u == 0) and not adj_u and not dc_reach:
             raise ValueError(f"{space_id} lacks access to an Underground War-Party.")
 
     for src, dst in move_plan:
@@ -108,8 +118,13 @@ def execute(
             raise ValueError(f"Move destination {dst} not among selected Provinces.")
         if dst in dst_seen:
             raise ValueError(f"Only one WP may move into {dst}.")
-        if not is_adjacent(src, dst):
-            raise ValueError(f"{src} not adjacent to {dst}.")
+        path = shortest_path(src, dst)
+        distance = len(path) - 1 if path else None
+        started_in_dc = dragging_canoe_loc and src == dragging_canoe_loc and dc_pool > dc_used
+        if started_in_dc and distance is not None and distance <= 2:
+            dc_used += 1
+        elif distance != 1:
+            raise ValueError(f"{src} not within Raid move range of {dst}.")
         dst_seen.add(dst)
 
     # ═══ resource payment ══════════════════════════════════════════════════

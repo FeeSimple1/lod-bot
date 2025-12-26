@@ -44,12 +44,14 @@ from lod_ai.rules_consts import (
     # Support indices
     ACTIVE_SUPPORT, PASSIVE_SUPPORT, NEUTRAL,
     PASSIVE_OPPOSITION, ACTIVE_OPPOSITION,
+    WEST_INDIES_ID,
 )
+from lod_ai.leaders        import apply_leader_modifiers, leader_location
+from lod_ai.util.piece_kinds import is_cube, loss_value
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.board.pieces   import remove_piece, add_piece
 from lod_ai.economy.resources import spend, can_afford
-from lod_ai.leaders        import apply_leader_modifiers
 from lod_ai.util.loss_mod  import pop_loss_mod
 
 COMMAND_NAME = "BATTLE"
@@ -122,22 +124,6 @@ def _resolve_space(
     ctx: Dict,
     attacker_faction: str,
     sid: str,
-    bonus: int,
-) -> None:
-    sp = state["spaces"][sid]
-
-    att_side = "ROYALIST" if attacker_faction == "BRITISH" else "REBELLION"
-    def_side = "REBELLION" if att_side == "ROYALIST" else "ROYALIST"
-
-    # Common‑Cause War‑Parties loaned as Tory cubes
-    cc_wp = ctx.get("common_cause", {}).get(sid, 0)
-
-    # ── Force calc helper ----------------------------------------------------
-def _resolve_space(
-    state: Dict,
-    ctx: Dict,
-    attacker_faction: str,
-    sid: str,
     attacker_bonus: int,
 ) -> None:
     sp = state["spaces"][sid]
@@ -171,9 +157,9 @@ def _resolve_space(
         roll_total = sum(_roll_d3(state) for _ in range(dice))
         mods = 0
         if is_defender:                                 # §3.6.5
-            if attacker_faction == "BRITISH" and sp.get("blockade", 0) and sid != "West_Indies":
+            if attacker_faction == "BRITISH" and sp.get("blockade", 0) and sid != WEST_INDIES_ID:
                 mods -= 1
-            if attacker_faction == "BRITISH" and sid == "West_Indies" and sp.get("blockade", 0):
+            if attacker_faction == "BRITISH" and sid == WEST_INDIES_ID and sp.get("blockade", 0):
                 mods -= 1
             if attacker_faction == "FRENCH" and ctx.get("attacker_defender_loss_bonus", 0):
                 mods += ctx["attacker_defender_loss_bonus"]
@@ -196,9 +182,9 @@ def _resolve_space(
     defender_loss += def_mod
 
     # ── Casualty removal -----------------------------------------------------
-    def _remove(side: str, loss: int) -> int:
+    def _remove(side: str, loss: int) -> tuple[int, bool]:
         if loss <= 0:
-            return 0
+            return 0, False
 
         if side == "ROYALIST":
             order = (
@@ -212,23 +198,38 @@ def _resolve_space(
                 FORT_PAT,
             )
         removed = 0
+        removed_cube_or_fort = False
+        remaining_loss = loss
         for tag in order:
             avail = sp.get(tag, 0)
-            if avail == 0:
-                continue
-            n = min(avail, loss - removed)
-            remove_piece(state, tag, sid, n, to="casualties")
-            removed += n
-            if removed == loss:
+            while avail and remaining_loss > 0:
+                remove_piece(state, tag, sid, 1, to="casualties")
+                removed += 1
+                remaining_loss -= loss_value(tag)
+                avail -= 1
+                if is_cube(tag) or tag in (FORT_BRI, FORT_PAT):
+                    removed_cube_or_fort = True
+            if remaining_loss <= 0:
                 break
-        return removed
+        return removed, removed_cube_or_fort
 
-    pieces_def_lost = _remove(def_side, defender_loss)
-    pieces_att_lost = _remove(att_side, attacker_loss)
+    pieces_def_lost, def_lost_cube_or_fort = _remove(def_side, defender_loss)
+    pieces_att_lost, att_lost_cube_or_fort = _remove(att_side, attacker_loss)
 
     # ── Win‑the‑Day support shift -------------------------------------------
-    def _shift(winner: str, loser_removed: int):
+    def _shift(winner: str, loser_removed: int, loser_lost_cube_or_fort: bool):
+        if sid == WEST_INDIES_ID:
+            return
+        if loser_removed < 2 or not loser_lost_cube_or_fort:
+            return
+
         shifts = min(3, loser_removed // 2)
+        if winner == "REBELLION":
+            if leader_location(state, "LEADER_WASHINGTON") == sid or leader_location(state, "WASHINGTON") == sid:
+                shifts = min(6, shifts * 2)
+
+        if shifts == 0:
+            return
         for _ in range(shifts):
             cur = state.get("support", {}).get(sid, NEUTRAL)
             if winner == "ROYALIST" and cur > ACTIVE_OPPOSITION:
@@ -245,9 +246,10 @@ def _resolve_space(
         winner = def_side
     # tie ⇒ Defender wins (already def_side)
 
-    if winner and sid != "West_Indies":
+    if winner:
         loser_removed = pieces_def_lost if winner == att_side else pieces_att_lost
-        _shift(winner, loser_removed)
+        loser_lost_cube_or_fort = def_lost_cube_or_fort if winner == att_side else att_lost_cube_or_fort
+        _shift(winner, loser_removed, loser_lost_cube_or_fort)
 
     # ── Log ------------------------------------------------------------------
     msg = (

@@ -30,7 +30,9 @@ from lod_ai import rules_consts as C
 from lod_ai.commands import raid, gather, march, scout
 from lod_ai.special_activities import plunder, war_path, trade
 from lod_ai.board.control import refresh_control
+from lod_ai.leaders import leader_location
 from lod_ai.util.history import push_history
+from lod_ai.map.adjacency import shortest_path
 
 # ----------------------------------------------------------------------
 #  MAP helpers
@@ -159,6 +161,8 @@ class IndianBot(BaseBot):
         Priority later: first where Plunder possible (WP > Rebels), then pop.
         """
         tgs = []
+        dc_loc = leader_location(state, "DRAGGING_CANOE") or leader_location(state, "LEADER_DRAGGING_CANOE")
+        dc_has_wp = dc_loc and state["spaces"].get(dc_loc, {}).get(C.WARPARTY_U, 0) > 0
         for col in self._opposition_colonies(state):
             sp = state["spaces"][col]
             has_u = sp.get(C.WARPARTY_U, 0) > 0
@@ -166,7 +170,11 @@ class IndianBot(BaseBot):
                 state["spaces"][nbr].get(C.WARPARTY_U, 0) > 0
                 for nbr in _adjacent(col)
             )
-            if has_u or adj_u:
+            dc_range = False
+            if dc_loc and dc_has_wp:
+                path = shortest_path(dc_loc, col)
+                dc_range = bool(path) and (len(path) - 1) <= 2
+            if has_u or adj_u or dc_range:
                 tgs.append(col)
         return tgs
 
@@ -184,6 +192,9 @@ class IndianBot(BaseBot):
         if not targets:
             return False
 
+        dc_loc = leader_location(state, "DRAGGING_CANOE") or leader_location(state, "LEADER_DRAGGING_CANOE")
+        available_wp = {sid: sp.get(C.WARPARTY_U, 0) for sid, sp in state["spaces"].items()}
+
         # Priority: first where WP > Rebels after move (for Plunder)
         def score(space: str) -> Tuple[int, int]:
             sp = state["spaces"][space]
@@ -198,8 +209,40 @@ class IndianBot(BaseBot):
             return (wp_total - rebels, pop)
 
         targets.sort(key=lambda t: score(t), reverse=True)
-        selected = targets[:3]
-        raid.execute(state, "INDIANS", {}, selected)
+        selected: List[str] = []
+        move_plan: List[Tuple[str, str]] = []
+
+        def _reserve_source(dst: str) -> str | None:
+            # prefer adjacent Underground WP
+            for src in _adjacent(dst):
+                if available_wp.get(src, 0) <= 0:
+                    continue
+                if state["spaces"][src].get(C.VILLAGE, 0) and available_wp[src] == 1:
+                    continue  # avoid stripping last WP from a Village space
+                return src
+            if dc_loc and available_wp.get(dc_loc, 0) > 0:
+                path = shortest_path(dc_loc, dst)
+                if path and (len(path) - 1) <= 2:
+                    return dc_loc
+            return None
+
+        for tgt in targets:
+            if len(selected) >= 3:
+                break
+            if state["spaces"][tgt].get(C.WARPARTY_U, 0) > 0:
+                selected.append(tgt)
+                continue
+            src = _reserve_source(tgt)
+            if src is None:
+                continue
+            selected.append(tgt)
+            move_plan.append((src, tgt))
+            available_wp[src] -= 1
+
+        if not selected:
+            return False
+
+        raid.execute(state, "INDIANS", {}, selected, move_plan=move_plan)
         return True
 
     # ------------------------------------------------------------------
