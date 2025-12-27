@@ -45,6 +45,7 @@ from lod_ai.rules_consts import (
     TORY, VILLAGE, WARPARTY_A, WARPARTY_U,
     BRITISH, PATRIOTS, FRENCH, INDIANS,
     FORT_BRI, FORT_PAT,
+    ACTIVE_SUPPORT, ACTIVE_OPPOSITION,
     BLOCKADE, BLOCKADE_KEY, WEST_INDIES_ID,
     LEADER_CHAIN,
     RAID, PROPAGANDA
@@ -326,6 +327,9 @@ def _support_phase(state):
 
     shifted = defaultdict(int)      # how many times each space has shifted
     control_map = state.get("control", {})
+    markers = state.setdefault("markers", {})
+    raid_on_map = markers.setdefault(RAID, {"pool": 0, "on_map": set()}).setdefault("on_map", set())
+    propaganda_on_map = markers.setdefault(PROPAGANDA, {"pool": 0, "on_map": set()}).setdefault("on_map", set())
 
     # ---------------------------------------------------------------
     # 6.4.1  Reward Loyalty  (British)
@@ -341,27 +345,31 @@ def _support_phase(state):
             continue
 
         level = state["support"].get(sid, 0)
-        if level >= 2:          # already max Active Support
+        if level >= ACTIVE_SUPPORT:          # already max Active Support
+            continue
+        steps_remaining = 2 - shifted[sid]
+        if steps_remaining <= 0:
             continue
 
-        # first, remove Raid or Propaganda marker if present
-        if sp.get(RAID):
-            remove_piece(state, RAID, sid, 1, to="available")
-            push_history(state, f"British removed Raid in {sid} (6.4.1)")
-            shifted[sid] += 1
-            continue
-        if sp.get(PROPAGANDA):
-            remove_piece(state, PROPAGANDA, sid, 1, to="available")
-            push_history(state, f"British removed Propaganda in {sid} (6.4.1)")
-            shifted[sid] += 1
-            continue
+        # first, remove Raid or Propaganda marker if present (costs 1 each)
+        for marker_tag, on_map in ((RAID, raid_on_map), (PROPAGANDA, propaganda_on_map)):
+            if steps_remaining <= 0 or not resources.can_afford(state, BRITISH, 1):
+                break
+            if sid in on_map:
+                resources.spend(state, BRITISH, 1)
+                remove_piece(state, marker_tag, sid, 1, to="available")
+                push_history(state, f"British removed {marker_tag} in {sid} (6.4.1)")
+                shifted[sid] += 1
+                steps_remaining -= 1
 
-        # otherwise pay 1 Resource to shift one level toward Active Support
-        if resources.can_afford(state, BRITISH, 1):
+        # pay 1 Resource per support shift, up to remaining steps
+        while steps_remaining > 0 and resources.can_afford(state, BRITISH, 1) and level < ACTIVE_SUPPORT:
             resources.spend(state, BRITISH, 1)
-            state["support"][sid] = level + 1
+            level += 1
+            state["support"][sid] = level
             spent += 1
             shifted[sid] += 1
+            steps_remaining -= 1
             push_history(state, f"British shifted {sid} toward Active Support (6.4.1)")
 
     if spent:
@@ -380,22 +388,32 @@ def _support_phase(state):
             continue
 
         level = state["support"].get(sid, 0)
-        if level <= -2:            # already max Active Opposition
+        if level <= ACTIVE_OPPOSITION:            # already max Active Opposition
+            continue
+        steps_remaining = 2 - shifted[sid]
+        if steps_remaining <= 0:
             continue
 
-        # first, remove Raid marker if present
-        if sp.get(RAID):
+        # Skip if only marker removal would occur
+        if level <= ACTIVE_OPPOSITION:
+            continue
+
+        # remove Raid markers first (cost 1 each)
+        if sid in raid_on_map and steps_remaining > 0 and resources.can_afford(state, PATRIOTS, 1):
+            resources.spend(state, PATRIOTS, 1)
             remove_piece(state, RAID, sid, 1, to="available")
             push_history(state, f"Patriots removed Raid in {sid} (6.4.2)")
             shifted[sid] += 1
-            continue
+            steps_remaining -= 1
 
-        # otherwise pay 1 Resource to shift one level toward Active Opposition
-        if resources.can_afford(state, PATRIOTS, 1):
+        # pay 1 Resource per shift toward Opposition
+        while steps_remaining > 0 and resources.can_afford(state, PATRIOTS, 1) and level > ACTIVE_OPPOSITION:
             resources.spend(state, PATRIOTS, 1)
-            state["support"][sid] = level - 1
+            level -= 1
+            state["support"][sid] = level
             spent += 1
             shifted[sid] += 1
+            steps_remaining -= 1
             push_history(state, f"Patriots shifted {sid} toward Active Opposition (6.4.2)")
 
     if spent:

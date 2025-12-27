@@ -15,15 +15,14 @@ from lod_ai.util.history import push_history  # adjust if your path differs
 from lod_ai.board.pieces import (
     move_piece, place_piece, remove_piece, place_with_caps, place_marker
 )
-from lod_ai.rules_consts import MAX_FNI
+from lod_ai.rules_consts import MAX_FNI, MIN_RESOURCES, MAX_RESOURCES
 from lod_ai.util.loss_mod import queue_loss_mod
 from lod_ai.util.free_ops import queue_free_op
+from lod_ai.economy import resources
 
 # --------------------------------------------------------------------------- #
 # Constants
 # --------------------------------------------------------------------------- #
-MAX_RESOURCES = 50
-MIN_RESOURCES = 0
 MAX_SUPPORT   = 2     # active Support
 MIN_SUPPORT   = -2    # active Opposition
 
@@ -35,9 +34,7 @@ def clamp_resources(state):
     Clamp every faction’s Resources to the official 0-50 range.
     Call this once after you change *any* resource value.
     """
-    res = state["resources"]
-    for fac in res:
-        res[fac] = max(MIN_RESOURCES, min(MAX_RESOURCES, res[fac]))
+    resources.clamp_all(state)
 
 _ALIAS = {
     "British": "BRITISH",  "BRITISH": "BRITISH",
