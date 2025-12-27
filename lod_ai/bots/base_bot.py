@@ -8,6 +8,7 @@ from lod_ai.bots import event_instructions as EI
 from lod_ai import dispatcher
 from lod_ai.cards import CARD_HANDLERS
 from lod_ai.util.history import push_history
+from lod_ai.util import eligibility as elig
 
 class BaseBot:
     faction: str            # e.g. "BRITISH"
@@ -42,6 +43,38 @@ class BaseBot:
             return
         shaded = card.get("dual") and self.faction in {"PATRIOTS", "FRENCH"}
         handler(state, shaded=shaded)
+        self._apply_eligibility_effects(state, card, shaded)
+
+    def _apply_eligibility_effects(self, state: Dict, card: Dict, shaded: bool) -> None:
+        """
+        Parse simple eligibility phrases from card text and mark flags on state.
+        This covers “Remain Eligible” and “Ineligible through next card”.
+        """
+        text_key = "shaded_event" if shaded else "unshaded_event"
+        text = (card.get(text_key) or "").lower()
+        targets = self._extract_factions_from_text(text) or [self.faction]
+        if "remain eligible" in text:
+            for fac in targets:
+                elig.mark_remain_eligible(state, fac)
+        if "ineligible through next card" in text:
+            for fac in targets:
+                elig.mark_ineligible_through_next(state, fac)
+
+    def _extract_factions_from_text(self, text: str) -> List[str]:
+        """Return any faction names mentioned in *text*."""
+        names = {
+            "british": "BRITISH",
+            "patriot": "PATRIOTS",
+            "patriots": "PATRIOTS",
+            "french": "FRENCH",
+            "indian": "INDIANS",
+            "indians": "INDIANS",
+        }
+        found = []
+        for key, fac in names.items():
+            if key in text:
+                found.append(fac)
+        return found
 
     #  REPLACE the placeholder method with this full version
     def _choose_event_vs_flowchart(self, state: Dict, card: Dict) -> bool:

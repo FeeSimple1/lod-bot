@@ -13,6 +13,7 @@ from lod_ai import rules_consts as C
 from lod_ai.board.control import refresh_control
 from lod_ai.map import adjacency as map_adj
 from lod_ai.util.caps import enforce_global_caps
+from lod_ai.economy import resources
 
 _MARKER_TAGS = (C.PROPAGANDA, C.RAID, C.BLOCKADE)
 
@@ -140,5 +141,6 @@ def normalize_state(state: Dict) -> None:
     _normalize_support(state, valid_spaces)
     _normalize_markers(state)
     _sanitize_pools(state)
+    resources.clamp_all(state)
     refresh_control(state)
     enforce_global_caps(state)

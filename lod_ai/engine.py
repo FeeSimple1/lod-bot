@@ -14,6 +14,7 @@ from lod_ai.util.year_end import resolve as resolve_year_end
 from lod_ai.util.history  import push_history
 from lod_ai import rules_consts as C
 from lod_ai.util.normalize_state import normalize_state
+from lod_ai.util import eligibility as elig
 
 # Command / SA implementations
 from lod_ai.commands import march, rally, battle, gather, muster, scout, raid
@@ -193,11 +194,13 @@ class Engine:
     # -------------------------------------------------------------------
     def _start_card(self, card: dict) -> tuple[str | None, str | None]:
         """Prepare eligibility and return acting factions for *card*."""
-        elig = self.state.setdefault("eligible", {})
+        elig_map = self.state.setdefault("eligible", {})
         for fac in self.state.pop("eligible_next", set()):
-            elig[fac] = True
+            elig_map[fac] = True
         for fac in self.state.pop("ineligible_next", set()):
-            elig[fac] = False
+            elig_map[fac] = False
+        for fac in elig.consume_ineligible_through_next(self.state):
+            elig_map[fac] = False
         order = determine_eligible_factions(self.state, card)
         self.state["current_card"] = card
         self.state["card_order"] = order
@@ -265,7 +268,10 @@ class Engine:
         normalize_state(self.state)
 
         # mark faction ineligible for remainder of card and queue for next card
-        elig = self.state.setdefault("eligible", {})
-        elig[faction] = False
-        self.state.setdefault("eligible_next", set()).discard(faction)
-        self.state.setdefault("ineligible_next", set()).add(faction)
+        if faction in self.state.get("remain_eligible", set()):
+            elig.clear_remain_eligible(self.state, faction)
+        else:
+            elig_map = self.state.setdefault("eligible", {})
+            elig_map[faction] = False
+            self.state.setdefault("eligible_next", set()).discard(faction)
+            self.state.setdefault("ineligible_next", set()).add(faction)

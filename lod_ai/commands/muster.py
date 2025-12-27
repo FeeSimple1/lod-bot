@@ -109,6 +109,7 @@ def _reward_loyalty(state: Dict, sp: Dict, space_id: str, levels: int) -> None:
     """
     if levels <= 0:
         return
+    levels = min(2, levels)
 
     # Checks – Regulars, Tories, Control
     if (sp.get(REGULAR_BRI, 0) == 0) or (sp.get(TORY, 0) == 0):
@@ -116,23 +117,35 @@ def _reward_loyalty(state: Dict, sp: Dict, space_id: str, levels: int) -> None:
     if state.get("control", {}).get(space_id) != "BRITISH":
         raise ValueError("British must Control the space to Reward Loyalty.")
 
-    # Calculate cost: levels + marker penalties
-    cost = levels
+    # Determine marker removals and potential shift
+    marker_state = state.setdefault("markers", {})
+    markers_here = []
     for marker in (PROPAGANDA, RAID):
-        marker_state = state.setdefault("markers", {}).setdefault(marker, {"pool": 0, "on_map": set()})
-        if space_id in marker_state.get("on_map", set()):
-            cost += 1
-            marker_state["on_map"].discard(space_id)
-            marker_state["pool"] = marker_state.get("pool", 0) + 1
+        entry = marker_state.setdefault(marker, {"pool": 0, "on_map": set()})
+        if space_id in entry.get("on_map", set()):
+            markers_here.append(marker)
 
+    current = _support_value(state, space_id)
+    shift_levels = min(levels, ACTIVE_SUPPORT - current)
+    if shift_levels <= 0:
+        # Skip Reward Loyalty if it would only clear markers
+        return
+
+    cost = len(markers_here) + shift_levels
     if state["resources"]["BRITISH"] < cost:
         raise ValueError("Not enough Resources to Reward Loyalty.")
 
     spend(state, "BRITISH", cost)
 
+    # Remove markers first (each already included in cost)
+    for marker in markers_here:
+        entry = marker_state.setdefault(marker, {"pool": 0, "on_map": set()})
+        if space_id in entry.get("on_map", set()):
+            entry["on_map"].discard(space_id)
+            entry["pool"] = entry.get("pool", 0) + 1
+
     # Apply shift
-    current = _support_value(state, space_id)
-    target  = current + levels
+    target  = current + shift_levels
     _set_support(state, space_id, target)
 
     # Log

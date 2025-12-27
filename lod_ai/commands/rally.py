@@ -146,6 +146,31 @@ def _move_militia(state: Dict,
         remove_piece(state, MILITIA_A, src_id, n_a)
         add_piece(state,    MILITIA_U, dst_id, n_a)   # Active flip Underground
 
+def _mid_rally_persuasion(state: Dict) -> None:
+    """
+    If Patriot Resources hit 0 during Rally, trigger Persuasion in up to
+    three eligible spaces (Rebellion Control + Underground Militia).
+    Preference: Patriot Fort present, then higher population.
+    """
+    from lod_ai.special_activities import persuasion
+
+    candidates = []
+    for sid, sp in state.get("spaces", {}).items():
+        if state.get("control", {}).get(sid) != "REBELLION":
+            continue
+        if sp.get(MILITIA_U, 0) <= 0:
+            continue
+        has_fort = sp.get(FORT_PAT, 0) > 0
+        pop = sp.get("population", 0)
+        candidates.append((-int(has_fort), -pop, sid))
+
+    if not candidates:
+        return
+
+    candidates.sort()
+    spaces = [sid for *_, sid in candidates[:3]]
+    persuasion.execute(state, "PATRIOTS", {}, spaces=spaces)
+
 
 # ---------------------------------------------------------------------------
 # Public entry point                                                          
@@ -189,6 +214,8 @@ def execute(
     # --- Cost payment -------------------------------------------------
     cost = len(selected)
     spend(state, "PATRIOTS", cost)
+    if state["resources"].get("PATRIOTS", 0) == 0:
+        _mid_rally_persuasion(state)
 
     push_history(state, f"PATRIOTS RALLY selected={selected}")
 
