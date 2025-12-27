@@ -36,7 +36,7 @@ def test_determine_eligible_factions():
 
 def test_engine_turn_marks_ineligible(tmp_path, monkeypatch):
     card_path = Path(__file__).resolve().parents[2] / "lod_ai" / "cards" / "data.json"
-    card = json.loads(card_path.read_text())[0]
+    card = json.loads(card_path.read_text(encoding="utf-8"))[0]
     state = {
         "spaces": {
             "Boston": {"British_Regular": 1, "adj": ["New_York"]},
@@ -90,4 +90,3 @@ def test_play_card_orders_and_skips(monkeypatch):
     assert state["eligible"][C.BRITISH] is False
     assert state["eligible"][C.FRENCH] is False
     assert state.get("ineligible_next", set()) == set()
-
