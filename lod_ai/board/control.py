@@ -1,47 +1,66 @@
+"""
 Control helpers (canonical location).
 
-`refresh_control(state)` computes controller for every space and writes
-the result to ``state["control"]`` and ``state["control_map"]``.
+`refresh_control(state)` computes controller for every space and writes the result to:
+- state["control"]
+- state["control_map"]  (backwards-compatibility alias)
 
-It also annotates each space dict in ``state["spaces"]`` with:
-- ``space["control"]``: "REBELLION", "BRITISH", or None
-- ``space["British_Control"]``: bool
-- ``space["Patriot_Control"]``: bool
+Control values:
+- "REBELLION" if Patriot+French pieces strictly exceed Royalist pieces.
+- "BRITISH" if Royalist pieces strictly exceed Rebellion pieces AND at least one British piece is present.
+- None otherwise (ties, or only Indians exceed Rebels).
 """
 
-from typing import Dict
+from __future__ import annotations
 
-REB_TAGS = ("Patriot_", "French_")
-ROY_BRI = ("British_",)
-ROY_IND = ("Indian_",)
+from typing import Any, Dict, Mapping
 
 
-def _tally(space: Dict, prefixes: tuple[str, ...]) -> int:
-    return sum(qty for tag, qty in space.items() if tag.startswith(prefixes))
+REB_PREFIXES: tuple[str, ...] = ("Patriot_", "French_")
+BRI_PREFIXES: tuple[str, ...] = ("British_",)
+IND_PREFIXES: tuple[str, ...] = ("Indian_",)
 
 
-def refresh_control(state: Dict) -> None:
-    """Populate control information for every space."""
-    ctrl_map = {}
-    for sid, sp in state.get("spaces", {}).items():
-        rebels = _tally(sp, REB_TAGS)
-        roy_brit = _tally(sp, ROY_BRI)
-        roy_ind = _tally(sp, ROY_IND)
-        royalist = roy_brit + roy_ind
+def _tally(space: Mapping[str, Any], prefixes: tuple[str, ...]) -> int:
+    total = 0
+    for tag, qty in space.items():
+        if not isinstance(tag, str):
+            continue
+        if not isinstance(qty, int):
+            continue
+        if qty <= 0:
+            continue
+        if tag.startswith(prefixes):
+            total += qty
+    return total
 
-        control = None
+
+def refresh_control(state: Dict[str, Any]) -> None:
+    """Populate state['control'] with the controller for every space."""
+    ctrl_map: Dict[str, str | None] = {}
+
+    spaces = state.get("spaces", {})
+    if not isinstance(spaces, dict):
+        state["control"] = {}
+        state["control_map"] = {}
+        return
+
+    for sid, sp in spaces.items():
+        if not isinstance(sp, dict):
+            continue
+
+        rebels = _tally(sp, REB_PREFIXES)
+        bri = _tally(sp, BRI_PREFIXES)
+        ind = _tally(sp, IND_PREFIXES)
+        royalist = bri + ind
+
+        control: str | None = None
         if rebels > royalist:
             control = "REBELLION"
-        elif royalist > rebels and roy_brit > 0:
+        elif royalist > rebels and bri > 0:
             control = "BRITISH"
 
-        ctrl_map[sid] = control
-
-        # Annotate the space dict (tests and callers expect these keys)
-        sp["control"] = control
-        sp["British_Control"] = (control == "BRITISH")
-        sp["Patriot_Control"] = (control == "REBELLION")
+        ctrl_map[str(sid)] = control
 
     state["control"] = ctrl_map
-    # Backwards compatibility for any older callers
     state["control_map"] = ctrl_map

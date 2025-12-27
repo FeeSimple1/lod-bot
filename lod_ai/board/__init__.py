@@ -1,11 +1,10 @@
-# lod_ai/board/__init__.py
 """
-Shim module: re-export mutable board helpers.
+lod_ai.board
 
-This keeps older imports like
-    from lod_ai.board.control import refresh_control
-working, while the actual implementation now lives in
-lod_ai.map.control.refresh_control.
+Re-export board helpers without creating circular imports.
+The canonical implementation of refresh_control lives in lod_ai.board.control.
 """
 
-from lod_ai.map.control import refresh_control  # re-export
+from .control import refresh_control
+
+__all__ = ["refresh_control"]
