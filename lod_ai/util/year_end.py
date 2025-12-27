@@ -235,15 +235,42 @@ def _resource_income(state):
     indian_income    = 0
     rebellion_spaces = 0                    # exclude West Indies
     control_map = state.get("control", {})
+    if not isinstance(control_map, dict):
+        control_map = {}
+
     blockade_state = state.get("markers", {}).get(BLOCKADE, {"pool": 0, "on_map": set()})
+    if not isinstance(blockade_state, dict):
+        blockade_state = {"pool": 0, "on_map": set()}
+
     blockaded_cities = blockade_state.get("on_map", set())
+    if not isinstance(blockaded_cities, set):
+        blockaded_cities = set(blockaded_cities or [])
+
+    # Support both "blockade pool" and "blockade count stored in West Indies space"
+    wi_space = state.get("spaces", {}).get(WEST_INDIES_ID, {})
+    wi_blockades = 0
+    if isinstance(wi_space, dict):
+        wi_blockades += int(wi_space.get(BLOCKADE, 0) or 0)
+        wi_blockades += int(wi_space.get(BLOCKADE_KEY, 0) or 0)
+
+    wi_pool_blockades = int(blockade_state.get("pool", 0) or 0)
+    total_wi_blockades = wi_pool_blockades + wi_blockades
 
     # ---------------  map sweep  --------------------------------
     for sid, sp in state["spaces"].items():
         meta = map_adj.space_meta(sid) or {}
         space_type = meta.get("type") or sp.get("type")
         pop = meta.get("population", sp.get("pop", 0))
-        ctrl = control_map.get(sid)
+        # Prefer centralized state["control"] if present; otherwise infer from per-space booleans
+        if sid in control_map:
+            ctrl = control_map[sid]
+        else:
+            if sp.get("British_Control"):
+                ctrl = "BRITISH"
+            elif sp.get("Patriot_Control") or sp.get("Rebellion_Control"):
+                ctrl = "REBELLION"
+            else:
+                ctrl = None
 
         # British Forts
         if sp.get(FORT_BRI):
@@ -280,8 +307,8 @@ def _resource_income(state):
         # After ToA: keep city pop and add FNI box level
         french_income += state.get("fni_level", 0)
     else:
-        # Before ToA: ignore city pop, earn 2× Blockades in W.I. pool
-        french_income = blockade_state.get("pool", 0) * 2
+        # Before ToA: ignore city pop, earn 2× Blockades in West Indies (pool + per-space)
+        french_income = total_wi_blockades * 2
 
     # West Indies bonuses
     if wi_ctrl == "BRITISH":
@@ -327,6 +354,18 @@ def _support_phase(state):
 
     shifted = defaultdict(int)      # how many times each space has shifted
     control_map = state.get("control", {})
+    if not isinstance(control_map, dict):
+        control_map = {}
+
+    def _ctrl(sid, sp):
+        if sid in control_map:
+            return control_map[sid]
+        if sp.get("British_Control"):
+            return "BRITISH"
+        if sp.get("Patriot_Control") or sp.get("Rebellion_Control"):
+            return "REBELLION"
+        return None
+
     markers = state.setdefault("markers", {})
     raid_on_map = markers.setdefault(RAID, {"pool": 0, "on_map": set()}).setdefault("on_map", set())
     propaganda_on_map = markers.setdefault(PROPAGANDA, {"pool": 0, "on_map": set()}).setdefault("on_map", set())
@@ -341,7 +380,7 @@ def _support_phase(state):
             continue
 
         # must be British-controlled City/Colony and contain both Regulars & Tories
-        if not (control_map.get(sid) == "BRITISH" and sp.get(REGULAR_BRI) and sp.get(TORY)):
+        if not (_ctrl(sid, sp) == "BRITISH" and sp.get(REGULAR_BRI) and sp.get(TORY)):
             continue
 
         level = state["support"].get(sid, 0)
@@ -384,7 +423,7 @@ def _support_phase(state):
             continue
 
         # must be Rebellion-controlled and contain Patriot pieces
-        if not (control_map.get(sid) == "REBELLION" and (sp.get(MILITIA_A) or sp.get(MILITIA_U) or sp.get(REGULAR_PAT))):
+        if not (_ctrl(sid, sp) == "REBELLION" and (sp.get(MILITIA_A) or sp.get(MILITIA_U) or sp.get(REGULAR_PAT))):
             continue
 
         level = state["support"].get(sid, 0)
@@ -612,12 +651,31 @@ def _tory_desertion(state):
 def _reset_phase(state):
     """Rule 6.7 – prepare map & deck for the next card."""
 
-    # Remove all Raid & Propaganda markers
+    # Remove all Raid & Propaganda markers (support both marker-map and per-space storage)
     markers = state.setdefault("markers", {})
     for tag in (RAID, PROPAGANDA):
         entry = markers.setdefault(tag, {"pool": 0, "on_map": set()})
         on_map = entry.get("on_map", set())
-        entry["pool"] = entry.get("pool", 0) + len(on_map)
+        if not isinstance(on_map, set):
+            on_map = set(on_map or [])
+
+        removed = 0
+
+        # If markers are stored directly in spaces (e.g., sp["Raid"]=1), remove them and count them.
+        for sid, sp in state.get("spaces", {}).items():
+            if not isinstance(sp, dict):
+                continue
+            if tag in sp:
+                cnt = int(sp.get(tag, 0) or 0)
+                sp.pop(tag, None)          # TESTS EXPECT KEY TO BE GONE
+                if cnt > 0:
+                    removed += cnt
+                on_map.discard(sid)        # avoid double-count if also tracked in markers.on_map
+
+        # If markers are tracked via markers[tag]["on_map"], remove 1 per remaining sid.
+        removed += len(on_map)
+
+        entry["pool"] = int(entry.get("pool", 0) or 0) + removed
         entry["on_map"] = set()
 
     # Mark all factions Eligible
