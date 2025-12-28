@@ -14,9 +14,16 @@ from typing import Callable, Dict, Any
 class Dispatcher:
     """Map op-strings to callables and execute them with kw-params."""
 
-    def __init__(self) -> None:
+    def __init__(self, engine: Any | None = None) -> None:
+        self.engine = engine
         self._cmd: Dict[str, Callable[..., Any]] = {}
         self._sa:  Dict[str, Callable[..., Any]] = {}
+        self.human_factions = set()
+        self._last_action: Dict[str, str | None] = {}
+
+    def set_human_factions(self, factions) -> None:
+        """Set the factions that are human-controlled for this game."""
+        self.human_factions = set(factions)
 
     # ------------- registration helpers -----------------
     def register_cmd(self, label: str, func: Callable[..., Any]) -> None:
@@ -48,3 +55,37 @@ class Dispatcher:
             return self._sa[label](faction=faction, space_id=space,
                                    free=free, **kwargs)
         raise KeyError(f"Action label '{label}' not registered")
+
+    # --------- helpers for interactive CLI support -------------------
+    def execute_event(self, faction: str, card: Any) -> Any:
+        """Process a faction playing the event on the given card."""
+        self._last_action[faction] = "event"
+        if self.engine and hasattr(self.engine, "handle_event"):
+            return self.engine.handle_event(faction, card)
+        return None
+
+    def execute_command(self, faction: str, command: str, special: str | None = None,
+                        limited: bool = False) -> Any:
+        """Execute a command (with optional special) for the given faction."""
+        self._last_action[faction] = "command"
+        if self.engine and hasattr(self.engine, "dispatcher"):
+            return self.engine.dispatcher.execute(
+                command, faction=faction, space=None, limited=limited, special=special
+            )
+        return None
+
+    def execute_bot_turn(self, faction: str, card: Any, first_action: str | None = None) -> Any:
+        """Execute a bot turn for the provided faction."""
+        if faction in self.human_factions:
+            return None
+        self._last_action[faction] = None
+        if self.engine and hasattr(self.engine, "bots"):
+            bot = self.engine.bots.get(faction)
+            if bot:
+                bot.take_turn(self.engine.state, card)
+                self._last_action[faction] = getattr(self.engine, "last_action", lambda f: None)(faction)
+        return self._last_action.get(faction)
+
+    def last_action(self, faction: str) -> str | None:
+        """Return the last recorded action for the faction."""
+        return self._last_action.get(faction)
