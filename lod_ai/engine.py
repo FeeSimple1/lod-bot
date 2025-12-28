@@ -15,6 +15,8 @@ from lod_ai.util.history  import push_history
 from lod_ai import rules_consts as C
 from lod_ai.util.normalize_state import normalize_state
 from lod_ai.util import eligibility as elig
+from lod_ai.state.setup_state import build_state
+from lod_ai.economy import resources
 
 # Command / SA implementations
 from lod_ai.commands import march, rally, battle, gather, muster, scout, raid
@@ -26,12 +28,13 @@ from lod_ai.bots.indians import IndianBot
 
 # ---------------------------------------------------------------------------
 class Engine:
-    def __init__(self, initial_state: dict, use_cli: bool = False):
-        self.state       = initial_state
+    def __init__(self, initial_state: dict | None = None, use_cli: bool = False):
+        self.state       = initial_state or build_state()
         normalize_state(self.state)
         self.ctx: dict   = {}          # scratch context per action
-        self.dispatcher  = Dispatcher()
+        self.dispatcher  = Dispatcher(self)
         self.use_cli     = use_cli
+        self.human_factions: set[str] = set()
 
         # ── core Command registrations ──────────────────────────────────
         self.dispatcher.register_cmd("march",  self._wrap_march())
@@ -109,6 +112,24 @@ class Engine:
             C.FRENCH:   FrenchBot(),
             C.INDIANS:  IndianBot(),
         }
+
+    def setup_scenario(self, year: str) -> None:
+        """Set up board and deck for the given scenario year (e.g. '1775', '1776', '1778')."""
+        self.state = build_state(year)
+        normalize_state(self.state)
+        self.ctx = {}
+
+    def set_human_factions(self, factions) -> None:
+        """Register which factions are controlled by humans."""
+        self.human_factions = set(factions)
+
+    def is_human_faction(self, faction: str) -> bool:
+        """Return True if the given faction is human-controlled."""
+        return faction in self.human_factions
+
+    def add_resources(self, faction: str, amount: int) -> None:
+        """Add resources to a faction (used when a faction passes)."""
+        resources.add(self.state, faction, amount)
 
     # -------------------------------------------------------------------
     # Dispatcher adapters
