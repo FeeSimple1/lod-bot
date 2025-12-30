@@ -8,6 +8,7 @@ from lod_ai.board.pieces import (
     place_marker,
     place_with_caps,
 )
+from lod_ai.board.control import get_control, refresh_control
 from lod_ai.util.history import push_history
 
 from lod_ai.rules_consts import (
@@ -316,8 +317,12 @@ def evt_030_hessians(state, shaded=False):
         if remove_qty:
             remove_piece(state, REGULAR_BRI, None, remove_qty, to="available")
     else:
-        eligible = [n for n, sp in state["spaces"].items()
-                    if sp.get(REGULAR_BRI) and sp.get("British_Control")]
+        if not isinstance(state.get("control"), dict):
+            refresh_control(state)
+        eligible = [
+            n for n, sp in state["spaces"].items()
+            if sp.get(REGULAR_BRI) and get_control(state, n) == "BRITISH"
+        ]
         for loc in eligible[:3]:
             _pull_regulars(loc, 2)
         add_resource(state, "British", +2)
@@ -340,9 +345,11 @@ def evt_032_rule_britannia(state, shaded=False):
             move_piece(state, tag, "unavailable", target, qty - moved)
 
     if shaded:
+        if not isinstance(state.get("control"), dict):
+            refresh_control(state)
         british_cities = [
             n for n, sp in state["spaces"].items()
-            if sp.get("British_Control") and sp.get("type") == "City"
+            if get_control(state, n) == "BRITISH" and sp.get("type") == "City"
         ]
         recipient = state.get("rule_britannia_recipient", "British")
         add_resource(state, recipient, len(british_cities) // 2)

@@ -79,6 +79,8 @@ def _supply_phase(state):
             return True
         return False
 
+    board_control.refresh_control(state)
+
     # British
     for sid, sp in state["spaces"].items():
         if sid == WEST_INDIES_ID:
@@ -87,7 +89,7 @@ def _supply_phase(state):
             continue
         meta = map_adj.space_meta(sid) or {}
         space_type = meta.get("type") or sp.get("type")
-        if sp.get(FORT_BRI) or (space_type == "City" and state.get("control", {}).get(sid) == "BRITISH"):
+        if sp.get(FORT_BRI) or (space_type == "City" and board_control.get_control(state, sid) == "BRITISH"):
             continue
         if _pay(BRITISH, sid, "British Supply"):
             continue
@@ -107,7 +109,7 @@ def _supply_phase(state):
             continue
         meta = map_adj.space_meta(sid) or {}
         space_type = meta.get("type") or sp.get("type")
-        if sp.get(FORT_PAT) or ((space_type in ("Colony", "City")) and state.get("control", {}).get(sid) == "REBELLION"):
+        if sp.get(FORT_PAT) or ((space_type in ("Colony", "City")) and board_control.get_control(state, sid) == "REBELLION"):
             continue
         if _pay(PATRIOTS, sid, "Patriot Supply"):
             continue
@@ -121,13 +123,15 @@ def _supply_phase(state):
                 remove_target -= qty
         push_history(state, f"Patriot Supply – units removed from {sid}")
 
+    board_control.refresh_control(state)
+
     # French
     for sid, sp in state["spaces"].items():
         fr = sp.get(REGULAR_FRE, 0)
         if fr == 0 or sid == WEST_INDIES_ID:
             continue
 
-        in_supply = sp.get(FORT_PAT) or sp.get("Rebellion_Control")
+        in_supply = sp.get(FORT_PAT) or (board_control.get_control(state, sid) == "REBELLION")
         if in_supply:
             continue
 
@@ -234,9 +238,7 @@ def _resource_income(state):
     french_income    = 0
     indian_income    = 0
     rebellion_spaces = 0                    # exclude West Indies
-    control_map = state.get("control", {})
-    if not isinstance(control_map, dict):
-        control_map = {}
+    board_control.refresh_control(state)
 
     blockade_state = state.get("markers", {}).get(BLOCKADE, {"pool": 0, "on_map": set()})
     if not isinstance(blockade_state, dict):
@@ -261,16 +263,7 @@ def _resource_income(state):
         meta = map_adj.space_meta(sid) or {}
         space_type = meta.get("type") or sp.get("type")
         pop = meta.get("population", sp.get("pop", 0))
-        # Prefer centralized state["control"] if present; otherwise infer from per-space booleans
-        if sid in control_map:
-            ctrl = control_map[sid]
-        else:
-            if sp.get("British_Control"):
-                ctrl = "BRITISH"
-            elif sp.get("Patriot_Control") or sp.get("Rebellion_Control"):
-                ctrl = "REBELLION"
-            else:
-                ctrl = None
+        ctrl = board_control.get_control(state, sid)
 
         # British Forts
         if sp.get(FORT_BRI):
@@ -301,7 +294,7 @@ def _resource_income(state):
     indian_income //= 2                         # ⌊Villages / 2⌋
     patriot_income += rebellion_spaces // 2     # ⌊spaces / 2⌋
 
-    wi_ctrl = control_map.get(WEST_INDIES_ID)
+    wi_ctrl = board_control.get_control(state, WEST_INDIES_ID)
 
     if state.get("treaty_of_alliance", False):
         # After ToA: keep city pop and add FNI box level
@@ -352,19 +345,11 @@ def _support_phase(state):
 
     from collections import defaultdict
 
+    board_control.refresh_control(state)
     shifted = defaultdict(int)      # how many times each space has shifted
-    control_map = state.get("control", {})
-    if not isinstance(control_map, dict):
-        control_map = {}
 
-    def _ctrl(sid, sp):
-        if sid in control_map:
-            return control_map[sid]
-        if sp.get("British_Control"):
-            return "BRITISH"
-        if sp.get("Patriot_Control") or sp.get("Rebellion_Control"):
-            return "REBELLION"
-        return None
+    def _ctrl(sid):
+        return board_control.get_control(state, sid)
 
     markers = state.setdefault("markers", {})
     raid_on_map = markers.setdefault(RAID, {"pool": 0, "on_map": set()}).setdefault("on_map", set())
@@ -380,7 +365,7 @@ def _support_phase(state):
             continue
 
         # must be British-controlled City/Colony and contain both Regulars & Tories
-        if not (_ctrl(sid, sp) == "BRITISH" and sp.get(REGULAR_BRI) and sp.get(TORY)):
+        if not (_ctrl(sid) == "BRITISH" and sp.get(REGULAR_BRI) and sp.get(TORY)):
             continue
 
         level = state["support"].get(sid, 0)
@@ -423,7 +408,7 @@ def _support_phase(state):
             continue
 
         # must be Rebellion-controlled and contain Patriot pieces
-        if not (_ctrl(sid, sp) == "REBELLION" and (sp.get(MILITIA_A) or sp.get(MILITIA_U) or sp.get(REGULAR_PAT))):
+        if not (_ctrl(sid) == "REBELLION" and (sp.get(MILITIA_A) or sp.get(MILITIA_U) or sp.get(REGULAR_PAT))):
             continue
 
         level = state["support"].get(sid, 0)

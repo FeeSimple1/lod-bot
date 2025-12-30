@@ -17,6 +17,7 @@ from .shared import (
     place_marker,
     adjust_fni,
 )
+from lod_ai.board.control import get_control, refresh_control
 from lod_ai.rules_consts import (
     WEST_INDIES_ID,
     VILLAGE,
@@ -106,11 +107,13 @@ def evt_009_von_steuben(state, shaded=False):
 def evt_011_kosciuszko(state, shaded=False):
     """Implement Kosciuszko event."""
     if shaded:
+        if not isinstance(state.get("control"), dict):
+            refresh_control(state)
         done = 0
         for name, sp in state["spaces"].items():
             if done == 2:
                 break
-            if not sp.get("Patriot_Control"):
+            if get_control(state, name) != "REBELLION":
                 continue
             # remove one Patriot piece if present
             for tag in list(sp.keys()):
@@ -196,8 +199,10 @@ def evt_027_queens_rangers(state, shaded=False):
             place_piece(state, MILITIA_U, name, 1)
         push_history(state, "Queen's Rangers suppressed by Patriot rallies")
     else:
+        if not isinstance(state.get("control"), dict):
+            refresh_control(state)
         targets = [n for n, sp in state["spaces"].items()
-                   if sp.get("type") == "Colony" and sp.get("British_Control")]
+                   if sp.get("type") == "Colony" and get_control(state, n) == "BRITISH"]
         for name in targets[:2]:
             moved = move_piece(state, TORY, "available", name, 2)
             if moved < 2:
@@ -417,8 +422,10 @@ def evt_071_treaty_amity(state, shaded=False):
         return
 
     pop = 0
-    for sp in state["spaces"].values():
-        if sp.get("type") == "City" and sp.get("Patriot_Control"):
+    if not isinstance(state.get("control"), dict):
+        refresh_control(state)
+    for name, sp in state["spaces"].items():
+        if sp.get("type") == "City" and get_control(state, name) == "REBELLION":
             pop += sp.get("population", 0)
     add_resource(state, "Patriots", pop)
     push_history(state, f"Treaty of Amity: Patriots gain {pop} Resources")
