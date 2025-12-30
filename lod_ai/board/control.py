@@ -62,12 +62,20 @@ def refresh_control(state: Dict[str, Any]) -> None:
 
         ctrl_map[str(sid)] = control
 
-        # Also store per-space for callers/tests that expect it.
-        sp["control"] = control
-        sp["British_Control"] = (control == "BRITISH")
-        sp["Patriot_Control"] = (control == "REBELLION")
-        # Keep legacy synonym if other code uses it
-        sp["Rebellion_Control"] = (control == "REBELLION")
-
     state["control"] = ctrl_map
     state["control_map"] = ctrl_map
+
+
+def get_control(state: Mapping[str, Any], sid: str | int) -> str | None:
+    """Return controlling faction for *sid* from ``state["control"]``."""
+    ctrl_map = state.get("control")
+    if isinstance(ctrl_map, dict) and isinstance(state, dict):
+        state["control_map"] = ctrl_map
+    if not isinstance(ctrl_map, dict):
+        refresh_control(state)
+        ctrl_map = state.get("control", {})
+
+    sid_key = str(sid)
+    if sid_key in ctrl_map:
+        return ctrl_map[sid_key]
+    return ctrl_map.get(sid) if isinstance(ctrl_map, dict) else None

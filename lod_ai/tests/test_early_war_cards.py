@@ -159,9 +159,14 @@ def test_card32_rule_britannia_any_colony_and_any_recipient():
     state["spaces"] = {
         "Georgia": {"type": "Colony"},
         "Virginia": {"type": "Colony"},
-        "Boston": {"type": "City", "British_Control": True},
-        "New_York_City": {"type": "City", "British_Control": True},
+        "Boston": {"type": "City"},
+        "New_York_City": {"type": "City"},
     }
+    state["control"] = {
+        "Boston": "BRITISH",
+        "New_York_City": "BRITISH",
+    }
+    state["control_map"] = dict(state["control"])
     state["available"] = {REGULAR_BRI: 1, TORY: 1}
     state["unavailable"] = {REGULAR_BRI: 2, TORY: 2}
 
