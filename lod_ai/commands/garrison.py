@@ -131,14 +131,16 @@ def execute(
     # Leader hooks (none today, keep pattern) -----------------------
     ctx = apply_leader_modifiers(state, faction, "pre_garrison", ctx)
 
+    state["_turn_command"] = COMMAND_NAME
+    dest_set = {dst for inner in move_map.values() for dst in inner}
     # Limited‑command validations -----------------------------------
     if limited:
-        dest_set = {dst for inner in move_map.values() for dst in inner}
         if len(dest_set) != 1:
             raise ValueError("Limited GARRISON must end in a single City")
         if displace_city and displace_city != next(iter(dest_set)):
             raise ValueError("Limited GARRISON displacement must originate in the destination City")
 
+    state.setdefault("_turn_affected_spaces", set()).update(dest_set)
     # Main movement --------------------------------------------------
     push_history(state, "BRITISH GARRISON")
 

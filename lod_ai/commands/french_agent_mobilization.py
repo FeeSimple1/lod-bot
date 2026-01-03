@@ -92,6 +92,8 @@ def execute(
     if state.get("support", {}).get(province, NEUTRAL) == ACTIVE_SUPPORT:
         raise ValueError("Cannot mobilize agents in a province at Active Support.")
 
+    state["_turn_command"] = COMMAND_NAME
+    state.setdefault("_turn_affected_spaces", set()).add(province)
     # Resource cost ----------------------------------------------------------
     spend(state, "FRENCH", 1)
 

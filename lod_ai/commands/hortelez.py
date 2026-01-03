@@ -42,6 +42,9 @@ def execute(
     if french_res < pay:
         raise ValueError(f"FRENCH have only {french_res} Resources, cannot pay {pay}.")
 
+    state["_turn_command"] = COMMAND_NAME
+    state["_turn_command_meta"] = {"pay": pay}
+    state.setdefault("_turn_affected_spaces", set())
     # Record state before mutation
     push_history(state, f"FRENCH HORTELEZ pay {pay}")
 

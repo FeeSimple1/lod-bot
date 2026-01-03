@@ -59,6 +59,7 @@ def execute(
     if option not in (1, 2, 3):
         raise ValueError("option must be 1, 2, or 3.")
 
+    state["_turn_used_special"] = True
     sp = state["spaces"][space_id]
 
     if sp.get(MILITIA_U, 0) == 0:

@@ -68,6 +68,7 @@ def execute(
     if choice not in ("BLOCKADE", "REGULARS", "RESOURCES"):
         raise ValueError("choice must be BLOCKADE, REGULARS, or RESOURCES.")
 
+    state["_turn_used_special"] = True
     push_history(state, f"FRENCH PREPARER choice={choice}")
 
     if choice == "BLOCKADE":

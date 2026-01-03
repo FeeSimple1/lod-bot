@@ -211,6 +211,8 @@ def execute(
         if promote_space and promote_space != dest:
             raise ValueError("Promotion must occur in the destination space for Limited Rally.")
 
+    state["_turn_command"] = COMMAND_NAME
+    state.setdefault("_turn_affected_spaces", set()).update(selected)
     # --- Cost payment -------------------------------------------------
     cost = len(selected)
     spend(state, "PATRIOTS", cost)

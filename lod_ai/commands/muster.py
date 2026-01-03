@@ -198,6 +198,8 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
     if build_fort and reward_levels:
         raise ValueError("Cannot both build a Fort and Reward Loyalty in the same Muster.")
 
+    state["_turn_command"] = COMMAND_NAME
+    state.setdefault("_turn_affected_spaces", set()).update(selected)
     # Leader hooks – none defined yet, keep pattern
     ctx = apply_leader_modifiers(state, faction, "pre_muster", ctx)
 

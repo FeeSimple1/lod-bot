@@ -98,6 +98,8 @@ def execute(
     if limited and len(set(selected)) != 1:
         raise ValueError("Limited Gather must target exactly one Province.")
 
+    state["_turn_command"] = COMMAND_NAME
+    state.setdefault("_turn_affected_spaces", set()).update(selected)
     # Default empty containers so later membership tests work
     place_one = place_one or set()
     build_village = build_village or set()
