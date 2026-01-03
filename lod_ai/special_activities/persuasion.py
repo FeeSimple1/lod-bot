@@ -53,6 +53,7 @@ def execute(
     if not 1 <= len(spaces) <= 3:
         raise ValueError("Persuasion must target 1-3 spaces.")
 
+    state["_turn_used_special"] = True
     push_history(state, f"PATRIOTS PERSUASION {spaces}")
 
     marker_state = state.setdefault("markers", {}).setdefault(PROPAGANDA, {"pool": 0, "on_map": set()})

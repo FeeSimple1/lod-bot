@@ -38,6 +38,7 @@ def execute(
     if faction != "BRITISH":
         raise ValueError("Only BRITISH may invoke Common Cause.")
 
+    state["_turn_used_special"] = True
     push_history(state, f"BRITISH COMMON_CAUSE in {', '.join(spaces)}")
     wp_counts = wp_counts or {}
 

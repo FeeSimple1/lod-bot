@@ -116,6 +116,8 @@ def execute(
     if n_tories   > _avail(TORY):
         raise ValueError(f"Not enough Tories in {src}.")
 
+    state["_turn_command"] = COMMAND_NAME
+    state.setdefault("_turn_affected_spaces", set()).add(dst)
     # -------- Resource payments ---------------------------------------------
     spend(state, "INDIANS", 1)
     spend(state, "BRITISH", 1)

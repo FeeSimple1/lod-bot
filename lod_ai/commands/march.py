@@ -97,6 +97,8 @@ def execute(
         if len(sources) != 1:
             raise ValueError("Limited March must originate from one space.")
 
+    state["_turn_command"] = COMMAND_NAME
+    state.setdefault("_turn_affected_spaces", set()).update(destinations)
     # Resource payment
     first_free = (faction == "INDIANS") and ctx.get("all_reserve_origin", False)
     _pay_cost(state, faction, len(destinations), first_free=first_free)

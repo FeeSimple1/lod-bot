@@ -14,16 +14,33 @@ class BaseBot:
     faction: str            # e.g. "BRITISH"
 
     # ------------ public entry ------------
-    def take_turn(self, state: Dict, card: Dict) -> None:
+    def take_turn(self, state: Dict, card: Dict, *, notes: str | None = None) -> Dict[str, object]:
         """Main driver called by engine.play_turn()."""
         if self._choose_event_vs_flowchart(state, card):
-            return                      # Event executed
+            return {
+                "action": "event",
+                "used_special": bool(state.get("_turn_used_special")),
+                "notes": notes or "",
+            }  # Event executed
 
         if state["resources"][self.faction] <= 0:
             push_history(state, f"{self.faction} PASS (no Resources)")
-            return
+            return {
+                "action": "pass",
+                "used_special": bool(state.get("_turn_used_special")),
+                "notes": "no resources",
+            }
 
         self._follow_flowchart(state)   # implemented by subclass
+        history = state.get("history") or []
+        last_entry = history[-1] if history else ""
+        last_text = last_entry.upper() if isinstance(last_entry, str) else ""
+        action = "pass" if last_text.startswith(f"{self.faction} PASS") else "command"
+        return {
+            "action": action,
+            "used_special": bool(state.get("_turn_used_special")),
+            "notes": notes or "",
+        }
     # ------------ helpers ---------------
 
     #  NEW: look-up table for musket-underline directives
@@ -42,7 +59,15 @@ class BaseBot:
         if not handler:
             return
         shaded = card.get("dual") and self.faction in {"PATRIOTS", "FRENCH"}
-        handler(state, shaded=shaded)
+        previous_active = state.get("active")
+        state["active"] = self.faction
+        try:
+            handler(state, shaded=shaded)
+        finally:
+            if previous_active is None:
+                state.pop("active", None)
+            else:
+                state["active"] = previous_active
         self._apply_eligibility_effects(state, card, shaded)
 
     def _apply_eligibility_effects(self, state: Dict, card: Dict, shaded: bool) -> None:

@@ -128,6 +128,8 @@ def execute(
         dst_seen.add(dst)
 
     # ═══ resource payment ══════════════════════════════════════════════════
+    state["_turn_command"] = COMMAND_NAME
+    state.setdefault("_turn_affected_spaces", set()).update(selected)
     cost = len(selected)
     spend(state, "INDIANS", cost)
 

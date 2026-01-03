@@ -84,6 +84,7 @@ def execute(
         a mapping {city_id: n_to_have_after}.  All cities in map must already
         hold a marker so we are merely rearranging.
     """
+    state["_turn_used_special"] = True
 
     if faction == "BRITISH":
         _exec_british(state, ctx, city_choice)

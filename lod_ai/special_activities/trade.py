@@ -57,6 +57,7 @@ def execute(
     if transfer < 0:
         raise ValueError("transfer cannot be negative.")
 
+    state["_turn_used_special"] = True
     sp = state["spaces"][space_id]
 
     # Eligibility checks

@@ -106,6 +106,8 @@ def execute(
     if limited and len(selected) != 1:
         raise ValueError("Limited Rabble‑Rousing must select exactly one space.")
 
+    state["_turn_command"] = COMMAND_NAME
+    state.setdefault("_turn_affected_spaces", set()).update(selected)
     # Resource cost
     _pay_cost(state, len(selected))
 

@@ -77,6 +77,8 @@ def execute(
     if not spaces:
         raise ValueError("Need ≥ 1 battle space")
 
+    state["_turn_command"] = COMMAND_NAME
+    state.setdefault("_turn_affected_spaces", set()).update(spaces)
     # Pay Resources (actor only); allied fees handled below
     if not free:
         spend(state, faction, len(spaces))

@@ -55,6 +55,7 @@ def execute(
     if not ctx.get("raid_active"):
         raise ValueError("Plunder can only follow a Raid Command this turn.")
 
+    state["_turn_used_special"] = True
     sp = state["spaces"][province]
 
     wp_total  = sp.get(WARPARTY_U, 0) + sp.get(WARPARTY_A, 0)

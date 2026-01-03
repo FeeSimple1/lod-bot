@@ -61,6 +61,7 @@ def execute(
     if option not in (1, 2, 3):
         raise ValueError("option must be 1, 2, or 3.")
 
+    state["_turn_used_special"] = True
     ctx = apply_leader_modifiers(state, faction, "pre_war_path", ctx)
     sp = state["spaces"][space_id]
 

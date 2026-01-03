@@ -91,11 +91,11 @@ def _ensure_handlers_imported() -> None:
     decorators to run and populate CARD_HANDLERS.
     """
     modules: Iterable[str] = (
-        "lod_ai.cards.early_war",
-        "lod_ai.cards.middle_war",
-        "lod_ai.cards.late_war",
-        "lod_ai.cards.winter_quarters",
-        "lod_ai.cards.brilliant_stroke",
+        "lod_ai.cards.effects.early_war",
+        "lod_ai.cards.effects.middle_war",
+        "lod_ai.cards.effects.late_war",
+        "lod_ai.cards.effects.winter_quarters",
+        "lod_ai.cards.effects.brilliant_stroke",
     )
     for mod in modules:
         try:
