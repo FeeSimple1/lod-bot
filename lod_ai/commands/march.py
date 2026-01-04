@@ -73,6 +73,7 @@ def execute(
     *,
     bring_escorts: bool = False,
     limited: bool = False,
+    move_plan: List[Dict] | None = None,
 ) -> Dict:
     """
     Perform a March.
@@ -81,31 +82,182 @@ def execute(
     ----------
     sources / destinations
         List of source spaces and destination spaces.  If *limited*,
-        exactly 1 source and 1 (matching) destination is required.
+        exactly 1 destination is required.
     bring_escorts
         If True, British/French may escort Tories/Continentals
         (plus Common-Cause WP for British) 1-for-1 with Regulars.
+    move_plan
+        Optional structured plan `[{"src": str, "dst": str, "pieces": {tag: n}}]`
+        limiting movement to exactly the counts chosen by the caller.
     """
+    faction = faction.upper()
     # Treaty gate for French
     if faction == "FRENCH" and not state.get("toa_played"):
         raise ValueError("FRENCH cannot March before Treaty of Alliance.")
 
+    def _norm_plan(plan: List[Dict]) -> List[Dict]:
+        norm = []
+        for entry in plan:
+            if isinstance(entry, dict):
+                src = entry.get("src") or entry.get("source")
+                dst = entry.get("dst") or entry.get("destination")
+                pieces = entry.get("pieces") or {}
+            elif isinstance(entry, (list, tuple)) and len(entry) == 3:
+                src, dst, pieces = entry
+            else:
+                raise ValueError("Invalid move_plan entry.")
+            if not src or not dst or not isinstance(pieces, dict):
+                raise ValueError("Move plan entries need src, dst, and pieces dict.")
+            pieces = {k: int(v) for k, v in pieces.items() if int(v) > 0}
+            if not pieces:
+                raise ValueError("Move plan entries must move at least one piece.")
+            norm.append({"src": src, "dst": dst, "pieces": pieces})
+        return norm
+
+    def _apply_flip_for_colony(sp_dst: Dict, moved_total: int) -> None:
+        if sp_dst.get("type") == "Colony" and moved_total > 0:
+            flip = min(moved_total // 3, sp_dst.get(MILITIA_U, 0))
+            if flip:
+                sp_dst[MILITIA_U] -= flip
+                sp_dst[MILITIA_A] = sp_dst.get(MILITIA_A, 0) + flip
+
+    def _apply_move(src: str, dst: str, pieces: Dict[str, int]) -> int:
+        if not is_adjacent(src, dst):
+            raise ValueError(f"{src} is not adjacent to {dst}.")
+        sp_src = state["spaces"][src]
+        sp_dst = state["spaces"][dst]
+
+        moved_total = 0
+
+        def _take(tag: str, count: int, arrive_as: str | None = None) -> int:
+            nonlocal moved_total
+            if count <= 0:
+                return 0
+            if sp_src.get(tag, 0) < count:
+                raise ValueError(f"Not enough {tag} in {src}.")
+            remove_piece(state, tag, src, count)
+            dest_tag = arrive_as or tag
+            add_piece(state, dest_tag, dst, count)
+            moved_total += count
+            return count
+
+        if faction == INDIANS and _is_city(dst):
+            raise ValueError("Indians cannot occupy a City space.")
+
+        if faction == "BRITISH":
+            reg = _take(REGULAR_BRI, pieces.get(REGULAR_BRI, 0))
+            tory = pieces.get(TORY, 0)
+            wp_u = pieces.get(WARPARTY_U, 0)
+            wp_a = pieces.get(WARPARTY_A, 0)
+            if (tory or wp_u or wp_a) and not bring_escorts:
+                raise ValueError("Escorts required to move Tories or War Parties.")
+            escort_cap = reg
+            if tory + wp_u + wp_a > escort_cap:
+                raise ValueError("Escort cap exceeded for British March.")
+            if tory:
+                _take(TORY, tory)
+            if wp_u or wp_a:
+                if _is_city(dst):
+                    raise ValueError("Common-Cause War Parties may not move into Cities.")
+                if wp_u:
+                    _take(WARPARTY_U, wp_u, arrive_as=WARPARTY_A)
+                if wp_a:
+                    _take(WARPARTY_A, wp_a, arrive_as=WARPARTY_A)
+            _apply_flip_for_colony(sp_dst, moved_total)
+
+        elif faction == "PATRIOTS":
+            reg = _take(REGULAR_PAT, pieces.get(REGULAR_PAT, 0))
+            mil_u = pieces.get(MILITIA_U, 0)
+            mil_a = pieces.get(MILITIA_A, 0)
+            if mil_u:
+                _take(MILITIA_U, mil_u, arrive_as=MILITIA_A)
+            if mil_a:
+                _take(MILITIA_A, mil_a, arrive_as=MILITIA_A)
+            wp_u = pieces.get(WARPARTY_U, 0)
+            wp_a = pieces.get(WARPARTY_A, 0)
+            if wp_u:
+                _take(WARPARTY_U, wp_u, arrive_as=WARPARTY_A)
+            if wp_a:
+                _take(WARPARTY_A, wp_a, arrive_as=WARPARTY_A)
+            if bring_escorts:
+                fr = pieces.get(REGULAR_FRE, 0)
+                if fr > reg:
+                    raise ValueError("French escort exceeds Continental column.")
+                if fr:
+                    _take(REGULAR_FRE, fr)
+
+        elif faction == "INDIANS":
+            wp_u = pieces.get(WARPARTY_U, 0)
+            wp_a = pieces.get(WARPARTY_A, 0)
+            if wp_u:
+                _take(WARPARTY_U, wp_u, arrive_as=WARPARTY_A)
+            if wp_a:
+                _take(WARPARTY_A, wp_a, arrive_as=WARPARTY_A)
+
+        elif faction == "FRENCH":
+            reg = _take(REGULAR_FRE, pieces.get(REGULAR_FRE, 0))
+            if bring_escorts:
+                pat = pieces.get(REGULAR_PAT, 0)
+                if pat > reg:
+                    raise ValueError("Continental escort exceeds French column.")
+                if pat:
+                    _take(REGULAR_PAT, pat)
+
+        return moved_total
+
+    if move_plan:
+        plan = _norm_plan(move_plan)
+        destinations_set = {p["dst"] for p in plan}
+        sources_set = {p["src"] for p in plan}
+    else:
+        destinations_set = set(destinations)
+        sources_set = set(sources)
+        plan = []
+        for src in sources:
+            sp_src = state["spaces"][src]
+            base_pieces = {}
+            if faction == "BRITISH":
+                base_pieces[REGULAR_BRI] = sp_src.get(REGULAR_BRI, 0)
+                if bring_escorts:
+                    base_pieces[TORY] = min(base_pieces[REGULAR_BRI], sp_src.get(TORY, 0))
+                    cc_avail = ctx.get("common_cause", {}).get(src, 0)
+                    base_pieces[WARPARTY_A] = min(base_pieces[REGULAR_BRI] - base_pieces.get(TORY, 0, 0), cc_avail)
+            elif faction == "PATRIOTS":
+                base_pieces[REGULAR_PAT] = sp_src.get(REGULAR_PAT, 0)
+                base_pieces[MILITIA_U] = sp_src.get(MILITIA_U, 0)
+                base_pieces[MILITIA_A] = sp_src.get(MILITIA_A, 0)
+                base_pieces[WARPARTY_U] = sp_src.get(WARPARTY_U, 0)
+                base_pieces[WARPARTY_A] = sp_src.get(WARPARTY_A, 0)
+                if bring_escorts:
+                    base_pieces[REGULAR_FRE] = min(base_pieces.get(REGULAR_PAT, 0), sp_src.get(REGULAR_FRE, 0))
+            elif faction == "INDIANS":
+                base_pieces[WARPARTY_U] = sp_src.get(WARPARTY_U, 0)
+                base_pieces[WARPARTY_A] = sp_src.get(WARPARTY_A, 0)
+            elif faction == "FRENCH":
+                base_pieces[REGULAR_FRE] = sp_src.get(REGULAR_FRE, 0)
+                if bring_escorts:
+                    base_pieces[REGULAR_PAT] = min(base_pieces.get(REGULAR_FRE, 0), sp_src.get(REGULAR_PAT, 0))
+            cleaned = {k: v for k, v in base_pieces.items() if v > 0}
+            if not cleaned:
+                continue
+            for dst in destinations:
+                plan.append({"src": src, "dst": dst, "pieces": cleaned})
+
     # Limited-command constraints
-    if limited:
-        if len(set(destinations)) != 1 or len(destinations) != 1:
-            raise ValueError("Limited March must end in a single destination.")
-        if len(sources) != 1:
-            raise ValueError("Limited March must originate from one space.")
+    if limited and len(destinations_set) != 1:
+        raise ValueError("Limited March must end in a single destination.")
+    if limited and move_plan is None and len(sources_set) != 1:
+        raise ValueError("Limited March must originate from one space.")
 
     state["_turn_command"] = COMMAND_NAME
-    state.setdefault("_turn_affected_spaces", set()).update(destinations)
+    state.setdefault("_turn_affected_spaces", set()).update(destinations_set)
     # Resource payment
     first_free = (faction == "INDIANS") and ctx.get("all_reserve_origin", False)
-    _pay_cost(state, faction, len(destinations), first_free=first_free)
+    _pay_cost(state, faction, len(destinations_set), first_free=first_free)
 
     # Escort ally-fee: French escorting Continentals → Patriots pay the fee
     if faction == "FRENCH" and bring_escorts:
-        fee = len(destinations)
+        fee = len(destinations_set)
         spend(state, "PATRIOTS", fee)
 
     # Leader hooks (placeholder for future modifiers)
@@ -116,109 +268,18 @@ def execute(
         f"{faction} MARCH begins: {sources} ➜ {destinations} (escorts={bring_escorts})"
     )
 
-    for src in sources:
-        sp_src = state["spaces"][src]
+    moved_overall = 0
+    for entry in plan:
+        moved_overall += _apply_move(entry["src"], entry["dst"], entry["pieces"])
 
-        for dst in destinations:
-            if not is_adjacent(src, dst):
-                raise ValueError(f"{src} is not adjacent to {dst}.")
-            sp_dst = state["spaces"][dst]
-
-            if faction == INDIANS and _is_city(dst):
-                raise ValueError("Indians cannot occupy a City space.")
-
-            if faction == "BRITISH":
-                # ── Move Regulars ───────────────────────────────────────────
-                reg = sp_src.get(REGULAR_BRI, 0)
-                if reg == 0:
-                    continue
-                _move(state, REGULAR_BRI, reg, src, dst)
-
-                # ── Escorts: first Tories, then Common-Cause WP ───────────
-                if bring_escorts:
-                    # Calculate availability
-                    tory_avail = sp_src.get(TORY, 0)
-                    cc_avail   = ctx.get("common_cause", {}).get(src, 0)
-                    max_escort = reg
-
-                    tory_take = min(tory_avail, max_escort)
-                    wp_take   = min(cc_avail, max_escort - tory_take)
-
-                    # WP may not enter a City
-                    if wp_take and _is_city(dst):
-                        raise ValueError("Common-Cause War Parties may not move into Cities.")
-
-                    if tory_take:
-                        _move(state, TORY, tory_take, src, dst)
-                    if wp_take:
-                        _move(state, WARPARTY_A, wp_take, src, dst)
-                else:
-                    tory_take = 0
-                    wp_take = 0
-
-                # Activate one Militia-U per three cubes moved into a Colony
-                if sp_dst.get("type") == "Colony":
-                    moved_total = reg + tory_take + wp_take
-                    flip = min(moved_total // 3, sp_dst.get(MILITIA_U, 0))
-                    if flip:
-                        sp_dst[MILITIA_U] -= flip
-                        sp_dst[MILITIA_A] = sp_dst.get(MILITIA_A, 0) + flip
-
-            elif faction == "PATRIOTS":
-                # ── Move Continentals ──────────────────────────────────────
-                reg = sp_src.get(REGULAR_PAT, 0)
-                if reg:
-                    _move(state, REGULAR_PAT, reg, src, dst)
-
-                # ── Move Militia (all) ─────────────────────────────────────
-                mil_u = sp_src.pop(MILITIA_U, 0)
-                mil_a = sp_src.pop(MILITIA_A, 0)
-                if mil_u or mil_a:
-                    sp_dst[MILITIA_A] = sp_dst.get(MILITIA_A, 0) + mil_u + mil_a
-
-                # ── French escort 1-for-1 with Regulars ───────────────────
-                if bring_escorts:
-                    fr_take = min(reg, sp_src.get(REGULAR_FRE, 0))
-                    if fr_take:
-                        _move(state, REGULAR_FRE, fr_take, src, dst)
-
-                # War Parties moving with Patriots become Active on arrival
-                if sp_src.get(WARPARTY_U, 0) or sp_src.get(WARPARTY_A, 0):
-                    wp_u = sp_src.pop(WARPARTY_U, 0)
-                    wp_a = sp_src.pop(WARPARTY_A, 0)
-                    total_wp = wp_u + wp_a
-                    if total_wp:
-                        sp_dst[WARPARTY_A] = sp_dst.get(WARPARTY_A, 0) + total_wp
-
-                # Militia obey stacking and city restrictions via enforce_global_caps
-
-            elif faction == "INDIANS":
-                # ── Move War Parties (all) and flip Active ────────────────
-                wp_u = sp_src.pop(WARPARTY_U, 0)
-                wp_a = sp_src.pop(WARPARTY_A, 0)
-                total = wp_u + wp_a
-                if total:
-                    sp_dst[WARPARTY_A] = sp_dst.get(WARPARTY_A, 0) + total
-                # City control from Indian pieces handled by refresh_control
-
-            elif faction == "FRENCH":
-                # ── Move French Regulars ───────────────────────────────────
-                reg = sp_src.get(REGULAR_FRE, 0)
-                if reg == 0:
-                    continue
-                _move(state, REGULAR_FRE, reg, src, dst)
-
-                # ── Continental escort 1-for-1 ────────────────────────────
-                if bring_escorts:
-                    pat_take = min(reg, sp_src.get(REGULAR_PAT, 0))
-                    if pat_take:
-                        _move(state, REGULAR_PAT, pat_take, src, dst)
+    if moved_overall <= 0:
+        raise ValueError("March must move at least one piece.")
 
     refresh_control(state)
     enforce_global_caps(state)
 
     # Log summary
     state.setdefault("log", []).append(
-        f"{faction} MARCH {sources} ➜ {destinations} (escorts={bring_escorts})"
+        f"{faction} MARCH {sources} ➜ {destinations_set} (escorts={bring_escorts})"
     )
     return ctx

@@ -38,6 +38,13 @@ def _ensure_core(state: Dict) -> None:
     state.setdefault("fni_level", 0)
 
 
+def _sync_treaty_flags(state: Dict) -> None:
+    """Keep Treaty of Alliance flags in sync across legacy keys."""
+    toa = bool(state.get("toa_played", state.get("treaty_of_alliance", False)))
+    state["toa_played"] = toa
+    state["treaty_of_alliance"] = toa
+
+
 def _normalize_support(state: Dict, valid_spaces: Iterable[str]) -> None:
     support = state.setdefault("support", {})
     for sid in valid_spaces:
@@ -136,6 +143,7 @@ def _sanitize_pools(state: Dict) -> None:
 def normalize_state(state: Dict) -> None:
     """Coerce *state* into canonical shape and enforce invariants."""
     _ensure_core(state)
+    _sync_treaty_flags(state)
     valid_spaces = list(map_adj.all_space_ids())
     _sanitize_spaces(state, valid_spaces)
     _normalize_support(state, valid_spaces)
