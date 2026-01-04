@@ -86,7 +86,7 @@ def execute(
         raise ValueError("Raid selects 1-3 Provinces.")
 
     move_plan = move_plan or []
-    dragging_canoe_loc = leader_location(state, "LEADER_DRAGGING_CANOE") or leader_location(state, "DRAGGING_CANOE")
+    dragging_canoe_loc = leader_location(state, "LEADER_DRAGGING_CANOE")
     initial_wp = {sid: sp.get(WARPARTY_U, 0) for sid, sp in state["spaces"].items()}
     dc_pool = initial_wp.get(dragging_canoe_loc, 0) if dragging_canoe_loc else 0
     dc_used = 0

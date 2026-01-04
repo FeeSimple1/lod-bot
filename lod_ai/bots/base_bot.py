@@ -46,10 +46,10 @@ class BaseBot:
     #  NEW: look-up table for musket-underline directives
     def _event_directive(self, card_id: int) -> str:
         tables = {
-            "BRITISH": EI.BRITISH,
-            "PATRIOT": EI.PATRIOT,  "PATRIOTS": EI.PATRIOT,
-            "INDIAN":  EI.INDIAN,   "INDIANS":  EI.INDIAN,
-            "FRENCH":  EI.FRENCH,
+            C.BRITISH: EI.BRITISH,
+            C.PATRIOTS: EI.PATRIOT,
+            C.INDIANS: EI.INDIAN,
+            C.FRENCH: EI.FRENCH,
         }
         return tables[self.faction].get(card_id, "normal")
 

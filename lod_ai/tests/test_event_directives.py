@@ -17,10 +17,9 @@ def test_event_directive_lookup():
     pat = PatriotBot()
     fre = FrenchBot()
     # PatriotBot stores faction name as "PATRIOTS" so adjust for lookup
-    pat.faction = "PATRIOT"
+    pat.faction = "PATRIOTS"
 
     assert brit._event_directive(18) == "ignore"
     assert pat._event_directive(18) == "force"
     assert fre._event_directive(52) == "force"
-
 

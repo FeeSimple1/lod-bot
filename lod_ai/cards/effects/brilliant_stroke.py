@@ -123,7 +123,7 @@ def evt_109_treaty_of_alliance(state, shaded=False):
     # French free Muster in the West Indies and Rochambeau arrives there
     queue_free_op(state, "FRENCH", "muster", WEST_INDIES_ID)
     place_piece(state, LEADER_ROCHAMBEAU, WEST_INDIES_ID)
-    state.setdefault("leaders", {})["ROCHAMBEAU"] = WEST_INDIES_ID
+    state.setdefault("leaders", {})[LEADER_ROCHAMBEAU] = WEST_INDIES_ID
 
     # Shift FNI toward war (after TOA flag so Rule 1.9 does not block)
     adjust_fni(state, +1)

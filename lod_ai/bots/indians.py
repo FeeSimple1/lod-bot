@@ -161,7 +161,7 @@ class IndianBot(BaseBot):
         Priority later: first where Plunder possible (WP > Rebels), then pop.
         """
         tgs = []
-        dc_loc = leader_location(state, "DRAGGING_CANOE") or leader_location(state, "LEADER_DRAGGING_CANOE")
+        dc_loc = leader_location(state, "LEADER_DRAGGING_CANOE")
         dc_has_wp = dc_loc and state["spaces"].get(dc_loc, {}).get(C.WARPARTY_U, 0) > 0
         for col in self._opposition_colonies(state):
             sp = state["spaces"][col]
@@ -192,7 +192,7 @@ class IndianBot(BaseBot):
         if not targets:
             return False
 
-        dc_loc = leader_location(state, "DRAGGING_CANOE") or leader_location(state, "LEADER_DRAGGING_CANOE")
+        dc_loc = leader_location(state, "LEADER_DRAGGING_CANOE")
         available_wp = {sid: sp.get(C.WARPARTY_U, 0) for sid, sp in state["spaces"].items()}
 
         # Priority: first where WP > Rebels after move (for Plunder)
