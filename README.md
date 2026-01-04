@@ -1,70 +1,78 @@
 # lod-bot
-Menu-driven helpers and bots for playing Liberty or Death.
-
-## Prerequisites
-- Python 3.10 or newer (the code uses `|` type unions).
-- Optional: a virtual environment to isolate dependencies.
+Interactive, menu-driven helpers and bots for **Liberty or Death**.
 
 ## Installation
-1. Create and activate a virtual environment:
-   - Unix/macOS:
-     ```bash
-     python -m venv .venv
-     source .venv/bin/activate
-     ```
-   - Windows (Command Prompt):
-     ```cmd
-     python -m venv .venv
-     .venv\Scripts\activate.bat
-     ```
+1. Create and activate a virtual environment (recommended):
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   ```
 2. Install dependencies:
    ```bash
    pip install -r requirements-dev.txt
    ```
 
-## Running the interactive CLI
-Launch the menu-driven interface with:
+## Run the interactive CLI
+Start a game with:
 ```bash
-python -m lod_ai.interactive_cli
+python -m lod_ai
 ```
 
-You will be prompted for:
-- Scenario (1775 Long, 1776 Medium, or 1778 Short).
-- Number of human players (0–4).
-- Which factions are human-controlled (BRITISH, PATRIOTS, FRENCH, INDIANS).
+Setup wizard:
+1) Pick scenario (1775 Long, 1776 Medium, 1778 Short).
+2) Choose deck method (Standard or Period Events) and RNG seed.
+3) Select number of human players (0–4) and which factions they control.
 
-During play, each revealed card shows its title, order icons/list, and the factions currently eligible. For every faction’s decision slot the CLI will only offer actions that are legal for that position (Pass, Event, or Command, with Special Activities only when permitted). Command menus are tailored to the faction and Treaty status for the French.
+During play the CLI always shows the current and upcoming card. Each faction’s turn presents only the actions that are legal for that slot (Pass, Event, Command/Special). Commands, spaces, and piece counts are chosen from numbered menus—no free typing. Illegal choices are rejected before they commit.
 
-### Example session (abridged)
+## Running tests
+```bash
+pytest
+```
+
+## CLI flow example
 ```
 Liberty or Death — Interactive CLI
 Select a scenario:
-  1. 1775 (Long)
-  2. 1776 (Medium)
-  3. 1778 (Short)
-Enter scenario number: 1
-Number of human players (0-4): 1
+  1. 1775 Long
+  2. 1776 Medium
+  3. 1778 Short
+Select: 1
+Deck method:
+  1. Standard
+  2. Period Events
+Select: 1
+Select RNG seed:
+  1. 1
+  2. 2
+  3. 3
+  4. 4
+  5. 5
+  6. Random (based on time)
+Select: 1
+Number of human players:
+  1. 0
+  2. 1
+  3. 2
+  4. 3
+  5. 4
+Select: 2
 Select human-controlled factions:
   1. BRITISH
   2. PATRIOTS
   3. FRENCH
   4. INDIANS
-Choose faction #1: 2
+Select: 1
+Select: 2
 
-====================================
-Card 1: Common Sense
-Order: BF
-Currently eligible: BRITISH, PATRIOTS, FRENCH, INDIANS
-====================================
-BRITISH turn. Allowed actions: command, event, pass
-P) Pass | E) Event | C) Command
-Choose action: P
+================ CURRENT CARD ================
+16: Treaty of Alliance | Order: PFBI
+---------------- UPCOMING ----------------
+17: Winter Quarters | Order: PFBI
+=============================================
+BRITISH turn. Choose action:
+  1. Pass
+  2. Event
+  3. Command
+Select: 3
 ```
-
-## Running tests
-Execute the test suite with:
-```bash
-pytest
-```
-
-The tests live under `lod_ai/tests` and cover card handlers, engine sequencing, and bot scaffolding.

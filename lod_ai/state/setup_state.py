@@ -13,7 +13,7 @@ import random
 import re
 from collections import Counter
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Iterable, List, Tuple
 from lod_ai.util.normalize_state import normalize_state
 
 # ── constants from rules_consts ──────────────────────────────────────────
@@ -105,7 +105,9 @@ def load_scenario(name: str) -> Dict[str, Any]:
     if not path.is_file():
         raise FileNotFoundError(f"Scenario file not found: {filename}")
     with path.open(encoding="utf-8") as fh:
-        return json.load(fh)
+        data = json.load(fh)
+    data["file_name"] = filename
+    return data
 
 # ----------------------------------------------------------------------- #
 # 3️⃣  MAP‑TAG → POOL‑TAG & RECONCILE                                      #
@@ -151,38 +153,31 @@ def _apply_unavailable_block(state: Dict[str, Any], scenario: Dict[str, Any]) ->
     available = state["available"]
     unavailable = state["unavailable"]
 
-    # French unavailable Regulars
-    if fr := unavail.get("FRENCH_REGULARS"):
-        if available.get(REGULAR_FRE, 0) < fr:
-            raise ValueError(f"Scenario unavailable overdraw: {fr} {REGULAR_FRE} requested")
-        available[REGULAR_FRE] -= fr
-        if available[REGULAR_FRE] == 0:
-            del available[REGULAR_FRE]
-        unavailable[REGULAR_FRE] = unavailable.get(REGULAR_FRE, 0) + fr
+    key_map = {
+        "FRENCH_REGULARS": REGULAR_FRE,
+        "French_Regular_Unavailable": REGULAR_FRE,
+        "BRITISH_REGULARS": REGULAR_BRI,
+        "British_Regular_Unavailable": REGULAR_BRI,
+        "BRITISH_TORIES": TORY,
+        "British_Tory_Unavailable": TORY,
+    }
+
+    for json_key, tag in key_map.items():
+        qty = unavail.get(json_key)
+        if not qty:
+            continue
+        if available.get(tag, 0) < qty:
+            raise ValueError(f"Scenario unavailable overdraw: {qty} {tag} requested")
+        available[tag] -= qty
+        if available[tag] == 0:
+            available.pop(tag, None)
+        unavailable[tag] = unavailable.get(tag, 0) + qty
 
     # French unavailable Squadrons/Blockades (logged only for now)
-    if sq := unavail.get("FRENCH_SQUADRONS"):
+    if sq := unavail.get("FRENCH_SQUADRONS") or unavail.get("Squadron"):
         state.setdefault("log", []).append(
             f"(setup) {sq} French Squadrons/Blockades unavailable in port"
         )
-
-    # British unavailable Regulars
-    if br := unavail.get("BRITISH_REGULARS"):
-        if available.get(REGULAR_BRI, 0) < br:
-            raise ValueError(f"Scenario unavailable overdraw: {br} {REGULAR_BRI} requested")
-        available[REGULAR_BRI] -= br
-        if available[REGULAR_BRI] == 0:
-            del available[REGULAR_BRI]
-        unavailable[REGULAR_BRI] = unavailable.get(REGULAR_BRI, 0) + br
-
-    # British unavailable Tories
-    if bt := unavail.get("BRITISH_TORIES"):
-        if available.get(TORY, 0) < bt:
-            raise ValueError(f"Scenario unavailable overdraw: {bt} {TORY} requested")
-        available[TORY] -= bt
-        if available[TORY] == 0:
-            del available[TORY]
-        unavailable[TORY] = unavailable.get(TORY, 0) + bt
 
 
 def _default_to_underground(spaces: Dict[str, Dict[str, int]]) -> None:
@@ -246,62 +241,122 @@ def _card_from_id(value: int | str) -> dict:
         raise KeyError(f"Card id {cid} not found in registry")
 
 
-def _build_deck_standard(cards: list[dict], rng: random.Random) -> list[dict]:
-    """Return *cards* shuffled for the Standard setup."""
+def _campaign_count(scenario_name: str) -> int:
+    scen = scenario_name.lower()
+    if "1775" in scen or "long" in scen:
+        return 6
+    if "1776" in scen or "medium" in scen:
+        return 4
+    if "1778" in scen or "short" in scen:
+        return 3
+    return 6
+
+
+def _period_piles(duration: int) -> List[Tuple[str, int]]:
+    """Return ordered (bucket, count) tuples for Period Events."""
+    if duration == 6:
+        return [("1775-1776", 2), ("1777-1778", 2), ("1779-1780", 2)]
+    if duration == 4:
+        return [("1775-1776", 1), ("1777-1778", 2), ("1779-1780", 1)]
+    return [("1777-1778", 1), ("1779-1780", 2)]
+
+
+def _bucket_for_card(card: dict) -> str:
+    years = card.get("years") or []
+    min_year = min(years) if years else 1775
+    if min_year <= 1776:
+        return "1775-1776"
+    if min_year <= 1778:
+        return "1777-1778"
+    return "1779-1780"
+
+
+def _insert_wq(pile: list[dict], wq_card: dict, rng: random.Random) -> list[dict]:
+    """Insert *wq_card* into the bottom 5 cards of *pile*."""
+    if not pile:
+        return [wq_card]
+    bottom = min(4, len(pile))
+    top_cards = pile[:-bottom]
+    bottom_cards = pile[-bottom:]
+    bottom_cards.append(wq_card)
+    rng.shuffle(bottom_cards)
+    return top_cards + bottom_cards
+
+
+def _build_standard_deck(rng: random.Random, duration: int) -> list[dict]:
+    """Construct the Standard deck per rules."""
+    cards = [c for c in _CARD_REGISTRY.values() if not c.get("winter_quarters") and c.get("type") != "BRILLIANT_STROKE"]
     rng.shuffle(cards)
-    return cards
+    wq = sorted([c for c in _CARD_REGISTRY.values() if c.get("winter_quarters")], key=lambda d: d["id"])
 
-
-def _build_deck_historical(
-    cards: list[dict], start_year: int, rng: random.Random
-) -> list[dict]:
-    """Return cards ordered by earliest year with Winter Quarters inserted."""
-    wq_cards = [c for c in cards if c.get("winter_quarters")]
-    event_cards = [c for c in cards if not c.get("winter_quarters")]
-
-    groups: dict[int, list[dict]] = {}
-    for c in event_cards:
-        year = min(c.get("years") or [start_year])
-        groups.setdefault(year, []).append(c)
+    piles: list[list[dict]] = []
+    for _ in range(duration):
+        pile = cards[:10]
+        cards = cards[10:]
+        if not pile:
+            raise ValueError("Not enough Event cards to build the requested deck.")
+        wq_card = wq.pop(0) if wq else None
+        if wq_card:
+            pile = _insert_wq(pile, wq_card, rng)
+        piles.append(pile)
 
     deck: list[dict] = []
-    wq_idx = 0
-    for year in sorted(groups):
-        group = sorted(groups[year], key=lambda d: d["id"])
-        deck.extend(group)
-        if wq_idx < len(wq_cards):
-            deck.append(wq_cards[wq_idx])
-            wq_idx += 1
+    for pile in piles:
+        deck.extend(pile)
+    return deck
 
-    deck.extend(wq_cards[wq_idx:])
+
+def _build_period_deck(rng: random.Random, duration: int) -> list[dict]:
+    """Construct the Period Events deck per rules."""
+    events = [c for c in _CARD_REGISTRY.values() if not c.get("winter_quarters") and c.get("type") != "BRILLIANT_STROKE"]
+    buckets: Dict[str, List[dict]] = {"1775-1776": [], "1777-1778": [], "1779-1780": []}
+    for card in events:
+        buckets[_bucket_for_card(card)].append(card)
+    for cards in buckets.values():
+        rng.shuffle(cards)
+
+    wq = sorted([c for c in _CARD_REGISTRY.values() if c.get("winter_quarters")], key=lambda d: d["id"])
+    piles: list[list[dict]] = []
+    for bucket_name, count in _period_piles(duration):
+        for _ in range(count):
+            bucket_cards = buckets[bucket_name]
+            pile = bucket_cards[:10]
+            buckets[bucket_name] = bucket_cards[10:]
+            if not pile:
+                raise ValueError(f"Not enough cards to build Period pile for {bucket_name}")
+            wq_card = wq.pop(0) if wq else None
+            if wq_card:
+                pile = _insert_wq(pile, wq_card, rng)
+            piles.append(pile)
+
+    deck: list[dict] = []
+    for pile in piles:
+        deck.extend(pile)
     return deck
 
 
 def _init_deck(
     state: Dict[str, Any], scenario: Dict[str, Any], *, setup_method: str
 ) -> None:
-    """Populate state['deck'] and state['upcoming_card'] from *scenario*."""
-    deck_ids = list(scenario.get("deck", []))
+    """Populate state['deck'] and state['upcoming_card'] from scenario data."""
+    scenario_name = scenario.get("file_name", scenario.get("scenario", "long")).lower()
+    duration = _campaign_count(scenario_name)
+
     upcoming = scenario.get("upcoming_event")
     current = scenario.get("current_event")
-
     if current is not None:
         state["current_card"] = _card_from_id(current)
 
+    method = setup_method.lower()
+    if method in {"period", "period_events", "historical"}:
+        deck_cards = _build_period_deck(state["rng"], duration)
+    else:
+        deck_cards = _build_standard_deck(state["rng"], duration)
+
     upcoming_card = _card_from_id(upcoming) if upcoming is not None else None
     if upcoming_card:
-        state["upcoming_card"] = upcoming_card
-
-    deck_cards = [_card_from_id(cid) for cid in deck_ids]
-    if upcoming_card:
         deck_cards = [c for c in deck_cards if c["id"] != upcoming_card["id"]]
-
-    if setup_method == "historical":
-        deck_cards = _build_deck_historical(
-            deck_cards, scenario.get("campaign_year", 1775), state["rng"]
-        )
-    else:
-        deck_cards = _build_deck_standard(deck_cards, state["rng"])
+        state["upcoming_card"] = upcoming_card
 
     state["deck"] = deck_cards
 
@@ -314,6 +369,7 @@ def build_state(
 ) -> Dict[str, Any]:
     """Return a fully‑initialised *state* for the given scenario alias."""
     scen = load_scenario(scenario)
+    method = setup_method.lower()
     _default_to_underground(scen.get("spaces", {}))
     _force_start_underground(scen.get("spaces", {}))
 
@@ -322,10 +378,15 @@ def build_state(
         "spaces":    scen["spaces"],
         "resources": scen["resources"],
         "treaty":    scen.get("treaty", 3),   # Treaty of Alliance step marker
+        "campaign_year": scen.get("campaign_year", 1775),
+        "fni_level": scen.get("fni_level", 0),
+        "toa_played": bool(scen.get("toa_played", False)),
+        "treaty_of_alliance": bool(scen.get("toa_played", False)),
+        "bs_played": scen.get("bs_played", {}),
         "leaders":   scen.get("leaders", {}),
         "available":    init_available(),
         "unavailable":  {},
-        "casualties":   {},
+        "casualties":   scen.get("casualties", {}),
         # 🔹 Marker pools -------------------------------------------------
         "markers":   {
             PROPAGANDA: {"pool": MAX_PROPAGANDA, "on_map": set()},
@@ -338,7 +399,8 @@ def build_state(
         "rng_log":   [],
         "history":   [],
         "log":       [],
-        "setup_method": setup_method,
+        "setup_method": method,
+        "seed": seed,
         "eligible": {
             BRITISH: True,
             PATRIOTS: True,
@@ -350,6 +412,6 @@ def build_state(
     _normalize_support(state)
     _apply_unavailable_block(state, scen)
     _reconcile_on_map(state)
-    _init_deck(state, scen, setup_method=setup_method)
+    _init_deck(state, scen, setup_method=method)
     normalize_state(state)
     return state

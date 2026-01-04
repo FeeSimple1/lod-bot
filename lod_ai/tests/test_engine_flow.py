@@ -2,6 +2,7 @@ import sys
 
 from lod_ai import rules_consts as C
 from lod_ai.engine import Engine
+from lod_ai.commands import march
 from lod_ai.cards import CARD_HANDLERS
 
 
@@ -43,3 +44,54 @@ def test_card_handlers_auto_import():
     assert "lod_ai.cards.effects.early_war" in sys.modules
     assert 2 in CARD_HANDLERS
     assert 24 in CARD_HANDLERS
+
+
+def test_winter_quarters_swap():
+    engine = Engine()
+    engine.state["deck"] = [
+        {"id": 5000, "title": "Event A", "order": [], "winter_quarters": False},
+        {"id": 6000, "title": "WQ", "order": [], "winter_quarters": True},
+    ]
+    engine.state.pop("upcoming_card", None)
+    card = engine.draw_card()
+    assert card["id"] == 6000
+    assert engine.state["current_card"]["id"] == 6000
+    assert engine.state["upcoming_card"]["id"] == 5000
+
+
+def test_dual_use_event_side_choice(monkeypatch):
+    calls = []
+
+    def handler(state, shaded=False):
+        calls.append(shaded)
+
+    monkeypatch.setitem(CARD_HANDLERS, 9999, handler)
+    engine = Engine()
+    card = {"id": 9999, "title": "Dual", "dual": True, "unshaded_event": "U", "shaded_event": "S"}
+
+    engine.handle_event(C.PATRIOTS, card, shaded=False)
+    engine.handle_event(C.PATRIOTS, card, shaded=True)
+    assert calls == [False, True]
+
+
+def test_march_move_plan_moves_only_selected(monkeypatch):
+    import random
+
+    state = {
+        "spaces": {
+            "Quebec_City": {C.REGULAR_PAT: 2},
+            "Quebec": {},
+        },
+        "resources": {C.PATRIOTS: 10, C.BRITISH: 10, C.FRENCH: 10, C.INDIANS: 10},
+        "available": {C.REGULAR_PAT: 10},
+        "unavailable": {},
+        "markers": {},
+        "support": {"Quebec_City": 0, "Quebec": 0},
+        "rng": random.Random(1),
+    }
+    engine = Engine(initial_state=state)
+    move_plan = [{"src": "Quebec_City", "dst": "Quebec", "pieces": {C.REGULAR_PAT: 1}}]
+    march.execute(engine.state, C.PATRIOTS, engine.ctx, [], ["Quebec"], move_plan=move_plan)
+
+    assert engine.state["spaces"]["Quebec_City"].get(C.REGULAR_PAT, 0) == 1
+    assert engine.state["spaces"]["Quebec"].get(C.REGULAR_PAT, 0) == 1

@@ -151,6 +151,7 @@ class Engine:
                 sources, destinations,
                 bring_escorts=kwargs.get("bring_escorts", False),
                 limited=kwargs.get("limited", False),
+                move_plan=kwargs.get("move_plan"),
             )
         return _runner
 
@@ -300,6 +301,13 @@ class Engine:
             return None
 
         next_upcoming = deck.pop(0) if deck else None
+
+        if next_upcoming and next_upcoming.get("winter_quarters"):
+            # Swap per Winter Quarters rule: WQ becomes current immediately
+            self.state["current_card"] = next_upcoming
+            self.state["upcoming_card"] = current if current else None
+            self.state["deck"] = deck
+            return next_upcoming
 
         self.state["deck"] = deck
         if next_upcoming:
@@ -454,13 +462,26 @@ class Engine:
             next_inel.add(faction)
             next_el.discard(faction)
 
-    def handle_event(self, faction: str, card: dict, *, state: dict | None = None) -> dict:
+    def handle_event(self, faction: str, card: dict, *, state: dict | None = None, shaded: bool | None = None) -> dict:
         """Execute the card event for *faction* on the provided state (defaults to engine state)."""
         target_state = state or self.state
         handler = CARD_HANDLERS.get(card.get("id"))
         if not handler:
             raise KeyError(f"No handler registered for card {card.get('id')}")
-        shaded = card.get("dual") and faction in {"PATRIOTS", "FRENCH"}
+
+        shaded_available = bool(card.get("dual") and card.get("shaded_event"))
+        unshaded_available = bool(card.get("unshaded_event"))
+
+        if card.get("dual"):
+            if shaded is None:
+                shaded = faction in {C.PATRIOTS, C.FRENCH}
+            if shaded and not shaded_available:
+                raise ValueError("Shaded side unavailable for this card.")
+            if (not shaded) and not unshaded_available:
+                raise ValueError("Unshaded side unavailable for this card.")
+        else:
+            shaded = False
+
         previous_active = target_state.get("active")
         target_state["active"] = faction
         try:
@@ -473,6 +494,7 @@ class Engine:
         return {
             "action": "event",
             "used_special": bool(target_state.get("_turn_used_special")),
+            "event_side": "shaded" if shaded else "unshaded",
         }
 
     # -------------------------------------------------------------------
