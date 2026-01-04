@@ -108,6 +108,15 @@ def execute(
 
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).update(selected)
+
+    # Validate all selections before paying
+    for space_id in selected:
+        sp = state["spaces"][space_id]
+        rebellion_control = state.get("control", {}).get(space_id) == "REBELLION"
+        has_underground = sp.get(MILITIA_U, 0) > 0
+        if not (rebellion_control and _has_patriot_piece(sp) or has_underground):
+            raise ValueError(f"{space_id} is not eligible for Rabble‑Rousing.")
+
     # Resource cost
     _pay_cost(state, len(selected))
 
@@ -120,12 +129,9 @@ def execute(
     for space_id in selected:
         sp = state["spaces"][space_id]
 
-        # Validate selection criteria
+        # Validate selection criteria (re-checked for clarity)
         rebellion_control = state.get("control", {}).get(space_id) == "REBELLION"
         has_underground = sp.get(MILITIA_U, 0) > 0
-        if not (rebellion_control and _has_patriot_piece(sp) or has_underground):
-            raise ValueError(f"{space_id} is not eligible for Rabble‑Rousing.")
-
         # Place a Propaganda marker if any remain
         if prop_state.get("pool", 0) > 0:
             prop_state["pool"] -= 1

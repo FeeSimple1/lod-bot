@@ -276,6 +276,8 @@ class Engine:
     def _prepare_card(self, card: dict) -> List[str]:
         """Prepare eligibility and return the acting queue for *card*."""
         elig_map = self.state.setdefault("eligible", {})
+        for fac in (C.BRITISH, C.PATRIOTS, C.FRENCH, C.INDIANS):
+            elig_map[fac] = True
         for fac in self.state.pop("eligible_next", set()):
             elig_map[fac] = True
         for fac in self.state.pop("ineligible_next", set()):
@@ -537,10 +539,11 @@ class Engine:
                 )
                 if not legal:
                     self._award_pass(faction)
-                    return {"action": "pass", "used_special": False}
+                    return {"action": "pass", "used_special": False, "reason": "illegal action"}
                 self._commit_state(sandbox_state, sandbox_ctx)
-            except Exception:  # noqa: BLE001
-                result = {"action": "command", "used_special": False}
+            except Exception as exc:  # noqa: BLE001
+                self._award_pass(faction)
+                return {"action": "pass", "used_special": False, "reason": f"bot error: {exc}"}
 
         if result is None:
             result = {"action": "command", "used_special": bool(self.state.get("_turn_used_special"))}
@@ -557,6 +560,9 @@ class Engine:
     def play_card(self, card: dict, human_decider: Callable[..., Tuple[dict, bool, dict, dict]] | None = None) -> List[Tuple[str, dict]]:
         """Execute all eligible turns for *card* (bot- and human-aware)."""
         queue = self._prepare_card(card)
+        if card.get("winter_quarters"):
+            resolve_year_end(self.state)
+            return []
         actions: List[Tuple[str, dict]] = []
         first_action: dict | None = None
 

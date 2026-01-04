@@ -33,7 +33,7 @@ from lod_ai.rules_consts import (
     PROPAGANDA, RAID, BLOCKADE,
 
     # factions
-    BRITISH, PATRIOTS, FRENCH, INDIANS,
+    BRITISH, PATRIOTS, FRENCH, INDIANS, SQUADRON,
 )
 
 # deck helpers
@@ -148,33 +148,49 @@ def _reconcile_on_map(state: Dict[str, Any]) -> None:
 
 
 def _apply_unavailable_block(state: Dict[str, Any], scenario: Dict[str, Any]) -> None:
-    """Move counts from scenario['unavailable'] into state['unavailable']."""
+    """Move counts from scenario['unavailable'] into state['unavailable'].""" 
     unavail = scenario.get("unavailable", {})
     available = state["available"]
     unavailable = state["unavailable"]
 
     key_map = {
-        "FRENCH_REGULARS": REGULAR_FRE,
         "French_Regular_Unavailable": REGULAR_FRE,
-        "BRITISH_REGULARS": REGULAR_BRI,
         "British_Regular_Unavailable": REGULAR_BRI,
-        "BRITISH_TORIES": TORY,
         "British_Tory_Unavailable": TORY,
+        "FRENCH_REGULARS": REGULAR_FRE,
+        "BRITISH_REGULARS": REGULAR_BRI,
+        "BRITISH_TORIES": TORY,
+        "Squadron": SQUADRON,
+        "FRENCH_SQUADRONS": SQUADRON,
     }
 
-    for json_key, tag in key_map.items():
-        qty = unavail.get(json_key)
+    for json_key, qty in unavail.items():
         if not qty:
             continue
+
+        if json_key in available:
+            tag = json_key
+        else:
+            tag = key_map.get(json_key)
+
+        if not tag:
+            state.setdefault("log", []).append(f"(setup) Unrecognised unavailable pool: {json_key}")
+            continue
+
+        if tag not in available:
+            state.setdefault("log", []).append(f"(setup) Unavailable pool not modelled: {json_key} ({qty})")
+            continue
+
         if available.get(tag, 0) < qty:
             raise ValueError(f"Scenario unavailable overdraw: {qty} {tag} requested")
+
         available[tag] -= qty
         if available[tag] == 0:
             available.pop(tag, None)
         unavailable[tag] = unavailable.get(tag, 0) + qty
 
     # French unavailable Squadrons/Blockades (logged only for now)
-    if sq := unavail.get("FRENCH_SQUADRONS") or unavail.get("Squadron"):
+    if sq := unavail.get("FRENCH_SQUADRONS"):
         state.setdefault("log", []).append(
             f"(setup) {sq} French Squadrons/Blockades unavailable in port"
         )
@@ -287,7 +303,8 @@ def _build_standard_deck(rng: random.Random, duration: int) -> list[dict]:
     """Construct the Standard deck per rules."""
     cards = [c for c in _CARD_REGISTRY.values() if not c.get("winter_quarters") and c.get("type") != "BRILLIANT_STROKE"]
     rng.shuffle(cards)
-    wq = sorted([c for c in _CARD_REGISTRY.values() if c.get("winter_quarters")], key=lambda d: d["id"])
+    wq = [c for c in _CARD_REGISTRY.values() if c.get("winter_quarters")]
+    rng.shuffle(wq)
 
     piles: list[list[dict]] = []
     for _ in range(duration):
@@ -315,7 +332,8 @@ def _build_period_deck(rng: random.Random, duration: int) -> list[dict]:
     for cards in buckets.values():
         rng.shuffle(cards)
 
-    wq = sorted([c for c in _CARD_REGISTRY.values() if c.get("winter_quarters")], key=lambda d: d["id"])
+    wq = [c for c in _CARD_REGISTRY.values() if c.get("winter_quarters")]
+    rng.shuffle(wq)
     piles: list[list[dict]] = []
     for bucket_name, count in _period_piles(duration):
         for _ in range(count):

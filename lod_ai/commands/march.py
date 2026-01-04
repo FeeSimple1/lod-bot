@@ -74,6 +74,7 @@ def execute(
     bring_escorts: bool = False,
     limited: bool = False,
     move_plan: List[Dict] | None = None,
+    plan: List[Dict] | None = None,
 ) -> Dict:
     """
     Perform a March.
@@ -89,7 +90,12 @@ def execute(
     move_plan
         Optional structured plan `[{"src": str, "dst": str, "pieces": {tag: n}}]`
         limiting movement to exactly the counts chosen by the caller.
+    plan
+        Alias for *move_plan* (backwards compatibility).
     """
+    if move_plan is None and plan is not None:
+        move_plan = plan
+
     faction = faction.upper()
     # Treaty gate for French
     if faction == "FRENCH" and not state.get("toa_played"):
@@ -246,8 +252,6 @@ def execute(
     # Limited-command constraints
     if limited and len(destinations_set) != 1:
         raise ValueError("Limited March must end in a single destination.")
-    if limited and move_plan is None and len(sources_set) != 1:
-        raise ValueError("Limited March must originate from one space.")
 
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).update(destinations_set)

@@ -147,3 +147,17 @@ def test_reset_phase_cleans_up(monkeypatch):
     assert state.get("upcoming_card", {}).get("title") == "Next"
     assert state.get("event") is True
     assert lifted.get("done") is True
+
+
+def test_reset_phase_keeps_existing_upcoming(monkeypatch):
+    state = basic_state()
+    state["spaces"][C.WEST_INDIES_ID] = {}
+    state["upcoming_card"] = {"title": "Keep"}
+    state["deck"] = [{"title": "Next"}]
+
+    monkeypatch.setattr(year_end, "lift_casualties", lambda s: None)
+
+    year_end._reset_phase(state)
+
+    assert state["upcoming_card"]["title"] == "Keep"
+    assert state["deck"] == [{"title": "Next"}]

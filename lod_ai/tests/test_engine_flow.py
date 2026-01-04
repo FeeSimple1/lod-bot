@@ -25,6 +25,22 @@ def test_year_end_runs_only_for_winter_cards(monkeypatch):
     assert calls == [True]
 
 
+def test_winter_quarters_card_skips_actions(monkeypatch):
+    calls = []
+    monkeypatch.setattr("lod_ai.engine.resolve_year_end", lambda state: calls.append(True))
+    engine = Engine()
+    engine.set_human_factions({C.BRITISH})
+
+    def _raising_decider(*args, **kwargs):
+        raise AssertionError("human_decider should not be called for Winter Quarters")
+
+    wq_card = {"id": 9100, "title": "Winter", "order": [C.BRITISH], "winter_quarters": True}
+    actions = engine.play_card(wq_card, human_decider=_raising_decider)
+
+    assert actions == []
+    assert calls == [True]
+
+
 def test_passing_awards_resources_and_keeps_eligibility():
     engine = Engine()
     engine.set_human_factions({C.BRITISH, C.PATRIOTS})

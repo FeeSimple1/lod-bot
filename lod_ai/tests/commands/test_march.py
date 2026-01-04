@@ -37,3 +37,30 @@ def test_march_invalid_adjacency():
     state = simple_state()
     with pytest.raises(ValueError):
         march.execute(state, C.BRITISH, {}, ["Boston"], ["New_York"])
+
+
+def test_limited_march_allows_multiple_origins_with_plan(monkeypatch):
+    state = simple_state()
+    state["spaces"]["New_York"][C.REGULAR_BRI] = 1
+    state["available"] = {C.REGULAR_BRI: 5}
+
+    monkeypatch.setattr(march, "is_adjacent", lambda a, b: True)
+
+    move_plan = [
+        {"src": "Boston", "dst": "Connecticut_Rhode_Island", "pieces": {C.REGULAR_BRI: 1}},
+        {"src": "New_York", "dst": "Connecticut_Rhode_Island", "pieces": {C.REGULAR_BRI: 1}},
+    ]
+
+    march.execute(
+        state,
+        C.BRITISH,
+        {},
+        [],
+        ["Connecticut_Rhode_Island"],
+        limited=True,
+        plan=move_plan,
+    )
+
+    assert state["spaces"]["Connecticut_Rhode_Island"].get(C.REGULAR_BRI, 0) == 2
+    assert state["spaces"]["Boston"].get(C.REGULAR_BRI, 0) == 1
+    assert state["spaces"]["New_York"].get(C.REGULAR_BRI, 0) == 0

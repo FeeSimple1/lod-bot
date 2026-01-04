@@ -90,3 +90,32 @@ def test_play_card_orders_and_skips(monkeypatch):
     assert state["eligible"][C.BRITISH] is False
     assert state["eligible"][C.FRENCH] is False
     assert state.get("ineligible_next", set()) == set()
+
+
+def test_eligibility_resets_each_card(monkeypatch):
+    def _pass_decider(faction, card, allowed, engine):
+        return {"action": "pass", "used_special": False}, True, None, None
+
+    state = {
+        "spaces": {},
+        "resources": {C.BRITISH: 1, C.PATRIOTS: 1, C.FRENCH: 1, C.INDIANS: 1},
+        "available": {C.REGULAR_BRI: 1, C.REGULAR_PAT: 1},
+        "eligible": {
+            C.BRITISH: True,
+            C.PATRIOTS: True,
+            C.FRENCH: True,
+            C.INDIANS: True,
+        },
+        "ineligible_next": {C.BRITISH},
+        "rng": __import__('random').Random(1),
+        "support": {},
+        "history": [],
+    }
+    engine = Engine(state)
+    engine.set_human_factions({C.PATRIOTS, C.FRENCH})
+
+    card_one = {"id": 2001, "title": "Card One", "order": [C.PATRIOTS, C.FRENCH]}
+    engine.play_card(card_one, human_decider=_pass_decider)
+
+    queue = engine._prepare_card({"id": 2002, "title": "Card Two", "order": [C.BRITISH, C.PATRIOTS]})
+    assert C.BRITISH in queue
