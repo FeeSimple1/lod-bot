@@ -227,7 +227,7 @@ def _resolve_space(
 
         shifts = min(3, loser_removed // 2)
         if winner == "REBELLION":
-            if leader_location(state, "LEADER_WASHINGTON") == sid or leader_location(state, "WASHINGTON") == sid:
+            if leader_location(state, "LEADER_WASHINGTON") == sid:
                 shifts = min(6, shifts * 2)
 
         if shifts == 0:

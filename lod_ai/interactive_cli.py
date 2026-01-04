@@ -401,7 +401,7 @@ def _raid_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict,
         sid: sp.get(RC.WARPARTY_U, 0)
         for sid, sp in state.get("spaces", {}).items()
     }
-    dragging_loc = leader_location(state, "LEADER_DRAGGING_CANOE") or leader_location(state, "DRAGGING_CANOE")
+    dragging_loc = leader_location(state, "LEADER_DRAGGING_CANOE")
 
     def _sources_for(dest: str) -> List[str]:
         sources: List[str] = []
