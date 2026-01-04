@@ -692,7 +692,7 @@ def _reset_phase(state):
 
     # Reveal next Ops card
     deck = state.get("deck", [])
-    if deck:
+    if deck and state.get("upcoming_card") is None:
         state["upcoming_card"] = deck.pop(0)
         _uc = state["upcoming_card"]
         _title = _uc.get("title") or _uc.get("name") or f"Card {_uc.get('id')}"

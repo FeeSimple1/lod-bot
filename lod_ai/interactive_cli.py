@@ -15,6 +15,7 @@ from lod_ai.cli_utils import choose_count, choose_multiple, choose_one
 from lod_ai.engine import Engine
 from lod_ai.map import adjacency as map_adj
 from lod_ai.state.setup_state import build_state
+from lod_ai.leaders import leader_location
 
 from lod_ai.commands import (
     march,
@@ -196,14 +197,135 @@ def _rally_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
 
 
 def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
-    options = _space_options(engine.state)
+    state = engine.state
+    support_ok = {RC.NEUTRAL, RC.PASSIVE_SUPPORT, RC.PASSIVE_OPPOSITION}
+    avail_wp = state.get("available", {}).get(RC.WARPARTY_U, 0)
+    avail_villages = state.get("available", {}).get(RC.VILLAGE, 0)
+    remaining_wp_on_map = {
+        sid: sp.get(RC.WARPARTY_U, 0) + sp.get(RC.WARPARTY_A, 0)
+        for sid, sp in state.get("spaces", {}).items()
+    }
+
+    def _has_adjacent_wp(prov: str) -> bool:
+        return any(
+            remaining_wp_on_map.get(src, 0) > 0 and map_adj.is_adjacent(src, prov)
+            for src in state.get("spaces", {})
+        )
+
+    def _gather_choices_for(prov: str) -> List[str]:
+        sp = state["spaces"][prov]
+        if state.get("support", {}).get(prov, 0) not in support_ok:
+            return []
+        if prov == RC.WEST_INDIES_ID:
+            return []
+        options: List[str] = []
+        base_total = sp.get(RC.VILLAGE, 0) + sp.get(RC.FORT_BRI, 0) + sp.get(RC.FORT_PAT, 0)
+        wp_total = sp.get(RC.WARPARTY_U, 0) + sp.get(RC.WARPARTY_A, 0)
+        if avail_wp > 0:
+            options.append("place_one")
+        if wp_total >= 2 and base_total < 2 and avail_villages > 0:
+            options.append("build_village")
+        if sp.get(RC.VILLAGE, 0) > 0 and avail_wp > 0:
+            options.append("bulk_place")
+        if _has_adjacent_wp(prov):
+            options.append("move_plan")
+        return options
+
+    province_options = [
+        (sid, sid)
+        for sid in state.get("spaces", {})
+        if _gather_choices_for(sid)
+    ]
+    if not province_options:
+        raise ValueError("No legal Provinces for Gather.")
+
     selected = choose_multiple(
         "Select Gather Provinces:",
-        options,
+        sorted(province_options),
         min_sel=1,
-        max_sel=1 if limited else None,
+        max_sel=1 if limited else 4,
     )
-    return lambda s, c: gather.execute(s, faction, c, selected, limited=limited)
+
+    place_one: set[str] = set()
+    build_village: set[str] = set()
+    bulk_place: Dict[str, int] = {}
+    move_plan: List[tuple[str, str, int]] = []
+
+    remaining_available_wp = avail_wp
+    remaining_available_villages = avail_villages
+
+    for prov in selected:
+        sp = state["spaces"][prov]
+        base_total = sp.get(RC.VILLAGE, 0) + sp.get(RC.FORT_BRI, 0) + sp.get(RC.FORT_PAT, 0)
+        wp_total = sp.get(RC.WARPARTY_U, 0) + sp.get(RC.WARPARTY_A, 0)
+        choices = []
+        if remaining_available_wp > 0:
+            choices.append(("Place 1 War Party", "place_one"))
+        if wp_total >= 2 and base_total < 2 and remaining_available_villages > 0:
+            choices.append(("Build Village (replace 2 WP)", "build_village"))
+        if sp.get(RC.VILLAGE, 0) > 0 and remaining_available_wp > 0:
+            max_bulk = min(remaining_available_wp, sp.get(RC.VILLAGE, 0) + 1)
+            if max_bulk > 0:
+                choices.append(("Bulk place War Parties", ("bulk_place", max_bulk)))
+        adj_sources = [
+            sid for sid, total in remaining_wp_on_map.items()
+            if total > 0 and map_adj.is_adjacent(sid, prov)
+        ]
+        if adj_sources:
+            choices.append(("Move War Parties in", ("move_plan", adj_sources)))
+
+        if not choices:
+            raise ValueError(f"No legal Gather actions remain for {prov}.")
+
+        choice = choose_one(f"Choose Gather action for {prov}:", choices)
+
+        if choice == "place_one":
+            place_one.add(prov)
+            remaining_available_wp -= 1
+        elif choice == "build_village":
+            build_village.add(prov)
+            remaining_available_villages -= 1
+            remaining_wp_on_map[prov] = max(0, remaining_wp_on_map.get(prov, 0) - 2)
+        elif isinstance(choice, tuple) and choice[0] == "bulk_place":
+            max_bulk = choice[1]
+            n_place = choose_count(
+                f"How many War Parties to place in {prov}? (1-{max_bulk})",
+                min_val=1,
+                max_val=max_bulk,
+            )
+            bulk_place[prov] = n_place
+            remaining_available_wp -= n_place
+        elif isinstance(choice, tuple) and choice[0] == "move_plan":
+            sources = choice[1]
+            selected_sources = choose_multiple(
+                f"Select sources to move War Parties into {prov}:",
+                [(s, s) for s in sources],
+                min_sel=1,
+                max_sel=None,
+            )
+            for src in selected_sources:
+                max_move = remaining_wp_on_map.get(src, 0)
+                n_move = choose_count(
+                    f"Move how many War Parties from {src} to {prov}?",
+                    min_val=1,
+                    max_val=max_move,
+                )
+                remaining_wp_on_map[src] -= n_move
+                move_plan.append((src, prov, n_move))
+        else:
+            raise ValueError("Unknown Gather choice.")
+
+    return lambda s, c: gather.execute(
+        s,
+        faction,
+        c,
+        selected,
+        place_one=place_one or None,
+        build_village=build_village or None,
+        bulk_place=bulk_place or None,
+        move_plan=move_plan or None,
+        limited=limited,
+    )
 
 
 def _muster_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
@@ -273,14 +395,71 @@ def _scout_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
 
 
 def _raid_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
-    options = _space_options(engine.state, lambda sid, sp: sp.get(RC.WARPARTY_A, 0) + sp.get(RC.WARPARTY_U, 0) > 0)
+    state = engine.state
+    support_ok = {RC.ACTIVE_OPPOSITION, RC.PASSIVE_OPPOSITION}
+    remaining_underground = {
+        sid: sp.get(RC.WARPARTY_U, 0)
+        for sid, sp in state.get("spaces", {}).items()
+    }
+    dragging_loc = leader_location(state, "LEADER_DRAGGING_CANOE") or leader_location(state, "DRAGGING_CANOE")
+
+    def _sources_for(dest: str) -> List[str]:
+        sources: List[str] = []
+        for sid, count in remaining_underground.items():
+            if count <= 0:
+                continue
+            path = map_adj.shortest_path(sid, dest)
+            distance = len(path) - 1 if path else None
+            if distance == 1:
+                sources.append(sid)
+            elif dragging_loc and sid == dragging_loc and distance is not None and distance <= 2:
+                sources.append(sid)
+        return sources
+
+    def _eligible(space_id: str, sp: Dict[str, Any]) -> bool:
+        if space_id == RC.WEST_INDIES_ID:
+            return False
+        if state.get("support", {}).get(space_id, 0) not in support_ok:
+            return False
+        underground_here = remaining_underground.get(space_id, 0) > 0
+        return underground_here or bool(_sources_for(space_id))
+
+    options = _space_options(state, _eligible)
+    if not options:
+        raise ValueError("No legal Provinces for Raid.")
+
     selected = choose_multiple(
         "Select Raid Provinces:",
         options,
         min_sel=1,
-        max_sel=1 if limited else None,
+        max_sel=1 if limited else 3,
     )
-    return lambda s, c: raid.execute(s, faction, c, selected, move_plan=None)
+
+    move_plan: List[tuple[str, str]] = []
+    for dest in selected:
+        underground_here = remaining_underground.get(dest, 0) > 0
+        sources = _sources_for(dest)
+        if not underground_here and not sources:
+            raise ValueError(f"{dest} has no accessible Underground War Party.")
+
+        should_move = False
+        if underground_here:
+            if sources:
+                should_move = choose_one(f"Move an Underground War Party into {dest}?", [("No", False), ("Yes", True)])
+            else:
+                should_move = False
+        else:
+            should_move = True
+
+        if should_move:
+            src = choose_one(
+                f"Select source for 1 Underground War Party into {dest}:",
+                [(s, s) for s in sources],
+            )
+            move_plan.append((src, dest))
+            remaining_underground[src] -= 1
+
+    return lambda s, c: raid.execute(s, faction, c, selected, move_plan=move_plan or None)
 
 
 def _garrison_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
@@ -300,7 +479,19 @@ def _garrison_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[d
 
 
 def _rabble_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
-    options = _space_options(engine.state)
+    state = engine.state
+    def _eligible(space_id: str, sp: Dict[str, Any]) -> bool:
+        if state.get("control", {}).get(space_id) != "REBELLION":
+            return False
+        has_patriot_piece = any(
+            sp.get(tag, 0) > 0
+            for tag in (RC.REGULAR_PAT, RC.MILITIA_A, RC.MILITIA_U, RC.FORT_PAT)
+        )
+        return has_patriot_piece or sp.get(RC.MILITIA_U, 0) > 0
+
+    options = _space_options(state, _eligible)
+    if not options:
+        raise ValueError("No eligible spaces for Rabble-Rousing.")
     selected = choose_multiple(
         "Select Rabble-Rousing spaces:",
         options,
@@ -327,38 +518,129 @@ def _hortelez_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[d
 # ---------------------------------------------------------------------------
 
 def _special_wizard(state: Dict[str, Any], faction: str) -> Callable[[dict, dict], Any] | None:
+    def _legal_space_list(builder: Callable[[dict, dict, str], Any]) -> List[Tuple[str, str]]:
+        legal: List[Tuple[str, str]] = []
+        for sid, _ in _space_options(state):
+            test_state = deepcopy(state)
+            test_ctx: dict = {}
+            try:
+                builder(test_state, test_ctx, sid)
+            except Exception:  # noqa: BLE001
+                continue
+            legal.append((sid, sid))
+        return legal
+
     options: List[Tuple[str, Callable[[dict, dict], Any] | None]] = []
 
-    spaces_all = _space_options(state)
     if faction == RC.BRITISH:
-        options.extend([
-            ("Naval Pressure", lambda s, c: naval_pressure.execute(s, RC.BRITISH, c, city_choice=choose_one("Select City for Naval Pressure:", spaces_all))),
-            ("Skirmish", lambda s, c: skirmish.execute(s, RC.BRITISH, c, choose_one("Skirmish space:", spaces_all), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3))),
-            ("Common Cause", lambda s, c: common_cause.execute(
-                s,
-                RC.BRITISH,
-                c,
-                [v for v in choose_multiple("Spaces for Common Cause:", spaces_all, min_sel=1)],
-            )),
-        ])
+        naval_spaces = _legal_space_list(lambda s, c, sid: naval_pressure.execute(s, RC.BRITISH, c, city_choice=sid))
+        if naval_spaces:
+            options.append((
+                "Naval Pressure",
+                lambda s, c: naval_pressure.execute(s, RC.BRITISH, c, city_choice=choose_one("Select City for Naval Pressure:", naval_spaces)),
+            ))
+        skirmish_spaces = _legal_space_list(lambda s, c, sid: skirmish.execute(s, RC.BRITISH, c, sid, option=1))
+        if skirmish_spaces:
+            options.append((
+                "Skirmish",
+                lambda s, c: skirmish.execute(s, RC.BRITISH, c, choose_one("Skirmish space:", skirmish_spaces), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3)),
+            ))
+        cc_spaces = _legal_space_list(lambda s, c, sid: common_cause.execute(s, RC.BRITISH, c, [sid]))
+        if cc_spaces:
+            options.append((
+                "Common Cause",
+                lambda s, c: common_cause.execute(
+                    s,
+                    RC.BRITISH,
+                    c,
+                    [v for v in choose_multiple("Spaces for Common Cause:", cc_spaces, min_sel=1)],
+                ),
+            ))
     elif faction == RC.PATRIOTS:
-        options.extend([
-            ("Partisans", lambda s, c: partisans.execute(s, RC.PATRIOTS, c, choose_one("Partisans space:", spaces_all), option=choose_count("Option (1-3):", min_val=1, max_val=3))),
-            ("Persuasion", lambda s, c: persuasion.execute(s, RC.PATRIOTS, c, spaces=[v for v in choose_multiple("Spaces for Persuasion (up to 3):", spaces_all, min_sel=1, max_sel=3)])),
-            ("Skirmish", lambda s, c: skirmish.execute(s, RC.PATRIOTS, c, choose_one("Skirmish space:", spaces_all), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3))),
-        ])
+        part_spaces = _legal_space_list(lambda s, c, sid: partisans.execute(s, RC.PATRIOTS, c, sid, option=1))
+        if part_spaces:
+            options.append((
+                "Partisans",
+                lambda s, c: partisans.execute(s, RC.PATRIOTS, c, choose_one("Partisans space:", part_spaces), option=choose_count("Option (1-3):", min_val=1, max_val=3)),
+            ))
+        persuasion_spaces = _legal_space_list(lambda s, c, sid: persuasion.execute(s, RC.PATRIOTS, c, spaces=[sid]))
+        if persuasion_spaces:
+            options.append((
+                "Persuasion",
+                lambda s, c: persuasion.execute(
+                    s,
+                    RC.PATRIOTS,
+                    c,
+                    spaces=[v for v in choose_multiple("Spaces for Persuasion (up to 3):", persuasion_spaces, min_sel=1, max_sel=3)],
+                ),
+            ))
+        skirmish_spaces = _legal_space_list(lambda s, c, sid: skirmish.execute(s, RC.PATRIOTS, c, sid, option=1))
+        if skirmish_spaces:
+            options.append((
+                "Skirmish",
+                lambda s, c: skirmish.execute(s, RC.PATRIOTS, c, choose_one("Skirmish space:", skirmish_spaces), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3)),
+            ))
     elif faction == RC.INDIANS:
-        options.extend([
-            ("Plunder", lambda s, c: plunder.execute(s, RC.INDIANS, c, choose_one("Province to Plunder:", spaces_all))),
-            ("Trade", lambda s, c: trade.execute(s, RC.INDIANS, c, choose_one("Province to Trade in:", spaces_all), transfer=choose_count("Resource transfer (0=roll D3):", min_val=0, max_val=3))),
-            ("War Path", lambda s, c: war_path.execute(s, RC.INDIANS, c, choose_one("Province for War Path:", spaces_all), option=choose_count("Option (1-3):", min_val=1, max_val=3))),
-        ])
+        plunder_spaces = _legal_space_list(lambda s, c, sid: plunder.execute(s, RC.INDIANS, c, sid))
+        if plunder_spaces:
+            options.append((
+                "Plunder",
+                lambda s, c: plunder.execute(s, RC.INDIANS, c, choose_one("Province to Plunder:", plunder_spaces)),
+            ))
+        trade_spaces = _legal_space_list(lambda s, c, sid: trade.execute(s, RC.INDIANS, c, sid, transfer=0))
+        if trade_spaces:
+            options.append((
+                "Trade",
+                lambda s, c: trade.execute(s, RC.INDIANS, c, choose_one("Province to Trade in:", trade_spaces), transfer=choose_count("Resource transfer (0=roll D3):", min_val=0, max_val=3)),
+            ))
+        war_path_spaces = _legal_space_list(lambda s, c, sid: war_path.execute(s, RC.INDIANS, c, sid, option=1))
+        if war_path_spaces:
+            options.append((
+                "War Path",
+                lambda s, c: war_path.execute(s, RC.INDIANS, c, choose_one("Province for War Path:", war_path_spaces), option=choose_count("Option (1-3):", min_val=1, max_val=3)),
+            ))
     elif faction == RC.FRENCH:
-        options.extend([
-            ("Skirmish", lambda s, c: skirmish.execute(s, RC.FRENCH, c, choose_one("Skirmish space:", spaces_all), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3))),
-            ("Naval Pressure", lambda s, c: naval_pressure.execute(s, RC.FRENCH, c, city_choice=choose_one("City to receive Blockade:", spaces_all), rearrange_map=None)),
-            ("Préparer la Guerre", lambda s, c: preparer.execute(s, RC.FRENCH, c, choice=choose_one("Choose Préparer option:", [("BLOCKADE", "BLOCKADE"), ("REGULARS", "REGULARS"), ("RESOURCES", "RESOURCES")]))),
-        ])
+        skirmish_spaces = _legal_space_list(lambda s, c, sid: skirmish.execute(s, RC.FRENCH, c, sid, option=1))
+        if skirmish_spaces:
+            options.append((
+                "Skirmish",
+                lambda s, c: skirmish.execute(s, RC.FRENCH, c, choose_one("Skirmish space:", skirmish_spaces), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3)),
+            ))
+        bloc = state.setdefault("markers", {}).setdefault(RC.BLOCKADE, {"pool": 0, "on_map": set()})
+        naval_spaces = _legal_space_list(lambda s, c, sid: naval_pressure.execute(s, RC.FRENCH, c, city_choice=sid))
+        if naval_spaces or bloc.get("pool", 0) == 0 and bloc.get("on_map"):
+            def _french_naval_runner(s: dict, c: dict) -> Any:
+                current_bloc = s.setdefault("markers", {}).setdefault(RC.BLOCKADE, {"pool": 0, "on_map": set()})
+                if current_bloc.get("pool", 0) > 0:
+                    city = choose_one("City to receive Blockade:", naval_spaces)
+                    return naval_pressure.execute(s, RC.FRENCH, c, city_choice=city, rearrange_map=None)
+                existing = list(current_bloc.get("on_map", set()))
+                if not existing:
+                    raise ValueError("No Blockades available for Naval Pressure.")
+                cities = _space_options(s)
+                selection = choose_multiple(
+                    f"Select {len(existing)} cities to host Blockades after rearrange:",
+                    cities,
+                    min_sel=len(existing),
+                    max_sel=len(existing),
+                )
+                rearrange_map = {cid: 1 for cid in selection}
+                return naval_pressure.execute(s, RC.FRENCH, c, city_choice=None, rearrange_map=rearrange_map)
+
+            options.append(("Naval Pressure", _french_naval_runner))
+        prep_choices: List[Tuple[str, str]] = []
+        for label, val in [("BLOCKADE", "BLOCKADE"), ("REGULARS", "REGULARS"), ("RESOURCES", "RESOURCES")]:
+            test_state = deepcopy(state)
+            try:
+                preparer.execute(test_state, RC.FRENCH, {}, choice=val)
+            except Exception:  # noqa: BLE001
+                continue
+            prep_choices.append((label, val))
+        if prep_choices:
+            options.append((
+                "Préparer la Guerre",
+                lambda s, c: preparer.execute(s, RC.FRENCH, c, choice=choose_one("Choose Préparer option:", prep_choices)),
+            ))
 
     if not options:
         return None
