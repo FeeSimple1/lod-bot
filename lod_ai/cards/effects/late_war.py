@@ -101,11 +101,11 @@ def evt_001_waxhaws(state, shaded=False):
 @register(7)
 def evt_007_john_paul_jones(state, shaded=False):
     if shaded:
-        add_resource(state, "Patriots", +5)
+        add_resource(state, PATRIOTS, +5)
         adjust_fni(state, +1)
         return
 
-    add_resource(state, "British", +3)
+    add_resource(state, BRITISH, +3)
     adjust_fni(state, -1)
     moved = move_piece(state, REGULAR_BRI, "available", WEST_INDIES_ID, 2)
     if moved:
@@ -136,9 +136,9 @@ def evt_018_if_not_stormy(state, shaded=False):
 def evt_019_nathan_hale(state, shaded=False):
     if shaded:
         place_piece(state, MILITIA_U, "Pennsylvania", 3)
-        add_resource(state, "Patriots", +3)
+        add_resource(state, PATRIOTS, +3)
     else:
-        add_resource(state, "Patriots", -4)
+        add_resource(state, PATRIOTS, -4)
 
 
 # 21  THE GAMECOCK THOMAS SUMTER
@@ -233,8 +233,8 @@ def evt_037_armada(state, shaded=False):
         remove_piece(state, REGULAR_BRI, None, 4, to="available")
         adjust_fni(state, +1)
     else:
-        add_resource(state, "Patriots", -2)
-        add_resource(state, "French", -3)
+        add_resource(state, PATRIOTS, -2)
+        add_resource(state, FRENCH, -3)
         adjust_fni(state, -1)
 
 
@@ -255,13 +255,13 @@ def evt_040_chesapeake(state, shaded=False):
         adjust_fni(state, 3 - state.get("fni_level", 0))
     else:
         adjust_fni(state, -state.get("fni_level", 0))
-        add_resource(state, "British", +2)
+        add_resource(state, BRITISH, +2)
 
 
 # 45  ADAM SMITH – WEALTH OF NATIONS
 @register(45)
 def evt_045_adam_smith(state, shaded=False):
-    add_resource(state, "British", +6 if not shaded else -4)
+    add_resource(state, BRITISH, +6 if not shaded else -4)
 
 
 # 48  GOD SAVE THE KING
@@ -342,16 +342,16 @@ def evt_062_langlade(state, shaded=False):
 @register(64)
 def evt_064_fielding(state, shaded=False):
     if shaded:
-        add_resource(state, "British", -3)
+        add_resource(state, BRITISH, -3)
         adjust_fni(state, +1)
     else:
-        add_resource(state, "British", +3)
+        add_resource(state, BRITISH, +3)
         adjust_fni(state, -1)
 
 # 65  JACQUES NECKER
 @register(65)
 def evt_065_necker(state, shaded=False):
-    add_resource(state, "French", +3 if shaded else -4)
+    add_resource(state, FRENCH, +3 if shaded else -4)
 
 # 66  DON BERNARDO TAKES PENSACOLA
 @register(66)
