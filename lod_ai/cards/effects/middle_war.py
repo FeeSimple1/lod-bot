@@ -27,6 +27,7 @@ from lod_ai.rules_consts import (
     FORT_BRI, FORT_PAT,
     PROPAGANDA,
     RAID,
+    BRITISH, PATRIOTS, FRENCH, INDIANS,
 )
 from lod_ai.util.free_ops import queue_free_op
 
@@ -133,7 +134,7 @@ def evt_012_martha_to_valley_forge(state, shaded=False):
     Shaded   – Patriot Resources +5.
     """
     if shaded:
-        add_resource(state, "Patriots", +5)
+        add_resource(state, PATRIOTS, +5)
     else:
         state["winter_flag"] = "PAT_DESERTION"
 
@@ -212,7 +213,7 @@ def evt_034_lord_sandwich(state, shaded=False):
         state["ineligible_next"].add("BRITISH")
         shift = +1
     else:
-        add_resource(state, "British", +6)
+        add_resource(state, BRITISH, +6)
         shift = -1
     adjust_fni(state, shift)
 
@@ -246,7 +247,7 @@ def evt_042_attack_danbury(state, shaded=False):
         place_piece(state, REGULAR_PAT, "Connecticut", 1)
         push_history(state, "Battle of Ridgefield bolsters Connecticut")
     else:
-        add_resource(state, "Patriots", -3)
+        add_resource(state, PATRIOTS, -3)
         place_piece(state, TORY, "Connecticut", 1)
         push_history(state, "Danbury raid: PAT -3 Resources")
 
@@ -334,7 +335,7 @@ def evt_055_french_navy(state, shaded=False):
 # 58  MARQUIS DE LAFAYETTE ARRIVES
 @register(58)
 def evt_058_lafayette(state, shaded=False):
-    add_resource(state, "Patriots", +3 if shaded else -4)
+    add_resource(state, PATRIOTS, +3 if shaded else -4)
 
 # 59  TRONSON DE COUDRAY
 @register(59)
@@ -347,7 +348,7 @@ def evt_059_coudray(state, shaded=False):
         Patriot Resources +3.
     """
     if shaded:
-        add_resource(state, "Patriots", +3)
+        add_resource(state, PATRIOTS, +3)
         return
 
     # pick first space that has the required pieces
@@ -363,17 +364,17 @@ def evt_059_coudray(state, shaded=False):
 def evt_060_orvilliers(state, shaded=False):
     if shaded:
         adjust_fni(state, +1)
-        add_resource(state, "British", -3)
+        add_resource(state, BRITISH, -3)
     else:
         adjust_fni(state, -2)
-        add_resource(state, "French",  -4)
+        add_resource(state, FRENCH,  -4)
 
 # 61  VERGENNES
 @register(61)
 def evt_061_vergennes(state, shaded=False):
     if shaded:
-        add_resource(state, "Patriots", +3)
-        add_resource(state, "French",   +2)
+        add_resource(state, PATRIOTS, +3)
+        add_resource(state, FRENCH,   +2)
     else:
         state.setdefault("ineligible_next", set()).add("PATRIOTS")
 
@@ -390,11 +391,11 @@ def evt_063_gibraltar(state, shaded=False):
         • British Resources –5
     """
     if shaded:
-        add_resource(state, "British", -5)
+        add_resource(state, BRITISH, -5)
         return
 
     # --- unshaded -----------------------------------------------------------
-    add_resource(state, "British", +1)
+    add_resource(state, BRITISH, +1)
     adjust_fni(state, -1)
     move_piece(state, REGULAR_BRI, WEST_INDIES_ID, "available", 2)
 
@@ -403,24 +404,24 @@ def evt_063_gibraltar(state, shaded=False):
 def evt_069_suffren(state, shaded=False):
     if shaded:
         adjust_fni(state, +1)
-        add_resource(state, "French", +3)
+        add_resource(state, FRENCH, +3)
     else:
         adjust_fni(state, -2)
-        add_resource(state, "British", +2)
+        add_resource(state, BRITISH, +2)
 
 
 # 71  TREATY OF AMITY & COMMERCE
 @register(71)
 def evt_071_treaty_amity(state, shaded=False):
     if shaded:
-        add_resource(state, "French", +5)
+        add_resource(state, FRENCH, +5)
         return
 
     pop = 0
     for sp in state["spaces"].values():
         if sp.get("type") == "City" and sp.get("Patriot_Control"):
             pop += sp.get("population", 0)
-    add_resource(state, "Patriots", pop)
+    add_resource(state, PATRIOTS, pop)
     push_history(state, f"Treaty of Amity: Patriots gain {pop} Resources")
 
 
@@ -439,7 +440,7 @@ def evt_074_chickasaw(state, shaded=False):
     """
     if not shaded:
         villages = sum(sp.get(VILLAGE, 0) for sp in state["spaces"].values())
-        add_resource(state, "Indians", villages // 2)
+        add_resource(state, INDIANS, villages // 2)
         return
 
     # shaded ------------------------------------------------------------

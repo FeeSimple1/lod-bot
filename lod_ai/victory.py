@@ -14,7 +14,7 @@ state["treaty_of_alliance"] : bool  # Treaty of Alliance Event resolved?
 If your project uses different keys, adjust the look-ups below.
 """
 
-from lod_ai.rules_consts import FORT_PAT, VILLAGE
+from lod_ai.rules_consts import BRITISH, PATRIOTS, FRENCH, INDIANS, FORT_PAT, VILLAGE
 
 # --------------------------------------------------------------------------- #
 #  Board summarizer – converts the live map into the tallies used below       #
@@ -95,18 +95,18 @@ def final_scoring(state) -> None:
     t = _summarize_board(state)
 
     totals = {
-        "British":  sum(_british_margin(t)),
-        "Patriots": sum(_patriot_margin(t)),
-        "French":   sum(_french_margin(t)),
-        "Indians":  sum(_indian_margin(t)),
+        BRITISH:  sum(_british_margin(t)),
+        PATRIOTS: sum(_patriot_margin(t)),
+        FRENCH:   sum(_french_margin(t)),
+        INDIANS:  sum(_indian_margin(t)),
     }
 
     # Treaty requirement: French score only if ToA played
     if not t["treaty_of_alliance"]:
-        totals["French"] = float("-inf")
+        totals[FRENCH] = float("-inf")
 
     # Rank: higher total wins; ties resolved BRI > PAT > FRE > IND
-    order = ["Patriots", "British", "French", "Indians"]
+    order = [PATRIOTS, BRITISH, FRENCH, INDIANS]
     winner = max(order, key=lambda f: totals[f])
 
     log = "Final Scoring – " + "  ".join(f"{f}:{totals[f]}" for f in order)

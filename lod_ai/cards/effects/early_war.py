@@ -50,7 +50,7 @@ def evt_002_common_sense(state, shaded=False):
         place_piece(state, REGULAR_BRI, city, 2)
         place_piece(state, TORY,   city, 2)
         place_marker(state, PROPAGANDA, city, 2)
-        add_resource(state, "British", +4)
+        add_resource(state, BRITISH, +4)
 
 # 4  THE PENOBSCOT EXPEDITION
 @register(4)                       # Penobscot Expedition
@@ -72,7 +72,7 @@ def evt_004_penobscot(state, shaded=False):
         else:
             push_history(state, "Penobscot shaded: no executing faction; no pieces placed")
     else:
-        add_resource(state, "Patriots", -2)
+        add_resource(state, PATRIOTS, -2)
         # Remove 3 Militia anywhere on the map, preferring Underground
         removed = remove_piece(state, MILITIA_U, None, 3, to="available")
         if removed < 3:
@@ -120,8 +120,8 @@ def evt_006_benedict_arnold(state, shaded=False):
 @register(10)   # Benjamin Franklin Travels to France
 def evt_010_franklin_to_france(state, shaded=False):
     if shaded:
-        add_resource(state, "French",   3)
-        add_resource(state, "Patriots", 2)
+        add_resource(state, FRENCH,   3)
+        add_resource(state, PATRIOTS, 2)
     else:
         c1, c2 = pick_two_cities(state)
         shift_support(state, c1, +1)
@@ -320,7 +320,7 @@ def evt_030_hessians(state, shaded=False):
                     if sp.get(REGULAR_BRI) and sp.get("British_Control")]
         for loc in eligible[:3]:
             _pull_regulars(loc, 2)
-        add_resource(state, "British", +2)
+        add_resource(state, BRITISH, +2)
 
 # 32  RULE BRITANNIA!
 @register(32)
@@ -344,7 +344,7 @@ def evt_032_rule_britannia(state, shaded=False):
             n for n, sp in state["spaces"].items()
             if sp.get("British_Control") and sp.get("type") == "City"
         ]
-        recipient = state.get("rule_britannia_recipient", "British")
+        recipient = state.get("rule_britannia_recipient", BRITISH)
         add_resource(state, recipient, len(british_cities) // 2)
         return
 
@@ -373,10 +373,10 @@ def evt_033_burning_falmouth(state, shaded=False):
     if shaded:
         for prov in ("Boston", "Connecticut_Rhode_Island"):  # both adjacent to Massachusetts
             queue_free_op(state, "PATRIOTS", "rally", prov)
-        add_resource(state, "Patriots", +3)
+        add_resource(state, PATRIOTS, +3)
 
     else:
-        add_resource(state, "Patriots", -3)
+        add_resource(state, PATRIOTS, -3)
 
         # Patriots choose any two Militia cubes (Active or Underground)
         cubes_needed = 2
@@ -514,11 +514,11 @@ def evt_051_bermuda_gunpowder(state, shaded=False):
 @register(53)
 def evt_053_french_ports_accept(state, shaded=False):
     if shaded:
-        add_resource(state, "British",  -2)
-        add_resource(state, "Patriots", +2)
+        add_resource(state, BRITISH,  -2)
+        add_resource(state, PATRIOTS, +2)
         adjust_fni(state, +1)
     else:
-        add_resource(state, "British", +3)
+        add_resource(state, BRITISH, +3)
         adjust_fni(state, -2)
 
 # 54  ANTOINE de SARTINE, SECRETARY OF THE NAVY
@@ -545,7 +545,7 @@ def evt_054_antoine_sartine(state, shaded=False):
 # 56  TURGOT’S ECONOMIC LIBERALISM
 @register(56)
 def evt_056_turgot(state, shaded=False):
-    add_resource(state, "Patriots", +3 if shaded else -3)
+    add_resource(state, PATRIOTS, +3 if shaded else -3)
 
 # 68  “FRENCH WANT CANADA”  –  TAKE QUÉBEC!
 @register(68)
