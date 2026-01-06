@@ -38,9 +38,9 @@ def clamp_resources(state):
 
 _ALIAS = {
     "British": "BRITISH",  "BRITISH": "BRITISH",
-    "Patriot": "PATRIOTS", "Patriots": "PATRIOTS", "PATRIOTS": "PATRIOTS",
+    "Patriots": "PATRIOTS", "PATRIOTS": "PATRIOTS",
     "French": "FRENCH",    "FRENCH": "FRENCH",
-    "Indian": "INDIANS",   "Indians": "INDIANS",   "INDIAN": "INDIANS", "INDIANS": "INDIANS",
+    "Indians": "INDIANS",   "INDIANS": "INDIANS",
 }
 def _canon_faction(f: str) -> str:
     return _ALIAS.get(f, f).upper()
