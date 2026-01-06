@@ -12,9 +12,10 @@ right before executing the gameplay step for that hook.
 
 state["leaders"] must be structured as:
     {
-        "BRITISH": ["Howe", "Clinton"],
-        "PATRIOTS": ["Washington"],
-        …
+        "BRITISH":  ["LEADER_HOWE", "LEADER_CLINTON"],
+        "PATRIOTS": ["LEADER_WASHINGTON"],
+        "INDIANS":  ["LEADER_BRANT"],
+        "FRENCH":   ["LEADER_ROCHAMBEAU"]
     }
 """
 
@@ -46,7 +47,7 @@ def _register(name: str, hook: str) -> Callable[[Modifier], Modifier]:
 # ---------------------------------------------------------------------------
 #  PATRIOTS
 # ---------------------------------------------------------------------------
-@_register("Washington", "pre_battle")
+@_register("LEADER_WASHINGTON", "pre_battle")
 def _washington(state: State, ctx: Context) -> None:
     """Double Win-the-Day shift; –1 Defender Loss when Rebellion defends."""
     ctx["washington_double_win"] = True
@@ -56,13 +57,13 @@ def _washington(state: State, ctx: Context) -> None:
 # ---------------------------------------------------------------------------
 #  FRENCH
 # ---------------------------------------------------------------------------
-@_register("Rochambeau", "pre_command")
+@_register("LEADER_ROCHAMBEAU", "pre_command")
 def _rochambeau(state: State, ctx: Context) -> None:
     """French may March/Battle with Patriot Command at 0 cost."""
     ctx["rochambeau_free_with_pats"] = True
 
 
-@_register("Lauzun", "pre_battle")
+@_register("LEADER_LAUZUN", "pre_battle")
 def _lauzun(state: State, ctx: Context) -> None:
     """+1 Defender Loss when French are attacking."""
     ctx["attacker_defender_loss_bonus"] = ctx.get("attacker_defender_loss_bonus", 0) + 1
@@ -71,13 +72,13 @@ def _lauzun(state: State, ctx: Context) -> None:
 # ---------------------------------------------------------------------------
 #  BRITISH
 # ---------------------------------------------------------------------------
-@_register("Gage", "pre_reward_loyalty")
+@_register("LEADER_GAGE", "pre_reward_loyalty")
 def _gage(state: State, ctx: Context) -> None:
     """First shift of Reward Loyalty in the space is free."""
     ctx["reward_loyalty_free"] = True
 
 
-@_register("Howe", "pre_special_activity")
+@_register("LEADER_HOWE", "pre_special_activity")
 def _howe(state: State, ctx: Context) -> None:
     """Lower FNI by 1 before executing any British SA."""
     fni = state.get("fni", 0)
@@ -86,7 +87,7 @@ def _howe(state: State, ctx: Context) -> None:
         ctx["howe_lowered_fni"] = True
 
 
-@_register("Clinton", "pre_skirmish")
+@_register("LEADER_CLINTON", "pre_skirmish")
 def _clinton(state: State, ctx: Context) -> None:
     """Skirmish removes one extra Militia in the space."""
     ctx["skirmish_extra_militia"] = ctx.get("skirmish_extra_militia", 0) + 1
@@ -95,19 +96,19 @@ def _clinton(state: State, ctx: Context) -> None:
 # ---------------------------------------------------------------------------
 #  INDIANS
 # ---------------------------------------------------------------------------
-@_register("Brant", "pre_war_path")
+@_register("LEADER_BRANT", "pre_war_path")
 def _brant(state: State, ctx: Context) -> None:
     """War Path removes one extra Militia in the space."""
     ctx["war_path_extra_militia"] = ctx.get("war_path_extra_militia", 0) + 1
 
 
-@_register("Cornplanter", "pre_gather")
+@_register("LEADER_CORNPLANTER", "pre_gather")
 def _cornplanter(state: State, ctx: Context) -> None:
     """Gather builds a Village for only 1 War Party in the space."""
     ctx["village_cost_war_parties"] = 1
 
 
-@_register("Dragging Canoe", "pre_raid")
+@_register("LEADER_DRAGGING_CANOE", "pre_raid")
 def _dragging_canoe(state: State, ctx: Context) -> None:
     """Raid may move 1 extra space if it originated here."""
     ctx["raid_extra_range"] = 1
@@ -126,24 +127,8 @@ def apply_leader_modifiers(state: State, faction: str, hook: str, ctx: Context) 
         if modifier:
             modifier(state, ctx)
     return ctx
-
-
-_LEADER_ALIASES = {
-    "WASHINGTON": {"WASHINGTON", "LEADER_WASHINGTON"},
-    "ROCHAMBEAU": {"ROCHAMBEAU", "LEADER_ROCHAMBEAU"},
-    "LAUZUN": {"LAUZUN", "LEADER_LAUZUN"},
-    "GAGE": {"GAGE", "LEADER_GAGE"},
-    "HOWE": {"HOWE", "LEADER_HOWE"},
-    "CLINTON": {"CLINTON", "LEADER_CLINTON"},
-    "BRANT": {"BRANT", "LEADER_BRANT"},
-    "CORNPLANTER": {"CORNPLANTER", "LEADER_CORNPLANTER"},
-    "DRAGGING_CANOE": {"DRAGGING_CANOE", "LEADER_DRAGGING_CANOE"},
-}
-
-
 def _leader_keys(leader_id: str) -> set[str]:
-    base = leader_id.replace("LEADER_", "")
-    return _LEADER_ALIASES.get(base, {leader_id, base})
+    return {leader_id}
 
 
 def leader_location(state: State, leader_id: str) -> str | None:

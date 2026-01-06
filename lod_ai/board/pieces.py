@@ -11,16 +11,8 @@ from lod_ai.util.history import push_history
 from lod_ai import rules_consts as C
 from lod_ai.rules_consts import LEADERS, WEST_INDIES_ID, PROPAGANDA, RAID, BLOCKADE
 
-# Accept older plural tag spellings used in some card/effect code
-_TAG_ALIAS = {
-    "British_Regulars":     "British_Regular",
-    "British_Tories":       "British_Tory",
-    "French_Regulars":      "French_Regular",
-    "Patriot_Continentals": "Patriot_Continental",
-}
-
 def _norm(tag: str) -> str:
-    return _TAG_ALIAS.get(tag, tag)
+    return tag
 
 _MARKERS = {PROPAGANDA, RAID, BLOCKADE}
 _BASE_TAGS = {C.FORT_BRI, C.FORT_PAT, C.VILLAGE}
@@ -57,7 +49,7 @@ def _space_dict(state: Dict[str, Any], loc: str) -> Dict[str, int]:
         return state["spaces"][loc]
     if loc in ("available", "unavailable", "casualties"):
         return state[loc]
-    if loc == WEST_INDIES_ID or str(loc).lower() == "west_indies":
+    if loc == WEST_INDIES_ID or str(loc).lower() == WEST_INDIES_ID.lower():
         return state["spaces"][WEST_INDIES_ID]
     raise ValueError(f"Unknown location '{loc}'")
 

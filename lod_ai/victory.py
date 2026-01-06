@@ -7,7 +7,7 @@ state["support"]            : int   # 0-30   (spaces at Active/Passive Support)
 state["opposition"]         : int   # 0-30   (spaces at Active/Passive Opposition)
 state["cbc"]                : int   # Cumulative British Casualties
 state["crc"]                : int   # Cumulative Rebellion Casualties
-state["forts"]["Patriot"]   : int   # Patriot Forts on map
+state["forts"]["PATRIOTS"]  : int   # Patriot Forts on map
 state["villages"]           : int   # Indian Villages on map
 state["treaty_of_alliance"] : bool  # Treaty of Alliance Event resolved?
 
@@ -50,7 +50,7 @@ def _summarize_board(state) -> dict:
         "opposition": opposition_total,
         "cbc":       cbc,
         "crc":       crc,
-        "forts":     {"Patriot": patriot_forts},
+        "forts":     {PATRIOTS: patriot_forts},
         "villages":  villages,
         "treaty_of_alliance": bool(toa),
     }
@@ -68,7 +68,7 @@ def _british_margin(t):
 
 def _patriot_margin(st) -> tuple[int, int]:
     cond1 = st["opposition"] - st["support"] - 10
-    cond2 = (st["forts"]["Patriot"] + 3) - st["villages"]
+    cond2 = (st["forts"][PATRIOTS] + 3) - st["villages"]
     return cond1, cond2
 
 
@@ -80,7 +80,7 @@ def _french_margin(st) -> tuple[int, int]:
 
 def _indian_margin(st) -> tuple[int, int]:
     cond1 = st["support"] - st["opposition"] - 10
-    cond2 = (st["villages"] - 3) - st["forts"]["Patriot"]
+    cond2 = (st["villages"] - 3) - st["forts"][PATRIOTS]
     return cond1, cond2
 
 # --------------------------------------------------------------------------- #

@@ -150,7 +150,7 @@ class PatriotBot(BaseBot):
         targets = []
         for sid, sp in state["spaces"].items():
             if self._battle_strength(sp) > self._british_strength(sp):
-                has_wash = sp.get("leader") == "Washington"
+                has_wash = sp.get("leader") == "LEADER_WASHINGTON"
                 pop = sp.get("population", 0)
                 villages = sp.get(C.VILLAGE, 0)
                 targets.append((-has_wash, -pop, -villages, random.random(), sid))

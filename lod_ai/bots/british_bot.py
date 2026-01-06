@@ -535,7 +535,7 @@ class BritishBot(BaseBot):
             if rebel < 2:
                 continue
             royal = sp.get(C.REGULAR_BRI, 0)
-            if royal + (1 if sp.get("leader", "") in {"Gage", "Clinton"} else 0) > rebel:
+            if royal + (1 if sp.get("leader", "") in {"LEADER_GAGE", "LEADER_CLINTON"} else 0) > rebel:
                 return True
         return False
 

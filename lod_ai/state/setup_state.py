@@ -157,11 +157,7 @@ def _apply_unavailable_block(state: Dict[str, Any], scenario: Dict[str, Any]) ->
         "French_Regular_Unavailable": REGULAR_FRE,
         "British_Regular_Unavailable": REGULAR_BRI,
         "British_Tory_Unavailable": TORY,
-        "FRENCH_REGULARS": REGULAR_FRE,
-        "BRITISH_REGULARS": REGULAR_BRI,
-        "BRITISH_TORIES": TORY,
         "Squadron": SQUADRON,
-        "FRENCH_SQUADRONS": SQUADRON,
     }
 
     for json_key, qty in unavail.items():
@@ -188,21 +184,6 @@ def _apply_unavailable_block(state: Dict[str, Any], scenario: Dict[str, Any]) ->
         if available[tag] == 0:
             available.pop(tag, None)
         unavailable[tag] = unavailable.get(tag, 0) + qty
-
-    # French unavailable Squadrons/Blockades (logged only for now)
-    if sq := unavail.get("FRENCH_SQUADRONS"):
-        state.setdefault("log", []).append(
-            f"(setup) {sq} French Squadrons/Blockades unavailable in port"
-        )
-
-
-def _default_to_underground(spaces: Dict[str, Dict[str, int]]) -> None:
-    """Convert any generic Militia/WP tags in *spaces* to their Underground state."""
-    for sp in spaces.values():
-        for src, dst in (("Patriot_Militia", MILITIA_U), ("Indian_War_Party", WARPARTY_U)):
-            if src in sp:
-                sp[dst] = sp.get(dst, 0) + int(sp.pop(src) or 0)
-
 
 def _force_start_underground(spaces: Dict[str, Dict[str, int]]) -> None:
     """
@@ -388,7 +369,7 @@ def build_state(
     """Return a fully‑initialised *state* for the given scenario alias."""
     scen = load_scenario(scenario)
     method = setup_method.lower()
-    _default_to_underground(scen.get("spaces", {}))
+    # Enforce Militia/WP start Underground.
     _force_start_underground(scen.get("spaces", {}))
 
     state: Dict[str, Any] = {
