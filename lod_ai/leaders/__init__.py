@@ -81,9 +81,9 @@ def _gage(state: State, ctx: Context) -> None:
 @_register("LEADER_HOWE", "pre_special_activity")
 def _howe(state: State, ctx: Context) -> None:
     """Lower FNI by 1 before executing any British SA."""
-    fni = state.get("fni", 0)
+    fni = state.get("fni_level", 0)
     if fni > 0:
-        state["fni"] = fni - 1
+        state["fni_level"] = fni - 1
         ctx["howe_lowered_fni"] = True
 
 
