@@ -7,21 +7,21 @@ Only the two routines already referenced by card code are provided:
 """
 
 from lod_ai.util.history import push_history
+from lod_ai.rules_consts import MAX_FNI
 
 
 def adjust_fni(state, delta: int) -> None:
     """
     Move the French Navy Influence (FNI) marker <delta> boxes
-    toward peace (negative) or war (positive). Track is 1 ↔ 6.
+    toward peace (negative) or war (positive). Track is 0 ↔ MAX_FNI.
 
     Cards #55, year_end.resolve, and Naval Pressure SA will call this.
     """
-    box = state.setdefault("fni_box", 3)       # default to center space 3
-    new_box = max(1, min(6, box + delta))
-    state["fni_box"] = new_box
+    before = state.get("fni_level", 0)
+    state["fni_level"] = max(0, min(MAX_FNI, before + delta))
     if delta:
         direction = "up" if delta > 0 else "down"
-        push_history(state, f"FNI shifts {direction} to box {new_box}")
+        push_history(state, f"FNI shifts {direction} to level {state['fni_level']}")
 
 
 # ──────────────────────────────────────────────────────────────
