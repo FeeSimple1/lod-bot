@@ -13,7 +13,7 @@ def simple_state():
             "New_York": {"British_Regular": 1, "adj": ["Boston"]},
         },
         "resources": {"BRITISH": 5, "PATRIOTS": 5, "FRENCH": 5, "INDIANS": 5},
-        "available": {"British_Regular": 5, "Tory": 5},
+        "available": {"British_Regular": 5, "British_Tory": 5},
         "rng": __import__('random').Random(1),
         "history": [],
         "support": {"Boston": 0, "New_York": 0},

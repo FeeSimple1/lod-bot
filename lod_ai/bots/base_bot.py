@@ -47,8 +47,8 @@ class BaseBot:
     def _event_directive(self, card_id: int) -> str:
         tables = {
             C.BRITISH: EI.BRITISH,
-            C.PATRIOTS: EI.PATRIOT,
-            C.INDIANS: EI.INDIAN,
+            C.PATRIOTS: EI.PATRIOTS,
+            C.INDIANS: EI.INDIANS,
             C.FRENCH: EI.FRENCH,
         }
         return tables[self.faction].get(card_id, "normal")

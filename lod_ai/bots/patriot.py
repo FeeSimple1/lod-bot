@@ -50,10 +50,10 @@ class PatriotBot(BaseBot):
 
     def _event_directive(self, card_id: int) -> str:
         """
-        Patriots use the existing Brown‑Bess instruction table keyed as 'PATRIOT'.
+        Patriots use the existing Brown‑Bess instruction table keyed as 'PATRIOTS'.
         Keeping the table as‑is while this bot uses the canonical 'PATRIOTS' key.
         """
-        return EI.PATRIOT.get(card_id, "normal")
+        return EI.PATRIOTS.get(card_id, "normal")
 
     # ===================================================================
     #  FLOW‑CHART DRIVER
@@ -61,7 +61,7 @@ class PatriotBot(BaseBot):
     def _follow_flowchart(self, state: Dict) -> None:
         # Node P3 – are we broke?
         if state["resources"][self.faction] == 0:
-            push_history(state, "PATRIOT PASS (no Resources)")
+            push_history(state, "PATRIOTS PASS (no Resources)")
             return
 
         # Node P6 – can we win a Battle somewhere?
@@ -79,7 +79,7 @@ class PatriotBot(BaseBot):
             if self._march_chain(state):      # P5 (+ P8 loop)
                 return
 
-        push_history(state, "PATRIOT PASS")
+        push_history(state, "PATRIOTS PASS")
 
     # ===================================================================
     #  EXECUTION CHAINS

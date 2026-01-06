@@ -15,7 +15,7 @@ Local stacking
     • ≤ 2 combined Fort + Village pieces in any single space.
     • West Indies may contain ONLY:
           - British_Regular, French_Regular,
-          - British_Fort,   French_Squadron
+          - British_Fort,   Squadron
     • Indian pieces may NOT occupy a City space.
 """
 

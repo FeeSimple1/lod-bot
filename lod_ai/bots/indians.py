@@ -88,7 +88,7 @@ class IndianBot(BaseBot):
                 return
 
         # If nothing executed, Pass
-        push_history(state, "INDIAN PASS")
+        push_history(state, "INDIANS PASS")
 
     # ==================================================================
     #  COMMAND + SA SEQUENCES  (each returns True if something executed)
