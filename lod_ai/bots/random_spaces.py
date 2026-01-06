@@ -17,7 +17,7 @@ RANDOM_SPACES_TABLE = [
     ["Quebec City",               "Northwest / Maryland-Delaware", "North Carolina"],
     ["Quebec / New York",         "Philadelphia",                  "Savannah"],
     ["New Hampshire",             "Pennsylvania",                  "Florida / South Carolina"],
-    ["Connecticut_Rhode_Island",  "Rhode_Island",                  "Norfolk"],
+    ["Connecticut_Rhode_Island",  "Norfolk",                       "Georgia"],
     ["New York City",             "Southwest / Virginia",          "Boston"],
     ["New Jersey",                "Charles Town",                  "Massachusetts"],
 ]

@@ -19,7 +19,7 @@ BRITISH = {
 # Additional musket instructions for the other factions.  These are a
 # pared‑down version of the Brown‑Bess chart used by the simplified bots.
 
-PATRIOT = {
+PATRIOTS = {
     # Always attempt to play these Events using the instructions from the
     # reference sheet.
     18: "force",  # "If it hadn't been so stormy…"
@@ -36,7 +36,7 @@ PATRIOT = {
     90: "force",  # "The World Turned Upside Down"
 }
 
-INDIAN = {
+INDIANS = {
     4: "force",    # The Penobscot Expedition
     18: "force",   # "If it hadn't been so stormy…"
     21: "force",   # The Gamecock Thomas Sumter
@@ -64,4 +64,3 @@ FRENCH = {
     89: "force",  # War Damages Colonies' Economy
     95: "force",  # Ohio Country Frontier Erupts
 }
-

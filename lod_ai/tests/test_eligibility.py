@@ -43,7 +43,7 @@ def test_engine_turn_marks_ineligible(tmp_path, monkeypatch):
             "New_York": {"adj": ["Boston"]},
         },
         "resources": {"BRITISH": 5, "PATRIOTS": 5, "FRENCH": 5, "INDIANS": 5},
-        "available": {"British_Regular": 5, "Tory": 5},
+        "available": {"British_Regular": 5, "British_Tory": 5},
         "rng": __import__('random').Random(1),
         "history": [],
         "support": {"Boston": 0, "New_York": 0},
