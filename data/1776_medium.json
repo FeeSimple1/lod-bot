@@ -52,9 +52,9 @@
   },
 
   "unavailable": {
-    "British_Regular": 6,
-    "British_Tory": 6,
-    "French_Regular": 9,
+    "British_Regular_Unavailable": 6,
+    "British_Tory_Unavailable": 6,
+    "French_Regular_Unavailable": 9,
     "Squadron": 1
   },
 
