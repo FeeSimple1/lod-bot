@@ -195,12 +195,12 @@ def evt_023_francis_marion(state, shaded=False):
 @register(25)
 def evt_025_prison_ships(state, shaded=False):
     if shaded:
-        for city in ("New_York_City", "Charleston"):
+        for city in ("New_York_City", "Charles_Town"):
             place_piece(state, MILITIA_U, city, 1)
             shift_support(state, city, -1)
             place_marker(state, PROPAGANDA, city)
     else:
-        for city in ("New_York_City", "Charleston"):
+        for city in ("New_York_City", "Charles_Town"):
             shift_support(state, city, +1)
 
 
@@ -244,7 +244,7 @@ def evt_039_king_mob(state, shaded=False):
     if shaded:
         return
     # shift 3 cities one step toward Neutral – sample implementation
-    for name in ("Boston", "New_York_City", "Charleston"):
+    for name in ("Boston", "New_York_City", "Charles_Town"):
         shift_support(state, name, -1)   # toward Neutral
 
 

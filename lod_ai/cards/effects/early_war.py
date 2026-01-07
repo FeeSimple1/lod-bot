@@ -466,7 +466,7 @@ def evt_046_burke(state, shaded=False):
     Unshaded – Place 1 Tory in each of 3 spaces (we pick 3 Cities).
     Shaded   – Shift 2 Cities 1 level toward Passive Opposition.
     """
-    cities = ("Boston", "New_York_City", "Charleston")
+    cities = ("Boston", "New_York_City", "Charles_Town")
     if shaded:
         shift_support(state, "New_York_City", -1)
         shift_support(state, "Philadelphia",  -1)
