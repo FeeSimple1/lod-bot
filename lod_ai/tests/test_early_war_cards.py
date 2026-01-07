@@ -146,7 +146,7 @@ def test_card29_bancroft_allows_indian_choice():
         "Ohio": {WARPARTY_U: 3},
         "Boston": {MILITIA_U: 2},
     }
-    state["card29_target"] = "Indians"
+    state["card29_target"] = "INDIANS"
 
     early_war.evt_029_bancroft(state, shaded=False)
 
@@ -172,7 +172,7 @@ def test_card32_rule_britannia_any_colony_and_any_recipient():
     assert state["spaces"]["Georgia"].get(TORY) == 2
 
     state = copy.deepcopy(state)
-    state["rule_britannia_recipient"] = "Indians"
+    state["rule_britannia_recipient"] = "INDIANS"
     early_war.evt_032_rule_britannia(state, shaded=True)
 
     assert state["resources"]["INDIANS"] == 1
