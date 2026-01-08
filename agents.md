@@ -23,7 +23,7 @@ Repository Guidelines
 6. **Source of Truth**
    - The documents in the Reference Documents folder are to be used as the source of truth.
      All documents in the data and lod_ai folder must not conflict with them.
-   - `rules_consts.py` is also a source of truth; all unit abbreviations must match those provided in `rules_consts.py`.
+   - `rules_consts.py` is also a source of truth; no labels for spaces or any other game item that is not permitted by rules_consts.py is allowed to be used.
    - None of the source-of-truth files are to be changed; other files must be changed to be consistent with them.
    - No file in the Reference Documents folder may be deleted, even if it is a duplicate of files located elsewhere.
    - For card behavior and card text, `Reference Documents/card reference full.txt` is the source of truth.
@@ -41,4 +41,5 @@ Repository Guidelines
    - Summarize changes by card number and filename.
 
 Follow these guidelines for future contributions.
+
 
