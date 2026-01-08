@@ -7,9 +7,9 @@ lod_ai.util.caps
 Enforce BOTH global caps (§1.2) and local stacking rules (§1.4.2).
 
 Global caps (from rules_consts.py)
-    • MAX_BRI_FORTS
-    • MAX_PAT_FORTS
-    • MAX_IND_VILLAGES
+    • MAX_FORT_BRI
+    • MAX_FORT_PAT
+    • MAX_VILLAGE
 
 Local stacking
     • ≤ 2 combined Fort + Village pieces in any single space.
