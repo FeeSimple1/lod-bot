@@ -12,8 +12,9 @@ French **Préparer la Guerre** SA  (§4.5.1).
 
 Assumptions about state schema
 ------------------------------
-• `state["spaces"]["West_Indies"]["blockade"]`      – int count of markers in pool.
-• Every City space has `space["blockade"]` (int, default 0).
+• `state["markers"]["Blockade"]["pool"]`   – counters in West Indies (Squadrons).
+• `state["markers"]["Blockade"]["on_map"]` – set of City IDs with Blockades.
+• `state["unavailable"]["Blockade"]`       – unused Squadron/Blockade counters.
 • Global marker cap is 3 (physical game).
 • Unavailable French Regulars are tracked in `state["unavailable"]["FRENCH"]`.
 """
@@ -26,6 +27,7 @@ from lod_ai.util.history  import push_history
 from lod_ai.util.caps     import refresh_control, enforce_global_caps
 from lod_ai.board.pieces      import remove_piece
 from lod_ai.economy.resources import add as add_res
+from lod_ai.util.naval import move_blockades_to_west_indies, total_blockades, unavailable_blockades
 
 SA_NAME = "PREPARER"        # auto-discovered by special_activities/__init__.py
 
@@ -36,8 +38,7 @@ _BLOCKADE_CAP = 3           # total markers that exist in the game
 # helpers
 # ---------------------------------------------------------------------------
 def _count_all_blockades(state: Dict) -> int:
-    bloc = state.setdefault("markers", {}).setdefault(BLOCKADE, {"pool": 0, "on_map": set()})
-    return bloc.get("pool", 0) + len(bloc.get("on_map", set()))
+    return total_blockades(state)
 
 # ---------------------------------------------------------------------------
 # public entry
@@ -72,11 +73,14 @@ def execute(
     push_history(state, f"FRENCH PREPARER choice={choice}")
 
     if choice == "BLOCKADE":
-        markers = state.setdefault("markers", {}).setdefault(BLOCKADE, {"pool": 0, "on_map": set()})
         total = _count_all_blockades(state)
         if total >= _BLOCKADE_CAP:
             raise ValueError("No unused Blockade markers remain to add.")
-        markers["pool"] = markers.get("pool", 0) + 1
+        if unavailable_blockades(state) <= 0:
+            raise ValueError("No unused Blockade markers remain to add.")
+        moved = move_blockades_to_west_indies(state, 1)
+        if moved == 0:
+            raise ValueError("West Indies Blockade pool is at capacity.")
         state.setdefault("log", []).append("FRENCH Préparer: +1 Blockade to West Indies pool")
 
     elif choice == "REGULARS":

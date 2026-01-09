@@ -36,6 +36,7 @@ except ImportError:  # pragma: no cover
 
 from lod_ai.util.history import push_history
 from lod_ai.board.control import refresh_control
+from lod_ai.util.naval import move_blockades_to_west_indies, unavailable_blockades
 
 # ---------------------------------------------------------------------------
 #  Static data
@@ -63,10 +64,10 @@ def _preparer_la_guerre(state: Dict, post_treaty: bool) -> bool:
     moved = False
     unavail = state.setdefault("unavailable", {})
     avail_pool = state.setdefault("available", {})
-    wi_space = state.setdefault("spaces", {}).setdefault(WEST_INDIES, {})
-    if unavail.get(C.BLOCKADE, 0) > 0:
-        unavail[C.BLOCKADE] -= 1
-        wi_space[C.BLOCKADE] = wi_space.get(C.BLOCKADE, 0) + 1
+    if unavailable_blockades(state) > 0:
+        moved = move_blockades_to_west_indies(state, 1)
+        if moved == 0:
+            return False
         push_history(state, "Préparer la Guerre: Blockade to West Indies")
         moved = True
     elif unavail.get(C.REGULAR_FRE, 0) > 0:

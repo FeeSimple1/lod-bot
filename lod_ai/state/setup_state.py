@@ -33,7 +33,7 @@ from lod_ai.rules_consts import (
     PROPAGANDA, RAID, BLOCKADE,
 
     # factions
-    BRITISH, PATRIOTS, FRENCH, INDIANS, SQUADRON,
+    BRITISH, PATRIOTS, FRENCH, INDIANS,
 )
 
 # deck helpers
@@ -157,7 +157,8 @@ def _apply_unavailable_block(state: Dict[str, Any], scenario: Dict[str, Any]) ->
         "French_Regular_Unavailable": REGULAR_FRE,
         "British_Regular_Unavailable": REGULAR_BRI,
         "British_Tory_Unavailable": TORY,
-        "Squadron": SQUADRON,
+        "Squadron": BLOCKADE,
+        "Blockade": BLOCKADE,
     }
 
     for json_key, qty in unavail.items():
@@ -171,6 +172,10 @@ def _apply_unavailable_block(state: Dict[str, Any], scenario: Dict[str, Any]) ->
 
         if not tag:
             state.setdefault("log", []).append(f"(setup) Unrecognised unavailable pool: {json_key}")
+            continue
+
+        if tag == BLOCKADE:
+            unavailable[tag] = unavailable.get(tag, 0) + qty
             continue
 
         if tag not in available:

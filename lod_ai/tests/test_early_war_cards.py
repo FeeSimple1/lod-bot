@@ -12,7 +12,10 @@ from lod_ai.rules_consts import (
     FORT_BRI,
     FORT_PAT,
     PROPAGANDA,
+    BLOCKADE,
+    WEST_INDIES_ID,
 )
+from lod_ai.util.naval import total_blockades
 
 
 def _base_state():
@@ -100,10 +103,10 @@ def test_card24_declaration_unshaded_removes_correct_pieces():
 
     early_war.evt_024_declaration(state, shaded=False)
 
-    assert state["casualties"].get(REGULAR_PAT) == 2
+    assert state["available"].get(REGULAR_PAT) == 2
     assert state["available"].get(MILITIA_U) == 1
     assert state["available"].get(MILITIA_A) == 1
-    assert state["casualties"].get(FORT_PAT) == 1
+    assert state["available"].get(FORT_PAT) == 1
 
 
 def test_card24_declaration_shaded_places_militia_and_fort():
@@ -176,3 +179,30 @@ def test_card32_rule_britannia_any_colony_and_any_recipient():
     early_war.evt_032_rule_britannia(state, shaded=True)
 
     assert state["resources"]["INDIANS"] == 1
+
+
+def test_card54_sartine_shaded_moves_to_west_indies():
+    state = _base_state()
+    state["spaces"] = {WEST_INDIES_ID: {}}
+    state["markers"][BLOCKADE] = {"pool": 0, "on_map": set()}
+    state["unavailable"] = {BLOCKADE: 2}
+
+    early_war.evt_054_antoine_sartine(state, shaded=True)
+
+    assert state["markers"][BLOCKADE]["pool"] == 2
+    assert state["unavailable"].get(BLOCKADE, 0) == 0
+    assert total_blockades(state) == 2
+
+
+def test_card54_sartine_unshaded_moves_from_wi_to_unavailable():
+    state = _base_state()
+    state["spaces"] = {WEST_INDIES_ID: {}}
+    state["markers"][BLOCKADE] = {"pool": 1, "on_map": {"Boston"}}
+    state["unavailable"] = {BLOCKADE: 1}
+
+    early_war.evt_054_antoine_sartine(state, shaded=False)
+
+    assert state["markers"][BLOCKADE]["pool"] == 0
+    assert state["unavailable"].get(BLOCKADE, 0) == 2
+    assert "Boston" in state["markers"][BLOCKADE]["on_map"]
+    assert total_blockades(state) == 3
