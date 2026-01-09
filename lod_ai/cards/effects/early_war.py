@@ -14,9 +14,11 @@ from lod_ai.rules_consts import (
     REGULAR_BRI, REGULAR_PAT, REGULAR_FRE, TORY,
     MILITIA_A, MILITIA_U, WARPARTY_A, WARPARTY_U,
     FORT_BRI, FORT_PAT, VILLAGE,
-    PROPAGANDA, RAID, BLOCKADE, WEST_INDIES_ID,
+    PROPAGANDA, RAID, WEST_INDIES_ID,
     BRITISH, PATRIOTS, FRENCH, INDIANS,
+    ACTIVE_SUPPORT,
 )
+from lod_ai.util.naval import move_blockades_to_unavailable, move_blockades_to_west_indies
 
 def _pick_spaces_with_militia(state, max_spaces=4):
     """Return up to *max_spaces* IDs that contain Patriot Militia."""
@@ -190,11 +192,11 @@ def evt_024_declaration(state, shaded=False):
             place_with_caps(state, FORT_PAT, targets[0])
         return
 
-    removed_continentals = remove_piece(state, REGULAR_PAT, None, 2, to="casualties")
+    removed_continentals = remove_piece(state, REGULAR_PAT, None, 2)
     removed_militia = remove_piece(state, MILITIA_U, None, 2, to="available")
     if removed_militia < 2:
         remove_piece(state, MILITIA_A, None, 2 - removed_militia, to="available")
-    remove_piece(state, FORT_PAT, None, 1, to="casualties")
+    remove_piece(state, FORT_PAT, None, 1)
 
 # 28  BATTLE OF MOORE’S CREEK BRIDGE
 @register(28)
@@ -528,19 +530,14 @@ def evt_054_antoine_sartine(state, shaded=False):
     Unshaded – Move 1 Blockade from West Indies to Unavailable (i.e., off-map).
     Shaded   – Move up to 2 Blockades from Unavailable to West Indies, up to cap.
     """
-    wi = state["spaces"][WEST_INDIES_ID]
     if shaded:
-        # Add as many as possible up to 2 without exceeding the total cap in West Indies
-        cur = wi.get(BLOCKADE, 0)
-        add = min(2, 3 - cur)  # MAX_WI_SQUADRONS = 3
-        if add > 0:
-            wi[BLOCKADE] = cur + add
+        moved = move_blockades_to_west_indies(state, 2)
+        if moved:
+            push_history(state, f"Antoine de Sartine: {moved} Squadron/Blockade to West Indies")
     else:
-        # Remove 1 from West Indies if present (becomes “unavailable” off-map)
-        if wi.get(BLOCKADE, 0) > 0:
-            wi[BLOCKADE] -= 1
-            if wi[BLOCKADE] == 0:
-                del wi[BLOCKADE]
+        moved = move_blockades_to_unavailable(state, 1)
+        if moved:
+            push_history(state, "Antoine de Sartine: Squadron/Blockade to Unavailable")
 
 # 56  TURGOT’S ECONOMIC LIBERALISM
 @register(56)
@@ -804,7 +801,9 @@ def evt_083_carleton_negotiates(state, shaded=False):
 
     # Unshaded
     place_piece(state, WARPARTY_U, "Quebec", 2)
-    shift_support(state, "Quebec_City", +1)
+    qc = state.get("support", {}).get("Quebec_City", 0)
+    delta = ACTIVE_SUPPORT - qc
+    shift_support(state, "Quebec_City", delta)
 
 
 # 84  SIX NATIONS AID THE WAR

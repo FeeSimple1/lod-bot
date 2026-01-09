@@ -179,9 +179,9 @@ def evt_023_francis_marion(state, shaded=False):
               state["spaces"].get(target, {}).get(MILITIA_A, 0)
         if mil:
             removed = 0
-            removed += remove_piece(state, REGULAR_BRI, target, 4, to="casualties")
+            removed += remove_piece(state, REGULAR_BRI, target, 4)
             if removed < 4:
-                remove_piece(state, TORY, target, 4 - removed, to="casualties")
+                remove_piece(state, TORY, target, 4 - removed)
     else:
         src = "South_Carolina"
         dst = "Georgia"

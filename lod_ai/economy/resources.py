@@ -10,12 +10,16 @@ def add(state, faction, n):
     res = state.setdefault("resources", {})
     res[faction] = max(MIN_RESOURCES, min(MAX_RESOURCES, res.get(faction, 0) + n))
 
-def spend(state, faction, n):
+def spend(state, faction, n, *, ignore_free: bool = False):
     res = state.setdefault("resources", {})
+    if state.get("bs_free") and not ignore_free:
+        return
     if res.get(faction, 0) < n:
         raise ValueError(f"{faction} cannot afford {n} Resources")
     res[faction] = max(MIN_RESOURCES, res.get(faction, 0) - n)
 
-def can_afford(state, faction, n) -> bool:
+def can_afford(state, faction, n, *, ignore_free: bool = False) -> bool:
     """Return True if the faction has ≥ n Resources."""
+    if state.get("bs_free") and not ignore_free:
+        return True
     return state["resources"][faction] >= n

@@ -508,9 +508,9 @@ def evt_077_burgoyne(state, shaded=False):
             if not any(tag.startswith("Indian_") for tag in sp):
                 continue
             # remove a British piece, forts last
-            if remove_piece(state, REGULAR_BRI, name, 1, to="casualties"):
+            if remove_piece(state, REGULAR_BRI, name, 1):
                 pass
-            elif remove_piece(state, TORY, name, 1, to="casualties"):
+            elif remove_piece(state, TORY, name, 1):
                 pass
             else:
                 remove_piece(state, FORT_BRI, name, 1, to="available")

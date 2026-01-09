@@ -135,7 +135,7 @@ def _reward_loyalty(state: Dict, sp: Dict, space_id: str, levels: int) -> None:
     if state["resources"]["BRITISH"] < cost:
         raise ValueError("Not enough Resources to Reward Loyalty.")
 
-    spend(state, "BRITISH", cost)
+    spend(state, "BRITISH", cost, ignore_free=True)
 
     # Remove markers first (each already included in cost)
     for marker in markers_here:

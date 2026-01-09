@@ -110,6 +110,14 @@ def _normalize_markers(state: Dict) -> None:
             elif count > 0:
                 normalized[C.BLOCKADE]["on_map"].add(sid)
 
+        # legacy Squadron counters (treat as Squadron/Blockade markers)
+        if C.SQUADRON in sp:
+            count = _clamp_int(sp.pop(C.SQUADRON))
+            if sid == C.WEST_INDIES_ID:
+                normalized[C.BLOCKADE]["pool"] += count
+            elif count > 0:
+                normalized[C.BLOCKADE]["on_map"].add(sid)
+
     for tag, entry in normalized.items():
         entry["on_map"] = set(entry["on_map"])
         normalized[tag] = entry
@@ -138,6 +146,9 @@ def _sanitize_pools(state: Dict) -> None:
             pool[tag] = _clamp_int(qty)
             if pool[tag] == 0:
                 pool.pop(tag, None)
+    unavail = state.setdefault("unavailable", {})
+    if C.SQUADRON in unavail:
+        unavail[C.BLOCKADE] = _clamp_int(unavail.get(C.BLOCKADE, 0)) + _clamp_int(unavail.pop(C.SQUADRON))
 
 
 def normalize_state(state: Dict) -> None:

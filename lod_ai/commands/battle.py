@@ -53,6 +53,7 @@ from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.board.pieces   import remove_piece, add_piece
 from lod_ai.economy.resources import spend, can_afford
 from lod_ai.util.loss_mod  import pop_loss_mod
+from lod_ai.util.naval import has_blockade
 
 COMMAND_NAME = "BATTLE"
 
@@ -159,9 +160,7 @@ def _resolve_space(
         roll_total = sum(_roll_d3(state) for _ in range(dice))
         mods = 0
         if is_defender:                                 # §3.6.5
-            if attacker_faction == "BRITISH" and sp.get("blockade", 0) and sid != WEST_INDIES_ID:
-                mods -= 1
-            if attacker_faction == "BRITISH" and sid == WEST_INDIES_ID and sp.get("blockade", 0):
+            if attacker_faction == "BRITISH" and has_blockade(state, sid):
                 mods -= 1
             if attacker_faction == "FRENCH" and ctx.get("attacker_defender_loss_bonus", 0):
                 mods += ctx["attacker_defender_loss_bonus"]

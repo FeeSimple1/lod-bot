@@ -19,6 +19,7 @@ from lod_ai.util.history import push_history
 from lod_ai import rules_consts as C
 from lod_ai.util.normalize_state import normalize_state
 from lod_ai.util import eligibility as elig
+from lod_ai.cards.effects import brilliant_stroke as bs
 from lod_ai.state.setup_state import build_state
 from lod_ai.economy import resources
 
@@ -424,6 +425,128 @@ class Engine:
         self.ctx = sandbox_ctx
         normalize_state(self.state)
 
+    def _record_played_card(self, card_id: int) -> None:
+        self.state.setdefault("played_cards", []).append(card_id)
+
+    def _bs_decl_info(self, decl: object) -> dict | None:
+        if decl == bs.TOA_KEY or decl == bs.TOA_CARD_ID:
+            return {"key": bs.TOA_KEY, "faction": C.FRENCH, "card_id": bs.TOA_CARD_ID, "toa": True}
+        if isinstance(decl, str):
+            fac = decl.upper()
+            if fac in (C.BRITISH, C.PATRIOTS, C.FRENCH, C.INDIANS):
+                return {"key": fac, "faction": fac, "card_id": bs.FACTION_BY_BS_CARD.get(fac), "toa": False}
+        return None
+
+    def _bs_can_trump(self, incoming: dict, current: dict) -> bool:
+        if current.get("toa"):
+            return False
+        if incoming.get("toa"):
+            return True
+        incoming_fac = incoming["faction"]
+        current_fac = current["faction"]
+        if incoming_fac == C.INDIANS:
+            return True
+        if incoming_fac == C.FRENCH:
+            return current_fac in (C.PATRIOTS, C.BRITISH)
+        if incoming_fac == C.BRITISH:
+            return current_fac == C.PATRIOTS
+        return False
+
+    def _bs_is_legal(self, info: dict) -> bool:
+        fac = info["faction"]
+        if not self.state.get("eligible", {}).get(fac, True):
+            return False
+        if not bs.leader_can_involve(self.state, fac):
+            return False
+        if info.get("toa"):
+            return bs.toa_available(self.state) and bs.preparations_total(self.state) > 15
+        return bs.bs_available(self.state, fac)
+
+    def _execute_brilliant_stroke_actions(self, faction: str) -> None:
+        plan_map = self.state.get("bs_plan", {})
+        plan = plan_map.get(faction, [])
+        if not isinstance(plan, list) or not plan:
+            raise ValueError(f"Brilliant Stroke requires a bs_plan for {faction}.")
+
+        cmd_count = 0
+        sa_count = 0
+        self.state["bs_free"] = True
+        self.ctx = {}
+        try:
+            for step in plan:
+                if not isinstance(step, dict):
+                    raise ValueError("Brilliant Stroke plan steps must be dicts.")
+                action_type = step.get("type") or step.get("action")
+                label = step.get("label") or step.get("name")
+                if not label or not action_type:
+                    raise ValueError("Brilliant Stroke plan steps require 'type' and 'label'.")
+                kwargs = dict(step.get("kwargs") or {})
+                space = kwargs.pop("space", None) or kwargs.pop("space_id", None)
+
+                self._reset_trace_on(self.state)
+                if action_type == "command":
+                    cmd_count += 1
+                    self.dispatcher.execute(label, faction=faction, space=space, limited=True, **kwargs)
+                    if self.state.get("_turn_used_special"):
+                        raise ValueError("Brilliant Stroke commands may not include Special Activities.")
+                    if self._command_effect_count(self.state) != 1:
+                        raise ValueError("Brilliant Stroke Limited Command must affect exactly one space.")
+                elif action_type == "special":
+                    sa_count += 1
+                    self.dispatcher.execute(label, faction=faction, space=space, **kwargs)
+                    if not self.state.get("_turn_used_special"):
+                        raise ValueError("Brilliant Stroke Special Activity did not register as special.")
+                else:
+                    raise ValueError(f"Unknown Brilliant Stroke action type: {action_type}")
+                normalize_state(self.state)
+        finally:
+            self.state.pop("bs_free", None)
+
+        if cmd_count != 2 or sa_count != 1:
+            raise ValueError("Brilliant Stroke must execute exactly two Limited Commands and one Special Activity.")
+
+    def _resolve_brilliant_stroke_interrupt(self, card: dict) -> bool:
+        declarations = self.state.pop("bs_declarations", None)
+        if not declarations or card.get("winter_quarters"):
+            return False
+
+        current: dict | None = None
+        for decl in declarations:
+            info = self._bs_decl_info(decl)
+            if not info or not self._bs_is_legal(info):
+                continue
+            if current and not self._bs_can_trump(info, current):
+                continue
+            if current:
+                bs.mark_bs_played(self.state, current["key"], False)
+                push_history(self.state, f"{info['faction']} trumps {current['faction']}'s Brilliant Stroke")
+            current = info
+            if info.get("toa"):
+                break
+            bs.mark_bs_played(self.state, info["key"], True)
+
+        if not current:
+            return False
+
+        if current.get("toa"):
+            if not bs.apply_treaty_of_alliance(self.state):
+                bs.mark_bs_played(self.state, current["key"], False)
+                return False
+            bs.mark_bs_played(self.state, current["key"], True)
+
+        self._record_played_card(card["id"])
+        if current.get("card_id"):
+            self._record_played_card(current["card_id"])
+
+        self._execute_brilliant_stroke_actions(current["faction"])
+
+        self.state["eligible"] = {fac: True for fac in (C.BRITISH, C.PATRIOTS, C.FRENCH, C.INDIANS)}
+        self.state.pop("eligible_next", None)
+        self.state.pop("ineligible_next", None)
+        self.state.pop("remain_eligible", None)
+        self.state.pop("ineligible_through_next", None)
+        return True
+
     # Public wrappers for sandbox operations -------------------------
     def simulate_action(
         self,
@@ -562,6 +685,10 @@ class Engine:
         queue = self._prepare_card(card)
         if card.get("winter_quarters"):
             resolve_year_end(self.state)
+            if card.get("id"):
+                self._record_played_card(card["id"])
+            return []
+        if self._resolve_brilliant_stroke_interrupt(card):
             return []
         actions: List[Tuple[str, dict]] = []
         first_action: dict | None = None
@@ -585,5 +712,8 @@ class Engine:
 
         if card.get("winter_quarters"):
             resolve_year_end(self.state)
+
+        if card.get("id"):
+            self._record_played_card(card["id"])
 
         return actions
