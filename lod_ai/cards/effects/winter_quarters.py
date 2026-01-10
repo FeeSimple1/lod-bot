@@ -1,6 +1,7 @@
 """Handlers for Winter-Quarters cards (97–104)."""
 
 from lod_ai.cards import register
+from lod_ai import rules_consts as C
 from lod_ai.cards.effects.shared import add_resource
 from lod_ai.board.pieces import remove_piece
 from lod_ai.util.history import push_history
@@ -53,9 +54,9 @@ def _casualty_shift(state, label):
 def _second_vc_leader(state):
     tallies = _summarize_board(state)
     if _patriot_margin(tallies)[1] > 0:
-        return "PATRIOTS"
+        return C.PATRIOTS
     if _indian_margin(tallies)[1] > 0:
-        return "INDIANS"
+        return C.INDIANS
     return None
 
 
@@ -71,12 +72,18 @@ def _lose_fort_or_village(state, label):
     fac = _second_vc_leader(state)
     if not fac:
         return
-    target_tag = "Patriot_Fort" if fac == "PATRIOTS" else "Village"
-    for sid, sp in state["spaces"].items():
-        if sp.get(target_tag):
-            remove_piece(state, target_tag, sid, 1, to="available")
-            push_history(state, f"{label} – removed 1 {target_tag} from {sid}")
-            break
+
+    target_tag = C.FORT_PAT if fac == C.PATRIOTS else C.VILLAGE
+
+    candidates = [sid for sid, sp in state["spaces"].items() if sp.get(target_tag)]
+    if not candidates:
+        return
+
+    rng = state.get("rng")
+    sid = rng.choice(candidates) if rng else candidates[0]
+
+    remove_piece(state, target_tag, sid, 1, to="available")
+    push_history(state, f"{label} – removed 1 {target_tag} from {sid}")
 
 # ---------------------------------------------------------------------------
 # Card handlers – each queues its Reset-Phase effect
@@ -120,5 +127,4 @@ def evt_103(state, shaded=False):
 @register(104)
 def evt_104(state, shaded=False):
     _queue_event(state, 104, lambda s: _lose_resources(s, "Hurricane hits the South"))
-
 

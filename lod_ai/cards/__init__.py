@@ -56,6 +56,15 @@ def determine_eligible_factions(state: dict, card: dict) -> Tuple[Optional[str],
     """
     flags = state.get("eligible", {})
 
+    # Winter Quarters cards: queue their reset-phase effect now.
+    # Engine resolves year_end directly for Winter Quarters cards and does not call handle_event,
+    # so without this, Winter Quarters card effects (97–104) never execute.
+    if card.get("winter_quarters"):
+        cid = card.get("id")
+        if isinstance(cid, int) and cid in CARD_HANDLERS:
+            # Winter Quarters cards have no shaded/unshaded choice; pass False.
+            CARD_HANDLERS[cid](state, False)
+
     # 1) Preferred: explicit order on the card
     if isinstance(card.get("order"), (list, tuple)) and card["order"]:
         base_order = [str(f).upper() for f in card["order"]]

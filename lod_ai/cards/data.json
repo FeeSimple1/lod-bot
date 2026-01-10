@@ -2742,7 +2742,7 @@
     "dual": false,
     "unshaded_event": null,
     "shaded_event": null,
-    "effect": "\"If French Preparation (French pieces Available + Blockades Available + CBC) > 15, French may choose to enter the war:\n\u2022 French free Muster and place Rochambeau there.\n\u2022 Raise FNI one level.\n\u2022 Place three French and three British Regulars (Unavailable first, then Available) in West Indies.\n\u2022 May Trump any \u201cBrilliant Stroke!\u201d\n\u2022 All Factions to Eligible.",
-    "note": "When executed, this card should set `state[\"toa_played\"] = True` so that later VP checks allow French and Patriots to win (helper already respects this flag).\""
+    "effect": "If French Preparation (French pieces Available + Blockades Available + CBC) > 15, French may choose to enter the war:\n\u2022 French free Muster and place Rochambeau there.\n\u2022 Raise FNI one level.\n\u2022 Place three French and three British Regulars (Unavailable first, then Available) in West Indies.\n\u2022 May Trump any \u201cBrilliant Stroke!\u201d\n\u2022 All Factions to Eligible.",
+    "note": "When executed, this card should set `state[\"toa_played\"] = True` so that later VP checks allow French and Patriots to win (helper already respects this flag)."
   }
 ]
