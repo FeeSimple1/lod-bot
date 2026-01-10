@@ -47,7 +47,8 @@ def _canon_faction(f: str) -> str:
 
 def add_resource(state, faction: str, amount: int) -> None:
     fac = _canon_faction(faction)
-    state["resources"][fac] = state["resources"].get(fac, 0) + amount
+    resources_map = state.setdefault("resources", {})
+    resources_map[fac] = resources_map.get(fac, 0) + amount
     clamp_resources(state)
     push_history(state, f"{fac} Resources {'+' if amount >= 0 else ''}{amount}")
 
