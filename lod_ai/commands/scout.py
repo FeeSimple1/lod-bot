@@ -71,6 +71,7 @@ def execute(
     n_regulars: int,
     n_tories: int = 0,
     skirmish: bool = False,
+    free: bool = False,
 ) -> Dict:
     """
     Perform the Scout Command.
@@ -119,8 +120,9 @@ def execute(
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).add(dst)
     # -------- Resource payments ---------------------------------------------
-    spend(state, "INDIANS", 1)
-    spend(state, "BRITISH", 1)
+    if not free:
+        spend(state, "INDIANS", 1)
+        spend(state, "BRITISH", 1)
 
     # -------- Execute move ---------------------------------------------------
     push_history(state, f"INDIANS SCOUT {src} → {dst}")
