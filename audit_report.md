@@ -21,3 +21,40 @@ Scope: Cards 23, 24, 54, 77, 83, 105-109
 - **Card 77 – General Burgoyne Cracks Down**: Shaded removal sends British pieces to Casualties, but the reference specifies removal (to Available) in three Provinces with Indians, forts last, plus Raid markers.
 - **Card 83 – Guy Carleton and Indians Negotiate**: Unshaded should shift Quebec City to Active Support; current handler only shifts one level.
 - **Cards 105-109 – Brilliant Stroke!/Treaty of Alliance**: Brilliant Stroke is not implemented as a true interrupt (no pre-action cancel), does not enforce leader involvement, trump chain, or eligibility reset; Treaty of Alliance trump rules and preparations check are incomplete, and BS tracking does not return trumped cards to availability.
+
+# Card audit (before fixes)
+
+Source: `Reference Documents/card reference full.txt`
+Scope: Cards 3, 5, 8-9, 11-12, 14, 17, 26-27, 34, 38, 42, 44, 47, 50, 55, 58-61, 63, 69, 71, 74, 76-78, 80, 88-89, 93
+
+- **Card 3 – George Rogers Clark’s Illinois Campaign**: Shaded queues Partisans instead of executing immediately and unshaded removal uses string literals that do not match constants.
+- **Card 5 – William Alexander, Lord Stirling**: Unshaded uses `ineligible_next` instead of `ineligible_through_next`; shaded queues free ops without parameters and does not ensure a legal March/Battle.
+- **Card 9 – Friedrich Wilhelm von Steuben**: Uses queued free Skirmish ops instead of immediate execution.
+- **Card 11 – Thaddeus Kosciuszko, Expert Engineer**: Uses `Patriot_Control` fields in spaces and string-literal piece tags; shaded removal does not prioritize unit removal and does not use shared caps placement.
+- **Card 12 – Martha Washington to Valley Forge**: Unshaded ok, shaded ok but needs crash-free handling in broader flow.
+- **Card 14 – Overmountain Men Fight for North Carolina**: Uses queued free ops, fixed destination, and executes War Path without Scout/March choices; does not implement British Battle option or free operations.
+- **Card 17 – Jane McCrea**: Unshaded uses string matching in space names and string-literal fort tag; shaded uses invalid `to_pool` arg.
+- **Card 26 – Josiah Martin**: Unshaded always places Tories instead of Fort/Tory choice and does not use caps; shaded queues free ops without ensuring legal March/Battle.
+- **Card 27 – The Queen’s Rangers**: Uses `sp.get("type")` and `sp.get("British_Control")` instead of map/control helpers; Tory sourcing uses move between pools incorrectly and does not prioritize Unavailable.
+- **Card 34 – Lord Sandwich’s Secret Correspondence**: Shaded uses `ineligible_next` without guarding against missing set and wrong duration.
+- **Card 38 – Sir John Johnson Raises the King’s Royal Greens**: Unshaded hardcodes Quebec, mixes sourcing order, and eligibility handling only clears `ineligible_next`; shaded ignores War Party option.
+- **Card 42 – British Attack Danbury**: Uses non-existent "Connecticut" space id.
+- **Card 44 – Conway Cabal**: Uses `ineligible_next` instead of `ineligible_through_next` and hardcodes Patriots.
+- **Card 47 – German Mercenaries Desert**: Hardcodes Virginia, does not enforce British control for unshaded, and shaded replacement/propaganda logic ignores source selection.
+- **Card 50 – French Fleet Arrives**: Unshaded uses `ineligible_next`, shaded hardcodes Virginia and does not place both Patriot/French pieces from any colony.
+- **Card 55 – French Fleet Expels British**: Uses queued free ops; shaded/unshaded movement should be mandatory/optional as per text and must avoid West Indies source.
+- **Card 58 – Ben Franklin’s Old Aide**: Shaded incorrectly grants Patriot resources; missing Tory-to-Militia replacement in specified spaces.
+- **Card 59 – Tronson de Coudray**: Unshaded requires both piece types ≥2 in same space rather than removing any two of each from one space.
+- **Card 60 – Joseph Brant, Indian Leader**: Current logic matches but must remain crash-free.
+- **Card 61 – Sylvain de Kalb Drills Patriots**: Unshaded uses `ineligible_next` instead of `ineligible_through_next`.
+- **Card 63 – British Raid French Fishing Stations**: Logic ok but must remain crash-free.
+- **Card 69 – The Battle of Monmouth**: Logic ok but must remain crash-free.
+- **Card 71 – French Alliance**: Unshaded computes resources incorrectly and uses `Patriot_Control` and `type` fields instead of control refresh and map metadata.
+- **Card 74 – John Stuart, Indian Agent, Escapes Patriots**: Unshaded always grants Indians; shaded removal uses `or` incorrectly and does not total required pieces.
+- **Card 76 – Edward Hand Leads Raids on Indians**: Unshaded does not enforce Province selection or specific militia removal ordering; shaded uses invalid `to_pool` arg.
+- **Card 77 – Gentlemen Volunteers Join the Patriots**: Shaded uses generic Indian detection, removes to casualties, and adds Raid markers without ensuring Province; unshaded uses direct dict mutation for War Party flipping.
+- **Card 78 – Cherry Valley Destroyed by Tories**: Needs constant usage and crash-free checks.
+- **Card 80 – Confusion Allows Slaves to Escape**: Hardcodes British, uses prefix hacks and ignores target faction selection.
+- **Card 88 – If It Hadn’t Been So Foggy…**: Does not implement Interpretation B movement; removes pieces instead of moving to adjacent spaces and hardcodes Patriots.
+- **Card 89 – War Damages Colonies’ Economy**: Replace logic ok but must ensure in-place replacement without invalid locations.
+- **Card 93 – Wyoming Massacre**: Uses `sp.get("type")` and ignores adjacency to Reserves; shifts support without neutral check.

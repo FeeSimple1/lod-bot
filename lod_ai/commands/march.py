@@ -47,7 +47,16 @@ COMMAND_NAME = "MARCH"            # auto-registered by commands/__init__.py
 # ──────────────────────────────────────────────────────────────────────────
 # Helper utilities
 # ──────────────────────────────────────────────────────────────────────────
-def _pay_cost(state: Dict, faction: str, n: int, first_free: bool = False) -> None:
+def _pay_cost(
+    state: Dict,
+    faction: str,
+    n: int,
+    *,
+    first_free: bool = False,
+    free: bool = False,
+) -> None:
+    if free:
+        return
     cost = n - (1 if first_free else 0)
     spend(state, faction, cost)
 
@@ -75,6 +84,7 @@ def execute(
     limited: bool = False,
     move_plan: List[Dict] | None = None,
     plan: List[Dict] | None = None,
+    free: bool = False,
 ) -> Dict:
     """
     Perform a March.
@@ -257,7 +267,7 @@ def execute(
     state.setdefault("_turn_affected_spaces", set()).update(destinations_set)
     # Resource payment
     first_free = (faction == "INDIANS") and ctx.get("all_reserve_origin", False)
-    _pay_cost(state, faction, len(destinations_set), first_free=first_free)
+    _pay_cost(state, faction, len(destinations_set), first_free=first_free, free=free)
 
     # Escort ally-fee: French escorting Continentals → Patriots pay the fee
     if faction == "FRENCH" and bring_escorts:
