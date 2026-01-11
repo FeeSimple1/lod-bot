@@ -30,6 +30,27 @@ def _pick_spaces_with_militia(state, max_spaces=4):
     spaces.sort()
     return spaces[:max_spaces]
 
+_RESERVE_PROVINCES = ("Northwest", "Southwest", "Quebec", "Florida")
+
+
+def _reserve_provinces(state):
+    return [name for name in _RESERVE_PROVINCES if name in state.get("spaces", {})]
+
+
+def _available_base_slots(state, space_id: str) -> int:
+    sp = state.get("spaces", {}).get(space_id, {})
+    total = sp.get(FORT_BRI, 0) + sp.get(FORT_PAT, 0) + sp.get(VILLAGE, 0)
+    return max(0, 2 - total)
+
+
+def _shift_support_toward(state, space_id: str, target: int, steps: int = 1) -> None:
+    for _ in range(steps):
+        cur = state.get("support", {}).get(space_id, 0)
+        if cur == target:
+            return
+        delta = 1 if cur < target else -1
+        shift_support(state, space_id, delta)
+
 
 # 2  COMMON SENSE
 @register(2)
@@ -342,11 +363,9 @@ def evt_032_rule_britannia(state, shaded=False):
             move_piece(state, tag, "unavailable", target, qty - moved)
 
     if shaded:
-        british_cities = [
-            n for n, sp in state["spaces"].items()
-            if sp.get("British_Control") and sp.get("type") == "City"
-        ]
-        recipient = state.get("rule_britannia_recipient", BRITISH)
+        cities = pick_cities(state, len(state.get("spaces", {})))
+        british_cities = [city for city in cities if state["spaces"][city].get("British_Control")]
+        recipient = str(state.get("active", BRITISH)).upper()
         add_resource(state, recipient, len(british_cities) // 2)
         return
 
@@ -430,12 +449,13 @@ def evt_035_tryon_plot(state, shaded=False):
 @register(41)
 def evt_041_william_pitt(state, shaded=False):
     """
-    Unshaded – Shift 2 Colonies 2 levels each toward Active Support.
-    Shaded   – Shift 2 Colonies 2 levels each toward Active Opposition.
+    Unshaded – Shift 2 Colonies 2 levels each toward Passive Support.
+    Shaded   – Shift 2 Colonies 2 levels each toward Passive Opposition.
     """
-    delta = +2 if not shaded else -2
-    for col in ("Virginia", "North_Carolina"):
-        shift_support(state, col, delta)
+    target = +1 if not shaded else -1
+    colonies = pick_colonies(state, 2)
+    for col in colonies:
+        _shift_support_toward(state, col, target, steps=2)
 
 # 43  HMS RUSSIAN MERCHANT WITH 4 000 MUSKETS
 @register(43)
@@ -465,16 +485,18 @@ def evt_043_russian_muskets(state, shaded=False):
 @register(46)
 def evt_046_burke(state, shaded=False):
     """
-    Unshaded – Place 1 Tory in each of 3 spaces (we pick 3 Cities).
+    Unshaded – Place 1 Tory in each of 3 spaces.
     Shaded   – Shift 2 Cities 1 level toward Passive Opposition.
     """
-    cities = ("Boston", "New_York_City", "Charles_Town")
     if shaded:
-        shift_support(state, "New_York_City", -1)
-        shift_support(state, "Philadelphia",  -1)
+        for city in pick_cities(state, 2):
+            _shift_support_toward(state, city, -1, steps=1)
     else:
-        for city in cities:
-            place_piece(state, TORY, city)
+        targets = sorted(state.get("spaces", {}))[:3]
+        for space in targets:
+            moved = move_piece(state, TORY, "available", space, 1)
+            if moved < 1:
+                move_piece(state, TORY, "unavailable", space, 1 - moved)
 
 
 # 49 CLAUDE LOUIS, COMTE de SAINT-GERMAIN
@@ -606,40 +628,54 @@ def evt_072_french_settlers(state, shaded=False):
 
     # Canonical constants; local import keeps the change self‑contained.
     from lod_ai.rules_consts import (
-        FORT_BRI, FORT_PAT, VILLAGE, MILITIA_A, WARPARTY_A, WEST_INDIES_ID
+        FORT_BRI, FORT_PAT, VILLAGE, REGULAR_BRI, REGULAR_PAT, REGULAR_FRE, TORY,
+        MILITIA_U, WARPARTY_U,
     )
 
-    fac     = str(state.get("active", "FRENCH")).upper()
-    spaces  = state["spaces"]
+    fac = str(state.get("active", "")).upper()
+    spaces = state["spaces"]
+    pool = state.setdefault("available", {})
 
-    # Pick target Reserve Province:
-    # 1) Northwest if present; else
-    # 2) any space flagged as a Reserve (type/flag); else
-    # 3) any on‑map, non‑pool, non‑WI space (safe fallback to avoid crash).
-    if "Northwest" in spaces:
-        target = "Northwest"
-    else:
-        reserve_candidates = [
-            sid for sid, sp in spaces.items()
-            if (sp.get("type") == "Reserve" or sp.get("reserve") or "Reserve" in sid)
-            and sid not in (WEST_INDIES_ID, "available", "unavailable", "out_of_play")
-        ]
-        target = reserve_candidates[0] if reserve_candidates else next(
-            sid for sid in spaces
-            if sid not in (WEST_INDIES_ID, "available", "unavailable", "out_of_play")
-        )
+    reserve_candidates = _reserve_provinces(state)
+    if not reserve_candidates:
+        return
+    target = reserve_candidates[0]
+
+    def _available_count(tag: str) -> int:
+        if tag in (MILITIA_U,):
+            return pool.get(MILITIA_U, 0)
+        if tag in (WARPARTY_U,):
+            return pool.get(WARPARTY_U, 0)
+        return pool.get(tag, 0)
+
+    def _place_units(priorities: list[str], total: int) -> None:
+        remaining = total
+        for tag in priorities:
+            if remaining <= 0:
+                return
+            available = _available_count(tag)
+            if available <= 0:
+                continue
+            qty = min(remaining, available)
+            if qty:
+                place_piece(state, tag, target, qty)
+                remaining -= qty
 
     # Friendly pieces by coalition:
     # • BRITISH/INDIANS: Village + 3 War Parties
     # • FRENCH/PATRIOTS: Fort (Patriot) + 3 Militia
     if fac in ("BRITISH", "INDIANS"):
-        place_with_caps(state, VILLAGE, target)
-        for _ in range(3):
-            place_with_caps(state, WARPARTY_A, target)
-    else:
+        placed = 0
+        if pool.get(VILLAGE, 0) > 0:
+            placed = place_with_caps(state, VILLAGE, target)
+        if placed == 0:
+            place_with_caps(state, FORT_BRI, target)
+        _place_units([WARPARTY_U, TORY, REGULAR_BRI], 3)
+    elif fac in ("PATRIOTS", "FRENCH"):
         place_with_caps(state, FORT_PAT, target)
-        for _ in range(3):
-            place_with_caps(state, MILITIA_A, target)
+        _place_units([MILITIA_U, REGULAR_PAT, REGULAR_FRE], 3)
+    else:
+        push_history(state, "French Settlers Help: no executing faction; no placement")
 
 # 75  CONGRESS’ SPEECH TO SIX NATIONS
 @register(75)
@@ -648,29 +684,17 @@ def evt_075_speech_six_nations(state, shaded=False):
     Unshaded – Indians free Gather in three Indian Reserve Provinces then free War Path in one of those spaces.
     Shaded   – Remove three Indian pieces from Northwest (Villages last).
     """
-    reserve_spaces = [
-        name
-        for name, info in state["spaces"].items()
-        if info.get("type") == "Reserve"
-    ]
-    reserve_spaces.sort()
+    reserve_spaces = _reserve_provinces(state)
 
     if shaded:
-        targets = ["Northwest", "Southwest", "Quebec", "Florida"]
+        if "Northwest" not in state.get("spaces", {}):
+            return
         remaining = 3
-        for loc in targets:
+        for tag in (WARPARTY_U, WARPARTY_A, VILLAGE):
             if remaining == 0:
                 break
-            for tag in (WARPARTY_U, WARPARTY_A, VILLAGE):
-                if remaining == 0:
-                    break
-                removed = remove_piece(state, tag, loc, remaining, to="available")
-                remaining -= removed
-        removed_total = 3 - remaining
-        push_history(
-            state,
-            f"Speech to Six Nations (shaded): removed {removed_total} Indian pieces (War Parties first, Villages last)",
-        )
+            removed = remove_piece(state, tag, "Northwest", remaining, to="available")
+            remaining -= removed
         return
 
     from lod_ai.util.free_ops import queue_free_op
@@ -861,28 +885,29 @@ def evt_090_world_turned_upside_down(state, shaded=False):
     executor = str(state.get("active", "")).upper()
     patriot_side = executor in (PATRIOTS, FRENCH)
 
-    if patriot_side:
-        colonies = pick_colonies(state, 1)
-        if colonies:
-            place_with_caps(state, FORT_PAT, colonies[0])
+    reserve_candidates = [name for name in _reserve_provinces(state) if _available_base_slots(state, name) > 0]
+    colonies = [name for name in pick_colonies(state, len(state.get("spaces", {}))) if _available_base_slots(state, name) > 0]
+    target = (reserve_candidates + colonies)[0] if (reserve_candidates or colonies) else None
+    if not target:
         return
 
-    reserve_order = ["Quebec", "Northwest", "Southwest", "Florida"]
-    reserve = next((name for name in reserve_order if name in state.get("spaces", {})), None)
-    placed = place_with_caps(state, VILLAGE, reserve) if reserve else 0
+    if patriot_side:
+        place_with_caps(state, FORT_PAT, target)
+        return
 
+    pool = state.setdefault("available", {})
+    placed = 0
+    if pool.get(VILLAGE, 0) > 0:
+        placed = place_with_caps(state, VILLAGE, target)
     if placed == 0:
-        colonies = pick_colonies(state, 1)
-        if colonies:
-            place_with_caps(state, FORT_BRI, colonies[0])
+        place_with_caps(state, FORT_BRI, target)
 
 # 91  INDIANS HELP BRITISH OUTSIDE COLONIES
 @register(91)
 def evt_091_indians_help(state, shaded=False):
     """Handle card #91, Indians Help British Outside Colonies."""
 
-    reserve_spaces = [name for name, info in state["spaces"].items() if info.get("type") == "Reserve"]
-    reserve_spaces.sort()
+    reserve_spaces = _reserve_provinces(state)
 
     if shaded:
         # Shaded: Remove one Village in one Indian Reserve Province.
@@ -916,10 +941,22 @@ def evt_092_cherokees_supplied(state, shaded=False):
     """
     if shaded:
         return
-    for name, sp in state["spaces"].items():
-        if sp.get(FORT_BRI, 0) == 1:
+    cities = set(pick_cities(state, len(state.get("spaces", {}))))
+    pool = state.setdefault("available", {})
+    for name in sorted(state.get("spaces", {})):
+        if name == WEST_INDIES_ID:
+            continue
+        sp = state["spaces"][name]
+        if sp.get(FORT_BRI, 0) + sp.get(VILLAGE, 0) == 0:
+            continue
+        if _available_base_slots(state, name) <= 0:
+            continue
+        if sp.get(VILLAGE, 0):
             place_with_caps(state, FORT_BRI, name)
             return
-        if sp.get(VILLAGE, 0) == 1:
-            place_with_caps(state, VILLAGE, name)
+        if sp.get(FORT_BRI, 0):
+            if name not in cities and pool.get(VILLAGE, 0) > 0:
+                place_with_caps(state, VILLAGE, name)
+            else:
+                place_with_caps(state, FORT_BRI, name)
             return
