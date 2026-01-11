@@ -11,6 +11,7 @@ from lod_ai.rules_consts import (
     WARPARTY_A,
     FORT_BRI,
     FORT_PAT,
+    VILLAGE,
     PROPAGANDA,
     BLOCKADE,
     WEST_INDIES_ID,
@@ -175,10 +176,152 @@ def test_card32_rule_britannia_any_colony_and_any_recipient():
     assert state["spaces"]["Georgia"].get(TORY) == 2
 
     state = copy.deepcopy(state)
-    state["rule_britannia_recipient"] = "INDIANS"
+    state["active"] = "INDIANS"
     early_war.evt_032_rule_britannia(state, shaded=True)
 
     assert state["resources"]["INDIANS"] == 1
+
+
+def test_card41_william_pitt_shifts_toward_passive_levels():
+    state = _base_state()
+    state["spaces"] = {
+        "Connecticut": {"type": "Colony"},
+        "Georgia": {"type": "Colony"},
+        "Virginia": {"type": "Colony"},
+    }
+    state["support"] = {"Connecticut": -2, "Georgia": 2, "Virginia": 0}
+
+    early_war.evt_041_william_pitt(state, shaded=False)
+
+    assert state["support"]["Connecticut"] == 0
+    assert state["support"]["Georgia"] == 1
+    assert state["support"]["Virginia"] == 0
+
+    early_war.evt_041_william_pitt(state, shaded=True)
+
+    assert state["support"]["Connecticut"] == -1
+    assert state["support"]["Georgia"] == -1
+
+
+def test_card46_burke_places_tories_and_shifts_cities():
+    state = _base_state()
+    state["spaces"] = {
+        "Albany": {},
+        "Boston": {"type": "City"},
+        "New_York_City": {"type": "City"},
+        "Philadelphia": {"type": "City"},
+    }
+    state["available"] = {TORY: 2}
+    state["unavailable"] = {TORY: 1}
+
+    early_war.evt_046_burke(state, shaded=False)
+
+    assert state["spaces"]["Albany"].get(TORY) == 1
+    assert state["spaces"]["Boston"].get(TORY) == 1
+    assert state["spaces"]["New_York_City"].get(TORY) == 1
+
+    state["support"] = {"Boston": 2, "New_York_City": -2, "Philadelphia": 0}
+    early_war.evt_046_burke(state, shaded=True)
+
+    assert state["support"]["Boston"] == 1
+    assert state["support"]["New_York_City"] == -1
+
+
+def test_card72_french_settlers_help_places_royalist_pieces():
+    state = _base_state()
+    state["spaces"] = {
+        "Northwest": {},
+        "Southwest": {},
+    }
+    state["available"] = {VILLAGE: 1, WARPARTY_U: 2, TORY: 1, REGULAR_BRI: 1}
+    state["active"] = "BRITISH"
+
+    early_war.evt_072_french_settlers(state, shaded=False)
+
+    assert state["spaces"]["Northwest"].get(VILLAGE) == 1
+    assert state["spaces"]["Northwest"].get(WARPARTY_U) == 2
+    assert state["spaces"]["Northwest"].get(TORY) == 1
+
+
+def test_card75_speech_to_six_nations_uses_reserve_list_and_northwest():
+    state = _base_state()
+    state["spaces"] = {
+        "Northwest": {WARPARTY_U: 1, WARPARTY_A: 1, VILLAGE: 1},
+        "Southwest": {},
+        "Quebec": {},
+        "Florida": {},
+    }
+
+    early_war.evt_075_speech_six_nations(state, shaded=False)
+
+    assert state["free_ops"] == [
+        ("INDIANS", "gather", "Northwest"),
+        ("INDIANS", "gather", "Southwest"),
+        ("INDIANS", "gather", "Quebec"),
+        ("INDIANS", "war_path", "Northwest"),
+    ]
+
+    early_war.evt_075_speech_six_nations(state, shaded=True)
+
+    assert state["spaces"]["Northwest"].get(WARPARTY_U, 0) == 0
+    assert state["spaces"]["Northwest"].get(WARPARTY_A, 0) == 0
+    assert state["spaces"]["Northwest"].get(VILLAGE, 0) == 0
+
+
+def test_card90_world_turned_upside_down_places_village_for_royalists():
+    state = _base_state()
+    state["spaces"] = {
+        "Northwest": {},
+        "Georgia": {"type": "Colony"},
+    }
+    state["available"] = {VILLAGE: 1, FORT_BRI: 1}
+    state["active"] = "BRITISH"
+
+    early_war.evt_090_world_turned_upside_down(state, shaded=False)
+
+    assert state["spaces"]["Northwest"].get(VILLAGE) == 1
+
+
+def test_card91_indians_help_outside_colonies_places_and_removes():
+    state = _base_state()
+    state["spaces"] = {
+        "Southwest": {},
+        "Quebec": {VILLAGE: 1},
+    }
+    state["available"] = {VILLAGE: 1, WARPARTY_U: 2}
+
+    early_war.evt_091_indians_help(state, shaded=False)
+
+    assert state["spaces"]["Southwest"].get(VILLAGE) == 1
+    assert state["spaces"]["Southwest"].get(WARPARTY_U) == 2
+
+    shaded_state = _base_state()
+    shaded_state["spaces"] = {
+        "Southwest": {},
+        "Quebec": {VILLAGE: 1},
+    }
+    early_war.evt_091_indians_help(shaded_state, shaded=True)
+
+    assert shaded_state["spaces"]["Quebec"].get(VILLAGE, 0) == 0
+
+
+def test_card92_cherokees_supplied_adds_second_base():
+    state = _base_state()
+    state["spaces"] = {
+        "Northwest": {VILLAGE: 1},
+        "Boston": {"type": "City", FORT_BRI: 1, VILLAGE: 1},
+        WEST_INDIES_ID: {},
+    }
+    state["available"] = {VILLAGE: 1, FORT_BRI: 2}
+
+    early_war.evt_092_cherokees_supplied(state, shaded=False)
+
+    assert state["spaces"]["Northwest"].get(FORT_BRI) == 1
+
+    state["available"] = {VILLAGE: 1, FORT_BRI: 2}
+    early_war.evt_092_cherokees_supplied(state, shaded=True)
+
+    assert state["spaces"]["Northwest"].get(FORT_BRI) == 1
 
 
 def test_card54_sartine_shaded_moves_to_west_indies():

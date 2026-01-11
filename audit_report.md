@@ -58,3 +58,17 @@ Scope: Cards 3, 5, 8-9, 11-12, 14, 17, 26-27, 34, 38, 42, 44, 47, 50, 55, 58-61,
 - **Card 88 – If It Hadn’t Been So Foggy…**: Does not implement Interpretation B movement; removes pieces instead of moving to adjacent spaces and hardcodes Patriots.
 - **Card 89 – War Damages Colonies’ Economy**: Replace logic ok but must ensure in-place replacement without invalid locations.
 - **Card 93 – Wyoming Massacre**: Uses `sp.get("type")` and ignores adjacency to Reserves; shifts support without neutral check.
+
+# Card audit (before fixes)
+
+Source: `Reference Documents/card reference full.txt`
+Scope: Cards 32, 41, 46, 72, 75, 90, 91, 92
+
+- **Card 32 – Rule Britannia!**: Shaded path counts Cities via `sp.get("type") == "City"` instead of using `pick_cities`, and uses a fixed recipient instead of awarding Resources to the executing faction based on Cities under British Control.
+- **Card 41 – William Pitt – America Can’t Be Conquered**: Hardcodes Virginia/North Carolina instead of shifting any two Colonies.
+- **Card 46 – Edmund Burke on Conciliation**: Unshaded hardcodes Cities instead of placing in any three spaces; shaded shifts specific Cities and uses direct delta without “toward Passive Opposition” behavior.
+- **Card 72 – French Settlers Help**: Uses `type`/`reserve` heuristics, ignores shaded no-op requirement, places with caps and wrong piece selection (Fort/Village + War Parties/Militia) and does not respect Available limits or per-faction preferences.
+- **Card 75 – Congress’ Speech to the Six Nations**: Reserve provinces derived from `type` field; unshaded does not constrain War Path to one of the Gather spaces; shaded removes from multiple spaces instead of Northwest only, and removal ordering is incomplete.
+- **Card 90 – The World Turned Upside Down**: Unshaded only places Forts/Villages with limited location logic and does not allow Village placement for Royalists in Provinces or enforce base-cap legality; does not allow Fort or Village selection in a Province with capacity.
+- **Card 91 – Indians Help British Outside Colonies**: Reserve provinces derived from `type` field; unshaded uses caps placement; shaded selection/removal logic does not use the fixed reserve list.
+- **Card 92 – Cherokees Supplied by the British**: Does not implement “second Fort or Village in a space where you have one” correctly and does not handle Village/Fort selection rules or base cap checks; shaded no-op must be explicit.
