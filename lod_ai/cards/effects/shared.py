@@ -57,8 +57,12 @@ def add_resource(state, faction: str, amount: int) -> None:
 # --------------------------------------------------------------------------- #
 def shift_support(state, space_id: str, delta: int) -> None:
     """
-    Shift Support in *space_id* by *delta* steps (+ = toward Patriots,
-    – = toward Opposition).  Result is clamped to ±2.
+    Shift Support/Opposition in *space_id* by *delta* steps.
+
+    +delta shifts toward Support (up to +2 / Active Support).
+    -delta shifts toward Opposition (down to -2 / Active Opposition).
+
+    Result is clamped to [-2, +2].
     """
     cur0 = state.get("support", {}).get(space_id, 0)
     new = max(MIN_SUPPORT, min(MAX_SUPPORT, cur0 + delta))

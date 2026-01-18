@@ -109,9 +109,12 @@ def _ensure_handlers_imported() -> None:
     for mod in modules:
         try:
             importlib.import_module(mod)
-        except ModuleNotFoundError:
+        except ModuleNotFoundError as exc:
             # Some scenarios may omit certain eras; that's fine.
-            continue
+            # But do NOT mask missing dependencies inside an existing module.
+            if getattr(exc, "name", None) == mod:
+                continue
+            raise
 
 
 # Import at module load so registry is ready for bots/engine.
