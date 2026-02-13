@@ -20,6 +20,12 @@ from lod_ai.map import adjacency as map_adj
 
 _MARKER_TAGS = (C.PROPAGANDA, C.RAID, C.BLOCKADE)
 
+# Non-piece metadata keys that refresh_control() and setup routines store
+# directly inside space dicts alongside piece counts.
+_SPACE_META_KEYS = frozenset({
+    "control", "type", "population", "pop", "Indian_Reserve",
+})
+
 
 def _require_keys(state: Dict, keys: Iterable[str]) -> None:
     missing = [k for k in keys if k not in state]
@@ -32,6 +38,8 @@ def _validate_spaces(state: Dict, valid_spaces: set[str]) -> None:
         if sid not in valid_spaces:
             raise ValueError(f"Unknown space id in state.spaces: {sid}")
         for tag, qty in sp.items():
+            if tag in _SPACE_META_KEYS:
+                continue
             if not isinstance(qty, int):
                 raise TypeError(f"state['spaces']['{sid}']['{tag}'] must be int")
             if qty < 0:
