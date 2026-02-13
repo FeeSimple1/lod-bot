@@ -221,10 +221,10 @@ from lod_ai.rules_consts import (
 )
 
 _CAPS = {
-    "British_Fort": MAX_FORT_BRI,
-    "Patriot_Fort": MAX_FORT_PAT,
-    VILLAGE:        MAX_VILLAGE,
-    PROPAGANDA:     MAX_PROPAGANDA,
+    C.FORT_BRI:  MAX_FORT_BRI,
+    C.FORT_PAT:  MAX_FORT_PAT,
+    VILLAGE:     MAX_VILLAGE,
+    PROPAGANDA:  MAX_PROPAGANDA,
 }
 
 def place_with_caps(state: Dict[str, Any], tag: str, loc: str, qty: int = 1) -> int:
