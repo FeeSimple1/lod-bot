@@ -590,7 +590,7 @@ def evt_027_queens_rangers(state, shaded=False):
         targets = [sid for sid in override if sid in state.get("spaces", {})]
     else:
         targets = [sid for sid in state.get("spaces", {}) if _is_colony(sid)]
-    targets = [sid for sid in targets if state.get("control", {}).get(sid) == "BRITISH"]
+    targets = [sid for sid in targets if state.get("control", {}).get(sid) == BRITISH]
 
     for name in targets[:2]:
         _place_from_pools(state, TORY, name, 2)
@@ -639,8 +639,8 @@ def evt_038_johnsons_royal_greens(state, shaded=False):
     mix = state.get("card38_unshaded_mix")
     reg_count = tory_count = None
     if isinstance(mix, dict):
-        reg_count = int(mix.get(REGULAR_BRI, mix.get("British_Regular", 0)))
-        tory_count = int(mix.get(TORY, mix.get("Tory", 0)))
+        reg_count = int(mix.get(REGULAR_BRI, 0))
+        tory_count = int(mix.get(TORY, 0))
         if reg_count + tory_count != 4:
             reg_count = tory_count = None
 
@@ -713,10 +713,10 @@ def evt_047_tories_tested(state, shaded=False):
     _ensure_control(state)
     if target not in state.get("spaces", {}):
         for sid in state.get("spaces", {}):
-            if _is_colony(sid) and state.get("control", {}).get(sid) == "BRITISH":
+            if _is_colony(sid) and state.get("control", {}).get(sid) == BRITISH:
                 target = sid
                 break
-    if target and state.get("control", {}).get(target) == "BRITISH":
+    if target and state.get("control", {}).get(target) == BRITISH:
         place_piece(state, TORY, target, 3)
         push_history(state, f"Card 47 unshaded: placed 3 Tories in {target}")
 
