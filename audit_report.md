@@ -1,74 +1,99 @@
-# Card audit (before fixes)
+# Card Audit Report
 
 Source: `Reference Documents/card reference full.txt`
-Scope: Cards 2, 6, 24, 28, 29, 32
+Last updated: Phase 2 compliance audit
 
-- **Card 2 – Common Sense**: Implementation hardcodes Boston for unshaded and New York City/Philadelphia for shaded instead of selecting any one/two Cities.
-- **Card 6 – Benedict Arnold**: Implementation hardcodes Virginia and only removes Underground Militia; should target any one Colony and remove Fort + 2 Militia (Underground then Active) regardless of status.
-- **Card 24 – Declaration of Independence**: Unshaded/Shaded effects are inverted vs reference; current code places pieces instead of removing them.
-- **Card 28 – Battle of Moore’s Creek Bridge**: Target is locked to North Carolina instead of any one space; function body is mis-indented with `target` defined at module scope.
-- **Card 29 – Edward Bancroft, British Spy**: Handler contains stray text and deterministically targets Patriots; needs selectable faction (Patriots or Indians) per reference.
-- **Card 32 – Rule Britannia!**: Unshaded locked to Virginia; shaded always gives Resources to Patriots; both should allow any Colony and any faction for Resources.
+---
 
-# Card audit (before fixes)
+## FIXED issues (this audit pass)
 
-Source: `Reference Documents/card reference full.txt`
-Scope: Cards 23, 24, 54, 77, 83, 105-109
+### late_war.py
 
-- **Card 23 – Lieutenant Colonel Francis Marion**: Current handler hardcodes South Carolina → Georgia for unshaded and ignores North Carolina/adjacent Provinces and British/Indian choice; shaded removes British pieces only in South Carolina and sends them to Casualties instead of removing from the chosen NC/SC space (Forts last).
-- **Card 24 – Declaration of Independence**: Unshaded removal sends Continentals and Fort to Casualties, but the reference only says “remove,” so it should return to Available.
-- **Card 54 – Antoine de Sartine, Secretary of the Navy**: Current handler only adjusts a West Indies space blockade count and ignores the shared Squadron/Blockade pool, Unavailable storage, and port blockades required by the reference.
-- **Card 77 – General Burgoyne Cracks Down**: Shaded removal sends British pieces to Casualties, but the reference specifies removal (to Available) in three Provinces with Indians, forts last, plus Raid markers.
-- **Card 83 – Guy Carleton and Indians Negotiate**: Unshaded should shift Quebec City to Active Support; current handler only shifts one level.
-- **Cards 105-109 – Brilliant Stroke!/Treaty of Alliance**: Brilliant Stroke is not implemented as a true interrupt (no pre-action cancel), does not enforce leader involvement, trump chain, or eligibility reset; Treaty of Alliance trump rules and preparations check are incomplete, and BS tracking does not return trumped cards to availability.
+- **Card 1 (Waxhaws)**: Fixed shaded "shift toward Neutral" — was shifting -1 (toward Opposition), now correctly shifts toward 0.
+- **Card 7 (John Paul Jones)**: Fixed unshaded to allow West Indies OR any City as destination per reference.
+- **Card 16 (Mercy Warren)**: Fixed unshaded to allow any target (was hardcoded NYC); fixed shaded to allow any City (was hardcoded Boston).
+- **Card 18 ("If it hadn't been so stormy…")**: Fixed `ineligible_next` → `ineligible_through_next`; added shaded no-op (reference says "(none)"); allow any faction selection.
+- **Card 19 (Nathan Hale)**: Fixed shaded to place 3 Militia "anywhere" (was hardcoded Pennsylvania).
+- **Card 21 (Gamecock Sumter)**: Fixed to allow South Carolina or Georgia target per reference.
+- **Card 22 (Newburgh Conspiracy)**: Fixed shaded to mark immediate Tory Desertion per "Immediately execute" in reference.
+- **Card 25 (British Prison Ships)**: Fixed both paths to properly shift "toward Passive Support/Opposition" (one step toward target, not set to target); use map helpers for city selection.
+- **Card 31 (Thomas Brown)**: Fixed to allow South Carolina or Georgia per reference.
+- **Card 39 (King Mob)**: Fixed "shift toward Neutral" — was always -1, now correctly shifts toward 0; use map helpers for city detection.
+- **Card 48 (God Save the King)**: Fixed shaded — was using string prefix matching and moving to "available" (removing pieces); now properly moves non-British units to adjacent spaces.
+- **Card 57 (French Caribbean)**: Fixed `ineligible_next` → `ineligible_through_next` for both paths; fixed shaded to move British from map to West Indies.
+- **Card 62 (Langlade)**: Fixed unshaded to allow War Party OR Tory choice in NY/Quebec/NW per reference; fixed shaded to allow French in Quebec OR Militia in NW.
+- **Card 64 (Fielding & Bylandt)**: **Critical fix** — shaded was British -3 & FNI +1, should be Patriots +5 per reference.
+- **Card 66 (Don Bernardo)**: Fixed unshaded to allow British cube mix (Regulars + Tories) and Florida or Southwest target.
+- **Card 73 (Sullivan)**: Fixed loop structure; added FORT_PAT to removal candidates; added shaded no-op.
+- **Card 79 (Tuscarora & Oneida)**: Fixed target to any Colony (was hardcoded Pennsylvania).
+- **Card 81 (Creek & Seminole)**: Fixed to allow SC or GA; shaded removes from both locations; includes Active War Party removal.
+- **Card 85 (Mississippi Raids)**: Fixed unshaded to allow Regulars and/or Tories mix; shaded allows Militia or Continental choice.
+- **Card 87 (Lenape)**: Fixed to remove any piece type (was only War Party); added Remain Eligible logic.
+- **Card 94 (Herkimer)**: Fixed shaded to remove from Pennsylvania AND adjacent spaces per reference.
+- **Card 95 (Ohio Frontier)**: Added shaded no-op check (was executing for both sides).
+- **Card 96 (Iroquois)**: Fixed unshaded to constrain Gather/War Path to Indian Reserve Provinces.
 
-# Card audit (before fixes)
+### middle_war.py
 
-Source: `Reference Documents/card reference full.txt`
-Scope: Cards 3, 5, 8-9, 11-12, 14, 17, 26-27, 34, 38, 42, 44, 47, 50, 55, 58-61, 63, 69, 71, 74, 76-78, 80, 88-89, 93
+- **Card 59 (Tronson de Coudray)**: Fixed to prefer spaces with both Continentals AND French Regulars for the "from one space" requirement.
+- **Card 71 (Treaty of Amity)**: **Critical fix** — shaded was British +4, should be French +5; unshaded was dividing population by 3 and capping at 5 and adding to both Patriots and French — should add total population of Rebellion cities to Patriots only.
 
-- **Card 3 – George Rogers Clark’s Illinois Campaign**: Shaded queues Partisans instead of executing immediately and unshaded removal uses string literals that do not match constants.
-- **Card 5 – William Alexander, Lord Stirling**: Unshaded uses `ineligible_next` instead of `ineligible_through_next`; shaded queues free ops without parameters and does not ensure a legal March/Battle.
-- **Card 9 – Friedrich Wilhelm von Steuben**: Uses queued free Skirmish ops instead of immediate execution.
-- **Card 11 – Thaddeus Kosciuszko, Expert Engineer**: Uses `Patriot_Control` fields in spaces and string-literal piece tags; shaded removal does not prioritize unit removal and does not use shared caps placement.
-- **Card 12 – Martha Washington to Valley Forge**: Unshaded ok, shaded ok but needs crash-free handling in broader flow.
-- **Card 14 – Overmountain Men Fight for North Carolina**: Uses queued free ops, fixed destination, and executes War Path without Scout/March choices; does not implement British Battle option or free operations.
-- **Card 17 – Jane McCrea**: Unshaded uses string matching in space names and string-literal fort tag; shaded uses invalid `to_pool` arg.
-- **Card 26 – Josiah Martin**: Unshaded always places Tories instead of Fort/Tory choice and does not use caps; shaded queues free ops without ensuring legal March/Battle.
-- **Card 27 – The Queen’s Rangers**: Uses `sp.get("type")` and `sp.get("British_Control")` instead of map/control helpers; Tory sourcing uses move between pools incorrectly and does not prioritize Unavailable.
-- **Card 34 – Lord Sandwich’s Secret Correspondence**: Shaded uses `ineligible_next` without guarding against missing set and wrong duration.
-- **Card 38 – Sir John Johnson Raises the King’s Royal Greens**: Unshaded hardcodes Quebec, mixes sourcing order, and eligibility handling only clears `ineligible_next`; shaded ignores War Party option.
-- **Card 42 – British Attack Danbury**: Uses non-existent "Connecticut" space id.
-- **Card 44 – Conway Cabal**: Uses `ineligible_next` instead of `ineligible_through_next` and hardcodes Patriots.
-- **Card 47 – German Mercenaries Desert**: Hardcodes Virginia, does not enforce British control for unshaded, and shaded replacement/propaganda logic ignores source selection.
-- **Card 50 – French Fleet Arrives**: Unshaded uses `ineligible_next`, shaded hardcodes Virginia and does not place both Patriot/French pieces from any colony.
-- **Card 55 – French Fleet Expels British**: Uses queued free ops; shaded/unshaded movement should be mandatory/optional as per text and must avoid West Indies source.
-- **Card 58 – Ben Franklin’s Old Aide**: Shaded incorrectly grants Patriot resources; missing Tory-to-Militia replacement in specified spaces.
-- **Card 59 – Tronson de Coudray**: Unshaded requires both piece types ≥2 in same space rather than removing any two of each from one space.
-- **Card 60 – Joseph Brant, Indian Leader**: Current logic matches but must remain crash-free.
-- **Card 61 – Sylvain de Kalb Drills Patriots**: Unshaded uses `ineligible_next` instead of `ineligible_through_next`.
-- **Card 63 – British Raid French Fishing Stations**: Logic ok but must remain crash-free.
-- **Card 69 – The Battle of Monmouth**: Logic ok but must remain crash-free.
-- **Card 71 – French Alliance**: Unshaded computes resources incorrectly and uses `Patriot_Control` and `type` fields instead of control refresh and map metadata.
-- **Card 74 – John Stuart, Indian Agent, Escapes Patriots**: Unshaded always grants Indians; shaded removal uses `or` incorrectly and does not total required pieces.
-- **Card 76 – Edward Hand Leads Raids on Indians**: Unshaded does not enforce Province selection or specific militia removal ordering; shaded uses invalid `to_pool` arg.
-- **Card 77 – Gentlemen Volunteers Join the Patriots**: Shaded uses generic Indian detection, removes to casualties, and adds Raid markers without ensuring Province; unshaded uses direct dict mutation for War Party flipping.
-- **Card 78 – Cherry Valley Destroyed by Tories**: Needs constant usage and crash-free checks.
-- **Card 80 – Confusion Allows Slaves to Escape**: Hardcodes British, uses prefix hacks and ignores target faction selection.
-- **Card 88 – If It Hadn’t Been So Foggy…**: Does not implement Interpretation B movement; removes pieces instead of moving to adjacent spaces and hardcodes Patriots.
-- **Card 89 – War Damages Colonies’ Economy**: Replace logic ok but must ensure in-place replacement without invalid locations.
-- **Card 93 – Wyoming Massacre**: Uses `sp.get("type")` and ignores adjacency to Reserves; shifts support without neutral check.
+### early_war.py
 
-# Card audit (before fixes)
+- **Card 15 (Morgan's Rifles)**: Fixed shaded to allow any Colony (was hardcoded Virginia).
+- **Card 32 (Rule Britannia)**: Fixed sourcing to Unavailable first per "from Unavailable or Available" in reference.
+- **Card 33 (Burning of Falmouth)**: Fixed shaded to use adjacency lookup for Massachusetts spaces.
+- **Card 35 (Tryon Plot)**: Fixed to allow New York or New York City per reference; shaded allows adjacent space.
+- **Card 46 (Edmund Burke)**: Fixed sourcing to Unavailable first per reference.
+- **Card 82 (Shawnee Warriors)**: Fixed unshaded provinces — was VA, GA, NY, SC; should be VA, GA, NC, SC (New York → North Carolina per reference).
 
-Source: `Reference Documents/card reference full.txt`
-Scope: Cards 32, 41, 46, 72, 75, 90, 91, 92
+---
 
-- **Card 32 – Rule Britannia!**: Shaded path counts Cities via `sp.get("type") == "City"` instead of using `pick_cities`, and uses a fixed recipient instead of awarding Resources to the executing faction based on Cities under British Control.
-- **Card 41 – William Pitt – America Can’t Be Conquered**: Hardcodes Virginia/North Carolina instead of shifting any two Colonies.
-- **Card 46 – Edmund Burke on Conciliation**: Unshaded hardcodes Cities instead of placing in any three spaces; shaded shifts specific Cities and uses direct delta without “toward Passive Opposition” behavior.
-- **Card 72 – French Settlers Help**: Uses `type`/`reserve` heuristics, ignores shaded no-op requirement, places with caps and wrong piece selection (Fort/Village + War Parties/Militia) and does not respect Available limits or per-faction preferences.
-- **Card 75 – Congress’ Speech to the Six Nations**: Reserve provinces derived from `type` field; unshaded does not constrain War Path to one of the Gather spaces; shaded removes from multiple spaces instead of Northwest only, and removal ordering is incomplete.
-- **Card 90 – The World Turned Upside Down**: Unshaded only places Forts/Villages with limited location logic and does not allow Village placement for Royalists in Provinces or enforce base-cap legality; does not allow Fort or Village selection in a Province with capacity.
-- **Card 91 – Indians Help British Outside Colonies**: Reserve provinces derived from `type` field; unshaded uses caps placement; shaded selection/removal logic does not use the fixed reserve list.
-- **Card 92 – Cherokees Supplied by the British**: Does not implement “second Fort or Village in a space where you have one” correctly and does not handle Village/Fort selection rules or base cap checks; shaded no-op must be explicit.
+## REMAINING known issues (not yet fixed)
+
+### Brilliant Stroke / Treaty of Alliance (Cards 105-109)
+- Not implemented as a true interrupt (no pre-action cancel)
+- Does not enforce leader involvement in at least one Limited Command
+- Trump chain is incomplete
+- Eligibility reset ("All Factions to Eligible") not fully implemented
+- Treaty of Alliance preparation check may be incomplete
+
+### Control access patterns (Phase 3)
+- Several cards still use `sp.get("British_Control")` instead of `state.get("control", {}).get(sid)`:
+  - Card 30 (Hessians) unshaded
+  - Card 32 (Rule Britannia) shaded
+- This is a design pattern issue — `board/control.py` sets both `sp["British_Control"]` boolean flags and `state["control"][sid]` values. Needs Phase 3 refactoring.
+
+### Cards using `sp.get("type")` or `sp.get("population")`
+- Card 71 falls back to `sp.get("population")` when map metadata is unavailable in tests
+- Some cards rely on space dict properties that should come from map metadata
+
+### Deterministic bot choices
+Many cards require player/bot selection that is currently hardcoded or uses alphabetical ordering as a deterministic fallback. These work for automated play but need proper bot intelligence or human menu prompts:
+- Card 2 (Common Sense): City selection
+- Card 6 (Benedict Arnold): Colony/space selection
+- Card 24 (Declaration of Independence): Space selection for placement/removal
+- Card 28 (Moore's Creek): Space selection
+- Card 80 (Confusion): Faction and space selection
+
+### Cards with queued vs immediate free ops
+Several cards queue free operations via `queue_free_op` that the reference text may intend as immediate execution. This depends on the game engine's free-op processing pipeline:
+- Card 1 (Waxhaws): shaded March/Battle
+- Card 3 (Illinois Campaign): shaded Partisans (currently immediate via direct call — correct)
+- Card 21 (Sumter): shaded March/Battle
+- Card 48 (God Save the King): unshaded March/Battle
+- Card 52 (French Fleet Wrong Spot): unshaded Battle
+- Card 66 (Don Bernardo): shaded March/Battle
+- Card 67 (De Grasse): shaded Rally/Muster
+
+### Minor issues
+- Card 23 (Francis Marion): Unshaded hardcodes SC→GA move direction, doesn't allow NC; shaded doesn't check NC
+- Card 36 (Naval Battle WI): Unshaded removes French from anywhere, reference specifies "on map or West Indies" (functionally equivalent if West Indies is a map space)
+- Card 50 (D'Estaing): Shaded sources French Regulars only from Available, reference says "from Available or West Indies"
+- Card 70 (French India): "Remove three Regulars" — reference doesn't specify whose; code removes British first then French
+
+---
+
+## Previously documented issues (from earlier audit passes)
+
+The following were documented in earlier passes. Many label compliance issues (string literals) were fixed in Phase 1. The functional issues listed above supersede the earlier notes where they overlap.
