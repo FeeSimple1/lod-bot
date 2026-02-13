@@ -267,17 +267,32 @@ class FrenchBot(BaseBot):
 
     # ----- Muster (F10) ----------------------------------------
     def _muster(self, state: Dict) -> bool:
-        # Destination selection per bullet list
+        """F10: Muster (Max 1) in 1 space with Rebel Control or the West Indies.
+
+        Per flowchart:
+        - If fewer than 4 French Regulars Available AND WI is not Rebel Controlled,
+          Muster in West Indies.
+        - Otherwise, Muster first in a Colony or City with Continentals, then random.
+        """
         west_indies = state["spaces"].get(WEST_INDIES)
+        avail_regs = state["available"].get(C.REGULAR_FRE, 0)
         west_rebel = bool(west_indies and west_indies.get("control") == "REBELLION")
-        if west_rebel or state["available"].get(C.REGULAR_FRE, 0) >= 4:
-            # With Rebel Control somewhere – look for Colony/City with Continentals
+
+        if avail_regs < 4 and not west_rebel:
+            # Muster in West Indies
+            targets = [WEST_INDIES] if west_indies else []
+        else:
+            # Muster first in Colony/City with Continentals, then random
             targets = [
                 sid for sid, sp in state["spaces"].items()
                 if (sp.get(C.REGULAR_PAT, 0) > 0) and sp.get("control") == "REBELLION"
             ]
-        else:
-            targets = [WEST_INDIES] if west_indies else []
+            if not targets:
+                # Fall back to any space with Rebel Control
+                targets = [
+                    sid for sid, sp in state["spaces"].items()
+                    if sp.get("control") == "REBELLION"
+                ]
 
         if not targets:
             return False
@@ -347,7 +362,8 @@ class FrenchBot(BaseBot):
     #  EVENT‑VS‑COMMAND BULLETS  (F2)
     # ===================================================================
     def _faction_event_conditions(self, state: Dict, card: Dict) -> bool:
-        text = card.get("unshaded_event", "")
+        # French play the SHADED event per F2 in the flowchart
+        text = card.get("shaded_event", "")
         support_map = state.get("support", {})
         sup = sum(max(0, lvl) for lvl in support_map.values())
         opp = sum(max(0, -lvl) for lvl in support_map.values())

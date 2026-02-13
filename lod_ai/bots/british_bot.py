@@ -55,6 +55,11 @@ class BritishBot(BaseBot):
     #  MAIN FLOW‑CHART DRIVER  (§8.4 nodes B4 → B13)
     # =======================================================================
     def _follow_flowchart(self, state: Dict) -> None:
+        # --- B3  : Resources > 0? -----------------------------------------
+        if state.get("resources", {}).get(C.BRITISH, 0) <= 0:
+            push_history(state, "BRITISH PASS (no Resources)")
+            return
+
         # --- B4  : GARRISON decision --------------------------------------
         if self._can_garrison(state) and self._garrison(state):
             return
