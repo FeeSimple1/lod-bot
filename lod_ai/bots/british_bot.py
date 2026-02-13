@@ -496,7 +496,7 @@ class BritishBot(BaseBot):
             if len(target_spaces) >= 2:
                 break
             for dst in _adjacent(sid):
-                if dst in target_spaces:
+                if dst not in state.get("spaces", {}) or dst in target_spaces:
                     continue
                 if state.get("control", {}).get(dst) == "REBELLION":
                     target_spaces.append(dst)
@@ -504,7 +504,7 @@ class BritishBot(BaseBot):
         if not target_spaces:
             for sid in origins:
                 for dst in _adjacent(sid):
-                    if dst in target_spaces:
+                    if dst not in state.get("spaces", {}) or dst in target_spaces:
                         continue
                     if self._support_level(state, dst) != C.ACTIVE_SUPPORT and _MAP_DATA[dst].get("population", 0) >= 1:
                         target_spaces.append(dst)
@@ -518,15 +518,15 @@ class BritishBot(BaseBot):
         origins.sort(
             key=lambda n: -(state["spaces"][n].get(C.REGULAR_BRI, 0) + state["spaces"][n].get(C.TORY, 0))
         )
-        move_map: Dict[str, Dict[str, int]] = {}
+        move_plan: List[Dict] = []
         for dst in target_spaces:
             best_origin = next((o for o in origins if dst in _adjacent(o) and can_leave(o)), None)
             if not best_origin:
                 continue
             qty = 2 if state["spaces"][best_origin].get(C.REGULAR_BRI, 0) >= 3 else 1
-            move_map.setdefault(best_origin, {})[dst] = qty
+            move_plan.append({"src": best_origin, "dst": dst, "pieces": {C.REGULAR_BRI: qty}})
 
-        if not move_map:
+        if not move_plan:
             return False
 
         # Execute the March
@@ -534,11 +534,11 @@ class BritishBot(BaseBot):
             state,
             C.BRITISH,
             {},
-            list(move_map.keys()),
-            list({d for m in move_map.values() for d in m}),
-            plan=move_map,
+            list({p["src"] for p in move_plan}),
+            list({p["dst"] for p in move_plan}),
+            plan=move_plan,
             bring_escorts=False,
-            limited=True,
+            limited=False,
         )
 
         # Common Cause check (B13)
