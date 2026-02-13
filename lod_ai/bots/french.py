@@ -77,8 +77,8 @@ def _preparer_la_guerre(state: Dict, post_treaty: bool) -> bool:
         push_history(state, f"Préparer la Guerre: {avail} Regulars to Available")
         moved = True
 
-    if post_treaty and not moved and state["resources"]["FRENCH"] == 0:
-        state["resources"]["FRENCH"] += 2
+    if post_treaty and not moved and state["resources"][C.FRENCH] == 0:
+        state["resources"][C.FRENCH] += 2
         push_history(state, "Préparer la Guerre: +2 Resources (post‑Treaty bonus)")
         moved = True
 
@@ -115,7 +115,7 @@ class FrenchBot(BaseBot):
     def _before_treaty(self, state: Dict) -> bool:
         # F5: Patriot Resources < 1D3 ?
         need_hortalez = (
-            state["resources"]["PATRIOTS"]
+            state["resources"][C.PATRIOTS]
             < state["rng"].randint(1, 3)
         )
 
@@ -196,7 +196,7 @@ class FrenchBot(BaseBot):
         sp = state["spaces"].get(WEST_INDIES)
         if sp and sp.get(C.REGULAR_FRE, 0) and sp.get(C.REGULAR_BRI, 0):
             try:
-                skirmish.execute(state, "FRENCH", {}, WEST_INDIES, option=2)
+                skirmish.execute(state, C.FRENCH, {}, WEST_INDIES, option=2)
                 return True
             except Exception:
                 pass
@@ -207,7 +207,7 @@ class FrenchBot(BaseBot):
                 continue
             if sp.get(C.REGULAR_FRE, 0) and sp.get(C.REGULAR_BRI, 0):
                 try:
-                    skirmish.execute(state, "FRENCH", {}, sid, option=2)
+                    skirmish.execute(state, C.FRENCH, {}, sid, option=2)
                     return True
                 except Exception:
                     continue
@@ -219,7 +219,7 @@ class FrenchBot(BaseBot):
         If none, fallback to Skirmish.
         """
         try:
-            naval_pressure.execute(state, "FRENCH", {})
+            naval_pressure.execute(state, C.FRENCH, {})
             return True
         except Exception:
             # last resort Skirmish
@@ -244,7 +244,7 @@ class FrenchBot(BaseBot):
                 best, best_score = prov, score
         if not best:
             return False
-        fam.execute(state, "FRENCH", {}, best, place_continental=False)
+        fam.execute(state, C.FRENCH, {}, best, place_continental=False)
         return True
 
     def _can_agent_mobilization(self, state: Dict) -> bool:
@@ -257,13 +257,13 @@ class FrenchBot(BaseBot):
 
     # ----- Hortalez (F6 / F11) ---------------------------------
     def _hortelez(self, state: Dict, *, before_treaty: bool) -> None:
-        pay = min(state["resources"]["FRENCH"], random.randint(1, 3))
-        hortelez.execute(state, "FRENCH", {}, pay=pay)
+        pay = min(state["resources"][C.FRENCH], random.randint(1, 3))
+        hortelez.execute(state, C.FRENCH, {}, pay=pay)
         phase = "pre‑Treaty" if before_treaty else "post‑Treaty"
         push_history(state, f"Roderigue Hortalez et Cie ({phase}): Pay {pay}")
 
     def _can_hortelez(self, state: Dict) -> bool:
-        return state["resources"]["FRENCH"] > 0
+        return state["resources"][C.FRENCH] > 0
 
     # ----- Muster (F10) ----------------------------------------
     def _muster(self, state: Dict) -> bool:
@@ -282,7 +282,7 @@ class FrenchBot(BaseBot):
         if not targets:
             return False
         target = random.choice(targets)
-        muster.execute(state, "FRENCH", {}, [target])
+        muster.execute(state, C.FRENCH, {}, [target])
         return True
 
     # ----- March (F14) -----------------------------------------
@@ -303,7 +303,7 @@ class FrenchBot(BaseBot):
         if not candidates:
             return False
         _, src, dst = max(candidates)
-        march.execute(state, "FRENCH", {}, [src], [dst], bring_escorts=False, limited=True)
+        march.execute(state, C.FRENCH, {}, [src], [dst], bring_escorts=False, limited=True)
         return True
 
     # ----- Battle (F16) ----------------------------------------
@@ -325,7 +325,7 @@ class FrenchBot(BaseBot):
         targets.sort(reverse=True)
         # Pre‑Battle SA: Skirmish loop (chart arrow “First execute a SA”)
         self._skirmish_loop(state)
-        battle.execute(state, "FRENCH", {}, [sid for _, sid in targets])
+        battle.execute(state, C.FRENCH, {}, [sid for _, sid in targets])
         return True
 
     # ===================================================================

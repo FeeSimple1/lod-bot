@@ -100,7 +100,7 @@ class BritishBot(BaseBot):
         # 1) West Indies check
         if state["spaces"].get(WEST_INDIES, {}).get(C.REGULAR_BRI, 0):
             try:
-                skirmish.execute(state, "BRITISH", {}, WEST_INDIES, option=1)
+                skirmish.execute(state, C.BRITISH, {}, WEST_INDIES, option=1)
                 return True
             except Exception:
                 pass
@@ -128,7 +128,7 @@ class BritishBot(BaseBot):
         targets.sort()
         for _, sid in targets:
             try:
-                skirmish.execute(state, "BRITISH", {}, sid, option=1)
+                skirmish.execute(state, C.BRITISH, {}, sid, option=1)
                 return True
             except Exception:
                 continue
@@ -144,7 +144,7 @@ class BritishBot(BaseBot):
         Falls back to Skirmish if nothing happens.
         """
         try:
-            naval_pressure.execute(state, "BRITISH", {})
+            naval_pressure.execute(state, C.BRITISH, {})
             return True
         except Exception:
             return False  # caller may chain
@@ -167,7 +167,7 @@ class BritishBot(BaseBot):
         move_map: Dict[str, Dict[str, int]] = {}
         moved_cubes = 0
         for sid, sp in state["spaces"].items():
-            if sid == target or self._control(state, sid) != "BRITISH":
+            if sid == target or self._control(state, sid) != C.BRITISH:
                 continue
             brit_units = (
                 sp.get(C.REGULAR_BRI, 0)
@@ -200,7 +200,7 @@ class BritishBot(BaseBot):
 
         garrison.execute(
             state,
-            "BRITISH",
+            C.BRITISH,
             {},
             move_map,
             displace_city=displace_city,
@@ -214,7 +214,7 @@ class BritishBot(BaseBot):
         candidates: List[Tuple[int, str]] = []
         for name in CITIES:
             sp = state["spaces"].get(name, {})
-            if self._control(state, name) == "BRITISH" or sp.get(C.FORT_PAT, 0):
+            if self._control(state, name) == C.BRITISH or sp.get(C.FORT_PAT, 0):
                 continue
             rebels = (
                 sp.get(C.REGULAR_PAT, 0)
@@ -351,7 +351,7 @@ class BritishBot(BaseBot):
         # ----- EXECUTE MUSTER ---------------------------------------------
         did_something = muster.execute(
             state,
-            "BRITISH",
+            C.BRITISH,
             {},
             list(set(regular_destinations + list(tory_plan.keys()))),
             regular_plan={"space": regular_destinations[0], "n": min(4, avail_regs)}
@@ -389,7 +389,7 @@ class BritishBot(BaseBot):
         # Helper: ensure we lose no British Control in origin
         def can_leave(sid: str) -> bool:
             sp = state["spaces"][sid]
-            if self._control(state, sid) != "BRITISH":
+            if self._control(state, sid) != C.BRITISH:
                 return False
             cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
             rebel = (
@@ -443,7 +443,7 @@ class BritishBot(BaseBot):
         # Execute the March
         march.execute(
             state,
-            "BRITISH",
+            C.BRITISH,
             {},
             list(move_map.keys()),
             list({d for m in move_map.values() for d in m}),
@@ -492,14 +492,14 @@ class BritishBot(BaseBot):
         if not used_cc:
             self._skirmish_then_naval(state)
 
-        battle.execute(state, "BRITISH", {}, chosen)
+        battle.execute(state, C.BRITISH, {}, chosen)
         return True
 
     # -------------------------------------------------------------------
     def _try_common_cause(self, state: Dict) -> bool:
         """Return True if Common Cause executed successfully."""
         try:
-            common_cause.execute(state, "BRITISH", {})
+            common_cause.execute(state, C.BRITISH, {})
             return True
         except Exception:
             return False
