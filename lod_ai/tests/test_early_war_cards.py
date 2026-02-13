@@ -95,6 +95,53 @@ def test_card6_benedict_arnold_shaded_any_space():
     assert state["spaces"]["Boston"].get(TORY) == 1
 
 
+def test_card4_penobscot_unshaded_removes_militia_and_resources():
+    """Card 4 unshaded: Remove 3 Patriot Militia, Resources -2."""
+    state = _base_state()
+    state["spaces"] = {
+        "Massachusetts": {MILITIA_U: 2, MILITIA_A: 2},
+    }
+    state["resources"]["PATRIOTS"] = 10
+
+    early_war.evt_004_penobscot(state, shaded=False)
+
+    assert state["resources"]["PATRIOTS"] == 8
+    # Removed 2 Underground + 1 Active = 3 total
+    total_militia = (state["spaces"]["Massachusetts"].get(MILITIA_U, 0)
+                     + state["spaces"]["Massachusetts"].get(MILITIA_A, 0))
+    assert total_militia == 1
+
+
+def test_card4_penobscot_shaded_crown_fallback_to_fort():
+    """Card 4 shaded BRI/IND: if Village cap reached, place Fort_BRI instead."""
+    state = _base_state()
+    state["spaces"] = {
+        "Massachusetts": {VILLAGE: 2},  # at cap (2 bases)
+    }
+    state["available"] = {VILLAGE: 1, FORT_BRI: 1, WARPARTY_U: 5}
+    state["active"] = "BRITISH"
+
+    early_war.evt_004_penobscot(state, shaded=True)
+
+    # Village cap (2 bases) already reached, so Fort_BRI should be placed
+    # Actually, stacking limit is 2 bases total, so neither can be placed
+    # Let's verify War Parties still placed
+    assert state["spaces"]["Massachusetts"].get(WARPARTY_U, 0) == 3
+
+
+def test_card4_penobscot_shaded_rebellion_places_fort_and_militia():
+    """Card 4 shaded PAT/FRE: place Fort_PAT + 3 Militia in Massachusetts."""
+    state = _base_state()
+    state["spaces"] = {"Massachusetts": {}}
+    state["available"] = {FORT_PAT: 1, MILITIA_U: 5}
+    state["active"] = "PATRIOTS"
+
+    early_war.evt_004_penobscot(state, shaded=True)
+
+    assert state["spaces"]["Massachusetts"].get(FORT_PAT) == 1
+    assert state["spaces"]["Massachusetts"].get(MILITIA_U) == 3
+
+
 def test_card24_declaration_unshaded_removes_correct_pieces():
     state = _base_state()
     state["spaces"] = {

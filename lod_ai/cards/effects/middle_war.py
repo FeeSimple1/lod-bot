@@ -721,13 +721,14 @@ def evt_047_tories_tested(state, shaded=False):
         push_history(state, f"Card 47 unshaded: placed 3 Tories in {target}")
 
 
-# 50  ADMIRAL D’ESTAING — FRENCH FLEET ARRIVES
+# 50  ADMIRAL D'ESTAING — FRENCH FLEET ARRIVES
 @register(50)
 def evt_050_destaing_arrives(state, shaded=False):
     """
     Unshaded – French Ineligible through next card; remove 2 French Regulars
                from West Indies *or* map to Available.
-    Shaded   – Place 2 Continentals & 2 French Regulars in 1 Colony.
+    Shaded   – Place 2 Continentals & 2 French Regulars (from Available or
+               West Indies) in any one Colony.
     """
     if shaded:
         target = state.get("card50_colony")
@@ -738,7 +739,10 @@ def evt_050_destaing_arrives(state, shaded=False):
                     break
         if target:
             place_piece(state, REGULAR_PAT, target, 2)
-            place_piece(state, REGULAR_FRE, target, 2)
+            # French Regulars come from Available or West Indies per reference
+            placed_fre = place_piece(state, REGULAR_FRE, target, 2)
+            if placed_fre < 2:
+                move_piece(state, REGULAR_FRE, WEST_INDIES_ID, target, 2 - placed_fre)
             push_history(state, f"Card 50 shaded: placed Patriot/French in {target}")
         return
 

@@ -80,9 +80,9 @@ def evt_002_common_sense(state, shaded=False):
 @register(4)                       # Penobscot Expedition
 def evt_004_penobscot(state, shaded=False):
     """
-    Unshaded – Expedition fails: Patriot Resources –2; remove 3 Patriot Militia.
-    Shaded   – Expedition succeeds: place 1 Patriot Fort and 3 Patriot Militia
-               in Massachusetts (respecting Fort cap).
+    Unshaded – Expedition fails: Patriot Resources -2; remove 3 Patriot Militia.
+    Shaded   – Expedition succeeds: place 1 Fort or Village and 3 Militia or
+               War Parties in Massachusetts.
     """
     if shaded:
         executor = str(state.get("active", "")).upper()
@@ -91,7 +91,10 @@ def evt_004_penobscot(state, shaded=False):
             place_with_caps(state, FORT_PAT, target)
             place_piece(state, MILITIA_U, target, 3)
         elif executor in (BRITISH, INDIANS):
-            place_with_caps(state, VILLAGE, target)
+            # "Fort or Village": try Village first, fall back to Fort_BRI
+            placed = place_with_caps(state, VILLAGE, target)
+            if placed == 0:
+                place_with_caps(state, FORT_BRI, target)
             place_piece(state, WARPARTY_U, target, 3)
         else:
             push_history(state, "Penobscot shaded: no executing faction; no pieces placed")

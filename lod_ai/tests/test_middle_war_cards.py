@@ -1,11 +1,13 @@
 from lod_ai.cards.effects import middle_war
 from lod_ai.rules_consts import (
     REGULAR_BRI,
+    REGULAR_FRE,
     REGULAR_PAT,
     TORY,
     MILITIA_A,
     MILITIA_U,
     FORT_PAT,
+    WEST_INDIES_ID,
     PATRIOTS,
     BRITISH,
     FRENCH,
@@ -98,3 +100,51 @@ def test_card71_shaded_french_resources():
     state = _base_state()
     middle_war.evt_071_treaty_amity(state, shaded=True)
     assert state["resources"][FRENCH] == 5
+
+
+def test_card50_shaded_draws_french_regulars_from_west_indies():
+    """Card 50 shaded: French Regulars come from Available or West Indies."""
+    state = _base_state()
+    state["spaces"] = {
+        "Georgia": {"type": "Colony"},
+        WEST_INDIES_ID: {REGULAR_FRE: 2},
+    }
+    # No French Regulars in Available — must draw from West Indies
+    state["available"] = {REGULAR_PAT: 5, REGULAR_FRE: 0}
+    state["card50_colony"] = "Georgia"
+
+    middle_war.evt_050_destaing_arrives(state, shaded=True)
+
+    assert state["spaces"]["Georgia"].get(REGULAR_PAT) == 2
+    assert state["spaces"]["Georgia"].get(REGULAR_FRE) == 2
+    assert state["spaces"][WEST_INDIES_ID].get(REGULAR_FRE, 0) == 0
+
+
+def test_card50_shaded_prefers_available_before_west_indies():
+    """Card 50 shaded: draw from Available first, then West Indies."""
+    state = _base_state()
+    state["spaces"] = {
+        "Georgia": {"type": "Colony"},
+        WEST_INDIES_ID: {REGULAR_FRE: 3},
+    }
+    state["available"] = {REGULAR_PAT: 5, REGULAR_FRE: 1}
+    state["card50_colony"] = "Georgia"
+
+    middle_war.evt_050_destaing_arrives(state, shaded=True)
+
+    assert state["spaces"]["Georgia"].get(REGULAR_PAT) == 2
+    assert state["spaces"]["Georgia"].get(REGULAR_FRE) == 2
+    # 1 came from Available, 1 from West Indies
+    assert state["spaces"][WEST_INDIES_ID].get(REGULAR_FRE) == 2
+
+
+def test_card50_unshaded_ineligible_through_next():
+    """Card 50 unshaded: French ineligible through next card, remove 2 FRE regs."""
+    state = _base_state()
+    state["spaces"] = {WEST_INDIES_ID: {REGULAR_FRE: 3}}
+
+    middle_war.evt_050_destaing_arrives(state, shaded=False)
+
+    assert state["spaces"][WEST_INDIES_ID].get(REGULAR_FRE) == 1
+    assert state["available"].get(REGULAR_FRE) == 2
+    assert FRENCH in state["ineligible_through_next"]
