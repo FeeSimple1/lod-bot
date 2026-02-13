@@ -40,6 +40,7 @@ from lod_ai.rules_consts import (
     REGULAR_BRI, REGULAR_PAT, REGULAR_FRE,
     TORY, FORT_PAT,
     MILITIA_A, MILITIA_U,
+    BRITISH,
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
@@ -120,7 +121,7 @@ def execute(
     number of Regulars.  Provide 0 or omit an entry to move none.
     """
 
-    if faction.upper() != "BRITISH":
+    if faction.upper() != BRITISH:
         raise ValueError("Only BRITISH may execute GARRISON")
 
     # FNI gate -------------------------------------------------------
@@ -128,7 +129,7 @@ def execute(
         raise ValueError("GARRISON unavailable at FNI level 3")
 
     # Cost -----------------------------------------------------------
-    spend(state, "BRITISH", 2)
+    spend(state, BRITISH, 2)
 
     # Leader hooks (none today, keep pattern) -----------------------
     ctx = apply_leader_modifiers(state, faction, "pre_garrison", ctx)
@@ -189,7 +190,7 @@ def execute(
         if sp_city.get(FORT_PAT, 0):
             raise ValueError("Cannot displace from a City with a Patriot Fort")
         # British Control check (1.7)
-        if state.get("control", {}).get(displace_city) != "BRITISH":
+        if state.get("control", {}).get(displace_city) != BRITISH:
             raise ValueError("Displace city must be under British Control")
         _displace_rebellion(displace_city, displace_target, state)
 

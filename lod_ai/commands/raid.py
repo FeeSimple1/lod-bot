@@ -30,6 +30,8 @@ from lod_ai.rules_consts import (
     RAID, MAX_RAID,
     # support enums
     ACTIVE_OPPOSITION, PASSIVE_OPPOSITION, NEUTRAL,
+    # factions
+    INDIANS,
 )
 from lod_ai.leaders import leader_location
 from lod_ai.util.history   import push_history
@@ -79,7 +81,7 @@ def execute(
         Optional movements of ONE WP each.  Each *dst* must be in *selected*,
         each *src* adjacent to its *dst*, and max 1 move per *dst*.
     """
-    if faction != "INDIANS":
+    if faction != INDIANS:
         raise ValueError("Only INDIANS may execute Raid.")
 
     if not (1 <= len(selected) <= 3):
@@ -131,7 +133,7 @@ def execute(
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).update(selected)
     cost = len(selected)
-    spend(state, "INDIANS", cost)
+    spend(state, INDIANS, cost)
 
     # ═══ execute ═══════════════════════════════════════════════════════════
     push_history(state, f"INDIANS RAID {selected}")

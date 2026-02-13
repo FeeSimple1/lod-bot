@@ -50,7 +50,7 @@ Example
 ~~~~~~~
 ```python
 rally.execute(
-    state, "PATRIOTS", {},
+    state, PATRIOTS, {},
     ["Boston", "Lexington"],
     build_fort={"Lexington"},
     bulk_place={"Boston": 3},
@@ -64,7 +64,7 @@ from typing import Dict, List, Set, Tuple
 from lod_ai.rules_consts import (
     ACTIVE_SUPPORT, PASSIVE_SUPPORT, NEUTRAL, PASSIVE_OPPOSITION,
     REGULAR_PAT, MILITIA_A, MILITIA_U, FORT_PAT, FORT_BRI, VILLAGE,
-    WEST_INDIES_ID,
+    WEST_INDIES_ID, PATRIOTS,
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
@@ -170,7 +170,7 @@ def _mid_rally_persuasion(state: Dict) -> None:
 
     candidates.sort()
     spaces = [sid for *_, sid in candidates[:3]]
-    persuasion.execute(state, "PATRIOTS", {}, spaces=spaces)
+    persuasion.execute(state, PATRIOTS, {}, spaces=spaces)
 
 
 # ---------------------------------------------------------------------------
@@ -191,7 +191,7 @@ def execute(
     limited: bool = False,
 ) -> Dict:
     """Perform the Patriot Rally command as directed by the caller."""
-    if faction != "PATRIOTS":
+    if faction != PATRIOTS:
         raise ValueError("Only PATRIOTS may Rally.")
 
     # Default buckets
@@ -216,8 +216,8 @@ def execute(
     state.setdefault("_turn_affected_spaces", set()).update(selected)
     # --- Cost payment -------------------------------------------------
     cost = len(selected)
-    spend(state, "PATRIOTS", cost)
-    if state["resources"].get("PATRIOTS", 0) == 0:
+    spend(state, PATRIOTS, cost)
+    if state["resources"].get(PATRIOTS, 0) == 0:
         _mid_rally_persuasion(state)
 
     push_history(state, f"PATRIOTS RALLY selected={selected}")

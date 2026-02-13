@@ -45,6 +45,8 @@ from lod_ai.rules_consts import (
     ACTIVE_SUPPORT, PASSIVE_SUPPORT, NEUTRAL,
     PASSIVE_OPPOSITION, ACTIVE_OPPOSITION,
     WEST_INDIES_ID,
+    # Factions
+    BRITISH, PATRIOTS, FRENCH,
 )
 from lod_ai.leaders        import apply_leader_modifiers, leader_location
 from lod_ai.util.piece_kinds import is_cube, loss_value
@@ -71,9 +73,9 @@ def execute(
     free: bool = False,          # ← see fix #2 below
 ) -> Dict:
     faction = faction.upper()
-    if faction not in ("BRITISH", "PATRIOTS", "FRENCH"):
+    if faction not in (BRITISH, PATRIOTS, FRENCH):
         raise ValueError("Only BRITISH, PATRIOTS or FRENCH may initiate Battle")
-    if faction == "FRENCH" and not state.get("toa_played"):
+    if faction == FRENCH and not state.get("toa_played"):
         raise ValueError("French cannot Battle before Treaty of Alliance")
     if not spaces:
         raise ValueError("Need ≥ 1 battle space")
@@ -84,14 +86,14 @@ def execute(
     if not free:
         spend(state, faction, len(spaces))
 
-    if faction == "PATRIOTS":
+    if faction == PATRIOTS:
         fee = sum(state["spaces"][s].get(REGULAR_FRE, 0) for s in spaces)
         if fee:
-            spend(state, "FRENCH", fee)
-    elif faction == "FRENCH":
+            spend(state, FRENCH, fee)
+    elif faction == FRENCH:
         fee = sum(state["spaces"][s].get(REGULAR_PAT, 0) for s in spaces)
         if fee:
-            spend(state, "PATRIOTS", fee)
+            spend(state, PATRIOTS, fee)
 
     ctx = apply_leader_modifiers(state, faction, "pre_battle", ctx)
     push_history(state, f"{faction} BATTLE in {', '.join(spaces)}")
@@ -131,7 +133,7 @@ def _resolve_space(
 ) -> None:
     sp = state["spaces"][sid]
 
-    att_side = "ROYALIST" if attacker_faction == "BRITISH" else "REBELLION"
+    att_side = "ROYALIST" if attacker_faction == BRITISH else "REBELLION"
     def_side = "REBELLION" if att_side == "ROYALIST" else "ROYALIST"
 
     cc_wp = ctx.get("common_cause", {}).get(sid, 0)
@@ -160,9 +162,9 @@ def _resolve_space(
         roll_total = sum(_roll_d3(state) for _ in range(dice))
         mods = 0
         if is_defender:                                 # §3.6.5
-            if attacker_faction == "BRITISH" and has_blockade(state, sid):
+            if attacker_faction == BRITISH and has_blockade(state, sid):
                 mods -= 1
-            if attacker_faction == "FRENCH" and ctx.get("attacker_defender_loss_bonus", 0):
+            if attacker_faction == FRENCH and ctx.get("attacker_defender_loss_bonus", 0):
                 mods += ctx["attacker_defender_loss_bonus"]
             if sp.get("leader"):                        # Attacking leader handled in ctx
                 mods += 1
