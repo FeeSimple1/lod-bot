@@ -717,6 +717,8 @@ class Engine:
             if not bs.apply_treaty_of_alliance(self.state):
                 bs.mark_bs_played(self.state, current["key"], False)
                 return False
+            # Drain free ops queued by ToA (e.g. free Muster) immediately
+            self._drain_free_ops(self.state)
             bs.mark_bs_played(self.state, current["key"], True)
             push_history(self.state, "Treaty of Alliance played")
         else:
@@ -870,6 +872,12 @@ class Engine:
             except Exception as exc:  # noqa: BLE001
                 self._award_pass(faction)
                 return {"action": "pass", "used_special": False, "reason": f"bot error: {exc}"}
+
+        # Drain any free ops queued by a card event handler.
+        # The engine's handle_event() drains internally, but the bot path
+        # (bot.take_turn → _execute_event) bypasses handle_event, so free
+        # ops queued there would otherwise remain stuck in the queue.
+        self._drain_free_ops(self.state)
 
         if result is None:
             result = {"action": "command", "used_special": bool(self.state.get("_turn_used_special"))}

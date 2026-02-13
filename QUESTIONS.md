@@ -52,3 +52,18 @@ Implemented:
 ## Q6: French bot F5 — RESOLVED
 
 **Decision:** Agent Mobilization first, Hortalez as fallback. The current code already implements this correctly.
+
+---
+
+## Q7: BS bot command priorities in _execute_bot_brilliant_stroke — OPEN
+
+**Context:** `engine.py` `_execute_bot_brilliant_stroke()` hardcodes command priorities (e.g., British: battle→muster→march, Patriots: battle→rally→march) instead of consulting each faction's flowchart.
+
+**What the reference says:** §8.3.7 states "follow the executing Faction's flowchart to select the first Limited Command that both matches the flowchart priorities and can involve that Faction's Leader."
+
+**What's ambiguous:** Whether the hardcoded order is an acceptable approximation or must be replaced with actual flowchart consultation. The flowcharts have conditional branches that the hardcoded order doesn't capture.
+
+**Options:**
+1. Replace hardcoded priorities with calls to each faction's bot `_follow_flowchart()` method
+2. Keep hardcoded order but verify it matches each flowchart's priority ordering
+3. Implement a dedicated `get_bs_limited_command()` method on each bot subclass

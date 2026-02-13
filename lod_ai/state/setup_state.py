@@ -414,6 +414,15 @@ def build_state(
         },
     }
 
+    # British Release Date Schedule (§6.5.3): convert year-keyed dict
+    # to an ordered list of tranches so _british_release can pop one per WQ.
+    raw_release = scen.get("brit_release", {})
+    if isinstance(raw_release, dict) and raw_release:
+        ordered = sorted(raw_release.items(), key=lambda kv: kv[0])
+        state["brit_release_schedule"] = [tranche for _key, tranche in ordered]
+    else:
+        state["brit_release_schedule"] = []
+
     _normalize_support(state)
     _apply_unavailable_block(state, scen)
     _reconcile_on_map(state)

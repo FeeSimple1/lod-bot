@@ -197,3 +197,75 @@ def test_reset_phase_keeps_existing_upcoming(monkeypatch):
 
     assert state["upcoming_card"]["title"] == "Keep"
     assert state["deck"] == [{"title": "Next"}]
+
+
+# ──────────────────────────────────────────────────────────────
+#  British Release Date (§6.5.3)
+# ──────────────────────────────────────────────────────────────
+
+def test_british_release_moves_regulars_and_tories():
+    """§6.5.3: Pop one tranche, move both Regulars and Tories from Unavailable."""
+    state = basic_state()
+    state["unavailable"] = {C.REGULAR_BRI: 12, C.TORY: 12}
+    state["available"] = {}
+    state["brit_release_schedule"] = [
+        {C.REGULAR_BRI: 6, C.TORY: 6},
+        {C.REGULAR_BRI: 6, C.TORY: 6},
+    ]
+
+    year_end._british_release(state)
+
+    # First tranche should be consumed
+    assert len(state["brit_release_schedule"]) == 1
+    assert state["available"].get(C.REGULAR_BRI) == 6
+    assert state["available"].get(C.TORY) == 6
+    assert state["unavailable"].get(C.REGULAR_BRI) == 6
+    assert state["unavailable"].get(C.TORY) == 6
+
+
+def test_british_release_caps_at_unavailable():
+    """§6.5.3: Move only those that are in Unavailable."""
+    state = basic_state()
+    state["unavailable"] = {C.REGULAR_BRI: 3}  # only 3, not 6
+    state["available"] = {}
+    state["brit_release_schedule"] = [
+        {C.REGULAR_BRI: 6, C.TORY: 6},
+    ]
+
+    year_end._british_release(state)
+
+    assert state["available"].get(C.REGULAR_BRI) == 3
+    assert state["available"].get(C.TORY, 0) == 0  # no Tories in Unavailable
+    assert state["brit_release_schedule"] == []
+
+
+def test_british_release_noop_when_empty_schedule():
+    """No schedule → no action, no crash."""
+    state = basic_state()
+    state["brit_release_schedule"] = []
+    state["unavailable"] = {C.REGULAR_BRI: 6}
+
+    year_end._british_release(state)
+
+    # Nothing should have moved
+    assert state["unavailable"].get(C.REGULAR_BRI) == 6
+
+
+def test_british_release_two_rounds():
+    """Two consecutive calls consume both tranches in order."""
+    state = basic_state()
+    state["unavailable"] = {C.REGULAR_BRI: 12, C.TORY: 12}
+    state["available"] = {}
+    state["brit_release_schedule"] = [
+        {C.REGULAR_BRI: 6, C.TORY: 6},
+        {C.REGULAR_BRI: 6, C.TORY: 6},
+    ]
+
+    year_end._british_release(state)
+    year_end._british_release(state)
+
+    assert state["brit_release_schedule"] == []
+    assert state["available"].get(C.REGULAR_BRI) == 12
+    assert state["available"].get(C.TORY) == 12
+    assert state["unavailable"].get(C.REGULAR_BRI, 0) == 0
+    assert state["unavailable"].get(C.TORY, 0) == 0

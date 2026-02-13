@@ -58,6 +58,10 @@
     "Squadron": 1
   },
 
+  "brit_release": {
+    "after_1776": { "British_Regular": 6, "British_Tory": 6 }
+  },
+
   "current_event": null,
   "upcoming_event": null,
   "deck": [],

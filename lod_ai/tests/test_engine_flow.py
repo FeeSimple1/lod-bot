@@ -90,6 +90,37 @@ def test_dual_use_event_side_choice(monkeypatch):
     assert calls == [False, True]
 
 
+def test_bot_event_drains_free_ops(monkeypatch):
+    """Free ops queued by a card handler should be drained after a bot turn."""
+    from lod_ai.util.free_ops import queue_free_op
+
+    executed_ops = []
+
+    def fake_handler(state, shaded=False):
+        queue_free_op(state, C.PATRIOTS, "march", "Boston")
+
+    monkeypatch.setitem(CARD_HANDLERS, 8888, fake_handler)
+
+    engine = Engine()
+    engine.state["spaces"].setdefault("Boston", {})
+
+    # Monkeypatch the dispatcher to record free op execution
+    original_execute = engine.dispatcher.execute
+
+    def tracking_execute(*args, **kwargs):
+        executed_ops.append((args, kwargs))
+
+    monkeypatch.setattr(engine.dispatcher, "execute", tracking_execute)
+
+    card = {"id": 8888, "title": "Free Op Test", "order": [C.PATRIOTS],
+            "winter_quarters": False, "unshaded_event": "text"}
+    engine.handle_event(C.PATRIOTS, card)
+
+    # After handle_event, free ops should have been drained
+    assert engine.state.get("free_ops", []) == []
+    assert len(executed_ops) == 1
+
+
 def test_march_move_plan_moves_only_selected(monkeypatch):
     import random
 

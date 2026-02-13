@@ -229,19 +229,89 @@ def apply_treaty_of_alliance(state) -> bool:
     return True
 
 # ------------------------------------------------ 105-108 ------------------ #
-for _cid, _fac in BS_CARD_BY_FACTION.items():
-    @register(_cid)                       # closure captures _cid/_fac
-    def _make_bs(state, shaded=False, _f=_fac):
-        """
-        Record a Brilliant-Stroke declaration for *_f*.
-        """
-        state.setdefault("bs_declarations", []).append(_f)
+# Each BS card event:
+#   1. Records a declaration (for the engine's interrupt/trump system)
+#   2. Resets all factions to Eligible (per card text)
+#   3. Logs the play
+# NOTE: The engine marks the card as played during trump resolution
+# (not here) because _bs_is_legal checks bs_available.
+# Actual execution of 2 LimComs + 1 SA is handled by the engine
+# (bot: _execute_bot_brilliant_stroke; human: _execute_human_bs_plan).
+
+def _bs_event(state, faction):
+    """Common BS event handler for cards 105-108.
+
+    Records a declaration for the engine's interrupt/trump system to pick up.
+    The engine handles marking the card as played and executing the 2 LimCom +
+    1 SA per S8.3.7.  Eligibility is reset here per the card text; the engine
+    also resets it independently so the order does not matter.
+    """
+    if not bs_available(state, faction):
+        push_history(state, f"{faction} Brilliant Stroke already played")
+        return
+    state.setdefault("bs_declarations", []).append(faction)
+    # All Factions to Eligible (per card text)
+    state["eligible"] = {
+        C.BRITISH: True, C.PATRIOTS: True,
+        C.FRENCH: True, C.INDIANS: True,
+    }
+    push_history(state, f"{faction} plays Brilliant Stroke")
+
+
+@register(105)
+def evt_105_bs_patriots(state, shaded=False):
+    """Brilliant Stroke! (Patriots) -- card #105.
+    Execute two free Limited Commands and one Special Activity.
+    Leader must be involved in at least one LimCom.
+    All Factions to Eligible."""
+    _bs_event(state, C.PATRIOTS)
+
+
+@register(106)
+def evt_106_bs_british(state, shaded=False):
+    """Brilliant Stroke! (British) -- card #106.
+    Execute two free Limited Commands and one Special Activity.
+    Leader must be involved in at least one LimCom.
+    Note: Reward Loyalty is NOT free.
+    British may Trump Patriot Brilliant Stroke.
+    All Factions to Eligible."""
+    _bs_event(state, C.BRITISH)
+
+
+@register(107)
+def evt_107_bs_french(state, shaded=False):
+    """Brilliant Stroke! (French) -- card #107.
+    Execute two free Limited Commands and one Special Activity.
+    Leader must be involved in at least one LimCom.
+    French may Trump Patriot or British Brilliant Stroke.
+    All Factions to Eligible."""
+    _bs_event(state, C.FRENCH)
+
+
+@register(108)
+def evt_108_bs_indians(state, shaded=False):
+    """Brilliant Stroke! (Indians) -- card #108.
+    Execute two free Limited Commands and one Special Activity.
+    Leader must be involved in at least one LimCom.
+    Indians may Trump Patriot, British or French Brilliant Stroke.
+    All Factions to Eligible."""
+    _bs_event(state, C.INDIANS)
+
 
 # ------------------------------------------------ 109  Treaty ------------- #
 @register(109)
 def evt_109_treaty_of_alliance(state, shaded=False):
-    """
-    Treaty of Alliance – special Brilliant Stroke (card #109)
-    """
+    """Treaty of Alliance -- special Brilliant Stroke (card #109).
+    If French Preparations > 15, French enter the war:
+    - French free Muster and place Rochambeau in West Indies
+    - Raise FNI one level
+    - Place 3 French and 3 British Regulars in West Indies
+    - May Trump any Brilliant Stroke
+    - All Factions to Eligible."""
     if apply_treaty_of_alliance(state):
         state.setdefault("bs_declarations", []).append(TOA_KEY)
+        state["eligible"] = {
+            C.BRITISH: True, C.PATRIOTS: True,
+            C.FRENCH: True, C.INDIANS: True,
+        }
+        push_history(state, "Treaty of Alliance played")
