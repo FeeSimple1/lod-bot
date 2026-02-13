@@ -167,12 +167,13 @@ def evt_013_origin_misfortunes(state, shaded=False):
 @register(15)
 def evt_015_morgans_rifles(state, shaded=False):
     """
-    Unshaded – Shift Virginia 2 → Active Support; place 2 Tories there.
-    Shaded   – Patriots free March, free Battle, then Partisans in any 1 Colony.
+    Unshaded – Shift Virginia two levels toward Active Support. Place two Tories there.
+    Shaded   – Patriots free March to any one Colony, then free Battle, then Partisans there.
     """
-    target = "Virginia"
     if shaded:
-        colony = "Virginia"  # deterministic for now; keep all three in same space
+        colony = state.get("card15_colony", "Virginia")
+        if colony not in state.get("spaces", {}):
+            colony = "Virginia"
         queue_free_op(state, PATRIOTS, "march",    colony)
         queue_free_op(state, PATRIOTS, "battle",   colony)
         queue_free_op(state, PATRIOTS, "partisans", colony)
@@ -392,7 +393,14 @@ def evt_033_burning_falmouth(state, shaded=False):
     from lod_ai.util.free_ops import queue_free_op
 
     if shaded:
-        for prov in ("Boston", "Connecticut_Rhode_Island"):  # both adjacent to Massachusetts
+        # "Free Rally in two spaces adjacent to Massachusetts."
+        from lod_ai.map import adjacency as map_adj
+        meta = map_adj.space_meta("Massachusetts") or {}
+        adj_spaces = []
+        for token in meta.get("adj", []):
+            adj_spaces.extend(token.split("|"))
+        adj_valid = [sid for sid in adj_spaces if sid in state.get("spaces", {})]
+        for prov in adj_valid[:2]:
             queue_free_op(state, PATRIOTS, "rally", prov)
         add_resource(state, PATRIOTS, +3)
 
@@ -421,11 +429,16 @@ def evt_035_tryon_plot(state, shaded=False):
     Shaded   – Plot foiled:
                • Remove all Tories in New York or in one adjacent space.
     """
-    target_space = "New_York"  # deterministic choice
+    target_space = state.get("card35_target", "New_York")
+    if target_space not in ("New_York", "New_York_City"):
+        target_space = "New_York"
 
     if shaded:
-        # Remove all Tories in New York (adjacent space variant omitted deterministically)
-        remove_piece(state, TORY, target_space, 999, to="available")
+        # "Remove all Tories in New York or in one adjacent space."
+        shaded_target = state.get("card35_shaded_target", target_space)
+        if shaded_target not in state.get("spaces", {}):
+            shaded_target = target_space
+        remove_piece(state, TORY, shaded_target, 999, to="available")
     else:
         # Remove two Patriot pieces in the target, then Activate all Militia there
         removed = 0
@@ -711,7 +724,7 @@ def evt_075_speech_six_nations(state, shaded=False):
 # 82  FRUSTRATED SHAWNEE WARRIORS ATTACK
 @register(82)
 def evt_082_shawnee(state, shaded=False):
-    unshaded_provs = ("Virginia", "Georgia", "New_York", "South_Carolina")
+    unshaded_provs = ("Virginia", "Georgia", "North_Carolina", "South_Carolina")
     shaded_provs = ("Virginia", "Georgia", "North_Carolina", "South_Carolina")
 
     if shaded:
