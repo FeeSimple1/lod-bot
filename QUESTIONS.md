@@ -4,38 +4,31 @@ These items were identified during the compliance audit. The Reference Documents
 
 ---
 
-## Q1: Control access pattern — `sp.get("British_Control")` vs `state["control"][sid]`
+## Q1: Control access pattern — RESOLVED
 
-**Context:** Several card handlers (e.g., Cards 30, 32) and bot modules access control state via `sp.get("British_Control")`, a boolean flag set directly on space dicts by `board/control.py`. The `board/control.py` module *also* maintains `state["control"][sid]` with values like `"BRITISH"` or `"REBELLION"`.
-
-**Question:** Should the codebase standardize on one access pattern? If so, which one? Changing `sp["British_Control"]` would require updating all tests that set up this flag directly.
-
-**Options:**
-1. Keep both (current state) — space-level flag for backward compatibility
-2. Remove `sp["British_Control"]` and only use `state["control"][sid]`
-3. Keep `sp["British_Control"]` as authoritative and derive `state["control"]` from it
+**Decision:** Standardize on `state["control"][sid]`. All `sp.get("British_Control")`, `sp.get("Patriot_Control")`, and `sp.get("Rebellion_Control")` removed. `board/control.py` no longer sets per-space legacy flags.
 
 ---
 
-## Q2: Card 70 (British Gain From French in India) — whose Regulars?
+## Q2: Card 70 (British Gain From French in India) — RESOLVED
 
-**Context:** Reference says "Remove three Regulars from map or West Indies to Available." It does not specify British or French Regulars.
-
-**Current implementation:** Removes British Regulars first, then French if insufficient.
-
-**Question:** Should this remove British only, French only, a mix, or the executing faction's Regulars? The card order is FIPB, suggesting it's primarily a French/Indian card, but "Regulars" is ambiguous here.
+**Decision:** Bot-specific removal per each faction's reference document:
+- British: Remove French Regulars from WI, then spaces with British pieces.
+- French: Remove British Regulars from spaces with Rebels.
+- Indian: Remove French Regulars from Village spaces first.
+- Patriot: Remove British Regulars from spaces with Patriot pieces.
 
 ---
 
-## Q3: Queued vs immediate free ops in card events
+## Q3: Queued vs immediate free ops — RESOLVED
 
-**Context:** Many card effects queue free operations (March, Battle, Rally, etc.) via `queue_free_op()`. Some reference text uses phrasing like "Patriots free March to and free Battle in one space" which may imply immediate execution rather than queuing for later processing.
-
-**Question:** Should card free ops execute immediately during event resolution, or should they be queued for the game engine to process after the event handler returns? This affects cards 1, 21, 48, 52, 66, 67 and others.
+**Decision:** Always immediate execution. Engine's `handle_event()` now drains all queued free ops immediately after the event handler returns, during event resolution.
 
 ---
 
 ## Q4: Brilliant Stroke (Cards 105-109) — interrupt mechanics
+
+**Status:** OPEN — awaiting full implementation.
 
 **Context:** The Brilliant Stroke cards describe an interrupt/trump chain where one faction can trump another's Brilliant Stroke. The current implementation does not support true interrupts.
 
@@ -46,16 +39,14 @@ These items were identified during the compliance audit. The Reference Documents
 
 ---
 
-## Q5: Indian bot I10 March — single vs multiple destinations
+## Q5: Indian bot I10 March — RESOLVED
 
-**Context:** The Indian bot flowchart describes March with detailed bullets including "March to get 3+ WP in 1 additional Neutral or Passive space with room for a Village." The current implementation only does a single move.
+**Decision:** Implement ALL flowchart movements (not single move). The Indian bot March should attempt up to 3 movements per the flowchart bullets.
 
-**Question:** Should the Indian bot March attempt up to 3 movements per the flowchart bullets, or is the single-move implementation an acceptable simplification for bot play?
+**Status:** Not yet implemented — documented for future work.
 
 ---
 
-## Q6: French bot F5 — Hortalez vs Agent Mobilization ordering
+## Q6: French bot F5 — RESOLVED
 
-**Context:** The French bot pre-treaty flow (F5-F7) has a conditional branch based on "Patriot Resources < 1D3." The current code checks this to decide between Hortalez and Agent Mobilization, but the ordering of the fallback may not match the flowchart exactly.
-
-**Question:** When the die roll check fails (Patriots have enough Resources), should F7 (Agent Mobilization) be attempted first with Hortalez as fallback, or vice versa? The flowchart arrow direction is ambiguous.
+**Decision:** Agent Mobilization first, Hortalez as fallback. The current code already implements this correctly.
