@@ -888,20 +888,24 @@ def evt_069_suffren(state, shaded=False):
 # 71  TREATY OF AMITY & COMMERCE
 @register(71)
 def evt_071_treaty_amity(state, shaded=False):
+    """
+    Unshaded – Add population of Cities under Rebellion Control to Patriot Resources.
+    Shaded   – French Resources +5.
+    """
     if shaded:
-        add_resource(state, BRITISH, +4)
-        push_history(state, "Card 71 shaded: British +4 Resources")
+        add_resource(state, FRENCH, +5)
+        push_history(state, "Card 71 shaded: French +5 Resources")
         return
 
     _ensure_control(state)
     pop = 0
     for sid, sp in state.get("spaces", {}).items():
         if _is_city(sid) and state.get("control", {}).get(sid) == "REBELLION":
-            pop += sp.get("population", 0)
-    gain = min(5, pop // 3)
-    add_resource(state, PATRIOTS, gain)
-    add_resource(state, FRENCH, gain)
-    push_history(state, f"Card 71 unshaded: Patriots/French +{gain}")
+            # Population from map metadata, falling back to space dict
+            meta = map_adj.space_meta(sid) or {}
+            pop += meta.get("population", sp.get("population", 0))
+    add_resource(state, PATRIOTS, pop)
+    push_history(state, f"Card 71 unshaded: Patriots +{pop} (Rebellion cities pop)")
 
 
 # 74  CHICKASAW ALLY WITH THE BRITISH

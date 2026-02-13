@@ -71,14 +71,30 @@ def test_card38_unshaded_places_royal_greens_and_keeps_eligible():
 
 
 def test_card71_unshaded_resources_from_rebellion_cities():
+    """Per card reference: 'Add population of Cities under Rebellion Control
+    to Patriot Resources.'  Only Patriots receive, not French."""
     state = _base_state()
     state["spaces"] = {
         "Boston": {MILITIA_A: 2, "population": 6},
         "Philadelphia": {MILITIA_U: 1, "population": 3},
         "New_York_City": {REGULAR_BRI: 1, "population": 6},
     }
+    # Pre-set control so test does not depend on refresh_control details
+    state["control"] = {
+        "Boston": "REBELLION",
+        "Philadelphia": "REBELLION",
+        "New_York_City": BRITISH,
+    }
 
     middle_war.evt_071_treaty_amity(state, shaded=False)
 
-    assert state["resources"][PATRIOTS] == 3
-    assert state["resources"][FRENCH] == 3
+    # Boston (pop 6) + Philadelphia (pop 3) = 9
+    assert state["resources"][PATRIOTS] == 9
+    assert state["resources"][FRENCH] == 0
+
+
+def test_card71_shaded_french_resources():
+    """Per card reference: 'French Resources +5.'"""
+    state = _base_state()
+    middle_war.evt_071_treaty_amity(state, shaded=True)
+    assert state["resources"][FRENCH] == 5
