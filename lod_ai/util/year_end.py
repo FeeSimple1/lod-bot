@@ -498,18 +498,38 @@ def _leader_redeploy(state):
 # ────────────────────────────────────────────────────────────────
 
 def _british_release(state):
-    qty = state.pop("brit_release", 0)
-    if not qty:
+    """§6.5.3 British Release Date.
+
+    Pop the next tranche from ``brit_release_schedule`` and move
+    the specified Regulars *and* Tories from Unavailable to Available.
+    If fewer pieces are in Unavailable than the schedule calls for,
+    move only those that are present (per §6.5.3).
+    """
+    schedule = state.get("brit_release_schedule", [])
+    if not schedule:
         return
 
-    # Move up to qty British Regulars from Unavailable → Available
-    moved = bp.lift_unavailable(state, REGULAR_BRI, qty)
+    tranche = schedule.pop(0)
+    if not tranche:
+        return
 
-    if moved:
-        push_history(
-            state,
-            f"British Release Date – {moved} Regulars to Available (6.5.3)"
-        )
+    unavail = state.setdefault("unavailable", {})
+    avail = state.setdefault("available", {})
+
+    total_moved = 0
+    for tag, qty in tranche.items():
+        have = unavail.get(tag, 0)
+        moved = min(qty, have)
+        if moved:
+            unavail[tag] = have - moved
+            if unavail[tag] == 0:
+                del unavail[tag]
+            avail[tag] = avail.get(tag, 0) + moved
+            total_moved += moved
+            push_history(state, f"British Release – {moved} {tag} to Available (6.5.3)")
+
+    if total_moved == 0:
+        push_history(state, "British Release Date – nothing in Unavailable (6.5.3)")
 
 # ────────────────────────────────────────────────────────────────
 #  FNI drift & Blockade shuffle (§6.5.4)
