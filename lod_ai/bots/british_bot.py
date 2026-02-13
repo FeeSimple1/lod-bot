@@ -97,13 +97,17 @@ class BritishBot(BaseBot):
     def _try_skirmish(self, state: Dict) -> bool:
         """
         Execute Skirmish (B11) following the priority list:
-            • West Indies
+            • In 1 space not selected for Battle or Muster, nor as
+              Garrison destination (tracked via _turn_affected_spaces).
+            • West Indies first
             • spaces with exactly 1 British Regular
             • otherwise as many casualties as possible
         Falls back to Naval Pressure if nothing happens.
         """
+        excluded = state.get("_turn_affected_spaces", set())
+
         # 1) West Indies check
-        if state["spaces"].get(WEST_INDIES, {}).get(C.REGULAR_BRI, 0):
+        if WEST_INDIES not in excluded and state["spaces"].get(WEST_INDIES, {}).get(C.REGULAR_BRI, 0):
             try:
                 skirmish.execute(state, C.BRITISH, {}, WEST_INDIES, option=1)
                 return True
@@ -113,6 +117,8 @@ class BritishBot(BaseBot):
         # 2) Exactly‑one‑Regular spaces then others
         targets = []
         for sid, sp in state["spaces"].items():
+            if sid in excluded or sid == WEST_INDIES:
+                continue
             reg = sp.get(C.REGULAR_BRI, 0)
             enemy = (
                 sp.get(C.REGULAR_PAT, 0)
@@ -122,11 +128,11 @@ class BritishBot(BaseBot):
                 + sp.get(C.WARPARTY_A, 0)
                 + sp.get(C.WARPARTY_U, 0)
             )
-            if enemy == 0 or sid == WEST_INDIES:
+            if enemy == 0:
                 continue
             priority = 0
             if reg == 1:
-                priority += 100  # bubble up “exactly one Regular” rule
+                priority += 100  # bubble up "exactly one Regular" rule
             priority += enemy
             targets.append((-priority, sid))  # minus = larger first
 
@@ -215,8 +221,12 @@ class BritishBot(BaseBot):
 
     # -------------------------------------------------------------------
     def _select_garrison_city(self, state: Dict) -> str | None:
-        """Apply priority bullets to pick the City to relieve."""
-        candidates: List[Tuple[int, str]] = []
+        """Apply priority bullets to pick the City to relieve.
+
+        Reference: "first where most Rebels without Patriot Fort, then
+        New York City, first where Underground Militia, then random."
+        """
+        candidates: List[Tuple[tuple, str]] = []
         for name in CITIES:
             sp = state["spaces"].get(name, {})
             if self._control(state, name) == C.BRITISH or sp.get(C.FORT_PAT, 0):
@@ -227,10 +237,11 @@ class BritishBot(BaseBot):
                 + sp.get(C.MILITIA_A, 0)
                 + sp.get(C.MILITIA_U, 0)
             )
-            prio = rebels * 10
-            if name == "New_York_City":
-                prio += 1  # NYC second priority
-            candidates.append((-prio, name))
+            has_underground = 1 if sp.get(C.MILITIA_U, 0) > 0 else 0
+            is_nyc = 1 if name == "New_York_City" else 0
+            # Sort key: most rebels, NYC tiebreak, underground militia tiebreak
+            key = (-rebels, -is_nyc, -has_underground)
+            candidates.append((key, name))
         if not candidates:
             return None
         candidates.sort()
@@ -336,10 +347,18 @@ class BritishBot(BaseBot):
             ]
             if rl_candidates:
                 raid_on_map = state.get("markers", {}).get(C.RAID, {}).get("on_map", set())
-                chosen_rl_space = max(
-                    rl_candidates,
-                    key=lambda n: (_MAP_DATA[n].get("population", 0), -(1 if n in raid_on_map else 0)),
-                )
+                prop_on_map = state.get("markers", {}).get(C.PROPAGANDA, {}).get("on_map", set())
+
+                def _rl_key(n):
+                    # Nested sort per reference RL:
+                    # 1. First where fewest Raid + Propaganda markers
+                    markers = (1 if n in raid_on_map else 0) + (1 if n in prop_on_map else 0)
+                    # 2. Then for largest shift in (Support – Opposition)
+                    sup = self._support_level(state, n)
+                    shift = -sup  # more negative support → larger positive shift
+                    return (-markers, shift)
+
+                chosen_rl_space = max(rl_candidates, key=_rl_key)
                 reward_levels = 1
         if chosen_rl_space is None and state["available"].get(C.FORT_BRI, 0):
             # build Fort in Colony with 5+ cubes & no Fort
