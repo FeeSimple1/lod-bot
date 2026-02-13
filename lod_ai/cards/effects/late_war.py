@@ -63,6 +63,19 @@ from lod_ai.board.pieces import (
     place_piece,
     place_with_caps,
 )
+from lod_ai.map import adjacency as map_adj
+
+
+def _is_city_late(space_id):
+    return map_adj.space_type(space_id) == "City"
+
+
+def _is_colony_late(space_id):
+    return map_adj.space_type(space_id) == "Colony"
+
+
+def _is_reserve_late(space_id):
+    return map_adj.space_type(space_id) == "Reserve"
 
 
 @register(1)
@@ -89,8 +102,13 @@ def evt_001_waxhaws(state, shaded=False):
         queue_free_op(state, PATRIOTS, "march",  target)
         queue_free_op(state, PATRIOTS, "battle", target)
         place_marker(state, PROPAGANDA, target, 2)
-        shift_support(state, target, -1)     # toward Neutral
-        push_history(state, f"Waxhaws (shaded): March/Battle in {target}, +2 PROPAGANDA, Support −1")
+        # Shift one level toward Neutral (toward 0)
+        cur = state.get("support", {}).get(target, 0)
+        if cur > 0:
+            shift_support(state, target, -1)
+        elif cur < 0:
+            shift_support(state, target, +1)
+        push_history(state, f"Waxhaws (shaded): March/Battle in {target}, +2 PROPAGANDA, shift toward Neutral")
     else:
         remove_piece(state, REGULAR_PAT, target, 2, to="casualties")
         shift_support(state, target, +1)     # toward Active Support
@@ -127,8 +145,17 @@ def evt_016_mercy_warren(state, shaded=False):
 # 18  “IF IT HADN’T BEEN SO STORMY…”
 @register(18)
 def evt_018_if_not_stormy(state, shaded=False):
-    affected = PATRIOTS if shaded else BRITISH
-    state.setdefault("ineligible_next", set()).add(affected)
+    """
+    Unshaded – Any one Faction Ineligible through the next card.
+    Shaded   – (none)
+    """
+    if shaded:
+        return
+    target = state.get("card18_target_faction", BRITISH)
+    if target not in {BRITISH, PATRIOTS, FRENCH, INDIANS}:
+        target = BRITISH
+    state.setdefault("ineligible_through_next", set()).add(target)
+    push_history(state, f"Card 18 unshaded: {target} ineligible through next")
 
 
 # 19  LEGEND OF NATHAN HALE
@@ -166,7 +193,9 @@ def evt_022_newburgh_conspiracy(state, shaded=False):
     Shaded   – **Immediate** Tory desertion this Winter.
     """
     if shaded:
-        state["winter_flag"] = "TORY_DESERTION"
+        # "Immediately execute Tory Desertion as per Winter Quarters Round."
+        state["winter_flag"] = "TORY_DESERTION_IMMEDIATE"
+        push_history(state, "Card 22 shaded: immediate Tory Desertion")
     else:
         _remove_four_patriot_units(state)
 
@@ -241,11 +270,26 @@ def evt_037_armada(state, shaded=False):
 # 39  “HIS MAJESTY, KING MOB” PROTESTS
 @register(39)
 def evt_039_king_mob(state, shaded=False):
+    """
+    Unshaded – Shift three Cities one level toward Neutral.
+    Shaded   – (none)
+    """
     if shaded:
         return
-    # shift 3 cities one step toward Neutral – sample implementation
-    for name in ("Boston", "New_York_City", "Charles_Town"):
-        shift_support(state, name, -1)   # toward Neutral
+    cities = [sid for sid in state.get("spaces", {})
+              if _is_city_late(sid)]
+    shifted = 0
+    for name in cities:
+        if shifted >= 3:
+            break
+        cur = state.get("support", {}).get(name, 0)
+        if cur > 0:
+            shift_support(state, name, -1)
+            shifted += 1
+        elif cur < 0:
+            shift_support(state, name, +1)
+            shifted += 1
+    push_history(state, f"Card 39 unshaded: shifted {shifted} Cities toward Neutral")
 
 
 # 40  BATTLE OF THE CHESAPEAKE
@@ -278,17 +322,38 @@ def evt_048_god_save_king(state, shaded=False):
         queue_free_op(state, BRITISH, "march",  target)
         queue_free_op(state, BRITISH, "battle", target)
     else:
-        moved = 0
-        for name, sp in state["spaces"].items():
-            if moved == 3:
+        # A non-British Faction moves units from three spaces containing
+        # British Regulars into any adjacent spaces.
+        non_brit_tags = [REGULAR_PAT, REGULAR_FRE, MILITIA_U, MILITIA_A,
+                         WARPARTY_U, WARPARTY_A, TORY]
+        moved_spaces = 0
+        for name in list(state.get("spaces", {})):
+            if moved_spaces == 3:
                 break
-            if sp.get(REGULAR_BRI, 0) and any(k.startswith("Patriot_") or k.startswith("French") or k.startswith("Indian") for k in sp):
-                for tag in list(sp.keys()):
-                    if tag.startswith("Patriot_") or tag.startswith("French") or tag.startswith("Indian"):
-                        qty = sp.get(tag, 0)
-                        if qty:
-                            move_piece(state, tag, name, "available", qty)
-                moved += 1
+            sp = state["spaces"].get(name, {})
+            if not sp.get(REGULAR_BRI, 0):
+                continue
+            has_non_brit = any(sp.get(tag, 0) for tag in non_brit_tags)
+            if not has_non_brit:
+                continue
+            # Find an adjacent space to move into
+            neighbors = map_adj.space_meta(name) or {}
+            adj_list = []
+            for token in neighbors.get("adj", []):
+                adj_list.extend(token.split("|"))
+            dest = None
+            for nbr in adj_list:
+                if nbr in state.get("spaces", {}):
+                    dest = nbr
+                    break
+            if not dest:
+                continue
+            for tag in non_brit_tags:
+                qty = sp.get(tag, 0)
+                if qty:
+                    move_piece(state, tag, name, dest, qty)
+            moved_spaces += 1
+            push_history(state, f"Card 48 shaded: non-British units move from {name} to {dest}")
 
 
 # 52  FRENCH FLEET ARRIVES IN THE WRONG SPOT
@@ -319,21 +384,52 @@ def evt_052_fleet_wrong_spot(state, shaded=False):
 @register(57)
 def evt_057_french_caribbean(state, shaded=False):
     if shaded:
-        move_piece(state, REGULAR_BRI, None, WEST_INDIES_ID, 2)
-        state.setdefault("ineligible_next", set()).add(BRITISH)
+        # Move 2 British Regulars from map to West Indies
+        moved = 0
+        for n, sp in state.get("spaces", {}).items():
+            if n == WEST_INDIES_ID:
+                continue
+            if moved >= 2:
+                break
+            qty = sp.get(REGULAR_BRI, 0)
+            if qty:
+                m = move_piece(state, REGULAR_BRI, n, WEST_INDIES_ID, min(qty, 2 - moved))
+                moved += m
+        state.setdefault("ineligible_through_next", set()).add(BRITISH)
+        push_history(state, "Card 57 shaded: British ineligible through next")
     else:
         move_piece(state, REGULAR_FRE, "available", WEST_INDIES_ID, 2)
-        state.setdefault("ineligible_next", set()).add(FRENCH)
+        state.setdefault("ineligible_through_next", set()).add(FRENCH)
         adjust_fni(state, -1)
+        push_history(state, "Card 57 unshaded: French ineligible through next")
 
 
 # 62  CHARLES MICHEL DE LANGLADE
 @register(62)
 def evt_062_langlade(state, shaded=False):
+    """
+    Unshaded – Place three War Parties or three Tories in New York, Quebec or Northwest.
+    Shaded   – Place three French Regulars in Quebec or three Militia in Northwest.
+    """
     if shaded:
-        place_piece(state, REGULAR_FRE, "Quebec", 3)
+        choice = state.get("card62_shaded_choice", "FRENCH_QUEBEC")
+        if choice == "MILITIA_NORTHWEST":
+            place_piece(state, MILITIA_U, "Northwest", 3)
+            push_history(state, "Card 62 shaded: 3 Militia in Northwest")
+        else:
+            place_piece(state, REGULAR_FRE, "Quebec", 3)
+            push_history(state, "Card 62 shaded: 3 French Regulars in Quebec")
     else:
-        place_piece(state, WARPARTY_U, "Northwest", 3)
+        target = state.get("card62_target")
+        if target not in ("New_York", "Quebec", "Northwest"):
+            target = "New_York"
+        choice = state.get("card62_unshaded_choice", "WARPARTY")
+        if choice == "TORIES":
+            place_piece(state, TORY, target, 3)
+            push_history(state, f"Card 62 unshaded: 3 Tories in {target}")
+        else:
+            place_piece(state, WARPARTY_U, target, 3)
+            push_history(state, f"Card 62 unshaded: 3 War Parties in {target}")
 
 
 
@@ -341,9 +437,12 @@ def evt_062_langlade(state, shaded=False):
 # 64  AFFAIR OF FIELDING & BYLANDT
 @register(64)
 def evt_064_fielding(state, shaded=False):
+    """
+    Unshaded – British seize Dutch contraband: British Resources +3. Lower FNI one level.
+    Shaded   – Dutch provide resources to Patriots: Patriot Resources +5.
+    """
     if shaded:
-        add_resource(state, BRITISH, -3)
-        adjust_fni(state, +1)
+        add_resource(state, PATRIOTS, +5)
     else:
         add_resource(state, BRITISH, +3)
         adjust_fni(state, -1)
@@ -404,12 +503,24 @@ def evt_070_french_india(state, shaded=False):
 # 73  SULLIVAN EXPEDITION VS IROQUOIS
 @register(73)
 def evt_073_sullivan(state, shaded=False):
-    # remove a Fort or Village in specified regions
-    for loc in ("New_York", "Northwest", "Quebec"):
-        if remove_piece(state, FORT_BRI, loc, 1, to="available"):
-            break
-        if remove_piece(state, VILLAGE, loc, 1, to="available"):
-            break
+    """
+    Unshaded – Remove one Fort or Village in New York, Northwest or Quebec.
+    Shaded   – (none)
+    """
+    if shaded:
+        return
+    target = state.get("card73_space")
+    candidates = ["New_York", "Northwest", "Quebec"]
+    if target not in candidates:
+        target = None
+    # Try to find a space with a Fort or Village to remove
+    for loc in ([target] if target else candidates):
+        for tag in (FORT_BRI, FORT_PAT, VILLAGE):
+            sp = state.get("spaces", {}).get(loc, {})
+            if sp.get(tag, 0):
+                remove_piece(state, tag, loc, 1, to="available")
+                push_history(state, f"Card 73 unshaded: removed 1 {tag} in {loc}")
+                return
 
 
 # 79  TUSCARORA & ONEIDA COME TO WASHINGTON
@@ -452,9 +563,25 @@ def evt_085_mississippi_raids(state, shaded=False):
 # 87  PATRIOTS MASSACRE LENAPE INDIANS
 @register(87)
 def evt_087_lenape(state, shaded=False):
+    """
+    Unshaded – Remove one piece in Pennsylvania. Remain Eligible.
+    Shaded   – (none)
+    """
     if shaded:
         return
-    remove_piece(state, WARPARTY_U, "Pennsylvania", 1, to="available")
+    loc = "Pennsylvania"
+    sp = state.get("spaces", {}).get(loc, {})
+    # Remove one piece of any type (prioritise units before bases)
+    for tag in (WARPARTY_U, WARPARTY_A, MILITIA_U, MILITIA_A, REGULAR_PAT,
+                REGULAR_BRI, REGULAR_FRE, TORY, FORT_BRI, FORT_PAT, VILLAGE):
+        if sp.get(tag, 0):
+            remove_piece(state, tag, loc, 1, to="available")
+            push_history(state, f"Card 87 unshaded: removed 1 {tag} in {loc}")
+            break
+    # Remain Eligible
+    executor = state.get("active")
+    if executor:
+        state.setdefault("remain_eligible", set()).add(str(executor).upper())
 
 
 # 94  HERKIMER’S RELIEF COLUMN
@@ -477,6 +604,13 @@ def evt_094_herkimer(state, shaded=False):
 # 95  OHIO COUNTRY FRONTIER ERUPTS
 @register(95)
 def evt_095_ohio_frontier(state, shaded=False):
+    """
+    Unshaded – In Northwest, remove any one enemy Fort or Village
+               and place three friendly units.
+    Shaded   – (none)
+    """
+    if shaded:
+        return
     loc = "Northwest"
     executor = str(state.get("active", "")).upper()
     patriot_side = executor in (PATRIOTS, FRENCH)
