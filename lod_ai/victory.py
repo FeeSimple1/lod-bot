@@ -94,20 +94,21 @@ def final_scoring(state) -> None:
     """
     t = _summarize_board(state)
 
+    # §7.3: raw sums without the -10 threshold offset used by §7.2 check()
     totals = {
-        BRITISH:  sum(_british_margin(t)),
-        PATRIOTS: sum(_patriot_margin(t)),
-        FRENCH:   sum(_french_margin(t)),
-        INDIANS:  sum(_indian_margin(t)),
+        BRITISH:  sum(_british_margin(t)) + 10,
+        PATRIOTS: sum(_patriot_margin(t)) + 10,
+        FRENCH:   sum(_french_margin(t))  + 10,
+        INDIANS:  sum(_indian_margin(t))  + 10,
     }
 
     # Treaty requirement: French score only if ToA played
     if not t["treaty_of_alliance"]:
         totals[FRENCH] = float("-inf")
 
-    # Rank: higher total wins; ties resolved BRI > PAT > FRE > IND
+    # Rank: higher total wins; ties per §7.1: PAT > BRI > FRE > IND
     order = [PATRIOTS, BRITISH, FRENCH, INDIANS]
-    winner = max(order, key=lambda f: totals[f])
+    winner = max(order, key=lambda f: (totals[f], -order.index(f)))
 
     log = "Final Scoring – " + "  ".join(f"{f}:{totals[f]}" for f in order)
     push_history(state, log)
