@@ -87,7 +87,7 @@ def _supply_phase(state):
             continue
         meta = map_adj.space_meta(sid) or {}
         space_type = meta.get("type") or sp.get("type")
-        if sp.get(FORT_BRI) or (space_type == "City" and state.get("control", {}).get(sid) == "BRITISH"):
+        if sp.get(FORT_BRI) or (space_type == "City" and state.get("control", {}).get(sid) == BRITISH):
             continue
         if _pay(BRITISH, sid, "British Supply"):
             continue
@@ -194,7 +194,7 @@ def _supply_phase(state):
     # West Indies battle + garrison payment
     wi = state["spaces"][WEST_INDIES_ID]
     if wi.get(REGULAR_FRE) and wi.get(REGULAR_BRI):
-        battle_execute(state, "FRENCH", {}, [WEST_INDIES_ID])
+        battle_execute(state, FRENCH, {}, [WEST_INDIES_ID])
         push_history(state, "Free Battle in West Indies (6.2.2)")
     def _wi_cleanup(pid, faction):
         cnt = wi.get(pid, 0)
@@ -266,7 +266,7 @@ def _resource_income(state):
             ctrl = control_map[sid]
         else:
             if sp.get("British_Control"):
-                ctrl = "BRITISH"
+                ctrl = BRITISH
             elif sp.get("Patriot_Control") or sp.get("Rebellion_Control"):
                 ctrl = "REBELLION"
             else:
@@ -285,7 +285,7 @@ def _resource_income(state):
 
         # British-controlled, non-Blockaded *Cities* → pop to British
         if (space_type == "City"
-                and ctrl == "BRITISH"
+                and ctrl == BRITISH
                 and sid not in blockaded_cities):
             british_income += pop
 
@@ -294,7 +294,7 @@ def _resource_income(state):
             rebellion_spaces += 1
 
         # City population *not* British-Controlled (for French after ToA)
-        if space_type == "City" and ctrl != "BRITISH":
+        if space_type == "City" and ctrl != BRITISH:
             french_income += pop      # kept only post-ToA
 
     # ---------------  derive totals  ----------------------------
@@ -311,7 +311,7 @@ def _resource_income(state):
         french_income = total_wi_blockades * 2
 
     # West Indies bonuses
-    if wi_ctrl == "BRITISH":
+    if wi_ctrl == BRITISH:
         british_income += 5
     if wi_ctrl == "REBELLION":
         french_income += 5
@@ -361,7 +361,7 @@ def _support_phase(state):
         if sid in control_map:
             return control_map[sid]
         if sp.get("British_Control"):
-            return "BRITISH"
+            return BRITISH
         if sp.get("Patriot_Control") or sp.get("Rebellion_Control"):
             return "REBELLION"
         return None
@@ -380,7 +380,7 @@ def _support_phase(state):
             continue
 
         # must be British-controlled City/Colony and contain both Regulars & Tories
-        if not (_ctrl(sid, sp) == "BRITISH" and sp.get(REGULAR_BRI) and sp.get(TORY)):
+        if not (_ctrl(sid, sp) == BRITISH and sp.get(REGULAR_BRI) and sp.get(TORY)):
             continue
 
         level = state["support"].get(sid, 0)
