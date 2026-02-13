@@ -63,11 +63,13 @@ Source: `Reference Documents/card reference full.txt`
 
 ### REMAINING card issues
 
-#### Brilliant Stroke / Treaty of Alliance (Cards 105-109)
-- Not a true interrupt (no pre-action cancel)
-- No leader involvement enforcement
-- Incomplete trump chain and eligibility reset
-- See QUESTIONS.md Q4 (OPEN)
+#### Brilliant Stroke / Treaty of Alliance (Cards 105-109) — RESOLVED (Q4)
+- Full trump hierarchy: ToA > Indians > French > British > Patriots
+- Bot auto-check before 1st eligible acts (per §8.3.7)
+- Bot BS execution: LimCom+SA+LimCom with leader/piece threshold
+- Treaty of Alliance: preparations formula fixed (half CBC, total blockades)
+- Trumped cards return to owners; all factions become Eligible after BS
+- 7 new tests covering conditions, triggers, and execution
 
 #### Deterministic bot choices
 Cards 2, 6, 24, 28, 80 use hardcoded/alphabetical defaults for player/bot selections.
@@ -145,5 +147,4 @@ Cards 2, 6, 24, 28, 80 use hardcoded/alphabetical defaults for player/bot select
 - **P7 Rally**: Hardcoded 2 Forts; missing Continental promotion step.
 - **P8/P12 Partisans/Skirmish**: Missing priority targeting (Village removal, Fort removal).
 
-#### Brilliant Stroke (QUESTIONS.md Q4 — OPEN)
-- Full trump chain, leader involvement, and eligibility reset not yet implemented.
+#### Brilliant Stroke — RESOLVED (see Phase 2 section above)

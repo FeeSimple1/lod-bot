@@ -15,7 +15,7 @@ from lod_ai.cards.effects.shared import adjust_fni
 from lod_ai.board.pieces import move_piece, place_piece
 from lod_ai import rules_consts as C
 from lod_ai.leaders import leader_location
-from lod_ai.util.naval import unavailable_blockades
+from lod_ai.util.naval import unavailable_blockades, total_blockades
 from lod_ai.rules_consts import (
     REGULAR_BRI,
     REGULAR_FRE,
@@ -68,8 +68,13 @@ def mark_bs_played(state, key: str, played: bool) -> None:
 
 
 def preparations_total(state) -> int:
+    """French Preparations = Available French Regulars + Squadrons/Blockades
+    + half Cumulative British Casualties (rounded down)."""
     available = state.get("available", {})
-    return available.get(REGULAR_FRE, 0) + unavailable_blockades(state) + state.get("cbc", 0)
+    fre_regs = available.get(REGULAR_FRE, 0)
+    naval = total_blockades(state)
+    half_cbc = state.get("cbc", 0) // 2
+    return fre_regs + naval + half_cbc
 
 
 def leader_can_involve(state, faction: str) -> bool:
@@ -83,6 +88,112 @@ def leader_can_involve(state, faction: str) -> bool:
         sp = state.get("spaces", {}).get(loc, {})
         if any(sp.get(tag, 0) for tag in pieces):
             return True
+    return False
+
+
+# ------------------------------------------------ piece thresholds ---------- #
+# The bot-trigger conditions for each faction's BS card.
+_LEADER_PIECE_THRESHOLD = {
+    C.BRITISH:  ({"LEADER_GAGE", "LEADER_HOWE", "LEADER_CLINTON"},
+                 (C.REGULAR_BRI,), 4),
+    C.PATRIOTS: ({"LEADER_WASHINGTON"},
+                 (C.REGULAR_PAT,), 4),
+    C.FRENCH:   ({"LEADER_ROCHAMBEAU", "LEADER_LAUZUN"},
+                 (C.REGULAR_FRE,), 4),
+    C.INDIANS:  ({"LEADER_BRANT", "LEADER_CORNPLANTER", "LEADER_DRAGGING_CANOE"},
+                 (C.WARPARTY_A, C.WARPARTY_U), 3),
+}
+
+REBELLION_FACTIONS = {C.PATRIOTS, C.FRENCH}
+
+
+def _leader_with_pieces(state, faction: str) -> bool:
+    """Return True if *faction* has a Leader in a space meeting its piece threshold."""
+    entry = _LEADER_PIECE_THRESHOLD.get(faction)
+    if not entry:
+        return False
+    leaders, piece_tags, threshold = entry
+    for leader in leaders:
+        loc = leader_location(state, leader)
+        if not loc:
+            continue
+        sp = state.get("spaces", {}).get(loc, {})
+        total = sum(sp.get(tag, 0) for tag in piece_tags)
+        if total >= threshold:
+            return True
+    return False
+
+
+def bot_wants_bs(
+    state,
+    faction: str,
+    first_eligible: str | None = None,
+    human_factions: set | None = None,
+    other_bs_faction: str | None = None,
+) -> bool:
+    """Evaluate whether a bot faction wants to play its Brilliant Stroke.
+
+    Per §8.3.7, §8.4.11, §8.5.8, §8.6.11, §8.7.8:
+    - All bot BS triggers require Treaty of Alliance to have been played.
+    - Each faction has Leader+piece threshold AND a situational trigger.
+
+    Parameters
+    ----------
+    first_eligible : str or None
+        The 1st-eligible faction for this card.
+    human_factions : set
+        Factions controlled by human players.
+    other_bs_faction : str or None
+        If another faction is currently playing a BS, this is their faction.
+        Used for trumping triggers ("OR Patriots play their BS", etc.).
+    """
+    if human_factions is None:
+        human_factions = set()
+
+    # Prerequisite: ToA must have been played already
+    if not state.get("toa_played", False):
+        return False
+
+    # Must still hold the BS card
+    if not bs_available(state, faction):
+        return False
+
+    # Must be eligible
+    if not state.get("eligible", {}).get(faction, True):
+        return False
+
+    # Must have leader + pieces
+    if not _leader_with_pieces(state, faction):
+        return False
+
+    # ---- Faction-specific situational trigger ----
+    is_player = lambda f: f in human_factions
+
+    if faction == C.BRITISH:
+        # "a Rebellion player Faction is 1st Eligible OR Patriots play their BS"
+        rebellion_player_1st = (
+            first_eligible in REBELLION_FACTIONS and is_player(first_eligible)
+        )
+        pat_plays_bs = (other_bs_faction == C.PATRIOTS)
+        return rebellion_player_1st or pat_plays_bs
+
+    if faction == C.PATRIOTS:
+        # "a player Faction is 1st Eligible"
+        return first_eligible is not None and is_player(first_eligible)
+
+    if faction == C.FRENCH:
+        # "any player Faction is 1st Eligible OR the British play their BS"
+        player_1st = first_eligible is not None and is_player(first_eligible)
+        brit_plays_bs = (other_bs_faction == C.BRITISH)
+        return player_1st or brit_plays_bs
+
+    if faction == C.INDIANS:
+        # "any player Faction is 1st Eligible OR a Rebellion Faction plays
+        #  a BS card other than Treaty of Alliance"
+        player_1st = first_eligible is not None and is_player(first_eligible)
+        reb_plays_bs = (other_bs_faction in REBELLION_FACTIONS)
+        return player_1st or reb_plays_bs
+
     return False
 
 
