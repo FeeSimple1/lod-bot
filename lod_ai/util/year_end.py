@@ -36,7 +36,7 @@ from lod_ai.map import adjacency as map_adj
 from lod_ai.util import caps as caps_util
 from lod_ai.economy import resources
 from lod_ai.economy.resources import add as add_res
-from lod_ai.cards.effects.shared import adjust_fni
+from lod_ai.cards.effects.shared import adjust_fni, shift_support
 from lod_ai.commands.battle import execute as battle_execute
 from lod_ai.victory import check as victory_check
 from lod_ai.rules_consts import (
@@ -91,8 +91,9 @@ def _supply_phase(state):
             continue
         if _pay(BRITISH, sid, "British Supply"):
             continue
-        if board_control.shift_support(state, sid, -1):
-            push_history(state, f"British Supply – Support shifted in {sid}")
+        cur_support = state.get("support", {}).get(sid, 0)
+        if cur_support > ACTIVE_OPPOSITION:
+            shift_support(state, sid, -1)
             continue
         if sp.get(REGULAR_BRI, 0):
             remove_piece(state, REGULAR_BRI, sid, sp[REGULAR_BRI], to="available")
@@ -140,7 +141,7 @@ def _supply_phase(state):
             # choose the fort with the shortest path (adj is map.adjacency alias)
             dest = min(
                 forts,
-                key=lambda x: len(map_adj.shortest_path(state, sid, x))
+                key=lambda x: len(map_adj.shortest_path(sid, x))
             )
             if dest != sid:
                 bp.move_piece(state, REGULAR_FRE, sid, dest, fr)
@@ -179,7 +180,7 @@ def _supply_phase(state):
         dests = [d for d, sp2 in state["spaces"].items() if sp2.get(VILLAGE)]
         if not dests:
             continue
-        dest = min(dests, key=lambda d: len(map_adj.shortest_path(state, sid, d)))
+        dest = min(dests, key=lambda d: len(map_adj.shortest_path(sid, d)))
         for pid in (WARPARTY_U, WARPARTY_A):
             qty = sp.get(pid, 0)
             if qty:

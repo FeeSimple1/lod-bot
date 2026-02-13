@@ -39,7 +39,6 @@ def test_supply_pays_when_affordable(monkeypatch):
     monkeypatch.setattr(year_end.board_control, "refresh_control", lambda s: None, raising=False)
     monkeypatch.setattr(year_end.caps_util, "enforce_global_caps", lambda s: None, raising=False)
     monkeypatch.setattr(year_end, "battle_execute", lambda *a, **k: None, raising=False)
-    monkeypatch.setattr(year_end.board_control, "shift_support", lambda *a, **k: False, raising=False)
     year_end._supply_phase(state)
 
     assert state["resources"][C.BRITISH] == 1
@@ -48,13 +47,13 @@ def test_supply_pays_when_affordable(monkeypatch):
 def test_supply_removes_if_cannot_pay(monkeypatch):
     state = basic_state()
     state["spaces"] = {"A": {C.REGULAR_BRI: 1}}
-    # no resources, so can't pay
+    # no resources, so can't pay; support already at Active Opposition so can't shift
+    state["support"]["A"] = C.ACTIVE_OPPOSITION
     state["spaces"][C.WEST_INDIES_ID] = {}
     monkeypatch.setattr(year_end.board_control, "refresh_control", lambda s: None, raising=False)
     monkeypatch.setattr(year_end.caps_util, "enforce_global_caps", lambda s: None, raising=False)
     monkeypatch.setattr(year_end, "battle_execute", lambda *a, **k: None, raising=False)
 
-    monkeypatch.setattr(year_end.board_control, "shift_support", lambda *a, **k: False, raising=False)
     year_end._supply_phase(state)
 
     assert C.REGULAR_BRI not in state["spaces"]["A"]
