@@ -49,7 +49,7 @@ def _adjacent(space: str) -> List[str]:
 
 
 class IndianBot(BaseBot):
-    faction = "INDIANS"
+    faction = C.INDIANS
 
     def _support_level(self, state: Dict, sid: str) -> int:
         return state.get("support", {}).get(sid, 0)

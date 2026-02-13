@@ -43,7 +43,7 @@ CITIES = [n for n, d in _MAP_DATA.items() if d.get("type") == "City"]
 
 class PatriotBot(BaseBot):
     """Full non‑player Patriot AI."""
-    faction = "PATRIOTS"             # canonical faction key
+    faction = C.PATRIOTS             # canonical faction key
 
     def _support_level(self, state: Dict, sid: str) -> int:
         return state.get("support", {}).get(sid, 0)

@@ -44,7 +44,7 @@ from lod_ai.util.naval import move_blockades_to_west_indies, unavailable_blockad
 _MAP_DATA = json.load(
     open(Path(__file__).resolve().parents[1] / "map" / "data" / "map.json")
 )
-WEST_INDIES = "West_Indies"
+WEST_INDIES = C.WEST_INDIES_ID
 _VALID_PROVINCES: List[str] = ["Quebec", "New_York", "New_Hampshire", "Massachusetts"]
 
 
@@ -86,7 +86,7 @@ def _preparer_la_guerre(state: Dict, post_treaty: bool) -> bool:
 
 
 class FrenchBot(BaseBot):
-    faction = "FRENCH"
+    faction = C.FRENCH
 
     def _support_level(self, state: Dict, sid: str) -> int:
         return state.get("support", {}).get(sid, 0)
