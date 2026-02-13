@@ -34,10 +34,9 @@ Village, Squadron, Blockade, Propaganda, Raid
 The authoritative definition of every card's unshaded and shaded effects. Card handler implementations in `lod_ai/cards/effects/` must match this file exactly — same targets, same piece types, same destinations ("to Casualties" vs "to Available" vs "remove"), same conditions.
 
 ### 3. `Reference Documents/` — Everything Else
-- `british bot flowchart and reference.txt` — British non-player decision tree
-- `patriot bot flowchart and reference.txt` — Patriot non-player decision tree
-- `indian bot flowchart and reference.txt` — Indian non-player decision tree
-- `french bot flowchart and reference.txt` — French non-player decision tree
+All files in the `Reference Documents/` directory are source-of-truth materials. Always check the full directory contents rather than relying solely on this list. Key files include but are not limited to:
+
+- `*bot flowchart and reference.txt` — Non-player decision trees (one per faction)
 - `Manual Ch 1.txt` through `Manual Ch 8.txt` — Full rules
 - `Manual Glossary.txt` — Definitions
 - `leader_capabilities.txt` — Leader special abilities
@@ -45,6 +44,8 @@ The authoritative definition of every card's unshaded and shaded effects. Card h
 - `map_base.csv` — Map topology (CSV; the only non-.txt reference file)
 - `setup instructions.txt` — Scenario setup procedure
 - `random spaces map.txt`, `random spaces table.txt` — Random space selection tables
+
+If a file exists in `Reference Documents/` and is not listed above, it is still authoritative. Any file added to this directory in the future is automatically a source of truth.
 
 All files are plain text (except `map_base.csv`). No PDFs, no images.
 
