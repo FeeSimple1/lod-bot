@@ -74,7 +74,7 @@ def execute(
     # Determine own and enemy tags per faction
     if faction == BRITISH:
         own_tag = REGULAR_BRI
-        enemy_cubes = [REGULAR_PAT, REGULAR_FRE, TORY]  # Tories never present on Rebellion side but harmless
+        enemy_cubes = [REGULAR_PAT, REGULAR_FRE]  # Rebellion cubes per §4.2.2
         enemy_militia_tag = MILITIA_A
         enemy_fort_side_tag = FORT_PAT        # Patriot Fort counts
     elif faction == PATRIOTS:
@@ -138,7 +138,7 @@ def execute(
 
     else:  # option == 3
         # remove Fort + 1 own regular
-        remove_piece(state, enemy_fort_side_tag, space_id, 1, to="available")
+        remove_piece(state, enemy_fort_side_tag, space_id, 1, to="casualties")
         remove_piece(state, own_tag,           space_id, 1, to="casualties")
 
     clinton_here = (faction == BRITISH) and (leader_location(state, "LEADER_CLINTON") == space_id)

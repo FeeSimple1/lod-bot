@@ -138,23 +138,26 @@ def _resolve_space(
 
     cc_wp = ctx.get("common_cause", {}).get(sid, 0)
 
-    def _force(side: str, acting_attacker: bool) -> int:
+    def _force(side: str, is_defending: bool) -> int:
+        """§3.6.2-3.6.3: cubes + half Active guerrillas + Forts if Defending."""
         if side == "ROYALIST":
             regs = sp.get(REGULAR_BRI, 0)
             tories = sp.get(TORY, 0) + cc_wp
-            if acting_attacker:
+            if not is_defending:
                 tories = min(tories, regs)
-            wp = max(0, sp.get(WARPARTY_A, 0) - cc_wp)
-            cubes = regs + tories + sp.get(WARPARTY_U, 0) + (wp // 2)
+            active_wp = max(0, sp.get(WARPARTY_A, 0) - cc_wp)
+            cubes = regs + tories + _half(active_wp)
         else:
             regs = sp.get(REGULAR_PAT, 0) + sp.get(REGULAR_FRE, 0)
-            mil = sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0)
-            cubes = regs + (mil // 2)
-        forts = sp.get(FORT_BRI if side == "ROYALIST" else FORT_PAT, 0)
-        return cubes + forts
+            active_mil = sp.get(MILITIA_A, 0)
+            cubes = regs + _half(active_mil)
+        if is_defending:
+            forts = sp.get(FORT_BRI if side == "ROYALIST" else FORT_PAT, 0)
+            return cubes + forts
+        return cubes
 
-    att_force = _force(att_side, True)  + attacker_bonus
-    def_force = _force(def_side, False) # ← defender gets no event bonus
+    att_force = _force(att_side, False)  + attacker_bonus  # attacker
+    def_force = _force(def_side, True)   # defender gets Forts
 
     def _loss_roll(force: int, is_defender: bool) -> int:
         # 0 dice if force ≤ 2  | ≤3 dice, each D3
@@ -184,36 +187,72 @@ def _resolve_space(
     attacker_loss += att_mod
     defender_loss += def_mod
 
-    # ── Casualty removal -----------------------------------------------------
+    # ── Casualty removal (§3.6.7) -------------------------------------------
+    is_att_royalist = att_side == "ROYALIST"
+
     def _remove(side: str, loss: int) -> tuple[int, bool]:
+        """Alternate removal per §3.6.7. Underground pieces ignored."""
         if loss <= 0:
             return 0, False
 
-        if side == "ROYALIST":
-            order = (
-                REGULAR_BRI, TORY, WARPARTY_A, WARPARTY_U,
-                FORT_BRI,  # forts last
-            )
-        else:
-            order = (
-                REGULAR_PAT, REGULAR_FRE,
-                MILITIA_A, MILITIA_U,
-                FORT_PAT,
-            )
+        is_defending = (side == def_side)
         removed = 0
         removed_cube_or_fort = False
         remaining_loss = loss
-        for tag in order:
-            avail = sp.get(tag, 0)
-            while avail and remaining_loss > 0:
-                remove_piece(state, tag, sid, 1, to="casualties")
-                removed += 1
-                remaining_loss -= loss_value(tag)
-                avail -= 1
-                if is_cube(tag) or tag in (FORT_BRI, FORT_PAT):
+
+        def _take_one(tag: str) -> bool:
+            nonlocal removed, remaining_loss, removed_cube_or_fort
+            if sp.get(tag, 0) <= 0 or remaining_loss <= 0:
+                return False
+            # Cubes to Casualties; guerrillas/villages to Available
+            dest = "casualties" if is_cube(tag) else "available"
+            remove_piece(state, tag, sid, 1, to=dest)
+            removed += 1
+            remaining_loss -= loss_value(tag)
+            if is_cube(tag) or tag in (FORT_BRI, FORT_PAT):
+                removed_cube_or_fort = True
+            return True
+
+        if side == "ROYALIST":
+            # Phase 1: Alternate Regulars and Tories
+            while remaining_loss > 0:
+                took_reg = _take_one(REGULAR_BRI)
+                if remaining_loss > 0:
+                    took_tory = _take_one(TORY)
+                else:
+                    break
+                if not took_reg and not took_tory:
+                    break
+            # Phase 2: Active War Parties (to Available)
+            while remaining_loss > 0 and sp.get(WARPARTY_A, 0) > 0:
+                _take_one(WARPARTY_A)
+            # Phase 3: If Defending only — Villages then Forts (to Casualties)
+            if is_defending:
+                while remaining_loss > 0 and sp.get(VILLAGE, 0) > 0:
+                    remove_piece(state, VILLAGE, sid, 1, to="available")
+                    removed += 1
+                    remaining_loss -= 1
+                while remaining_loss > 0 and sp.get(FORT_BRI, 0) > 0:
+                    remove_piece(state, FORT_BRI, sid, 1, to="casualties")
+                    removed += 1
+                    remaining_loss -= 1
                     removed_cube_or_fort = True
-            if remaining_loss <= 0:
-                break
+        else:
+            # Phase 1: Alternate French Regulars, Continentals, Active Militia
+            while remaining_loss > 0:
+                took_fre = _take_one(REGULAR_FRE)
+                took_pat = _take_one(REGULAR_PAT) if remaining_loss > 0 else False
+                took_mil = _take_one(MILITIA_A) if remaining_loss > 0 else False
+                if not took_fre and not took_pat and not took_mil:
+                    break
+            # Phase 2: If Defending only — Forts
+            if is_defending:
+                while remaining_loss > 0 and sp.get(FORT_PAT, 0) > 0:
+                    remove_piece(state, FORT_PAT, sid, 1, to="casualties")
+                    removed += 1
+                    remaining_loss -= 1
+                    removed_cube_or_fort = True
+
         return removed, removed_cube_or_fort
 
     pieces_def_lost, def_lost_cube_or_fort = _remove(def_side, defender_loss)
