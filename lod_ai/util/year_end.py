@@ -127,7 +127,7 @@ def _supply_phase(state):
         if fr == 0 or sid == WEST_INDIES_ID:
             continue
 
-        in_supply = sp.get(FORT_PAT) or sp.get("Rebellion_Control")
+        in_supply = sp.get(FORT_PAT) or state.get("control", {}).get(sid) == "REBELLION"
         if in_supply:
             continue
 
@@ -261,16 +261,7 @@ def _resource_income(state):
         meta = map_adj.space_meta(sid) or {}
         space_type = meta.get("type") or sp.get("type")
         pop = meta.get("population", sp.get("pop", 0))
-        # Prefer centralized state["control"] if present; otherwise infer from per-space booleans
-        if sid in control_map:
-            ctrl = control_map[sid]
-        else:
-            if sp.get("British_Control"):
-                ctrl = BRITISH
-            elif sp.get("Patriot_Control") or sp.get("Rebellion_Control"):
-                ctrl = "REBELLION"
-            else:
-                ctrl = None
+        ctrl = control_map.get(sid)
 
         # British Forts
         if sp.get(FORT_BRI):
@@ -358,13 +349,7 @@ def _support_phase(state):
         control_map = {}
 
     def _ctrl(sid, sp):
-        if sid in control_map:
-            return control_map[sid]
-        if sp.get("British_Control"):
-            return BRITISH
-        if sp.get("Patriot_Control") or sp.get("Rebellion_Control"):
-            return "REBELLION"
-        return None
+        return control_map.get(sid)
 
     markers = state.setdefault("markers", {})
     raid_on_map = markers.setdefault(RAID, {"pool": 0, "on_map": set()}).setdefault("on_map", set())

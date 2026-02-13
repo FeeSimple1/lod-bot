@@ -1,6 +1,6 @@
 # Compliance Audit Report
 
-Last updated: Phase 3 (Bot & Rules Compliance)
+Last updated: Phase 3+ (QUESTIONS.md resolutions + British bot corrections)
 
 ---
 
@@ -21,9 +21,9 @@ All `.py` files in `lod_ai/` audited for string literals that should be constant
 
 Source: `Reference Documents/card reference full.txt`
 
-### FIXED cards (30 total)
+### FIXED cards (31 total)
 
-#### late_war.py (24 cards fixed)
+#### late_war.py (25 cards fixed)
 - **Card 1 (Waxhaws)**: Shaded "shift toward Neutral" was shifting -1 (toward Opposition), now correctly shifts toward 0.
 - **Card 7 (John Paul Jones)**: Unshaded allows West Indies OR any City as destination.
 - **Card 16 (Mercy Warren)**: Both paths allow proper target selection (was hardcoded).
@@ -39,6 +39,7 @@ Source: `Reference Documents/card reference full.txt`
 - **Card 62 (Langlade)**: War Party/Tory choice; NY/Quebec/NW target; shaded French/Militia choice.
 - **Card 64 (Fielding)**: **Critical** — shaded was British -3 & FNI +1, corrected to Patriots +5.
 - **Card 66 (Don Bernardo)**: British cube mix; FL or SW target.
+- **Card 70 (British Gain From French in India)**: Bot-specific Regulars removal per Q2 answer.
 - **Card 73 (Sullivan)**: Fixed loop; added FORT_PAT; shaded no-op.
 - **Card 79 (Tuscarora)**: Any Colony (was hardcoded PA).
 - **Card 81 (Creek & Seminole)**: SC or GA; shaded from both; Active WP removal.
@@ -54,7 +55,7 @@ Source: `Reference Documents/card reference full.txt`
 
 #### early_war.py (6 cards fixed)
 - **Card 15 (Morgan's Rifles)**: Shaded allows any Colony.
-- **Card 32 (Rule Britannia)**: Sourcing order Unavailable first.
+- **Card 32 (Rule Britannia)**: Sourcing order Unavailable first; uses refresh_control.
 - **Card 33 (Burning of Falmouth)**: Adjacency lookup for Massachusetts.
 - **Card 35 (Tryon Plot)**: NY or NYC; shaded adjacent space.
 - **Card 46 (Edmund Burke)**: Sourcing order Unavailable first.
@@ -66,16 +67,10 @@ Source: `Reference Documents/card reference full.txt`
 - Not a true interrupt (no pre-action cancel)
 - No leader involvement enforcement
 - Incomplete trump chain and eligibility reset
-
-#### Control access patterns
-- Cards 30, 32 still use `sp.get("British_Control")` instead of control helpers
-- Design pattern issue — both `sp["British_Control"]` and `state["control"][sid]` exist
+- See QUESTIONS.md Q4 (OPEN)
 
 #### Deterministic bot choices
 Cards 2, 6, 24, 28, 80 use hardcoded/alphabetical defaults for player/bot selections.
-
-#### Queued vs immediate free ops
-Cards 1, 21, 48, 52, 66, 67 queue free ops that may need immediate execution.
 
 ---
 
@@ -88,13 +83,30 @@ Cards 1, 21, 48, 52, 66, 67 queue free ops that may need immediate execution.
 
 #### year_end.py
 - **French Blockade rearrangement**: Was hardcoded as "forgo"; Manual Ch 6.5.4 says "French may rearrange."
+- **French Supply**: `sp.get("Rebellion_Control")` → `state.get("control", {}).get(sid) == "REBELLION"`.
 
 #### french.py
 - **F2 event check**: `_faction_event_conditions` was checking `unshaded_event` text — French play SHADED events per flowchart. Fixed to check `shaded_event`.
 - **F10 Muster logic inverted**: Was Mustering in Colonies when WI rebel or >=4 Available. Per flowchart: Muster in WI when <4 Available and WI not Rebel Controlled; otherwise Colony/City with Continentals.
+- **F5 ordering**: Verified correct — Agent Mobilization first, Hortalez as fallback (Q6 RESOLVED).
 
 #### british_bot.py
 - **B3 resource gate missing**: Flowchart requires `British Resources > 0` check before attempting any operations. Added gate with PASS if resources <= 0.
+- **B11 Skirmish space restriction**: Now excludes spaces selected for Battle/Muster/Garrison destination (uses `_turn_affected_spaces`).
+- **B5 Garrison tiebreaker**: Added Underground Militia tiebreaker to city selection.
+- **Reward Loyalty nested sort**: Fixed from `(population, -has_raid)` to `(-marker_count, shift_magnitude)` per reference: "First where fewest Raid + Propaganda markers, then for largest shift in (Support – Opposition)."
+
+#### indians.py
+- **I11 Trade**: British resource transfer now uses half the DIE ROLL (rounded up), not half of Resources. Per OPS reference: "roll 1D6; if result < Brit Resources, offer to transfer half (round up) rolled Resources to Indians."
+
+#### board/control.py
+- **Q1 RESOLVED**: Removed all per-space legacy control flags (`sp["British_Control"]`, `sp["Patriot_Control"]`, `sp["Rebellion_Control"]`). All callers now use `state["control"][sid]` or `refresh_control(state)`.
+
+#### engine.py
+- **Q3 RESOLVED**: Free ops now execute immediately during event resolution. Added `_drain_free_ops()` that runs all queued free ops right after the event handler returns in `handle_event()`.
+
+#### late_war.py
+- **Card 70 Q2 RESOLVED**: Bot-specific Regulars removal. British removes French Regulars from WI first; French removes British from Rebel spaces; Indian removes French from Village spaces; Patriot removes British from Patriot spaces.
 
 ### Engine/Dispatcher/Victory — PASS
 
@@ -111,7 +123,7 @@ Cards 1, 21, 48, 52, 66, 67 queue free ops that may need immediate execution.
 - Desertion (§6.6): 1-in-5 removal with correct rounding.
 - Reset phase (§6.7): Marker removal, eligibility reset, flip to Underground all correct.
 
-### REMAINING bot issues (documented, not fixable without ambiguity resolution)
+### REMAINING bot issues
 
 #### British Bot (british_bot.py)
 - **B1-B2 (Event handling)**: Event eligibility and event/command decision nodes not implemented in flowchart driver — delegated to BaseBot.
@@ -120,13 +132,11 @@ Cards 1, 21, 48, 52, 66, 67 queue free ops that may need immediate execution.
 - **B12 Battle**: Leader modifier (+1 for Gage/Clinton) not included in force level calculation.
 
 #### French Bot (french.py)
-- **F5 pre-treaty flow**: Hortalez/Agent Mobilization ordering may need reversal depending on resource threshold.
 - **F13 Battle precondition**: Should check "Rebel cubes + Leader exceed British pieces" — leader modifier may be missing.
 
 #### Indian Bot (indians.py)
 - **I7 Gather**: Delegates entirely to `gather.execute()` — cannot verify Cornplanter condition (2+ vs 3+ War Parties).
-- **I10 March**: Severely simplified — single move instead of up to 3; no prioritization by Rebel Control or Active Support.
-- **I11 Trade**: Missing British resource request step before Trading.
+- **I10 March**: Severely simplified — single move instead of up to 3; no prioritization by Rebel Control or Active Support. (Q5 answered: implement ALL movements — not yet done.)
 - **I12 Scout**: No destination priority (Fort → Village → Control).
 
 #### Patriot Bot (patriot.py)
@@ -134,3 +144,6 @@ Cards 1, 21, 48, 52, 66, 67 queue free ops that may need immediate execution.
 - **P5 March**: Delegates bullet details to `march.execute()`.
 - **P7 Rally**: Hardcoded 2 Forts; missing Continental promotion step.
 - **P8/P12 Partisans/Skirmish**: Missing priority targeting (Village removal, Fort removal).
+
+#### Brilliant Stroke (QUESTIONS.md Q4 — OPEN)
+- Full trump chain, leader involvement, and eligibility reset not yet implemented.

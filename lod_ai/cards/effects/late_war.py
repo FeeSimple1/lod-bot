@@ -588,12 +588,83 @@ def evt_070_french_india(state, shaded=False):
     """
     Unshaded – Remove 3 Regulars from map or West Indies to Available.
     Shaded   – (none)
+
+    Bot-specific instructions (Q2):
+      British: French Regulars from WI, then spaces with British pieces.
+      French:  British Regulars from spaces with Rebels.
+      Indian:  French Regulars from Village spaces first.
+      Patriot: British Regulars from spaces with Patriot pieces.
     """
     if shaded:
         return
-    removed = remove_piece(state, REGULAR_BRI, None, 3, to="available")
-    if removed < 3:
-        remove_piece(state, REGULAR_FRE, None, 3 - removed, to="available")
+
+    active = state.get("active", "").upper()
+    remaining = 3
+
+    if active == BRITISH:
+        # "Remove French Regulars from West Indies, then from spaces with British pieces."
+        wi = state["spaces"].get(WEST_INDIES_ID, {})
+        take = min(remaining, wi.get(REGULAR_FRE, 0))
+        if take:
+            remaining -= remove_piece(state, REGULAR_FRE, WEST_INDIES_ID, take, to="available")
+        for sid, sp in state["spaces"].items():
+            if remaining <= 0:
+                break
+            if sid == WEST_INDIES_ID:
+                continue
+            if sp.get(REGULAR_BRI, 0) > 0 or sp.get(TORY, 0) > 0:
+                take = min(remaining, sp.get(REGULAR_FRE, 0))
+                if take:
+                    remaining -= remove_piece(state, REGULAR_FRE, sid, take, to="available")
+
+    elif active == FRENCH:
+        # "Remove British Regulars from spaces with Rebels."
+        for sid, sp in state["spaces"].items():
+            if remaining <= 0:
+                break
+            rebels = (sp.get(REGULAR_PAT, 0) + sp.get(REGULAR_FRE, 0)
+                      + sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0))
+            if rebels > 0:
+                take = min(remaining, sp.get(REGULAR_BRI, 0))
+                if take:
+                    remaining -= remove_piece(state, REGULAR_BRI, sid, take, to="available")
+
+    elif active == INDIANS:
+        # "Remove French Regulars from Village spaces first."
+        village_spaces = [
+            (sid, sp) for sid, sp in state["spaces"].items()
+            if sp.get(VILLAGE, 0) > 0
+        ]
+        for sid, sp in village_spaces:
+            if remaining <= 0:
+                break
+            take = min(remaining, sp.get(REGULAR_FRE, 0))
+            if take:
+                remaining -= remove_piece(state, REGULAR_FRE, sid, take, to="available")
+        # Then other spaces
+        for sid, sp in state["spaces"].items():
+            if remaining <= 0:
+                break
+            take = min(remaining, sp.get(REGULAR_FRE, 0))
+            if take:
+                remaining -= remove_piece(state, REGULAR_FRE, sid, take, to="available")
+
+    elif active == PATRIOTS:
+        # "Remove British Regulars from spaces with Patriot pieces."
+        for sid, sp in state["spaces"].items():
+            if remaining <= 0:
+                break
+            pats = (sp.get(REGULAR_PAT, 0) + sp.get(MILITIA_A, 0)
+                    + sp.get(MILITIA_U, 0) + sp.get(FORT_PAT, 0))
+            if pats > 0:
+                take = min(remaining, sp.get(REGULAR_BRI, 0))
+                if take:
+                    remaining -= remove_piece(state, REGULAR_BRI, sid, take, to="available")
+    else:
+        # Fallback: remove British then French (generic)
+        removed = remove_piece(state, REGULAR_BRI, None, remaining, to="available")
+        if removed < remaining:
+            remove_piece(state, REGULAR_FRE, None, remaining - removed, to="available")
 
 # 73  SULLIVAN EXPEDITION VS IROQUOIS
 @register(73)

@@ -406,8 +406,20 @@ class IndianBot(BaseBot):
             return False
 
         target = spaces[0]
+
+        # British bot OPS: "roll 1D6; if result < Brit Resources, offer to
+        # transfer half (round up) rolled Resources to Indians."
+        transfer = 0
+        brit_res = state.get("resources", {}).get(C.BRITISH, 0)
+        if state.get("resources", {}).get(C.INDIANS, 0) < brit_res:
+            roll = state["rng"].randint(1, 6)
+            state.setdefault("rng_log", []).append(("Indian Trade D6", roll))
+            if roll < brit_res:
+                transfer = -(-roll // 2)  # ceil(roll / 2)
+                push_history(state, f"Indian Trade: British offer {transfer} (rolled {roll})")
+
         try:
-            trade.execute(state, C.INDIANS, {}, target, transfer=0)
+            trade.execute(state, C.INDIANS, {}, target, transfer=transfer)
             return True
         except Exception:
             return False

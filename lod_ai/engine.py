@@ -254,6 +254,29 @@ class Engine:
                 normalize_state(target_state)
         return True
 
+    def _drain_free_ops(self, target_state: dict) -> None:
+        """Execute ALL queued free ops immediately (FIFO, all factions).
+
+        Called after an event handler so that free operations granted by cards
+        resolve during event resolution per COIN rules, not on a later turn.
+        """
+        ops = target_state.pop("free_ops", [])
+        if not ops:
+            return
+        old_state = self.state
+        self.state = target_state
+        try:
+            for _fac, _op, _loc in ops:
+                try:
+                    self.dispatcher.execute(_op, faction=_fac, space=_loc, free=True)
+                    push_history(target_state, f"FREE {_op.upper()} by {_fac} in {_loc or 'chosen space'}")
+                    normalize_state(target_state)
+                except Exception:
+                    # If the command fails (e.g. no valid targets), log and continue
+                    push_history(target_state, f"FREE {_op.upper()} by {_fac} — skipped (no valid target)")
+        finally:
+            self.state = old_state
+
     def _base_order(self, card: dict) -> List[str]:
         if isinstance(card.get("order"), (list, tuple)) and card["order"]:
             base_order = [str(f).upper() for f in card["order"]]
@@ -611,6 +634,9 @@ class Engine:
         target_state["active"] = faction
         try:
             handler(target_state, shaded=bool(shaded))
+            # COIN rule: free ops granted by events execute immediately
+            # during event resolution, never deferred to a later turn.
+            self._drain_free_ops(target_state)
         finally:
             if previous_active is None:
                 target_state.pop("active", None)

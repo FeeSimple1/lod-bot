@@ -62,12 +62,8 @@ def refresh_control(state: Dict[str, Any]) -> None:
 
         ctrl_map[str(sid)] = control
 
-        # Also store per-space for callers/tests that expect it.
+        # Also store per-space for callers that expect sp["control"]
         sp["control"] = control
-        sp["British_Control"] = (control == "BRITISH")
-        sp["Patriot_Control"] = (control == "REBELLION")
-        # Keep legacy synonym if other code uses it
-        sp["Rebellion_Control"] = (control == "REBELLION")
 
     state["control"] = ctrl_map
     state["control_map"] = ctrl_map
