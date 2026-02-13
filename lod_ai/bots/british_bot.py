@@ -32,7 +32,7 @@ _MAP_DATA = json.load(
     open(Path(__file__).resolve().parents[1] / "map" / "data" / "map.json")
 )
 CITIES: List[str] = [n for n, d in _MAP_DATA.items() if d.get("type") == "City"]
-WEST_INDIES = "West_Indies"
+WEST_INDIES = C.WEST_INDIES_ID
 
 def _adjacent(space: str) -> List[str]:
     """Return list of adjacent space IDs (split multi‑edge tokens)."""
@@ -43,7 +43,7 @@ def _adjacent(space: str) -> List[str]:
 
 
 class BritishBot(BaseBot):
-    faction = "BRITISH"
+    faction = C.BRITISH
 
     def _support_level(self, state: Dict, sid: str) -> int:
         return state.get("support", {}).get(sid, 0)
@@ -514,7 +514,7 @@ class BritishBot(BaseBot):
             return False
         for name in CITIES:
             sp = state["spaces"][name]
-            if self._control(state, name) == "REBELLION" and sp.get("Patriot_Fort", 0) == 0:
+            if self._control(state, name) == "REBELLION" and sp.get(C.FORT_PAT, 0) == 0:
                 return True
         return False
 
