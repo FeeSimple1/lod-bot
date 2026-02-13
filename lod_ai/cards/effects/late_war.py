@@ -214,11 +214,13 @@ def evt_019_nathan_hale(state, shaded=False):
 @register(21)
 def evt_021_sumter(state, shaded=False):
     """
-    Unshaded – Shift SC or GA 2 levels toward Active Support.
-    Shaded   – Patriots free March to and free Battle in SC or GA.
+    Unshaded – Shift South Carolina or Georgia two levels toward Active Support.
+    Shaded   – Patriots free March to and free Battle in South Carolina or Georgia.
     """
     from lod_ai.util.free_ops import queue_free_op
-    colony = "South_Carolina"
+    colony = state.get("card21_target", "South_Carolina")
+    if colony not in ("South_Carolina", "Georgia"):
+        colony = "South_Carolina"
 
     if shaded:
         queue_free_op(state, PATRIOTS, "march",  colony)
@@ -265,26 +267,59 @@ def evt_023_francis_marion(state, shaded=False):
 # 25  BRITISH PRISON SHIPS
 @register(25)
 def evt_025_prison_ships(state, shaded=False):
-    if shaded:
-        for city in ("New_York_City", "Charles_Town"):
-            place_piece(state, MILITIA_U, city, 1)
-            shift_support(state, city, -1)
-            place_marker(state, PROPAGANDA, city)
+    """
+    Unshaded – Shift two Cities one level each toward Passive Support.
+    Shaded   – In two Cities place one Militia and shift each one level
+               toward Passive Opposition. Place one Propaganda in each.
+    """
+    override = state.get("card25_cities")
+    if isinstance(override, list):
+        cities = [sid for sid in override if sid in state.get("spaces", {})]
     else:
-        for city in ("New_York_City", "Charles_Town"):
-            shift_support(state, city, +1)
+        cities = [sid for sid in sorted(state.get("spaces", {}))
+                  if _is_city_late(sid)]
+
+    if shaded:
+        for city in cities[:2]:
+            place_piece(state, MILITIA_U, city, 1)
+            # One level toward Passive Opposition (-1)
+            cur = state.get("support", {}).get(city, 0)
+            if cur > -1:
+                shift_support(state, city, -1)
+            elif cur < -1:
+                shift_support(state, city, +1)
+            place_marker(state, PROPAGANDA, city, 1)
+        push_history(state, "Card 25 shaded: Militia + Propaganda in 2 Cities")
+    else:
+        for city in cities[:2]:
+            # One level toward Passive Support (+1)
+            cur = state.get("support", {}).get(city, 0)
+            if cur < 1:
+                shift_support(state, city, +1)
+            elif cur > 1:
+                shift_support(state, city, -1)
+        push_history(state, "Card 25 unshaded: 2 Cities toward Passive Support")
 
 
 # 31  THOMAS BROWN & KING’S RANGERS
 @register(31)
 def evt_031_kings_rangers(state, shaded=False):
-    space = "South_Carolina"
+    """
+    Unshaded – Place one British Fort and two Tories in South Carolina or Georgia.
+    Shaded   – Patriots place two Militia in South Carolina or Georgia
+               and may Partisans there.
+    """
+    space = state.get("card31_target", "South_Carolina")
+    if space not in ("South_Carolina", "Georgia"):
+        space = "South_Carolina"
     if shaded:
         place_piece(state, MILITIA_U, space, 2)
         queue_free_op(state, PATRIOTS, "partisans", space)
+        push_history(state, f"Card 31 shaded: 2 Militia + Partisans in {space}")
     else:
         place_with_caps(state, FORT_BRI, space)
         place_piece(state, TORY, space, 2)
+        push_history(state, f"Card 31 unshaded: Fort + 2 Tories in {space}")
 
 
 # 36  NAVAL BATTLE IN WEST INDIES
@@ -610,15 +645,30 @@ def evt_079_tuscarora_oneida(state, shaded=False):
 # 81  CREEK & SEMINOLE ACTIVE IN SOUTH
 @register(81)
 def evt_081_creek_seminole(state, shaded=False):
-    loc = "South_Carolina"
+    """
+    Unshaded – Place two War Parties, one Raid marker, and one Village
+               in South Carolina or Georgia.
+    Shaded   – Remove two War Parties total in South Carolina and/or Georgia.
+    """
     if shaded:
-        removed = remove_piece(state, WARPARTY_U, loc, 2, to="available")
-        if removed < 2:
-            remove_piece(state, WARPARTY_U, "Georgia", 2 - removed, to="available")
+        remaining = 2
+        for loc in ("South_Carolina", "Georgia"):
+            if remaining <= 0:
+                break
+            removed = remove_piece(state, WARPARTY_U, loc, remaining, to="available")
+            remaining -= removed
+            if remaining > 0:
+                removed = remove_piece(state, WARPARTY_A, loc, remaining, to="available")
+                remaining -= removed
+        push_history(state, f"Card 81 shaded: removed {2 - remaining} War Parties")
     else:
+        loc = state.get("card81_target", "South_Carolina")
+        if loc not in ("South_Carolina", "Georgia"):
+            loc = "South_Carolina"
         place_piece(state, WARPARTY_U, loc, 2)
-        place_marker(state, RAID, loc)
+        place_marker(state, RAID, loc, 1)
         place_piece(state, VILLAGE, loc, 1)
+        push_history(state, f"Card 81 unshaded: War Parties + Raid + Village in {loc}")
 
 
 # 85  INDIANS HELP BRITISH RAIDS ON MISSISSIPPI
