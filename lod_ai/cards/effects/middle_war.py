@@ -250,7 +250,7 @@ def evt_009_von_steuben(state, shaded=False):
         if actor == BRITISH:
             if sp.get(REGULAR_BRI, 0) == 0:
                 return False
-            enemy = sp.get(REGULAR_PAT, 0) + sp.get(REGULAR_FRE, 0) + sp.get(TORY, 0)
+            enemy = sp.get(REGULAR_PAT, 0) + sp.get(REGULAR_FRE, 0)
             enemy += sp.get(MILITIA_A, 0)
             return enemy > 0
         if actor == PATRIOTS:

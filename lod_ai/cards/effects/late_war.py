@@ -402,7 +402,7 @@ def evt_048_god_save_king(state, shaded=False):
         # A non-British Faction moves units from three spaces containing
         # British Regulars into any adjacent spaces.
         non_brit_tags = [REGULAR_PAT, REGULAR_FRE, MILITIA_U, MILITIA_A,
-                         WARPARTY_U, WARPARTY_A, TORY]
+                         WARPARTY_U, WARPARTY_A]
         moved_spaces = 0
         for name in list(state.get("spaces", {})):
             if moved_spaces == 3:
