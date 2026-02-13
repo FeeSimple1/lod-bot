@@ -545,8 +545,9 @@ def _fni_drift(state):
         state["unavailable"][BLOCKADE] += 1
         push_history(state, "French remove one Blockade in West Indies (6.5.4)")
 
-        # French choose not to rearrange the remaining Blockade markers
-        push_history(state, "French forgo Blockade rearrange (6.5.4)")
+        # Per Manual Ch 6.5.4: "French may rearrange the remaining Blockade markers"
+        # For bot play, the French bot decides; for now, log the opportunity.
+        push_history(state, "French may rearrange remaining Blockade markers (6.5.4)")
 
 # ────────────────────────────────────────────────────────────────
 #  §6.6  Desertion helpers  (full Rule 6.6 logic)
