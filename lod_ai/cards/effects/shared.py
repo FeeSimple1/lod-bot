@@ -15,7 +15,7 @@ from lod_ai.util.history import push_history  # adjust if your path differs
 from lod_ai.board.pieces import (
     move_piece, place_piece, remove_piece, place_with_caps, place_marker
 )
-from lod_ai.rules_consts import MAX_FNI, MIN_RESOURCES, MAX_RESOURCES
+from lod_ai.rules_consts import MAX_FNI, MIN_RESOURCES, MAX_RESOURCES, BRITISH, PATRIOTS, FRENCH, INDIANS
 from lod_ai.util.loss_mod import queue_loss_mod
 from lod_ai.util.free_ops import queue_free_op
 from lod_ai.economy import resources
@@ -37,10 +37,10 @@ def clamp_resources(state):
     resources.clamp_all(state)
 
 _ALIAS = {
-    "British": "BRITISH",  "BRITISH": "BRITISH",
-    "Patriots": "PATRIOTS", "PATRIOTS": "PATRIOTS",
-    "French": "FRENCH",    "FRENCH": "FRENCH",
-    "Indians": "INDIANS",   "INDIANS": "INDIANS",
+    "British": BRITISH,  BRITISH: BRITISH,
+    "Patriots": PATRIOTS, PATRIOTS: PATRIOTS,
+    "French": FRENCH,    FRENCH: FRENCH,
+    "Indians": INDIANS,   INDIANS: INDIANS,
 }
 def _canon_faction(f: str) -> str:
     return _ALIAS.get(f, f).upper()

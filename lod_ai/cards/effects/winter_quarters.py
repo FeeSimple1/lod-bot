@@ -21,19 +21,19 @@ def _queue_event(state, cid, func):
 
 def _royals_commit(state):
     if state.get("crc", 0) > state.get("cbc", 0):
-        add_resource(state, "FRENCH", 5)
+        add_resource(state, C.FRENCH, 5)
         push_history(state, "Royals Commit – French Resources +5")
     else:
-        add_resource(state, "BRITISH", 5)
+        add_resource(state, C.BRITISH, 5)
         push_history(state, "Royals Commit – British Resources +5")
 
 
 def _overconfident(state):
     if state.get("crc", 0) > state.get("cbc", 0):
-        add_resource(state, "BRITISH", -3)
+        add_resource(state, C.BRITISH, -3)
         push_history(state, "Overconfident – British Resources -3")
     else:
-        add_resource(state, "FRENCH", -3)
+        add_resource(state, C.FRENCH, -3)
         push_history(state, "Overconfident – French Resources -3")
 
 
