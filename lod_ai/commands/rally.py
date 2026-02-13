@@ -64,6 +64,7 @@ from typing import Dict, List, Set, Tuple
 from lod_ai.rules_consts import (
     ACTIVE_SUPPORT, PASSIVE_SUPPORT, NEUTRAL, PASSIVE_OPPOSITION,
     REGULAR_PAT, MILITIA_A, MILITIA_U, FORT_PAT, FORT_BRI, VILLAGE,
+    WEST_INDIES_ID,
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
@@ -87,7 +88,7 @@ def _is_indian_reserve(sp: Dict) -> bool:
 
 
 def _is_west_indies(space_id: str) -> bool:
-    return space_id == "West_Indies"  # canonical ID in map.json
+    return space_id == WEST_INDIES_ID
 
 
 def _place_militia(state: Dict, space_id: str, n: int = 1) -> None:

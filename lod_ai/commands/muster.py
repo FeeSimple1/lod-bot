@@ -40,6 +40,8 @@ from lod_ai.rules_consts import (
     PASSIVE_OPPOSITION, ACTIVE_OPPOSITION,
     # markers
     PROPAGANDA, RAID,
+    # space IDs
+    WEST_INDIES_ID,
 )
 from lod_ai.board.pieces      import add_piece, remove_piece
 from lod_ai.economy.resources import spend, can_afford
@@ -225,7 +227,7 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
         # 2) Tory placement – loop over tory_plan dict
         if tory_plan:
             for sp_id, n in tory_plan.items():
-                if sp_id not in selected or sp_id == "West_Indies":
+                if sp_id not in selected or sp_id == WEST_INDIES_ID:
                     continue
                 support_level = state.get("support", {}).get(sp_id, NEUTRAL)
                 if support_level == ACTIVE_OPPOSITION:
