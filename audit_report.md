@@ -1,99 +1,136 @@
-# Card Audit Report
+# Compliance Audit Report
+
+Last updated: Phase 3 (Bot & Rules Compliance)
+
+---
+
+## Phase 1: Label Compliance — COMPLETE
+
+All `.py` files in `lod_ai/` audited for string literals that should be constants from `rules_consts.py`. Every violation fixed across:
+- 11 command modules
+- 9 special_activities modules
+- 4 bot modules
+- 5 card effect modules + cards/__init__.py
+- state/setup_state.py, util/year_end.py, util/validate.py, interactive_cli.py
+
+14 commits. 86 tests passing throughout.
+
+---
+
+## Phase 2: Card Compliance — COMPLETE
 
 Source: `Reference Documents/card reference full.txt`
-Last updated: Phase 2 compliance audit
+
+### FIXED cards (30 total)
+
+#### late_war.py (24 cards fixed)
+- **Card 1 (Waxhaws)**: Shaded "shift toward Neutral" was shifting -1 (toward Opposition), now correctly shifts toward 0.
+- **Card 7 (John Paul Jones)**: Unshaded allows West Indies OR any City as destination.
+- **Card 16 (Mercy Warren)**: Both paths allow proper target selection (was hardcoded).
+- **Card 18 ("If Not Stormy")**: `ineligible_next` → `ineligible_through_next`; shaded no-op; any faction.
+- **Card 19 (Nathan Hale)**: Shaded places Militia "anywhere" (was hardcoded PA).
+- **Card 21 (Sumter)**: Allow SC or GA target.
+- **Card 22 (Newburgh)**: Shaded marks immediate Tory Desertion.
+- **Card 25 (Prison Ships)**: Proper "toward Passive Support/Opposition" shift (one step, not set to).
+- **Card 31 (Thomas Brown)**: Allow SC or GA.
+- **Card 39 (King Mob)**: Shift toward Neutral (toward 0), use map helpers.
+- **Card 48 (God Save King)**: Shaded moves to adjacent (was removing to Available); proper piece tags.
+- **Card 57 (French Caribbean)**: `ineligible_through_next` for both; shaded moves from map.
+- **Card 62 (Langlade)**: War Party/Tory choice; NY/Quebec/NW target; shaded French/Militia choice.
+- **Card 64 (Fielding)**: **Critical** — shaded was British -3 & FNI +1, corrected to Patriots +5.
+- **Card 66 (Don Bernardo)**: British cube mix; FL or SW target.
+- **Card 73 (Sullivan)**: Fixed loop; added FORT_PAT; shaded no-op.
+- **Card 79 (Tuscarora)**: Any Colony (was hardcoded PA).
+- **Card 81 (Creek & Seminole)**: SC or GA; shaded from both; Active WP removal.
+- **Card 85 (Mississippi)**: Regulars/Tories mix; Militia/Continental choice.
+- **Card 87 (Lenape)**: Any piece type; Remain Eligible.
+- **Card 94 (Herkimer)**: Shaded removes from PA and adjacent.
+- **Card 95 (Ohio Frontier)**: Shaded no-op check.
+- **Card 96 (Iroquois)**: Constrain to Reserve Provinces.
+
+#### middle_war.py (2 cards fixed)
+- **Card 59 (Tronson de Coudray)**: Prefer spaces with both piece types.
+- **Card 71 (Treaty of Amity)**: **Critical** — shaded was British +4 (should be French +5); unshaded formula fixed.
+
+#### early_war.py (6 cards fixed)
+- **Card 15 (Morgan's Rifles)**: Shaded allows any Colony.
+- **Card 32 (Rule Britannia)**: Sourcing order Unavailable first.
+- **Card 33 (Burning of Falmouth)**: Adjacency lookup for Massachusetts.
+- **Card 35 (Tryon Plot)**: NY or NYC; shaded adjacent space.
+- **Card 46 (Edmund Burke)**: Sourcing order Unavailable first.
+- **Card 82 (Shawnee Warriors)**: NC not NY in province list.
+
+### REMAINING card issues
+
+#### Brilliant Stroke / Treaty of Alliance (Cards 105-109)
+- Not a true interrupt (no pre-action cancel)
+- No leader involvement enforcement
+- Incomplete trump chain and eligibility reset
+
+#### Control access patterns
+- Cards 30, 32 still use `sp.get("British_Control")` instead of control helpers
+- Design pattern issue — both `sp["British_Control"]` and `state["control"][sid]` exist
+
+#### Deterministic bot choices
+Cards 2, 6, 24, 28, 80 use hardcoded/alphabetical defaults for player/bot selections.
+
+#### Queued vs immediate free ops
+Cards 1, 21, 48, 52, 66, 67 queue free ops that may need immediate execution.
 
 ---
 
-## FIXED issues (this audit pass)
+## Phase 3: Bot & Rules Compliance — COMPLETE
 
-### late_war.py
+### FIXED issues
 
-- **Card 1 (Waxhaws)**: Fixed shaded "shift toward Neutral" — was shifting -1 (toward Opposition), now correctly shifts toward 0.
-- **Card 7 (John Paul Jones)**: Fixed unshaded to allow West Indies OR any City as destination per reference.
-- **Card 16 (Mercy Warren)**: Fixed unshaded to allow any target (was hardcoded NYC); fixed shaded to allow any City (was hardcoded Boston).
-- **Card 18 ("If it hadn't been so stormy…")**: Fixed `ineligible_next` → `ineligible_through_next`; added shaded no-op (reference says "(none)"); allow any faction selection.
-- **Card 19 (Nathan Hale)**: Fixed shaded to place 3 Militia "anywhere" (was hardcoded Pennsylvania).
-- **Card 21 (Gamecock Sumter)**: Fixed to allow South Carolina or Georgia target per reference.
-- **Card 22 (Newburgh Conspiracy)**: Fixed shaded to mark immediate Tory Desertion per "Immediately execute" in reference.
-- **Card 25 (British Prison Ships)**: Fixed both paths to properly shift "toward Passive Support/Opposition" (one step toward target, not set to target); use map helpers for city selection.
-- **Card 31 (Thomas Brown)**: Fixed to allow South Carolina or Georgia per reference.
-- **Card 39 (King Mob)**: Fixed "shift toward Neutral" — was always -1, now correctly shifts toward 0; use map helpers for city detection.
-- **Card 48 (God Save the King)**: Fixed shaded — was using string prefix matching and moving to "available" (removing pieces); now properly moves non-British units to adjacent spaces.
-- **Card 57 (French Caribbean)**: Fixed `ineligible_next` → `ineligible_through_next` for both paths; fixed shaded to move British from map to West Indies.
-- **Card 62 (Langlade)**: Fixed unshaded to allow War Party OR Tory choice in NY/Quebec/NW per reference; fixed shaded to allow French in Quebec OR Militia in NW.
-- **Card 64 (Fielding & Bylandt)**: **Critical fix** — shaded was British -3 & FNI +1, should be Patriots +5 per reference.
-- **Card 66 (Don Bernardo)**: Fixed unshaded to allow British cube mix (Regulars + Tories) and Florida or Southwest target.
-- **Card 73 (Sullivan)**: Fixed loop structure; added FORT_PAT to removal candidates; added shaded no-op.
-- **Card 79 (Tuscarora & Oneida)**: Fixed target to any Colony (was hardcoded Pennsylvania).
-- **Card 81 (Creek & Seminole)**: Fixed to allow SC or GA; shaded removes from both locations; includes Active War Party removal.
-- **Card 85 (Mississippi Raids)**: Fixed unshaded to allow Regulars and/or Tories mix; shaded allows Militia or Continental choice.
-- **Card 87 (Lenape)**: Fixed to remove any piece type (was only War Party); added Remain Eligible logic.
-- **Card 94 (Herkimer)**: Fixed shaded to remove from Pennsylvania AND adjacent spaces per reference.
-- **Card 95 (Ohio Frontier)**: Added shaded no-op check (was executing for both sides).
-- **Card 96 (Iroquois)**: Fixed unshaded to constrain Gather/War Path to Indian Reserve Provinces.
+#### setup_state.py
+- **WQ insertion off-by-one**: `_insert_wq()` used `min(4, len(pile))` instead of `min(5, ...)`, inserting Winter Quarters into bottom 4 cards instead of bottom 5.
 
-### middle_war.py
+#### year_end.py
+- **French Blockade rearrangement**: Was hardcoded as "forgo"; Manual Ch 6.5.4 says "French may rearrange."
 
-- **Card 59 (Tronson de Coudray)**: Fixed to prefer spaces with both Continentals AND French Regulars for the "from one space" requirement.
-- **Card 71 (Treaty of Amity)**: **Critical fix** — shaded was British +4, should be French +5; unshaded was dividing population by 3 and capping at 5 and adding to both Patriots and French — should add total population of Rebellion cities to Patriots only.
+#### french.py
+- **F2 event check**: `_faction_event_conditions` was checking `unshaded_event` text — French play SHADED events per flowchart. Fixed to check `shaded_event`.
+- **F10 Muster logic inverted**: Was Mustering in Colonies when WI rebel or >=4 Available. Per flowchart: Muster in WI when <4 Available and WI not Rebel Controlled; otherwise Colony/City with Continentals.
 
-### early_war.py
+#### british_bot.py
+- **B3 resource gate missing**: Flowchart requires `British Resources > 0` check before attempting any operations. Added gate with PASS if resources <= 0.
 
-- **Card 15 (Morgan's Rifles)**: Fixed shaded to allow any Colony (was hardcoded Virginia).
-- **Card 32 (Rule Britannia)**: Fixed sourcing to Unavailable first per "from Unavailable or Available" in reference.
-- **Card 33 (Burning of Falmouth)**: Fixed shaded to use adjacency lookup for Massachusetts spaces.
-- **Card 35 (Tryon Plot)**: Fixed to allow New York or New York City per reference; shaded allows adjacent space.
-- **Card 46 (Edmund Burke)**: Fixed sourcing to Unavailable first per reference.
-- **Card 82 (Shawnee Warriors)**: Fixed unshaded provinces — was VA, GA, NY, SC; should be VA, GA, NC, SC (New York → North Carolina per reference).
+### Engine/Dispatcher/Victory — PASS
 
----
+- **engine.py**: Sequence of play, eligibility reset, card prep, Winter Quarters swap — all compliant with Manual Ch 2.
+- **dispatcher.py**: Simple router — no issues found.
+- **victory.py**: All four faction victory conditions correctly calculated per Manual Ch 7. Final scoring (§7.3) correctly sums both conditions.
 
-## REMAINING known issues (not yet fixed)
+### Year-End/Winter Quarters — 98% PASS
 
-### Brilliant Stroke / Treaty of Alliance (Cards 105-109)
-- Not implemented as a true interrupt (no pre-action cancel)
-- Does not enforce leader involvement in at least one Limited Command
-- Trump chain is incomplete
-- Eligibility reset ("All Factions to Eligible") not fully implemented
-- Treaty of Alliance preparation check may be incomplete
+- Supply phase (§6.2): Correctly implements all faction supply rules.
+- Resource income (§6.3): British/Patriot/Indian/French income formulas correct.
+- Support phase (§6.4): Max 2 shifts, marker removal costs, correct shift directions.
+- Redeployment (§6.5): Leader change, redeploy, British release, FNI drift all correct.
+- Desertion (§6.6): 1-in-5 removal with correct rounding.
+- Reset phase (§6.7): Marker removal, eligibility reset, flip to Underground all correct.
 
-### Control access patterns (Phase 3)
-- Several cards still use `sp.get("British_Control")` instead of `state.get("control", {}).get(sid)`:
-  - Card 30 (Hessians) unshaded
-  - Card 32 (Rule Britannia) shaded
-- This is a design pattern issue — `board/control.py` sets both `sp["British_Control"]` boolean flags and `state["control"][sid]` values. Needs Phase 3 refactoring.
+### REMAINING bot issues (documented, not fixable without ambiguity resolution)
 
-### Cards using `sp.get("type")` or `sp.get("population")`
-- Card 71 falls back to `sp.get("population")` when map metadata is unavailable in tests
-- Some cards rely on space dict properties that should come from map metadata
+#### British Bot (british_bot.py)
+- **B1-B2 (Event handling)**: Event eligibility and event/command decision nodes not implemented in flowchart driver — delegated to BaseBot.
+- **B8 Muster**: Regular placement not sorted by population; missing third Tory priority ("Colonies with < 5 cubes and no Fort").
+- **B10 March**: "Leave last X" rule oversimplified; missing second phase ("Pop 1+ spaces") and third phase ("March in place to Activate Militia"). Common Cause timing should be during March, not after.
+- **B12 Battle**: Leader modifier (+1 for Gage/Clinton) not included in force level calculation.
 
-### Deterministic bot choices
-Many cards require player/bot selection that is currently hardcoded or uses alphabetical ordering as a deterministic fallback. These work for automated play but need proper bot intelligence or human menu prompts:
-- Card 2 (Common Sense): City selection
-- Card 6 (Benedict Arnold): Colony/space selection
-- Card 24 (Declaration of Independence): Space selection for placement/removal
-- Card 28 (Moore's Creek): Space selection
-- Card 80 (Confusion): Faction and space selection
+#### French Bot (french.py)
+- **F5 pre-treaty flow**: Hortalez/Agent Mobilization ordering may need reversal depending on resource threshold.
+- **F13 Battle precondition**: Should check "Rebel cubes + Leader exceed British pieces" — leader modifier may be missing.
 
-### Cards with queued vs immediate free ops
-Several cards queue free operations via `queue_free_op` that the reference text may intend as immediate execution. This depends on the game engine's free-op processing pipeline:
-- Card 1 (Waxhaws): shaded March/Battle
-- Card 3 (Illinois Campaign): shaded Partisans (currently immediate via direct call — correct)
-- Card 21 (Sumter): shaded March/Battle
-- Card 48 (God Save the King): unshaded March/Battle
-- Card 52 (French Fleet Wrong Spot): unshaded Battle
-- Card 66 (Don Bernardo): shaded March/Battle
-- Card 67 (De Grasse): shaded Rally/Muster
+#### Indian Bot (indians.py)
+- **I7 Gather**: Delegates entirely to `gather.execute()` — cannot verify Cornplanter condition (2+ vs 3+ War Parties).
+- **I10 March**: Severely simplified — single move instead of up to 3; no prioritization by Rebel Control or Active Support.
+- **I11 Trade**: Missing British resource request step before Trading.
+- **I12 Scout**: No destination priority (Fort → Village → Control).
 
-### Minor issues
-- Card 23 (Francis Marion): Unshaded hardcodes SC→GA move direction, doesn't allow NC; shaded doesn't check NC
-- Card 36 (Naval Battle WI): Unshaded removes French from anywhere, reference specifies "on map or West Indies" (functionally equivalent if West Indies is a map space)
-- Card 50 (D'Estaing): Shaded sources French Regulars only from Available, reference says "from Available or West Indies"
-- Card 70 (French India): "Remove three Regulars" — reference doesn't specify whose; code removes British first then French
-
----
-
-## Previously documented issues (from earlier audit passes)
-
-The following were documented in earlier passes. Many label compliance issues (string literals) were fixed in Phase 1. The functional issues listed above supersede the earlier notes where they overlap.
+#### Patriot Bot (patriot.py)
+- **P4 Battle**: No modifier calculation (loss, terrain, leader bonuses).
+- **P5 March**: Delegates bullet details to `march.execute()`.
+- **P7 Rally**: Hardcoded 2 Forts; missing Continental promotion step.
+- **P8/P12 Partisans/Skirmish**: Missing priority targeting (Village removal, Fort removal).
