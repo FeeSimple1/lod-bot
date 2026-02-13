@@ -353,3 +353,19 @@ def test_card54_sartine_unshaded_moves_from_wi_to_unavailable():
     assert state["unavailable"].get(BLOCKADE, 0) == 2
     assert "Boston" in state["markers"][BLOCKADE]["on_map"]
     assert total_blockades(state) == 3
+
+
+def test_card29_bancroft_activates_both_factions():
+    """Card 29: Both Patriots (Militia) and Indians (WP) should activate."""
+    state = _base_state()
+    state["spaces"] = {
+        "A": {MILITIA_U: 6, MILITIA_A: 0, WARPARTY_U: 4, WARPARTY_A: 0},
+    }
+    early_war.evt_029_bancroft(state, shaded=False)
+
+    # 6 total Militia → target 3 Active
+    assert state["spaces"]["A"].get(MILITIA_A, 0) == 3
+    assert state["spaces"]["A"].get(MILITIA_U, 0) == 3
+    # 4 total WP → target 2 Active
+    assert state["spaces"]["A"].get(WARPARTY_A, 0) == 2
+    assert state["spaces"]["A"].get(WARPARTY_U, 0) == 2

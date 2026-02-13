@@ -149,6 +149,42 @@ def test_reset_phase_cleans_up(monkeypatch):
     assert lifted.get("done") is True
 
 
+def test_desertion_runs_unconditionally(monkeypatch):
+    """§6.6: Desertion is unconditional — runs every WQ without winter_flag."""
+    state = basic_state()
+    state["spaces"] = {
+        "A": {"type": "Colony", C.MILITIA_U: 10, C.MILITIA_A: 0, C.REGULAR_PAT: 5},
+        "B": {"type": "Colony", C.TORY: 10},
+        C.WEST_INDIES_ID: {},
+    }
+    state["control"] = {"A": "REBELLION", "B": "BRITISH", C.WEST_INDIES_ID: None}
+    state["eligible"] = {C.BRITISH: True, C.PATRIOTS: True, C.FRENCH: True, C.INDIANS: True}
+    # Do NOT set winter_flag — desertion should still run
+    monkeypatch.setattr(year_end, "victory_check", lambda s: False)
+    monkeypatch.setattr(year_end, "return_leaders", lambda s: None)
+    monkeypatch.setattr(year_end, "_supply_phase", lambda s: None)
+    monkeypatch.setattr(year_end, "_resource_income", lambda s: None)
+    monkeypatch.setattr(year_end, "_support_phase", lambda s: None)
+    monkeypatch.setattr(year_end, "_leader_change", lambda s: None)
+    monkeypatch.setattr(year_end, "_leader_redeploy", lambda s: None)
+    monkeypatch.setattr(year_end, "_british_release", lambda s: None)
+    monkeypatch.setattr(year_end, "_fni_drift", lambda s: None)
+    monkeypatch.setattr(year_end, "_reset_phase", lambda s: None)
+
+    year_end.resolve(state)
+
+    # Desertion should have reduced pieces even without winter_flag
+    total_militia = sum(
+        sp.get(C.MILITIA_U, 0) + sp.get(C.MILITIA_A, 0)
+        for sp in state["spaces"].values()
+    )
+    total_tories = sum(sp.get(C.TORY, 0) for sp in state["spaces"].values())
+    # 10 Militia → remove 2 (10//5), so 8 remain
+    assert total_militia == 8
+    # 10 Tories → remove 2 (10//5), so 8 remain
+    assert total_tories == 8
+
+
 def test_reset_phase_keeps_existing_upcoming(monkeypatch):
     state = basic_state()
     state["spaces"][C.WEST_INDIES_ID] = {}

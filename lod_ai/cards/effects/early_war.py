@@ -267,64 +267,39 @@ def evt_028_moores_creek(state, shaded=False):
 @register(29)
 def evt_029_bancroft(state, shaded=False):
     """
-    Unshaded only – Patriots or Indians must Activate their Militia or
+    Unshaded – Patriots AND Indians must Activate their Militia or
     War Parties until 1/2 of them are Active (rounded down).
     """
     if shaded:
         return
 
-    def _pick_target_faction() -> str:
-        explicit = state.get("card29_target") or state.get("bancroft_target")
-        if explicit:
-            choice = str(explicit).upper()
-            if choice in {PATRIOTS, INDIANS}:
-                return choice
+    def _activate_faction(hidden_tag, active_tag, faction_name):
+        total = sum(sp.get(hidden_tag, 0) + sp.get(active_tag, 0)
+                    for sp in state["spaces"].values())
+        if total == 0:
+            return
+        target_active = total // 2
+        cur_active = sum(sp.get(active_tag, 0) for sp in state["spaces"].values())
+        need = max(0, target_active - cur_active)
+        if need == 0:
+            return
+        flipped = 0
+        for _, sp in state["spaces"].items():
+            if flipped == need:
+                break
+            here = sp.get(hidden_tag, 0)
+            if here:
+                take = min(here, need - flipped)
+                sp[hidden_tag] -= take
+                if sp[hidden_tag] == 0:
+                    del sp[hidden_tag]
+                sp[active_tag] = sp.get(active_tag, 0) + take
+                flipped += take
+        push_history(state, f"Bancroft activates {flipped} {faction_name} (to {target_active} Active)")
 
-        militia_total = sum(
-            sp.get(MILITIA_U, 0) + sp.get(MILITIA_A, 0)
-            for sp in state["spaces"].values()
-        )
-        warparty_total = sum(
-            sp.get(WARPARTY_U, 0) + sp.get(WARPARTY_A, 0)
-            for sp in state["spaces"].values()
-        )
-        return INDIANS if warparty_total > militia_total else PATRIOTS
-
-    target_faction = _pick_target_faction()
-    hidden_tag, active_tag = (
-        (MILITIA_U, MILITIA_A)
-        if target_faction == PATRIOTS
-        else (WARPARTY_U, WARPARTY_A)
-    )
-
-    total = sum(sp.get(hidden_tag, 0) + sp.get(active_tag, 0)
-                for sp in state["spaces"].values())
-    if total == 0:
-        return
-
-    target_active = total // 2
-    cur_active = sum(sp.get(active_tag, 0) for sp in state["spaces"].values())
-    need = max(0, target_active - cur_active)
-    if need == 0:
-        return
-
-    flipped = 0
-    for _, sp in state["spaces"].items():
-        if flipped == need:
-            break
-        here = sp.get(hidden_tag, 0)
-        if here:
-            take = min(here, need - flipped)
-            sp[hidden_tag] -= take
-            if sp[hidden_tag] == 0:
-                del sp[hidden_tag]
-            sp[active_tag] = sp.get(active_tag, 0) + take
-            flipped += take
-
-    push_history(
-        state,
-        f"Bancroft activates {flipped} for {target_faction} (to reach {target_active} Active)",
-    )
+    # Both factions activate their respective pieces
+    _activate_faction(MILITIA_U, MILITIA_A, "Militia")
+    _activate_faction(WARPARTY_U, WARPARTY_A, "War Parties")
 
 # 30  HESSIANS
 @register(30)

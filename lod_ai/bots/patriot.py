@@ -138,20 +138,31 @@ class PatriotBot(BaseBot):
     # ===================================================================
     # ---------- Battle (P4) -------------------------------------------
     def _battle_possible(self, state: Dict) -> bool:
+        """P6: 'Rebel cubes + Leader > Active British and/or Indian pieces
+        in space with both?'"""
         refresh_control(state)
         for sid, sp in state["spaces"].items():
-            if self._battle_strength(sp) > self._british_strength(sp):
+            rebel = self._rebel_cube_count(state, sid)
+            royal = self._active_royal_count(sp)
+            if rebel > 0 and royal > 0 and rebel > royal:
                 return True
         return False
 
     def _execute_battle(self, state: Dict) -> bool:
-        """Select targets per P4 bullets and resolve Battle."""
+        """P4: Select targets per priority bullets and resolve Battle.
+
+        Sort: first with Washington, then highest Pop, then most Villages,
+        then random.
+        """
         refresh_control(state)
         targets = []
         for sid, sp in state["spaces"].items():
-            if self._battle_strength(sp) > self._british_strength(sp):
-                has_wash = sp.get("leader") == "LEADER_WASHINGTON"
-                pop = sp.get("population", 0)
+            rebel = self._rebel_cube_count(state, sid)
+            royal = self._active_royal_count(sp)
+            if rebel > royal and royal > 0:
+                leader_loc = state.get("leaders", {}).get(sid, "")
+                has_wash = 1 if leader_loc == "LEADER_WASHINGTON" else 0
+                pop = _MAP_DATA.get(sid, {}).get("population", 0)
                 villages = sp.get(C.VILLAGE, 0)
                 targets.append((-has_wash, -pop, -villages, random.random(), sid))
         if not targets:
@@ -161,20 +172,21 @@ class PatriotBot(BaseBot):
         battle.execute(state, self.faction, {}, chosen)
         return True
 
-    def _battle_strength(self, sp: Dict) -> int:
-        rebels = (
-            sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0) +
-            sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
-        )
-        # include French if present
-        return rebels
+    def _rebel_cube_count(self, state: Dict, sid: str) -> int:
+        """P6: 'Rebel cubes + Leader' = Continentals + French Regulars + leader."""
+        sp = state["spaces"].get(sid, {})
+        cubes = sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+        leader_loc = state.get("leaders", {}).get(sid, "")
+        if leader_loc == "LEADER_WASHINGTON":
+            cubes += 1
+        return cubes
 
-    def _british_strength(self, sp: Dict) -> int:
-        royal = (
+    def _active_royal_count(self, sp: Dict) -> int:
+        """P6: 'Active British and/or Indian pieces'."""
+        return (
             sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0) +
-            sp.get(C.WARPARTY_A, 0)  # active Indians only per rule
+            sp.get(C.WARPARTY_A, 0)
         )
-        return royal
 
     # ---------- March (P5) --------------------------------------------
     def _execute_march(self, state: Dict) -> bool:
@@ -202,7 +214,7 @@ class PatriotBot(BaseBot):
                 [sid],
                 [dst],
                 bring_escorts=True,
-                limited=True,
+                limited=False,
             )
             used += 1
         return used > 0
@@ -214,18 +226,19 @@ class PatriotBot(BaseBot):
         )
 
     def _march_destination(self, state: Dict, origin: str) -> str | None:
-        """Pick destination per bullet list (Villages > Cities > other)."""
+        """Pick destination per P5 bullets (Villages > Cities > other, highest Pop)."""
         best = None
         best_key = (-1, -1, -1)
+        ctrl = state.get("control", {})
         for token in _MAP_DATA[origin]["adj"]:
             for dst in token.split("|"):
-                dsp = state["spaces"][dst]
-                if dsp.get("control") == "REBELLION":
+                if dst not in state.get("spaces", {}):
                     continue
-                # lose no Rebel Control in origin/destination test left to command layer
-                has_village = dsp.get(C.VILLAGE, 0)
-                is_city = dst in CITIES
-                pop = dsp.get("population", 0)
+                if ctrl.get(dst) == "REBELLION":
+                    continue
+                has_village = state["spaces"][dst].get(C.VILLAGE, 0)
+                is_city = 1 if dst in CITIES else 0
+                pop = _MAP_DATA.get(dst, {}).get("population", 0)
                 key = (has_village, is_city, pop)
                 if key > best_key:
                     best_key = key
@@ -259,8 +272,9 @@ class PatriotBot(BaseBot):
                 militia_spaces.append(sid)
         if not militia_spaces:
             # else try to flip control elsewhere
+            ctrl = state.get("control", {})
             for sid, sp in state["spaces"].items():
-                if sp.get("control") != "REBELLION":
+                if ctrl.get(sid) != "REBELLION":
                     militia_spaces.append(sid)
         militia_spaces = militia_spaces[:4]
 
@@ -322,9 +336,10 @@ class PatriotBot(BaseBot):
         return False
 
     def _try_persuasion(self, state: Dict) -> bool:
+        ctrl = state.get("control", {})
         spaces = [
             sid for sid, sp in state["spaces"].items()
-            if sp.get("control") == "REBELLION" and sp.get(C.MILITIA_U, 0)
+            if ctrl.get(sid) == "REBELLION" and sp.get(C.MILITIA_U, 0)
         ]
         if not spaces:
             return False
@@ -358,19 +373,20 @@ class PatriotBot(BaseBot):
     #  EVENT‑VS‑COMMAND BULLETS  (P2)
     # ===================================================================
     def _faction_event_conditions(self, state: Dict, card: Dict) -> bool:
-        text = card.get("unshaded_event", "")
+        # Patriots play SHADED events per flowchart P2
+        text = card.get("shaded_event", "") or ""
         support_map = state.get("support", {})
         sup = sum(max(0, lvl) for lvl in support_map.values())
         opp = sum(max(0, -lvl) for lvl in support_map.values())
 
-        # • Support > Opposition & event shifts Support/Opposition
+        # • Support > Opposition & event shifts Support/Opposition in Rebel favor
         if sup > opp and any(k in text for k in ("Support", "Opposition")):
             return True
-        # • Places Militia underground, Fort, or removes Village
+        # • Places Underground Militia, Patriot Fort, or removes Village
         if any(k in text for k in ("Militia", "Fort", "Village")):
             return True
-        # • Adds ≥3 Patriot Resources
+        # • Adds 3+ Patriot Resources
         if "Resources" in text:
             return True
-        # • Ineffective die‑roll bullet handled by BaseBot after effectiveness test
+        # • Ineffective die-roll bullet handled by BaseBot after effectiveness test
         return False

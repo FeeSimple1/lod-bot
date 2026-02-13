@@ -69,12 +69,12 @@ def mark_bs_played(state, key: str, played: bool) -> None:
 
 def preparations_total(state) -> int:
     """French Preparations = Available French Regulars + Squadrons/Blockades
-    + half Cumulative British Casualties (rounded down)."""
+    + Cumulative British Casualties (§2.3.9)."""
     available = state.get("available", {})
     fre_regs = available.get(REGULAR_FRE, 0)
     naval = total_blockades(state)
-    half_cbc = state.get("cbc", 0) // 2
-    return fre_regs + naval + half_cbc
+    cbc = state.get("cbc", 0)
+    return fre_regs + naval + cbc
 
 
 def leader_can_involve(state, faction: str) -> bool:

@@ -75,9 +75,9 @@ def test_card71_unshaded_resources_from_rebellion_cities():
     to Patriot Resources.'  Only Patriots receive, not French."""
     state = _base_state()
     state["spaces"] = {
-        "Boston": {MILITIA_A: 2, "population": 6},
-        "Philadelphia": {MILITIA_U: 1, "population": 3},
-        "New_York_City": {REGULAR_BRI: 1, "population": 6},
+        "Boston": {MILITIA_A: 2},
+        "Philadelphia": {MILITIA_U: 1},
+        "New_York_City": {REGULAR_BRI: 1},
     }
     # Pre-set control so test does not depend on refresh_control details
     state["control"] = {
@@ -88,8 +88,8 @@ def test_card71_unshaded_resources_from_rebellion_cities():
 
     middle_war.evt_071_treaty_amity(state, shaded=False)
 
-    # Boston (pop 6) + Philadelphia (pop 3) = 9
-    assert state["resources"][PATRIOTS] == 9
+    # Boston (pop 1) + Philadelphia (pop 1) = 2 per map_base.csv
+    assert state["resources"][PATRIOTS] == 2
     assert state["resources"][FRENCH] == 0
 
 
