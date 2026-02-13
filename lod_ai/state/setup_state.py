@@ -28,9 +28,10 @@ from lod_ai.rules_consts import (
     REGULAR_BRI, REGULAR_FRE, REGULAR_PAT,
     TORY, MILITIA_A, MILITIA_U, WARPARTY_A, WARPARTY_U,
     FORT_BRI, FORT_PAT, VILLAGE,
+    FRENCH_UNAVAIL, BRIT_UNAVAIL, TORY_UNAVAIL,
 
     # marker tags
-    PROPAGANDA, RAID, BLOCKADE,
+    PROPAGANDA, RAID, BLOCKADE, SQUADRON,
 
     # factions
     BRITISH, PATRIOTS, FRENCH, INDIANS,
@@ -154,11 +155,11 @@ def _apply_unavailable_block(state: Dict[str, Any], scenario: Dict[str, Any]) ->
     unavailable = state["unavailable"]
 
     key_map = {
-        "French_Regular_Unavailable": REGULAR_FRE,
-        "British_Regular_Unavailable": REGULAR_BRI,
-        "British_Tory_Unavailable": TORY,
-        "Squadron": BLOCKADE,
-        "Blockade": BLOCKADE,
+        FRENCH_UNAVAIL: REGULAR_FRE,
+        BRIT_UNAVAIL: REGULAR_BRI,
+        TORY_UNAVAIL: TORY,
+        SQUADRON: BLOCKADE,
+        BLOCKADE: BLOCKADE,
     }
 
     for json_key, qty in unavail.items():
