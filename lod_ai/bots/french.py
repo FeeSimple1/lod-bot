@@ -95,16 +95,21 @@ class FrenchBot(BaseBot):
     #  FLOW‑CHART DRIVER
     # ===================================================================
     def _follow_flowchart(self, state: Dict) -> None:
+        # F3: French Resources > 0?
+        if state.get("resources", {}).get(C.FRENCH, 0) <= 0:
+            push_history(state, "FRENCH PASS (no Resources)")
+            return
+
         treaty = state.get("toa_played", False)
 
-        # -------- PRE‑TREATY BRANCH (F5‑F8) ----------------------------------
+        # -------- PRE-TREATY BRANCH (F5-F8) ----------------------------------
         if not treaty:
             if self._before_treaty(state):
                 return
             push_history(state, "FRENCH PASS")
             return
 
-        # -------- POST‑TREATY BRANCH (F9‑F17) ------------------------------
+        # -------- POST-TREATY BRANCH (F9-F17) --------------------------------
         if self._after_treaty(state):
             return
         push_history(state, "FRENCH PASS")
@@ -232,12 +237,13 @@ class FrenchBot(BaseBot):
     def _agent_mobilization(self, state: Dict) -> bool:
         """Place 2 Militia or 1 Continental per F7 priorities."""
         best, best_score = None, -1
+        ctrl = state.get("control", {})
         for prov in _VALID_PROVINCES:
             sp = state["spaces"].get(prov)
             if not sp:
                 continue
             # first to add most Rebel Control, then most Patriot units
-            rc_shift = 1 if sp.get("control") != "REBELLION" else 0
+            rc_shift = 1 if ctrl.get(prov) != "REBELLION" else 0
             patriots = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0) + sp.get(C.REGULAR_PAT, 0)
             score = rc_shift * 10 + patriots
             if score > best_score:
@@ -276,22 +282,21 @@ class FrenchBot(BaseBot):
         """
         west_indies = state["spaces"].get(WEST_INDIES)
         avail_regs = state["available"].get(C.REGULAR_FRE, 0)
-        west_rebel = bool(west_indies and west_indies.get("control") == "REBELLION")
+        ctrl = state.get("control", {})
+        west_rebel = ctrl.get(WEST_INDIES) == "REBELLION"
 
         if avail_regs < 4 and not west_rebel:
-            # Muster in West Indies
             targets = [WEST_INDIES] if west_indies else []
         else:
-            # Muster first in Colony/City with Continentals, then random
+            # Muster first in Colony/City with Continentals and Rebel Control
             targets = [
                 sid for sid, sp in state["spaces"].items()
-                if (sp.get(C.REGULAR_PAT, 0) > 0) and sp.get("control") == "REBELLION"
+                if sp.get(C.REGULAR_PAT, 0) > 0 and ctrl.get(sid) == "REBELLION"
             ]
             if not targets:
-                # Fall back to any space with Rebel Control
                 targets = [
-                    sid for sid, sp in state["spaces"].items()
-                    if sp.get("control") == "REBELLION"
+                    sid for sid in state["spaces"]
+                    if ctrl.get(sid) == "REBELLION"
                 ]
 
         if not targets:
@@ -302,44 +307,56 @@ class FrenchBot(BaseBot):
 
     # ----- March (F14) -----------------------------------------
     def _march(self, state: Dict) -> bool:
+        """F14: March with French Regulars + Continentals to add Rebel Control,
+        first in Cities, within that first where most British.
+        """
         refresh_control(state)
-        # Primary: add Rebel Control in Cities first
-        candidates: List[Tuple[int, str, str]] = []
+        ctrl = state.get("control", {})
+        candidates: List[Tuple[tuple, str, str]] = []
         for src, sp in state["spaces"].items():
             if sp.get(C.REGULAR_FRE, 0) == 0:
                 continue
-            for adj in _MAP_DATA[src]["adj"]:
+            for adj in _MAP_DATA.get(src, {}).get("adj", []):
                 for dst in adj.split("|"):
-                    dsp = state["spaces"][dst]
-                    if dsp.get("control") == "REBELLION":
+                    if dst not in state.get("spaces", {}):
                         continue
-                    dest_score = (dst in _VALID_PROVINCES) * 2 + dsp.get("population", 0)
-                    candidates.append((dest_score, src, dst))
+                    if ctrl.get(dst) == "REBELLION":
+                        continue
+                    dsp = state["spaces"][dst]
+                    is_city = 1 if _MAP_DATA.get(dst, {}).get("type") == "City" else 0
+                    british = dsp.get(C.REGULAR_BRI, 0) + dsp.get(C.TORY, 0)
+                    candidates.append(((is_city, british, random.random()), src, dst))
         if not candidates:
             return False
         _, src, dst = max(candidates)
-        march.execute(state, C.FRENCH, {}, [src], [dst], bring_escorts=False, limited=True)
+        march.execute(state, C.FRENCH, {}, [src], [dst], bring_escorts=False, limited=False)
         return True
 
     # ----- Battle (F16) ----------------------------------------
     def _battle(self, state: Dict) -> bool:
+        """F16: Select spaces where Rebel Force > Royalist Force, highest Pop.
+        SA entry at F17 (Naval Pressure), not F12.
+        """
         refresh_control(state)
         targets = []
         for sid, sp in state["spaces"].items():
-            rebel_force = (
-                sp.get(C.REGULAR_FRE, 0)
-                + sp.get(C.REGULAR_PAT, 0)
-                + sp.get(C.MILITIA_A, 0)
-                + sp.get(C.MILITIA_U, 0)
-            )
-            crown_force = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
-            if rebel_force > crown_force and crown_force > 0:
-                targets.append((sp.get("population", 0), sid))
+            # Rebel force: cubes + half militia + forts (§3.6.2-3.6.3)
+            rebel_cubes = sp.get(C.REGULAR_FRE, 0) + sp.get(C.REGULAR_PAT, 0)
+            total_militia = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+            rebel_force = rebel_cubes + (total_militia // 2)
+
+            # Royalist force: cubes + forts + half WP
+            crown_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+            crown_force = crown_cubes + sp.get(C.FORT_BRI, 0) + (sp.get(C.WARPARTY_A, 0) // 2)
+
+            if rebel_force > crown_force and crown_cubes > 0:
+                pop = _MAP_DATA.get(sid, {}).get("population", 0)
+                targets.append((pop, sid))
         if not targets:
             return False
         targets.sort(reverse=True)
-        # Pre‑Battle SA: Skirmish loop (chart arrow “First execute a SA”)
-        self._skirmish_loop(state)
+        # F16: "First execute a Special Activity." SA entry at F17 (Naval Pressure)
+        self._try_naval_pressure(state)
         battle.execute(state, C.FRENCH, {}, [sid for _, sid in targets])
         return True
 

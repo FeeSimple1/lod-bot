@@ -29,3 +29,23 @@ def test_french_bot_turn():
     bot = FrenchBot()
     bot.take_turn(state, card)
     assert state.get("history")
+
+
+def test_f3_zero_resources_passes():
+    """F3: French Resources > 0? No → PASS immediately."""
+    from lod_ai import rules_consts as C
+    bot = FrenchBot()
+    state = {
+        "spaces": {"Quebec": {"French_Regular": 2, "adj": []}},
+        "resources": {C.BRITISH: 5, C.PATRIOTS: 5, C.FRENCH: 0, C.INDIANS: 5},
+        "available": {C.REGULAR_FRE: 4},
+        "rng": __import__("random").Random(42),
+        "history": [],
+        "support": {},
+        "toa_played": True,
+        "casualties": {},
+    }
+    card = {"id": 9999, "order_icons": "BFPI"}
+    bot.take_turn(state, card)
+    history = " ".join(str(h) for h in state.get("history", []))
+    assert "FRENCH PASS" in history
