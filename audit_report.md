@@ -148,3 +148,42 @@ Cards 2, 6, 24, 28, 80 use hardcoded/alphabetical defaults for player/bot select
 - **P8/P12 Partisans/Skirmish**: Missing priority targeting (Village removal, Fort removal).
 
 #### Brilliant Stroke — RESOLVED (see Phase 2 section above)
+
+---
+
+## Session 2 Fixes (Review Session)
+
+### Battle Loss Modifiers — COMPLETE
+- **§3.6.5 Defender Loss**: Rewrote with all modifiers: +1 half regs, +1 underground, +1 attacking leader, +1 Lauzun (French attacking), -1 blockaded city, -1 WI squadron, -1 per defending fort, -1 Indians in reserve, -1 Washington defending.
+- **§3.6.6 Attacker Loss**: All modifiers: +1 half regs, +1 underground, +1 defending leader, -1 blockaded city, -1 WI squadron, +1 per defending fort.
+- Washington modifier was previously applied to wrong side (attacker loss instead of defender loss). Fixed.
+- 24 unit tests added (test_battle_modifiers.py).
+
+### Brilliant Stroke Cards 105-108 — COMPLETE
+- Replaced loop-based stubs with individual named functions (evt_105_bs_patriots, etc.).
+- Each handler records a declaration, resets all factions to Eligible, and logs.
+- Does NOT call mark_bs_played (engine handles this during trump resolution).
+- Card 109 (ToA) enhanced to also reset eligibility.
+
+### Free Ops Drain — COMPLETE
+- **BS resolution path**: apply_treaty_of_alliance() queues a free Muster but _drain_free_ops was never called in _resolve_brilliant_stroke_interrupt. Fixed.
+- **Bot play_turn path**: bot.take_turn() → _execute_event() calls handlers directly, bypassing engine.handle_event() where drain existed. Added drain after _commit_state in play_turn.
+- WQ event path verified safe (WQ card handlers 97-104 don't queue free ops).
+- Added test verifying free ops drain after handle_event.
+
+### Card Handler Fixes — COMPLETE
+- **Card 50 (Admiral d'Estaing) shaded**: French Regulars now drawn from Available OR West Indies per reference "(from Available or West Indies)". Was only drawing from Available.
+- **Card 4 (Penobscot) shaded**: Added Fort_BRI fallback for Crown when Village cap reached, matching reference "Fort or Village".
+- **Card 72 (French Settlers)**: Verified correct — proper fallback and piece selection already in place.
+- Added 6 tests for cards 4 and 50.
+
+### British Release Date (§6.5.3) — COMPLETE
+- `_british_release()` expected integer but scenario JSON has year-keyed dict of piece counts.
+- Called nonexistent `bp.lift_unavailable()`.
+- Only released Regulars, ignoring Tories.
+- **Fix**: build_state() converts year-keyed dict to ordered list of tranches. _british_release() pops one per WQ, moves both Regulars and Tories.
+- Added brit_release to 1776_medium.json (was missing: 6 Regs + 6 Tories after 1776).
+- 4 tests added.
+
+### Pre-existing Issues Documented
+- **Q7** (QUESTIONS.md): _execute_bot_brilliant_stroke() hardcodes command priorities instead of consulting faction flowcharts per §8.3.7.
