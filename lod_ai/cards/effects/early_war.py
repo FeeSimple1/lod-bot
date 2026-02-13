@@ -19,6 +19,7 @@ from lod_ai.rules_consts import (
     ACTIVE_SUPPORT,
 )
 from lod_ai.util.naval import move_blockades_to_unavailable, move_blockades_to_west_indies
+from lod_ai.board.control import refresh_control
 
 def _pick_spaces_with_militia(state, max_spaces=4):
     """Return up to *max_spaces* IDs that contain Patriot Militia."""
@@ -340,8 +341,9 @@ def evt_030_hessians(state, shaded=False):
         if remove_qty:
             remove_piece(state, REGULAR_BRI, None, remove_qty, to="available")
     else:
+        refresh_control(state)
         eligible = [n for n, sp in state["spaces"].items()
-                    if sp.get(REGULAR_BRI) and sp.get("British_Control")]
+                    if sp.get(REGULAR_BRI) and state.get("control", {}).get(n) == BRITISH]
         for loc in eligible[:3]:
             _pull_regulars(loc, 2)
         add_resource(state, BRITISH, +2)
@@ -365,7 +367,8 @@ def evt_032_rule_britannia(state, shaded=False):
 
     if shaded:
         cities = pick_cities(state, len(state.get("spaces", {})))
-        british_cities = [city for city in cities if state["spaces"][city].get("British_Control")]
+        refresh_control(state)
+        british_cities = [city for city in cities if state.get("control", {}).get(city) == BRITISH]
         recipient = str(state.get("active", BRITISH)).upper()
         add_resource(state, recipient, len(british_cities) // 2)
         return
