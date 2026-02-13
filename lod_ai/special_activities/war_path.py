@@ -27,6 +27,8 @@ from lod_ai.rules_consts import (
     # Rebellion pieces
     REGULAR_PAT, REGULAR_FRE, MILITIA_A, MILITIA_U,
     FORT_PAT,
+    # factions
+    INDIANS,
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
@@ -55,7 +57,7 @@ def execute(
     option: int = 1,        # 1, 2, or 3
 ) -> Dict:
 
-    if faction != "INDIANS":
+    if faction != INDIANS:
         raise ValueError("War Path is Indian-only.")
 
     if option not in (1, 2, 3):

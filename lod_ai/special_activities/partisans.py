@@ -25,6 +25,7 @@ from lod_ai.rules_consts import (
     REGULAR_BRI, TORY,
     WARPARTY_A, WARPARTY_U,
     VILLAGE, MILITIA_U, MILITIA_A, FORT_BRI,
+    PATRIOTS,
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
@@ -53,7 +54,7 @@ def execute(
     option: int = 1,          # 1, 2, or 3 (see docstring)
 ) -> Dict:
 
-    if faction != "PATRIOTS":
+    if faction != PATRIOTS:
         raise ValueError("Partisans is a Patriot-only Special Activity.")
 
     if option not in (1, 2, 3):

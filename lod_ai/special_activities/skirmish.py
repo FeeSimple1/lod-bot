@@ -6,7 +6,7 @@ British (§4.2.2), Patriot (§4.3.3), and French (§4.5.2) Skirmish.
 Call signature
 --------------
 execute(state, faction, ctx, space_id, *, option)
-    • faction  : "BRITISH", "PATRIOTS", or "FRENCH"
+    • faction  : BRITISH, PATRIOTS, or FRENCH
     • space_id : map space where Skirmish occurs
     • option   : 1, 2, or 3  (see rules below)
 
@@ -30,6 +30,7 @@ from lod_ai.rules_consts import (
     REGULAR_BRI, REGULAR_FRE, REGULAR_PAT,
     TORY, MILITIA_A, MILITIA_U,
     FORT_BRI, FORT_PAT,
+    BRITISH, PATRIOTS, FRENCH,
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import enforce_global_caps, refresh_control
@@ -57,10 +58,10 @@ def execute(
     option: int = 1,         # 1, 2, or 3 as per rules text
 ) -> Dict:
 
-    if faction not in ("BRITISH", "PATRIOTS", "FRENCH"):
+    if faction not in (BRITISH, PATRIOTS, FRENCH):
         raise ValueError("Skirmish available only to BRITISH, PATRIOTS, or FRENCH.")
 
-    if faction == "FRENCH" and not state.get("toa_played"):
+    if faction == FRENCH and not state.get("toa_played"):
         raise ValueError("FRENCH cannot Skirmish before Treaty of Alliance.")
 
     if option not in (1, 2, 3):
@@ -71,12 +72,12 @@ def execute(
     sp = state["spaces"][space_id]
 
     # Determine own and enemy tags per faction
-    if faction == "BRITISH":
+    if faction == BRITISH:
         own_tag = REGULAR_BRI
         enemy_cubes = [REGULAR_PAT, REGULAR_FRE, TORY]  # Tories never present on Rebellion side but harmless
         enemy_militia_tag = MILITIA_A
         enemy_fort_side_tag = FORT_PAT        # Patriot Fort counts
-    elif faction == "PATRIOTS":
+    elif faction == PATRIOTS:
         own_tag = REGULAR_PAT
         enemy_cubes = [REGULAR_BRI, TORY]
         enemy_militia_tag = None          # Militia not relevant to British side
@@ -140,8 +141,8 @@ def execute(
         remove_piece(state, enemy_fort_side_tag, space_id, 1, to="available")
         remove_piece(state, own_tag,           space_id, 1, to="casualties")
 
-    clinton_here = (faction == "BRITISH") and (leader_location(state, "LEADER_CLINTON") == space_id)
-    extra_militia = (ctx.get("skirmish_extra_militia", 0) if faction == "BRITISH" else 0)
+    clinton_here = (faction == BRITISH) and (leader_location(state, "LEADER_CLINTON") == space_id)
+    extra_militia = (ctx.get("skirmish_extra_militia", 0) if faction == BRITISH else 0)
     if clinton_here:
         extra_militia += 1
 
