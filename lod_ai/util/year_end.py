@@ -522,13 +522,14 @@ def _fni_drift(state):
     if state.get("fni_level", 0) > 0:
         adjust_fni(state, -1)
         push_history(state, "FNI drift – box shifts 1 toward War (6.5.4)")
-    # Remove one Blockade from West Indies if present
+    # Remove one Blockade from a City to the West Indies pool (§6.5.4)
     bloc = state.setdefault("markers", {}).setdefault(BLOCKADE, {"pool": 0, "on_map": set()})
-    if bloc.get("pool", 0) > 0:
-        bloc["pool"] -= 1
-        state.setdefault("unavailable", {}).setdefault(BLOCKADE, 0)
-        state["unavailable"][BLOCKADE] += 1
-        push_history(state, "French remove one Blockade in West Indies (6.5.4)")
+    on_map = bloc.get("on_map", set())
+    if on_map:
+        removed_city = next(iter(on_map))
+        on_map.discard(removed_city)
+        bloc["pool"] = bloc.get("pool", 0) + 1
+        push_history(state, f"Blockade removed from {removed_city} to West Indies (6.5.4)")
 
         # Per Manual Ch 6.5.4: "French may rearrange the remaining Blockade markers"
         # For bot play, the French bot decides; for now, log the opportunity.
@@ -664,10 +665,13 @@ def _reset_phase(state):
         entry["pool"] = int(entry.get("pool", 0) or 0) + removed
         entry["on_map"] = set()
 
-    # Mark all factions Eligible
+    # Mark all factions Eligible (§6.7 step 2)
     state["eligible"] = {BRITISH: True, PATRIOTS: True, FRENCH: True, INDIANS: True}
 
-    # Flip Militia & War Parties to Underground
+    # Move cubes from the Casualties box to Available (§6.7 step 3)
+    lift_casualties(state)
+
+    # Flip Militia & War Parties to Underground (§6.7 step 4)
     for sp in state["spaces"].values():
         if sp.get(MILITIA_A):
             sp[MILITIA_U] = sp.get(MILITIA_U, 0) + sp[MILITIA_A]
@@ -676,7 +680,7 @@ def _reset_phase(state):
             sp[WARPARTY_U] = sp.get(WARPARTY_U, 0) + sp[WARPARTY_A]
             sp[WARPARTY_A] = 0
 
-    # Reveal next Ops card
+    # Reveal next Ops card (§6.7 step 5)
     deck = state.get("deck", [])
     if deck and state.get("upcoming_card") is None:
         state["upcoming_card"] = deck.pop(0)
@@ -684,14 +688,12 @@ def _reset_phase(state):
         _title = _uc.get("title") or _uc.get("name") or f"Card {_uc.get('id')}"
         push_history(state, f"Reset – revealed card {_title}")
 
-    # Fire Winter‑Quarters Event, if provided
+    # Resolve WQ card event (§6.7 step 6)
     wq_event = state.pop("winter_card_event", None)
     if callable(wq_event):
         wq_event(state)
         push_history(state, "Reset – Winter‑Quarters event executed")
 
-    # Move cubes from the Casualties box to Available
-    lift_casualties(state)
     push_history(state, "Reset Phase complete (6.7)")
 
 
@@ -735,12 +737,9 @@ def resolve(state):
     _british_release(state)
     _fni_drift(state)
 
-    # 6.6  Desertion Phase (if flagged by the card)
-    flag = state.pop("winter_flag", None)
-    if flag in ("PAT_DESERTION", "PAT_TORY_DESERTION"):
-        _patriot_desertion(state)
-    if flag in ("TORY_DESERTION", "PAT_TORY_DESERTION"):
-        _tory_desertion(state)
+    # 6.6  Desertion Phase — unconditional per §6.6
+    _patriot_desertion(state)
+    _tory_desertion(state)
 
     # 6.7  Reset Phase
     _reset_phase(state)
