@@ -3,6 +3,8 @@
 Menu-driven CLI for Liberty or Death.
 
 All selections are presented as numbered menus (spaces, actions, counts).
+Upgraded with board state display, bot summaries, card display, and
+meta-commands (status/history/quit) at every input prompt.
 """
 
 from __future__ import annotations
@@ -11,7 +13,22 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, List, Tuple
 
 from lod_ai import rules_consts as RC
-from lod_ai.cli_utils import choose_count, choose_multiple, choose_one
+from lod_ai.cli_utils import choose_count, choose_multiple, choose_one, set_game_state
+from lod_ai.cli_display import (
+    display_board_state,
+    display_card,
+    display_event_choice,
+    display_bot_summary,
+    display_turn_context,
+    display_game_end,
+    display_setup_confirmation,
+    display_winter_quarters_header,
+    display_wq_phase,
+    display_victory_margins,
+    display_history,
+    pause_for_player,
+    _snapshot_state,
+)
 from lod_ai.engine import Engine
 from lod_ai.map import adjacency as map_adj
 from lod_ai.state.setup_state import build_state
@@ -90,20 +107,6 @@ def _movable_sources(state: Dict[str, Any], faction: str, bring_escorts: bool = 
         if counts:
             sources[sid] = counts
     return sources
-
-
-def _display_cards(engine: Engine, current: Dict[str, Any]) -> None:
-    upcoming = engine.state.get("upcoming_card")
-    print("\n================ CURRENT CARD ================")
-    print(f"{current.get('id')}: {current.get('title')} | Order: {current.get('order') or current.get('order_icons')}")
-    if current.get("winter_quarters"):
-        print("Winter Quarters")
-    if upcoming:
-        print("---------------- UPCOMING ----------------")
-        print(f"{upcoming.get('id')}: {upcoming.get('title')} | Order: {upcoming.get('order') or upcoming.get('order_icons')}")
-        if upcoming.get("winter_quarters"):
-            print("Winter Quarters")
-    print("=============================================")
 
 
 # ---------------------------------------------------------------------------
@@ -638,8 +641,8 @@ def _special_wizard(state: Dict[str, Any], faction: str) -> Callable[[dict, dict
             prep_choices.append((label, val))
         if prep_choices:
             options.append((
-                "Préparer la Guerre",
-                lambda s, c: preparer.execute(s, RC.FRENCH, c, choice=choose_one("Choose Préparer option:", prep_choices)),
+                "Preparer la Guerre",
+                lambda s, c: preparer.execute(s, RC.FRENCH, c, choice=choose_one("Choose Preparer option:", prep_choices)),
             ))
 
     if not options:
@@ -699,6 +702,11 @@ def _command_runner_for(faction: str, engine: Engine, limited: bool) -> Callable
 
 def _human_decider(faction: str, card: dict, allowed: Dict[str, Any], engine: Engine) -> Tuple[dict, bool, dict | None, dict | None]:
     """Interactive handler for a human-controlled faction."""
+    # Determine slot label
+    first_action = engine.state.get("_first_action_this_card")
+    slot = "1st Eligible" if first_action is None else "2nd Eligible"
+    display_turn_context(faction, engine.state, slot=slot, card=card)
+
     while True:
         actions = []
         if "pass" in allowed["actions"]:
@@ -715,6 +723,9 @@ def _human_decider(faction: str, card: dict, allowed: Dict[str, Any], engine: En
             return {"action": "pass", "used_special": False}, True, None, None
 
         if choice == "event":
+            # Show event text
+            if card.get("dual"):
+                display_event_choice(card)
             shaded = None
             if card.get("dual"):
                 sides = []
@@ -731,7 +742,7 @@ def _human_decider(faction: str, card: dict, allowed: Dict[str, Any], engine: En
             try:
                 command_runner = _command_runner_for(faction, engine, allowed.get("limited_only", False))
             except ValueError as exc:
-                print(exc)
+                print(f"  Cannot execute: {exc}")
                 continue
 
             special_runner: Callable[[dict, dict], Any] | None = None
@@ -753,6 +764,9 @@ def _human_decider(faction: str, card: dict, allowed: Dict[str, Any], engine: En
 
             runner = _runner
 
+        # Take snapshot before simulating for summary
+        pre_snap = _snapshot_state(engine.state)
+
         try:
             result, legal, sim_state, sim_ctx = engine.simulate_action(faction, card, allowed, runner)
         except Exception as exc:  # noqa: BLE001
@@ -760,6 +774,9 @@ def _human_decider(faction: str, card: dict, allowed: Dict[str, Any], engine: En
             continue
 
         if legal:
+            # Show structured summary of what the human action did
+            if sim_state:
+                display_bot_summary(faction, sim_state, pre_snap, result)
             return result, True, sim_state, sim_ctx
         print("That action was not legal for this slot. Please choose again.")
 
@@ -814,23 +831,101 @@ def _choose_seed() -> int:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    print("Liberty or Death — Interactive CLI")
+    print("Liberty or Death -- Interactive CLI")
+    print("Type 'status'/'s' for board state, 'history'/'h' for log, 'quit'/'q' to exit\n")
+
     scenario, deck_method = _choose_scenario()
     seed = _choose_seed()
     human_factions = _choose_humans()
+
+    # Setup confirmation loop
+    while True:
+        display_setup_confirmation(scenario, deck_method, seed, human_factions)
+        confirm = choose_one("Start game?", [("Yes", True), ("No - re-select", False)])
+        if confirm:
+            break
+        scenario, deck_method = _choose_scenario()
+        seed = _choose_seed()
+        human_factions = _choose_humans()
 
     initial_state = build_state(scenario, seed=seed, setup_method=deck_method)
     engine = Engine(initial_state=initial_state, use_cli=True)
     engine.set_human_factions(human_factions)
 
+    # Register state for meta-commands
+    set_game_state(engine.state)
+
     print(f"\nGame start! (seed={seed}, method={deck_method})")
+
     while True:
         card = engine.draw_card()
         if not card:
-            print("No more cards in deck. Game over.")
+            print("No more cards in deck.")
+            display_game_end(engine.state)
             break
-        _display_cards(engine, card)
-        engine.play_card(card, human_decider=_human_decider)
+
+        # Display the card
+        display_card(
+            card,
+            upcoming=engine.state.get("upcoming_card"),
+            eligible=engine.state.get("eligible", {}),
+        )
+
+        # Winter Quarters handling
+        if card.get("winter_quarters"):
+            display_winter_quarters_header()
+
+            # Phase 1: Victory Check
+            display_wq_phase(1, "Victory Check")
+            display_victory_margins(engine.state)
+
+            raw = pause_for_player()
+            if raw in ("status", "s"):
+                display_board_state(engine.state)
+
+            # Run the full WQ resolution via play_card
+            pre_snap = _snapshot_state(engine.state)
+            engine.play_card(card, human_decider=_human_decider)
+
+            # Show what changed
+            print("\nWinter Quarters complete.")
+            display_bot_summary("WINTER QUARTERS", engine.state, pre_snap)
+
+            raw = pause_for_player()
+            if raw in ("status", "s"):
+                display_board_state(engine.state)
+
+            # Check if game ended
+            history = engine.state.get("history", [])
+            for entry in reversed(history[-20:]):
+                msg = entry.get("msg", "") if isinstance(entry, dict) else str(entry)
+                if "Winner:" in msg or "Victory achieved" in msg:
+                    display_game_end(engine.state)
+                    return
+            continue
+
+        # Normal card play
+        # Snapshot before bot turns
+        pre_snap = _snapshot_state(engine.state)
+
+        # Store first action marker for human context display
+        engine.state["_first_action_this_card"] = None
+
+        actions = engine.play_card(card, human_decider=_human_decider)
+
+        # Show bot summaries for non-human factions
+        for fac, result in actions:
+            if fac not in engine.human_factions:
+                display_bot_summary(fac, engine.state, pre_snap, result)
+                raw = pause_for_player()
+                if raw in ("status", "s"):
+                    display_board_state(engine.state)
+            # Track first action
+            if engine.state.get("_first_action_this_card") is None:
+                engine.state["_first_action_this_card"] = result
+
+        # Clean up temp marker
+        engine.state.pop("_first_action_this_card", None)
 
     print("Thanks for playing!")
 
