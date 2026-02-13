@@ -26,16 +26,18 @@ These items were identified during the compliance audit. The Reference Documents
 
 ---
 
-## Q4: Brilliant Stroke (Cards 105-109) — interrupt mechanics
+## Q4: Brilliant Stroke (Cards 105-109) — RESOLVED
 
-**Status:** OPEN — awaiting full implementation.
+**Decision:** Full implementation per Manual §2.3.8, §2.3.9, §8.3.7.
 
-**Context:** The Brilliant Stroke cards describe an interrupt/trump chain where one faction can trump another's Brilliant Stroke. The current implementation does not support true interrupts.
-
-**Question:** How should the trump chain work in the bot engine? Specifically:
-- When a bot plays a Brilliant Stroke, should all other factions be offered the chance to trump before it resolves?
-- What is the exact sequence for multi-bot trump chains?
-- Does trumping return the original Brilliant Stroke card to the trumped faction's hand?
+Implemented:
+- Trump hierarchy: ToA > Indians > French > British > Patriots
+- Trumped BS cards return to owners (mark_bs_played → False)
+- Bot auto-check before 1st eligible acts (bot_wants_bs conditions)
+- Bot BS execution: LimCom + SA + LimCom, leader in space with pieces
+- Treaty of Alliance: preparations > 15 (Available French Regs + all Blockades + half CBC)
+- All factions become Eligible after BS resolves
+- Simultaneous bot BS resolved via trump hierarchy
 
 ---
 
