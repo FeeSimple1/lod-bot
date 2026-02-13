@@ -590,7 +590,7 @@ def evt_027_queens_rangers(state, shaded=False):
         targets = [sid for sid in override if sid in state.get("spaces", {})]
     else:
         targets = [sid for sid in state.get("spaces", {}) if _is_colony(sid)]
-    targets = [sid for sid in targets if state.get("control", {}).get(sid) == "BRITISH"]
+    targets = [sid for sid in targets if state.get("control", {}).get(sid) == BRITISH]
 
     for name in targets[:2]:
         _place_from_pools(state, TORY, name, 2)
@@ -639,8 +639,8 @@ def evt_038_johnsons_royal_greens(state, shaded=False):
     mix = state.get("card38_unshaded_mix")
     reg_count = tory_count = None
     if isinstance(mix, dict):
-        reg_count = int(mix.get(REGULAR_BRI, mix.get("British_Regular", 0)))
-        tory_count = int(mix.get(TORY, mix.get("Tory", 0)))
+        reg_count = int(mix.get(REGULAR_BRI, 0))
+        tory_count = int(mix.get(TORY, 0))
         if reg_count + tory_count != 4:
             reg_count = tory_count = None
 
@@ -713,10 +713,10 @@ def evt_047_tories_tested(state, shaded=False):
     _ensure_control(state)
     if target not in state.get("spaces", {}):
         for sid in state.get("spaces", {}):
-            if _is_colony(sid) and state.get("control", {}).get(sid) == "BRITISH":
+            if _is_colony(sid) and state.get("control", {}).get(sid) == BRITISH:
                 target = sid
                 break
-    if target and state.get("control", {}).get(target) == "BRITISH":
+    if target and state.get("control", {}).get(target) == BRITISH:
         place_piece(state, TORY, target, 3)
         push_history(state, f"Card 47 unshaded: placed 3 Tories in {target}")
 
@@ -821,10 +821,17 @@ def evt_059_coudray(state, shaded=False):
 
     target = state.get("card59_space")
     if target not in state.get("spaces", {}):
+        # Prefer a space with both Continentals and French Regulars
         for sid, sp in state.get("spaces", {}).items():
-            if sp.get(REGULAR_PAT, 0) or sp.get(REGULAR_FRE, 0):
+            if sp.get(REGULAR_PAT, 0) and sp.get(REGULAR_FRE, 0):
                 target = sid
                 break
+        # Fall back to any space with either piece type
+        if target not in state.get("spaces", {}):
+            for sid, sp in state.get("spaces", {}).items():
+                if sp.get(REGULAR_PAT, 0) or sp.get(REGULAR_FRE, 0):
+                    target = sid
+                    break
     if target:
         remove_piece(state, REGULAR_PAT, target, 2, to="available")
         remove_piece(state, REGULAR_FRE, target, 2, to="available")
@@ -888,20 +895,24 @@ def evt_069_suffren(state, shaded=False):
 # 71  TREATY OF AMITY & COMMERCE
 @register(71)
 def evt_071_treaty_amity(state, shaded=False):
+    """
+    Unshaded – Add population of Cities under Rebellion Control to Patriot Resources.
+    Shaded   – French Resources +5.
+    """
     if shaded:
-        add_resource(state, BRITISH, +4)
-        push_history(state, "Card 71 shaded: British +4 Resources")
+        add_resource(state, FRENCH, +5)
+        push_history(state, "Card 71 shaded: French +5 Resources")
         return
 
     _ensure_control(state)
     pop = 0
     for sid, sp in state.get("spaces", {}).items():
         if _is_city(sid) and state.get("control", {}).get(sid) == "REBELLION":
-            pop += sp.get("population", 0)
-    gain = min(5, pop // 3)
-    add_resource(state, PATRIOTS, gain)
-    add_resource(state, FRENCH, gain)
-    push_history(state, f"Card 71 unshaded: Patriots/French +{gain}")
+            # Population from map metadata, falling back to space dict
+            meta = map_adj.space_meta(sid) or {}
+            pop += meta.get("population", sp.get("population", 0))
+    add_resource(state, PATRIOTS, pop)
+    push_history(state, f"Card 71 unshaded: Patriots +{pop} (Rebellion cities pop)")
 
 
 # 74  CHICKASAW ALLY WITH THE BRITISH

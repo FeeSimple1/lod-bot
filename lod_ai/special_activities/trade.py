@@ -52,7 +52,7 @@ def execute(
         If 0, Indians instead gain 1 Resource at no British cost.
     """
 
-    if faction != "INDIANS":
+    if faction != INDIANS:
         raise ValueError("Trade is an Indian-only Special Activity.")
     if transfer < 0:
         raise ValueError("transfer cannot be negative.")
@@ -67,7 +67,7 @@ def execute(
         raise ValueError("Trade requires a Village in the Province.")
 
     # Resource availability
-    if transfer > state["resources"]["BRITISH"]:
+    if transfer > state["resources"][BRITISH]:
         raise ValueError("BRITISH lack Resources to transfer.")
 
     push_history(state, f"INDIANS TRADE in {space_id} (transfer={transfer})")

@@ -58,7 +58,7 @@ class BaseBot:
         handler = CARD_HANDLERS.get(card["id"])
         if not handler:
             return
-        shaded = card.get("dual") and self.faction in {"PATRIOTS", "FRENCH"}
+        shaded = card.get("dual") and self.faction in {C.PATRIOTS, C.FRENCH}
         previous_active = state.get("active")
         state["active"] = self.faction
         try:
@@ -88,12 +88,12 @@ class BaseBot:
     def _extract_factions_from_text(self, text: str) -> List[str]:
         """Return any faction names mentioned in *text*."""
         names = {
-            "british": "BRITISH",
-            "patriot": "PATRIOTS",
-            "patriots": "PATRIOTS",
-            "french": "FRENCH",
-            "indian": "INDIANS",
-            "indians": "INDIANS",
+            "british": C.BRITISH,
+            "patriot": C.PATRIOTS,
+            "patriots": C.PATRIOTS,
+            "french": C.FRENCH,
+            "indian": C.INDIANS,
+            "indians": C.INDIANS,
         }
         found = []
         for key, fac in names.items():
@@ -160,7 +160,7 @@ class BaseBot:
         from copy import deepcopy
         before = deepcopy(state)
         after = deepcopy(state)
-        shaded = card.get("dual") and self.faction in {"PATRIOTS", "FRENCH"}
+        shaded = card.get("dual") and self.faction in {C.PATRIOTS, C.FRENCH}
         handler(after, shaded=shaded)
         before.pop("history", None)
         after.pop("history", None)

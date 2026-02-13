@@ -16,13 +16,13 @@ Assumptions about state schema
 • `state["markers"]["Blockade"]["on_map"]` – set of City IDs with Blockades.
 • `state["unavailable"]["Blockade"]`       – unused Squadron/Blockade counters.
 • Global marker cap is 3 (physical game).
-• Unavailable French Regulars are tracked in `state["unavailable"]["FRENCH"]`.
+• Unavailable French Regulars are tracked in `state["unavailable"][FRENCH]`.
 """
 
 from __future__ import annotations
 from typing import Dict
 
-from lod_ai.rules_consts import REGULAR_FRE, FRENCH_UNAVAIL, BLOCKADE, WEST_INDIES_ID
+from lod_ai.rules_consts import REGULAR_FRE, FRENCH_UNAVAIL, BLOCKADE, WEST_INDIES_ID, FRENCH
 from lod_ai.util.history  import push_history
 from lod_ai.util.caps     import refresh_control, enforce_global_caps
 from lod_ai.board.pieces      import remove_piece
@@ -59,7 +59,7 @@ def execute(
         "BLOCKADE", "REGULARS", or "RESOURCES".
     """
 
-    if faction != "FRENCH":
+    if faction != FRENCH:
         raise ValueError("Préparer la Guerre is French-only.")
 
     if not state.get("toa_played"):
@@ -88,7 +88,7 @@ def execute(
         remove_piece(state, REGULAR_FRE, "unavailable", 3)
 
     else:  # RESOURCES
-        add_res(state, "FRENCH", 2)
+        add_res(state, FRENCH, 2)
         state.setdefault("log", []).append("FRENCH Préparer: +2 £")
 
     refresh_control(state)

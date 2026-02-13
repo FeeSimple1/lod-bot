@@ -5,7 +5,7 @@ lod_ai.special_activities.common_cause
 during the *same* March or Battle.
 
 * Allowed only if:
-    – faction == "BRITISH"
+    – faction == BRITISH
     – each listed space contains ≥1 British cube and ≥1 War-Party.
 * War Parties chosen become **Active** immediately.
 * They may **not** move into or between Cities.
@@ -19,6 +19,7 @@ from typing import Dict, List
 from lod_ai.rules_consts import (
     REGULAR_BRI,
     WARPARTY_U, WARPARTY_A,
+    BRITISH,
 )
 from lod_ai.util.history import push_history
 
@@ -35,7 +36,7 @@ def execute(
     mode: str = "MARCH",                       # "MARCH" or "BATTLE"
     destinations: List[str] | None = None,     # required for March validation
 ) -> Dict:
-    if faction != "BRITISH":
+    if faction != BRITISH:
         raise ValueError("Only BRITISH may invoke Common Cause.")
 
     state["_turn_used_special"] = True

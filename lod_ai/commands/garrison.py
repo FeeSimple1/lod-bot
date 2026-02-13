@@ -38,8 +38,9 @@ from typing import Dict, Mapping
 
 from lod_ai.rules_consts import (
     REGULAR_BRI, REGULAR_PAT, REGULAR_FRE,
-    TORY,
+    TORY, FORT_PAT,
     MILITIA_A, MILITIA_U,
+    BRITISH,
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
@@ -47,6 +48,8 @@ from lod_ai.util.adjacency import is_adjacent
 from lod_ai.leaders        import apply_leader_modifiers
 from lod_ai.board.pieces      import remove_piece, add_piece
 from lod_ai.economy.resources import spend, can_afford
+
+COMMAND_NAME = "GARRISON"  # auto-registered by commands/__init__.py
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -118,7 +121,7 @@ def execute(
     number of Regulars.  Provide 0 or omit an entry to move none.
     """
 
-    if faction.upper() != "BRITISH":
+    if faction.upper() != BRITISH:
         raise ValueError("Only BRITISH may execute GARRISON")
 
     # FNI gate -------------------------------------------------------
@@ -126,7 +129,7 @@ def execute(
         raise ValueError("GARRISON unavailable at FNI level 3")
 
     # Cost -----------------------------------------------------------
-    spend(state, "BRITISH", 2)
+    spend(state, BRITISH, 2)
 
     # Leader hooks (none today, keep pattern) -----------------------
     ctx = apply_leader_modifiers(state, faction, "pre_garrison", ctx)
@@ -184,10 +187,10 @@ def execute(
         if _is_blockaded(displace_city, state):
             raise ValueError("Cannot displace from a Blockaded City")
         sp_city = state["spaces"][displace_city]
-        if sp_city.get("Patriot_Fort", 0):
+        if sp_city.get(FORT_PAT, 0):
             raise ValueError("Cannot displace from a City with a Patriot Fort")
         # British Control check (1.7)
-        if state.get("control", {}).get(displace_city) != "BRITISH":
+        if state.get("control", {}).get(displace_city) != BRITISH:
             raise ValueError("Displace city must be under British Control")
         _displace_rebellion(displace_city, displace_target, state)
 

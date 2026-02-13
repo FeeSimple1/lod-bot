@@ -78,7 +78,7 @@ def determine_eligible_factions(state: dict, card: dict) -> Tuple[Optional[str],
         base_order = [str(f).upper() for f in base_order if f]
 
         # 3) Fallback: full roster to guarantee we can pick two if eligible
-        for f in ("BRITISH", "PATRIOTS", "INDIANS", "FRENCH"):
+        for f in (C.BRITISH, C.PATRIOTS, C.INDIANS, C.FRENCH):
             if f not in base_order:
                 base_order.append(f)
 

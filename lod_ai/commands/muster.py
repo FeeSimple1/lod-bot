@@ -40,6 +40,10 @@ from lod_ai.rules_consts import (
     PASSIVE_OPPOSITION, ACTIVE_OPPOSITION,
     # markers
     PROPAGANDA, RAID,
+    # space IDs
+    WEST_INDIES_ID,
+    # factions
+    BRITISH, PATRIOTS, FRENCH,
 )
 from lod_ai.board.pieces      import add_piece, remove_piece
 from lod_ai.economy.resources import spend, can_afford
@@ -114,7 +118,7 @@ def _reward_loyalty(state: Dict, sp: Dict, space_id: str, levels: int) -> None:
     # Checks – Regulars, Tories, Control
     if (sp.get(REGULAR_BRI, 0) == 0) or (sp.get(TORY, 0) == 0):
         raise ValueError("Reward Loyalty requires ≥1 British Regular and ≥1 Tory in space.")
-    if state.get("control", {}).get(space_id) != "BRITISH":
+    if state.get("control", {}).get(space_id) != BRITISH:
         raise ValueError("British must Control the space to Reward Loyalty.")
 
     # Determine marker removals and potential shift
@@ -132,10 +136,10 @@ def _reward_loyalty(state: Dict, sp: Dict, space_id: str, levels: int) -> None:
         return
 
     cost = len(markers_here) + shift_levels
-    if state["resources"]["BRITISH"] < cost:
+    if state["resources"][BRITISH] < cost:
         raise ValueError("Not enough Resources to Reward Loyalty.")
 
-    spend(state, "BRITISH", cost, ignore_free=True)
+    spend(state, BRITISH, cost, ignore_free=True)
 
     # Remove markers first (each already included in cost)
     for marker in markers_here:
@@ -159,10 +163,10 @@ def _reward_loyalty(state: Dict, sp: Dict, space_id: str, levels: int) -> None:
 # ---------------------------------------------------------------------------
 
 def _brit_cost(state: Dict, n_spaces: int):
-    spend(state, "BRITISH", n_spaces)
+    spend(state, BRITISH, n_spaces)
 
 def _french_cost(state: Dict):
-    spend(state, "FRENCH", 2)
+    spend(state, FRENCH, 2)
 
 # ---------------------------------------------------------------------------
 # Adjacency helper
@@ -191,7 +195,7 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
             reward_levels: int = 0) -> Dict:
     """Perform the Muster Command for *faction* in *selected* spaces."""
     # Treaty gate
-    if faction == "FRENCH" and not state.get("toa_played"):
+    if faction == FRENCH and not state.get("toa_played"):
         raise ValueError("FRENCH cannot Muster before Treaty of Alliance.")
 
     # Mutual‑exclusion checks
@@ -208,7 +212,7 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
     # -------------------------------------------------------------------
     # BRITISH flow
     # -------------------------------------------------------------------
-    if faction == "BRITISH":
+    if faction == BRITISH:
         # Pay cost (1 Resource per selected space)
         _brit_cost(state, len(selected))
 
@@ -225,7 +229,7 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
         # 2) Tory placement – loop over tory_plan dict
         if tory_plan:
             for sp_id, n in tory_plan.items():
-                if sp_id not in selected or sp_id == "West_Indies":
+                if sp_id not in selected or sp_id == WEST_INDIES_ID:
                     continue
                 support_level = state.get("support", {}).get(sp_id, NEUTRAL)
                 if support_level == ACTIVE_OPPOSITION:
@@ -258,10 +262,10 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
 
         # Optional Patriot Fort substitution if Patriots have Resources
         sp = state["spaces"][sp_id]
-        if sp.get(REGULAR_FRE, 0) >= 2 and can_afford(state, "PATRIOTS", 1):
+        if sp.get(REGULAR_FRE, 0) >= 2 and can_afford(state, PATRIOTS, 1):
             remove_piece(state, REGULAR_FRE, sp_id, 2)
             add_piece(state, FORT_PAT,       sp_id, 1)          # Patriot Fort
-            spend(state, "PATRIOTS", 1)
+            spend(state, PATRIOTS, 1)
 
     # -------------------------------------------------------------------
     # Wrap‑up bookkeeping

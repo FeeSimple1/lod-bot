@@ -30,6 +30,8 @@ from lod_ai.rules_consts import (
     FORT_PAT,
     # Marker
     PROPAGANDA,
+    # Factions
+    PATRIOTS,
 )
 
 from lod_ai.util.history   import push_history
@@ -55,7 +57,7 @@ _SUPPORT_ORDER = [
 # ---------------------------------------------------------------------------
 
 def _pay_cost(state: Dict, n_spaces: int):
-    spend(state, "PATRIOTS", n_spaces)
+    spend(state, PATRIOTS, n_spaces)
 
 
 def _shift_toward_active_opposition(state: Dict, space_id: str):
@@ -100,7 +102,7 @@ def execute(
     limited : bool, default False
         If *True*, the list *selected* must contain exactly **one** space.
     """
-    if faction != "PATRIOTS":
+    if faction != PATRIOTS:
         raise ValueError("Only PATRIOTS may Rabble‑Rouse.")
 
     if limited and len(selected) != 1:

@@ -9,6 +9,7 @@ French **Roderigue Hortalez et Cie** Command (rules §3.5.2).
 """
 
 from typing import Dict
+from lod_ai.rules_consts import FRENCH, PATRIOTS
 from lod_ai.util.history import push_history
 from lod_ai.economy.resources import spend, add
 
@@ -33,12 +34,12 @@ def execute(
         Resources the French will spend (must be ≥ 1 and ≤ current French
         Resources).
     """
-    if faction != "FRENCH":
+    if faction != FRENCH:
         raise ValueError("Only FRENCH may execute the Hortelez command.")
 
     if pay < 1:
         raise ValueError("Must pay at least 1 Resource.")
-    french_res = state["resources"].get("FRENCH", 0)
+    french_res = state["resources"].get(FRENCH, 0)
     if french_res < pay:
         raise ValueError(f"FRENCH have only {french_res} Resources, cannot pay {pay}.")
 
@@ -49,8 +50,8 @@ def execute(
     push_history(state, f"FRENCH HORTELEZ pay {pay}")
 
     # Transfer Resources
-    spend(state, "FRENCH", pay)
-    add(state,   "PATRIOTS", pay + 1)
+    spend(state, FRENCH, pay)
+    add(state,   PATRIOTS, pay + 1)
 
     # Log
     state.setdefault("log", []).append(

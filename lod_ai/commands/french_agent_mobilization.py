@@ -20,9 +20,10 @@ whether to place Militia or Continentals.
 from typing import Dict
 
 from lod_ai.rules_consts import (
-    ACTIVE_SUPPORT,
+    ACTIVE_SUPPORT, NEUTRAL,
     REGULAR_PAT,    # Continentals
     MILITIA_U,      # Patriot Militia (Underground)
+    FRENCH,
 )
 from lod_ai.util.history  import push_history
 from lod_ai.util.caps     import refresh_control, enforce_global_caps
@@ -74,7 +75,7 @@ def execute(
     place_continental : bool, optional
         If *True*, place 1 Continental; otherwise place 2 Underground Militia.
     """
-    if faction != "FRENCH":
+    if faction != FRENCH:
         raise ValueError("Only FRENCH may execute Agent Mobilization.")
 
     # Treaty gate ------------------------------------------------------------
@@ -95,7 +96,7 @@ def execute(
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).add(province)
     # Resource cost ----------------------------------------------------------
-    spend(state, "FRENCH", 1)
+    spend(state, FRENCH, 1)
 
     # All validations passed – record history before mutating ---------------
     push_history(state, f"FRENCH AGENT MOBILIZATION in {province}")

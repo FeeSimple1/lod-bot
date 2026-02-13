@@ -784,10 +784,10 @@ def _choose_humans() -> List[str]:
     if num == 0:
         return []
     factions = [
-        ("BRITISH", RC.BRITISH),
-        ("PATRIOTS", RC.PATRIOTS),
-        ("FRENCH", RC.FRENCH),
-        ("INDIANS", RC.INDIANS),
+        (RC.BRITISH, RC.BRITISH),
+        (RC.PATRIOTS, RC.PATRIOTS),
+        (RC.FRENCH, RC.FRENCH),
+        (RC.INDIANS, RC.INDIANS),
     ]
     humans = choose_multiple(
         "Select human-controlled factions:",

@@ -28,6 +28,8 @@ from lod_ai.rules_consts import (
     # support enums
     ACTIVE_SUPPORT, ACTIVE_OPPOSITION,
     PASSIVE_SUPPORT, PASSIVE_OPPOSITION, NEUTRAL,
+    # factions
+    INDIANS,
 )
 from lod_ai.util.history import push_history
 from lod_ai.util.caps import refresh_control, enforce_global_caps
@@ -51,7 +53,7 @@ def _is_indian_reserve(space: Dict) -> bool:
 
 def _pay_cost(state: Dict, selected: List[str], free_one_reserve: bool) -> None:
     cost = len(selected) - (1 if free_one_reserve else 0)
-    spend(state, "INDIANS", cost)
+    spend(state, INDIANS, cost)
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +94,7 @@ def execute(
         True = Limited Command; every action must pertain to the single
         Province in *selected*.
     """
-    if faction != "INDIANS":
+    if faction != INDIANS:
         raise ValueError("Only INDIANS may execute Gather.")
 
     if limited and len(set(selected)) != 1:

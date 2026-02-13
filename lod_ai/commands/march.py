@@ -31,7 +31,8 @@ from lod_ai.rules_consts import (
     REGULAR_BRI, REGULAR_FRE, REGULAR_PAT,
     TORY, MILITIA_A, MILITIA_U,
     WARPARTY_A, WARPARTY_U,
-    INDIANS,
+    # factions
+    BRITISH, PATRIOTS, INDIANS, FRENCH,
 )
 from lod_ai.util.history     import push_history
 from lod_ai.util.caps        import refresh_control, enforce_global_caps
@@ -108,7 +109,7 @@ def execute(
 
     faction = faction.upper()
     # Treaty gate for French
-    if faction == "FRENCH" and not state.get("toa_played"):
+    if faction == FRENCH and not state.get("toa_played"):
         raise ValueError("FRENCH cannot March before Treaty of Alliance.")
 
     def _norm_plan(plan: List[Dict]) -> List[Dict]:
@@ -160,7 +161,7 @@ def execute(
         if faction == INDIANS and _is_city(dst):
             raise ValueError("Indians cannot occupy a City space.")
 
-        if faction == "BRITISH":
+        if faction == BRITISH:
             reg = _take(REGULAR_BRI, pieces.get(REGULAR_BRI, 0))
             tory = pieces.get(TORY, 0)
             wp_u = pieces.get(WARPARTY_U, 0)
@@ -181,7 +182,7 @@ def execute(
                     _take(WARPARTY_A, wp_a, arrive_as=WARPARTY_A)
             _apply_flip_for_colony(sp_dst, moved_total)
 
-        elif faction == "PATRIOTS":
+        elif faction == PATRIOTS:
             reg = _take(REGULAR_PAT, pieces.get(REGULAR_PAT, 0))
             mil_u = pieces.get(MILITIA_U, 0)
             mil_a = pieces.get(MILITIA_A, 0)
@@ -202,7 +203,7 @@ def execute(
                 if fr:
                     _take(REGULAR_FRE, fr)
 
-        elif faction == "INDIANS":
+        elif faction == INDIANS:
             wp_u = pieces.get(WARPARTY_U, 0)
             wp_a = pieces.get(WARPARTY_A, 0)
             if wp_u:
@@ -210,7 +211,7 @@ def execute(
             if wp_a:
                 _take(WARPARTY_A, wp_a, arrive_as=WARPARTY_A)
 
-        elif faction == "FRENCH":
+        elif faction == FRENCH:
             reg = _take(REGULAR_FRE, pieces.get(REGULAR_FRE, 0))
             if bring_escorts:
                 pat = pieces.get(REGULAR_PAT, 0)
@@ -232,13 +233,13 @@ def execute(
         for src in sources:
             sp_src = state["spaces"][src]
             base_pieces = {}
-            if faction == "BRITISH":
+            if faction == BRITISH:
                 base_pieces[REGULAR_BRI] = sp_src.get(REGULAR_BRI, 0)
                 if bring_escorts:
                     base_pieces[TORY] = min(base_pieces[REGULAR_BRI], sp_src.get(TORY, 0))
                     cc_avail = ctx.get("common_cause", {}).get(src, 0)
                     base_pieces[WARPARTY_A] = min(base_pieces[REGULAR_BRI] - base_pieces.get(TORY, 0, 0), cc_avail)
-            elif faction == "PATRIOTS":
+            elif faction == PATRIOTS:
                 base_pieces[REGULAR_PAT] = sp_src.get(REGULAR_PAT, 0)
                 base_pieces[MILITIA_U] = sp_src.get(MILITIA_U, 0)
                 base_pieces[MILITIA_A] = sp_src.get(MILITIA_A, 0)
@@ -246,10 +247,10 @@ def execute(
                 base_pieces[WARPARTY_A] = sp_src.get(WARPARTY_A, 0)
                 if bring_escorts:
                     base_pieces[REGULAR_FRE] = min(base_pieces.get(REGULAR_PAT, 0), sp_src.get(REGULAR_FRE, 0))
-            elif faction == "INDIANS":
+            elif faction == INDIANS:
                 base_pieces[WARPARTY_U] = sp_src.get(WARPARTY_U, 0)
                 base_pieces[WARPARTY_A] = sp_src.get(WARPARTY_A, 0)
-            elif faction == "FRENCH":
+            elif faction == FRENCH:
                 base_pieces[REGULAR_FRE] = sp_src.get(REGULAR_FRE, 0)
                 if bring_escorts:
                     base_pieces[REGULAR_PAT] = min(base_pieces.get(REGULAR_FRE, 0), sp_src.get(REGULAR_PAT, 0))
@@ -266,13 +267,13 @@ def execute(
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).update(destinations_set)
     # Resource payment
-    first_free = (faction == "INDIANS") and ctx.get("all_reserve_origin", False)
+    first_free = (faction == INDIANS) and ctx.get("all_reserve_origin", False)
     _pay_cost(state, faction, len(destinations_set), first_free=first_free, free=free)
 
     # Escort ally-fee: French escorting Continentals → Patriots pay the fee
-    if faction == "FRENCH" and bring_escorts:
+    if faction == FRENCH and bring_escorts:
         fee = len(destinations_set)
-        spend(state, "PATRIOTS", fee)
+        spend(state, PATRIOTS, fee)
 
     # Leader hooks (placeholder for future modifiers)
     ctx = apply_leader_modifiers(state, faction, "pre_march", ctx)

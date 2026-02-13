@@ -49,7 +49,7 @@ def _adjacent(space: str) -> List[str]:
 
 
 class IndianBot(BaseBot):
-    faction = "INDIANS"
+    faction = C.INDIANS
 
     def _support_level(self, state: Dict, sid: str) -> int:
         return state.get("support", {}).get(sid, 0)
@@ -242,13 +242,13 @@ class IndianBot(BaseBot):
         if not selected:
             return False
 
-        raid.execute(state, "INDIANS", {}, selected, move_plan=move_plan)
+        raid.execute(state, C.INDIANS, {}, selected, move_plan=move_plan)
         return True
 
     # ------------------------------------------------------------------
     # PLUNDER  (Special Activity)  -------------------------------------
     def _can_plunder(self, state: Dict) -> bool:
-        if state["resources"]["PATRIOTS"] == 0:
+        if state["resources"][C.PATRIOTS] == 0:
             return False
         for sid, sp in state["spaces"].items():
             wp = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
@@ -278,7 +278,7 @@ class IndianBot(BaseBot):
         if not choices:
             return False
         target = max(choices)[1]
-        plunder.execute(state, "INDIANS", {}, target)
+        plunder.execute(state, C.INDIANS, {}, target)
         return True
 
     # ------------------------------------------------------------------
@@ -300,7 +300,7 @@ class IndianBot(BaseBot):
 
     def _gather(self, state: Dict) -> bool:
         # very high‑level: delegate detailed bullet logic to command module
-        return gather.execute(state, "INDIANS", {}, max_spaces=4)
+        return gather.execute(state, C.INDIANS, {}, max_spaces=4)
 
     # ------------------------------------------------------------------
     # WAR‑PATH  (Command)  ---------------------------------------------
@@ -337,7 +337,7 @@ class IndianBot(BaseBot):
         if not choices:
             return False
         target = max(choices)[-1]
-        return war_path.execute(state, "INDIANS", {}, target)
+        return war_path.execute(state, C.INDIANS, {}, target)
 
     # ------------------------------------------------------------------
     # MARCH  (Command)  -------------------------------------------------

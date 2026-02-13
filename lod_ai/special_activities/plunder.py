@@ -21,6 +21,7 @@ from typing import Dict
 from lod_ai.rules_consts import (
     WARPARTY_U, WARPARTY_A,
     REGULAR_PAT, REGULAR_FRE, MILITIA_A, FORT_PAT,
+    INDIANS, PATRIOTS,
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
@@ -49,7 +50,7 @@ def execute(
     province: str,
 ) -> Dict:
 
-    if faction != "INDIANS":
+    if faction != INDIANS:
         raise ValueError("Plunder is Indian-only.")
 
     if not ctx.get("raid_active"):
@@ -70,9 +71,9 @@ def execute(
     push_history(state, f"INDIANS PLUNDER begins in {province} (pop={pop})")
 
     # Resource transfer
-    stolen = min(pop, state["resources"]["PATRIOTS"])
-    spend(state, "PATRIOTS", stolen)
-    add_res(state,  "INDIANS",  stolen)
+    stolen = min(pop, state["resources"][PATRIOTS])
+    spend(state, PATRIOTS, stolen)
+    add_res(state,  INDIANS,  stolen)
 
     # Remove one War-Party (returns to pool)
     _remove_one_wp(state, province)

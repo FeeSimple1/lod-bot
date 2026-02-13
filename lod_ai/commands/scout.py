@@ -32,7 +32,8 @@ from lod_ai.rules_consts import (
     WARPARTY_U, WARPARTY_A,
     REGULAR_BRI, TORY,
     MILITIA_U, MILITIA_A,
-    INDIANS,
+    # factions
+    INDIANS, BRITISH,
 )
 from lod_ai.util.history import push_history
 from lod_ai.util.caps import refresh_control, enforce_global_caps
@@ -121,8 +122,8 @@ def execute(
     state.setdefault("_turn_affected_spaces", set()).add(dst)
     # -------- Resource payments ---------------------------------------------
     if not free:
-        spend(state, "INDIANS", 1)
-        spend(state, "BRITISH", 1)
+        spend(state, INDIANS, 1)
+        spend(state, BRITISH, 1)
 
     # -------- Execute move ---------------------------------------------------
     push_history(state, f"INDIANS SCOUT {src} → {dst}")
@@ -152,7 +153,7 @@ def execute(
     # -------- Optional Skirmish ---------------------------------------------
     if skirmish:
         from lod_ai.special_activities import skirmish as sa_skirmish
-        ctx = sa_skirmish.execute(state, "BRITISH", ctx, dst)
+        ctx = sa_skirmish.execute(state, BRITISH, ctx, dst)
 
     # -------- Final housekeeping --------------------------------------------
     refresh_control(state)

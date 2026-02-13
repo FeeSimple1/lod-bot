@@ -18,13 +18,13 @@ def _remove_four_patriot_units(state):
     """Remove up to 4 Patriot Militia/Continentals from one Colony."""
     for name, sp in state["spaces"].items():
         pat_total = sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0)
-        pat_total += sp.get("Patriot_Continental", 0)
+        pat_total += sp.get(REGULAR_PAT, 0)
         if pat_total:
             removed = 0
             for tag in (
                 MILITIA_A,
                 MILITIA_U,
-                "Patriot_Continental",
+                REGULAR_PAT,
             ):
                 while sp.get(tag, 0) and removed < 4:
                     remove_piece(state, tag, name, 1, to="available")
@@ -63,6 +63,19 @@ from lod_ai.board.pieces import (
     place_piece,
     place_with_caps,
 )
+from lod_ai.map import adjacency as map_adj
+
+
+def _is_city_late(space_id):
+    return map_adj.space_type(space_id) == "City"
+
+
+def _is_colony_late(space_id):
+    return map_adj.space_type(space_id) == "Colony"
+
+
+def _is_reserve_late(space_id):
+    return map_adj.space_type(space_id) == "Reserve"
 
 
 @register(1)
@@ -86,11 +99,16 @@ def evt_001_waxhaws(state, shaded=False):
     target = eligible[0]
 
     if shaded:
-        queue_free_op(state, "PATRIOTS", "march",  target)
-        queue_free_op(state, "PATRIOTS", "battle", target)
+        queue_free_op(state, PATRIOTS, "march",  target)
+        queue_free_op(state, PATRIOTS, "battle", target)
         place_marker(state, PROPAGANDA, target, 2)
-        shift_support(state, target, -1)     # toward Neutral
-        push_history(state, f"Waxhaws (shaded): March/Battle in {target}, +2 PROPAGANDA, Support −1")
+        # Shift one level toward Neutral (toward 0)
+        cur = state.get("support", {}).get(target, 0)
+        if cur > 0:
+            shift_support(state, target, -1)
+        elif cur < 0:
+            shift_support(state, target, +1)
+        push_history(state, f"Waxhaws (shaded): March/Battle in {target}, +2 PROPAGANDA, shift toward Neutral")
     else:
         remove_piece(state, REGULAR_PAT, target, 2, to="casualties")
         shift_support(state, target, +1)     # toward Active Support
@@ -100,6 +118,11 @@ def evt_001_waxhaws(state, shaded=False):
 # 7  JOHN PAUL JONES
 @register(7)
 def evt_007_john_paul_jones(state, shaded=False):
+    """
+    Unshaded – British Resources +3. Lower FNI one level. Move up to two
+               British Regulars from Available to West Indies or any City.
+    Shaded   – Patriot Resources +5. Raise FNI one level.
+    """
     if shaded:
         add_resource(state, PATRIOTS, +5)
         adjust_fni(state, +1)
@@ -107,35 +130,81 @@ def evt_007_john_paul_jones(state, shaded=False):
 
     add_resource(state, BRITISH, +3)
     adjust_fni(state, -1)
-    moved = move_piece(state, REGULAR_BRI, "available", WEST_INDIES_ID, 2)
+    # Move up to 2 British Regulars from Available to West Indies or any City
+    dest = state.get("card7_dest", WEST_INDIES_ID)
+    if dest != WEST_INDIES_ID and not _is_city_late(dest):
+        dest = WEST_INDIES_ID
+    moved = move_piece(state, REGULAR_BRI, "available", dest, 2)
     if moved:
-        push_history(state, f"John Paul Jones: {moved} Regulars to West Indies")
+        push_history(state, f"John Paul Jones: {moved} Regulars to {dest}")
 
 
 # 16  MERCY WARREN’S “THE MOTLEY ASSEMBLY”
 @register(16)
 def evt_016_mercy_warren(state, shaded=False):
+    """
+    Unshaded – Place two Tories anywhere.
+    Shaded   – Shift one City to Passive Opposition.
+    """
     if shaded:
-        city = "Boston"  # deterministic choice
-        # set support to Passive Opposition
-        delta = -1 - state["support"].get(city, 0)
-        shift_support(state, city, delta)
+        city = state.get("card16_city")
+        if not city or not _is_city_late(city):
+            # Pick the first City alphabetically
+            city = next((sid for sid in sorted(state.get("spaces", {}))
+                         if _is_city_late(sid)), None)
+        if city:
+            # Passive Opposition = -1
+            delta = -1 - state.get("support", {}).get(city, 0)
+            if delta:
+                shift_support(state, city, delta)
+            push_history(state, f"Card 16 shaded: {city} to Passive Opposition")
     else:
-        place_piece(state, TORY, "New_York_City", 2)
+        # "Place two Tories anywhere" — bot/player chooses location
+        target = state.get("card16_target")
+        if target not in state.get("spaces", {}):
+            target = next(iter(sorted(state.get("spaces", {}))), None)
+        if target:
+            place_piece(state, TORY, target, 2)
+            push_history(state, f"Card 16 unshaded: 2 Tories in {target}")
 
 
 # 18  “IF IT HADN’T BEEN SO STORMY…”
 @register(18)
 def evt_018_if_not_stormy(state, shaded=False):
-    affected = "PATRIOTS" if shaded else "BRITISH"
-    state.setdefault("ineligible_next", set()).add(affected)
+    """
+    Unshaded – Any one Faction Ineligible through the next card.
+    Shaded   – (none)
+    """
+    if shaded:
+        return
+    target = state.get("card18_target_faction", BRITISH)
+    if target not in {BRITISH, PATRIOTS, FRENCH, INDIANS}:
+        target = BRITISH
+    state.setdefault("ineligible_through_next", set()).add(target)
+    push_history(state, f"Card 18 unshaded: {target} ineligible through next")
 
 
 # 19  LEGEND OF NATHAN HALE
 @register(19)
 def evt_019_nathan_hale(state, shaded=False):
+    """
+    Unshaded – Patriot Resources –4.
+    Shaded   – Place three Patriot Militia anywhere. Patriot Resources +3.
+    """
     if shaded:
-        place_piece(state, MILITIA_U, "Pennsylvania", 3)
+        # "anywhere" — bot/player decides; default to first 3 spaces
+        targets = state.get("card19_targets")
+        if isinstance(targets, list):
+            for sid in targets[:3]:
+                if sid in state.get("spaces", {}):
+                    place_piece(state, MILITIA_U, sid, 1)
+        else:
+            placed = 0
+            for sid in sorted(state.get("spaces", {})):
+                if placed >= 3:
+                    break
+                place_piece(state, MILITIA_U, sid, 1)
+                placed += 1
         add_resource(state, PATRIOTS, +3)
     else:
         add_resource(state, PATRIOTS, -4)
@@ -145,15 +214,17 @@ def evt_019_nathan_hale(state, shaded=False):
 @register(21)
 def evt_021_sumter(state, shaded=False):
     """
-    Unshaded – Shift SC or GA 2 levels toward Active Support.
-    Shaded   – Patriots free March to and free Battle in SC or GA.
+    Unshaded – Shift South Carolina or Georgia two levels toward Active Support.
+    Shaded   – Patriots free March to and free Battle in South Carolina or Georgia.
     """
     from lod_ai.util.free_ops import queue_free_op
-    colony = "South_Carolina"
+    colony = state.get("card21_target", "South_Carolina")
+    if colony not in ("South_Carolina", "Georgia"):
+        colony = "South_Carolina"
 
     if shaded:
-        queue_free_op(state, "PATRIOTS", "march",  colony)
-        queue_free_op(state, "PATRIOTS", "battle", colony)
+        queue_free_op(state, PATRIOTS, "march",  colony)
+        queue_free_op(state, PATRIOTS, "battle", colony)
     else:
         shift_support(state, colony, +2)
 
@@ -166,7 +237,9 @@ def evt_022_newburgh_conspiracy(state, shaded=False):
     Shaded   – **Immediate** Tory desertion this Winter.
     """
     if shaded:
-        state["winter_flag"] = "TORY_DESERTION"
+        # "Immediately execute Tory Desertion as per Winter Quarters Round."
+        state["winter_flag"] = "TORY_DESERTION_IMMEDIATE"
+        push_history(state, "Card 22 shaded: immediate Tory Desertion")
     else:
         _remove_four_patriot_units(state)
 
@@ -185,7 +258,7 @@ def evt_023_francis_marion(state, shaded=False):
     else:
         src = "South_Carolina"
         dst = "Georgia"
-        for tag in (MILITIA_A, MILITIA_U, "Patriot_Continental"):
+        for tag in (MILITIA_A, MILITIA_U, REGULAR_PAT):
             qty = state["spaces"].get(src, {}).get(tag, 0)
             if qty:
                 move_piece(state, tag, src, dst, qty)
@@ -194,26 +267,59 @@ def evt_023_francis_marion(state, shaded=False):
 # 25  BRITISH PRISON SHIPS
 @register(25)
 def evt_025_prison_ships(state, shaded=False):
-    if shaded:
-        for city in ("New_York_City", "Charles_Town"):
-            place_piece(state, MILITIA_U, city, 1)
-            shift_support(state, city, -1)
-            place_marker(state, PROPAGANDA, city)
+    """
+    Unshaded – Shift two Cities one level each toward Passive Support.
+    Shaded   – In two Cities place one Militia and shift each one level
+               toward Passive Opposition. Place one Propaganda in each.
+    """
+    override = state.get("card25_cities")
+    if isinstance(override, list):
+        cities = [sid for sid in override if sid in state.get("spaces", {})]
     else:
-        for city in ("New_York_City", "Charles_Town"):
-            shift_support(state, city, +1)
+        cities = [sid for sid in sorted(state.get("spaces", {}))
+                  if _is_city_late(sid)]
+
+    if shaded:
+        for city in cities[:2]:
+            place_piece(state, MILITIA_U, city, 1)
+            # One level toward Passive Opposition (-1)
+            cur = state.get("support", {}).get(city, 0)
+            if cur > -1:
+                shift_support(state, city, -1)
+            elif cur < -1:
+                shift_support(state, city, +1)
+            place_marker(state, PROPAGANDA, city, 1)
+        push_history(state, "Card 25 shaded: Militia + Propaganda in 2 Cities")
+    else:
+        for city in cities[:2]:
+            # One level toward Passive Support (+1)
+            cur = state.get("support", {}).get(city, 0)
+            if cur < 1:
+                shift_support(state, city, +1)
+            elif cur > 1:
+                shift_support(state, city, -1)
+        push_history(state, "Card 25 unshaded: 2 Cities toward Passive Support")
 
 
 # 31  THOMAS BROWN & KING’S RANGERS
 @register(31)
 def evt_031_kings_rangers(state, shaded=False):
-    space = "South_Carolina"
+    """
+    Unshaded – Place one British Fort and two Tories in South Carolina or Georgia.
+    Shaded   – Patriots place two Militia in South Carolina or Georgia
+               and may Partisans there.
+    """
+    space = state.get("card31_target", "South_Carolina")
+    if space not in ("South_Carolina", "Georgia"):
+        space = "South_Carolina"
     if shaded:
         place_piece(state, MILITIA_U, space, 2)
-        queue_free_op(state, "PATRIOTS", "partisans", space)
+        queue_free_op(state, PATRIOTS, "partisans", space)
+        push_history(state, f"Card 31 shaded: 2 Militia + Partisans in {space}")
     else:
         place_with_caps(state, FORT_BRI, space)
         place_piece(state, TORY, space, 2)
+        push_history(state, f"Card 31 unshaded: Fort + 2 Tories in {space}")
 
 
 # 36  NAVAL BATTLE IN WEST INDIES
@@ -241,11 +347,26 @@ def evt_037_armada(state, shaded=False):
 # 39  “HIS MAJESTY, KING MOB” PROTESTS
 @register(39)
 def evt_039_king_mob(state, shaded=False):
+    """
+    Unshaded – Shift three Cities one level toward Neutral.
+    Shaded   – (none)
+    """
     if shaded:
         return
-    # shift 3 cities one step toward Neutral – sample implementation
-    for name in ("Boston", "New_York_City", "Charles_Town"):
-        shift_support(state, name, -1)   # toward Neutral
+    cities = [sid for sid in state.get("spaces", {})
+              if _is_city_late(sid)]
+    shifted = 0
+    for name in cities:
+        if shifted >= 3:
+            break
+        cur = state.get("support", {}).get(name, 0)
+        if cur > 0:
+            shift_support(state, name, -1)
+            shifted += 1
+        elif cur < 0:
+            shift_support(state, name, +1)
+            shifted += 1
+    push_history(state, f"Card 39 unshaded: shifted {shifted} Cities toward Neutral")
 
 
 # 40  BATTLE OF THE CHESAPEAKE
@@ -275,20 +396,41 @@ def evt_048_god_save_king(state, shaded=False):
 
     if not shaded:
         target = None                # let the bot/AI select
-        queue_free_op(state, "BRITISH", "march",  target)
-        queue_free_op(state, "BRITISH", "battle", target)
+        queue_free_op(state, BRITISH, "march",  target)
+        queue_free_op(state, BRITISH, "battle", target)
     else:
-        moved = 0
-        for name, sp in state["spaces"].items():
-            if moved == 3:
+        # A non-British Faction moves units from three spaces containing
+        # British Regulars into any adjacent spaces.
+        non_brit_tags = [REGULAR_PAT, REGULAR_FRE, MILITIA_U, MILITIA_A,
+                         WARPARTY_U, WARPARTY_A, TORY]
+        moved_spaces = 0
+        for name in list(state.get("spaces", {})):
+            if moved_spaces == 3:
                 break
-            if sp.get(REGULAR_BRI, 0) and any(k.startswith("Patriot_") or k.startswith("French") or k.startswith("Indian") for k in sp):
-                for tag in list(sp.keys()):
-                    if tag.startswith("Patriot_") or tag.startswith("French") or tag.startswith("Indian"):
-                        qty = sp.get(tag, 0)
-                        if qty:
-                            move_piece(state, tag, name, "available", qty)
-                moved += 1
+            sp = state["spaces"].get(name, {})
+            if not sp.get(REGULAR_BRI, 0):
+                continue
+            has_non_brit = any(sp.get(tag, 0) for tag in non_brit_tags)
+            if not has_non_brit:
+                continue
+            # Find an adjacent space to move into
+            neighbors = map_adj.space_meta(name) or {}
+            adj_list = []
+            for token in neighbors.get("adj", []):
+                adj_list.extend(token.split("|"))
+            dest = None
+            for nbr in adj_list:
+                if nbr in state.get("spaces", {}):
+                    dest = nbr
+                    break
+            if not dest:
+                continue
+            for tag in non_brit_tags:
+                qty = sp.get(tag, 0)
+                if qty:
+                    move_piece(state, tag, name, dest, qty)
+            moved_spaces += 1
+            push_history(state, f"Card 48 shaded: non-British units move from {name} to {dest}")
 
 
 # 52  FRENCH FLEET ARRIVES IN THE WRONG SPOT
@@ -313,27 +455,58 @@ def evt_052_fleet_wrong_spot(state, shaded=False):
             move_piece(state, REGULAR_FRE, name, "available", min(here, 4 - removed))
             removed += min(here, 4 - removed)
 
-    queue_free_op(state, "FRENCH", "battle_plus2")     # anywhere
+    queue_free_op(state, FRENCH, "battle_plus2")     # anywhere
 
 # 57  FRENCH FLEET SAILS FOR THE CARIBBEAN
 @register(57)
 def evt_057_french_caribbean(state, shaded=False):
     if shaded:
-        move_piece(state, REGULAR_BRI, None, WEST_INDIES_ID, 2)
-        state.setdefault("ineligible_next", set()).add("BRITISH")
+        # Move 2 British Regulars from map to West Indies
+        moved = 0
+        for n, sp in state.get("spaces", {}).items():
+            if n == WEST_INDIES_ID:
+                continue
+            if moved >= 2:
+                break
+            qty = sp.get(REGULAR_BRI, 0)
+            if qty:
+                m = move_piece(state, REGULAR_BRI, n, WEST_INDIES_ID, min(qty, 2 - moved))
+                moved += m
+        state.setdefault("ineligible_through_next", set()).add(BRITISH)
+        push_history(state, "Card 57 shaded: British ineligible through next")
     else:
         move_piece(state, REGULAR_FRE, "available", WEST_INDIES_ID, 2)
-        state.setdefault("ineligible_next", set()).add("FRENCH")
+        state.setdefault("ineligible_through_next", set()).add(FRENCH)
         adjust_fni(state, -1)
+        push_history(state, "Card 57 unshaded: French ineligible through next")
 
 
 # 62  CHARLES MICHEL DE LANGLADE
 @register(62)
 def evt_062_langlade(state, shaded=False):
+    """
+    Unshaded – Place three War Parties or three Tories in New York, Quebec or Northwest.
+    Shaded   – Place three French Regulars in Quebec or three Militia in Northwest.
+    """
     if shaded:
-        place_piece(state, REGULAR_FRE, "Quebec", 3)
+        choice = state.get("card62_shaded_choice", "FRENCH_QUEBEC")
+        if choice == "MILITIA_NORTHWEST":
+            place_piece(state, MILITIA_U, "Northwest", 3)
+            push_history(state, "Card 62 shaded: 3 Militia in Northwest")
+        else:
+            place_piece(state, REGULAR_FRE, "Quebec", 3)
+            push_history(state, "Card 62 shaded: 3 French Regulars in Quebec")
     else:
-        place_piece(state, WARPARTY_U, "Northwest", 3)
+        target = state.get("card62_target")
+        if target not in ("New_York", "Quebec", "Northwest"):
+            target = "New_York"
+        choice = state.get("card62_unshaded_choice", "WARPARTY")
+        if choice == "TORIES":
+            place_piece(state, TORY, target, 3)
+            push_history(state, f"Card 62 unshaded: 3 Tories in {target}")
+        else:
+            place_piece(state, WARPARTY_U, target, 3)
+            push_history(state, f"Card 62 unshaded: 3 War Parties in {target}")
 
 
 
@@ -341,9 +514,12 @@ def evt_062_langlade(state, shaded=False):
 # 64  AFFAIR OF FIELDING & BYLANDT
 @register(64)
 def evt_064_fielding(state, shaded=False):
+    """
+    Unshaded – British seize Dutch contraband: British Resources +3. Lower FNI one level.
+    Shaded   – Dutch provide resources to Patriots: Patriot Resources +5.
+    """
     if shaded:
-        add_resource(state, BRITISH, -3)
-        adjust_fni(state, +1)
+        add_resource(state, PATRIOTS, +5)
     else:
         add_resource(state, BRITISH, +3)
         adjust_fni(state, -1)
@@ -364,11 +540,29 @@ def evt_066_don_bernardo(state, shaded=False):
     from lod_ai.util.free_ops import queue_free_op
 
     if shaded:
-        fac = "FRENCH" if state.get("toa_played") else "PATRIOTS"
+        fac = FRENCH if state.get("toa_played") else PATRIOTS
         queue_free_op(state, fac, "march", "Florida")
         queue_free_op(state, fac, "battle_plus2", "Florida")
     else:
-        place_piece(state, REGULAR_BRI, "Florida", 6)
+        # "Place six British cubes in either Florida or Southwest."
+        # British cubes = Regulars + Tories
+        target = state.get("card66_target", "Florida")
+        if target not in ("Florida", "Southwest"):
+            target = "Florida"
+        mix = state.get("card66_mix")
+        if isinstance(mix, dict):
+            reg = int(mix.get(REGULAR_BRI, 0))
+            tory = int(mix.get(TORY, 0))
+            if reg + tory == 6:
+                if reg:
+                    place_piece(state, REGULAR_BRI, target, reg)
+                if tory:
+                    place_piece(state, TORY, target, tory)
+            else:
+                place_piece(state, REGULAR_BRI, target, 6)
+        else:
+            place_piece(state, REGULAR_BRI, target, 6)
+        push_history(state, f"Card 66 unshaded: 6 British cubes in {target}")
 
 
 # 67  DE GRASSE ARRIVES
@@ -380,7 +574,7 @@ def evt_067_de_grasse(state, shaded=False):
     """
     from lod_ai.util.free_ops import queue_free_op
     if shaded:
-        fac = "FRENCH" if state.get("toa_played") else "PATRIOTS"
+        fac = FRENCH if state.get("toa_played") else PATRIOTS
         queue_free_op(state, fac, "rally")
         state.setdefault("eligible_next", set()).add(fac)
     else:
@@ -404,57 +598,134 @@ def evt_070_french_india(state, shaded=False):
 # 73  SULLIVAN EXPEDITION VS IROQUOIS
 @register(73)
 def evt_073_sullivan(state, shaded=False):
-    # remove a Fort or Village in specified regions
-    for loc in ("New_York", "Northwest", "Quebec"):
-        if remove_piece(state, FORT_BRI, loc, 1, to="available"):
-            break
-        if remove_piece(state, VILLAGE, loc, 1, to="available"):
-            break
+    """
+    Unshaded – Remove one Fort or Village in New York, Northwest or Quebec.
+    Shaded   – (none)
+    """
+    if shaded:
+        return
+    target = state.get("card73_space")
+    candidates = ["New_York", "Northwest", "Quebec"]
+    if target not in candidates:
+        target = None
+    # Try to find a space with a Fort or Village to remove
+    for loc in ([target] if target else candidates):
+        for tag in (FORT_BRI, FORT_PAT, VILLAGE):
+            sp = state.get("spaces", {}).get(loc, {})
+            if sp.get(tag, 0):
+                remove_piece(state, tag, loc, 1, to="available")
+                push_history(state, f"Card 73 unshaded: removed 1 {tag} in {loc}")
+                return
 
 
 # 79  TUSCARORA & ONEIDA COME TO WASHINGTON
 @register(79)
 def evt_079_tuscarora_oneida(state, shaded=False):
-    loc = "Pennsylvania"
+    """
+    Unshaded – Place one Village and two War Parties in one Colony.
+    Shaded   – Remove one Village and two War Parties in one Colony.
+    """
+    loc = state.get("card79_colony")
+    if not loc or not _is_colony_late(loc):
+        # Default to first Colony alphabetically
+        loc = next((sid for sid in sorted(state.get("spaces", {}))
+                     if _is_colony_late(sid)), "Pennsylvania")
     if shaded:
         remove_piece(state, VILLAGE, loc, 1, to="available")
-        remove_piece(state, WARPARTY_U, loc, 2, to="available")
+        removed = remove_piece(state, WARPARTY_U, loc, 2, to="available")
+        if removed < 2:
+            remove_piece(state, WARPARTY_A, loc, 2 - removed, to="available")
+        push_history(state, f"Card 79 shaded: removed Village + War Parties in {loc}")
     else:
         place_piece(state, VILLAGE, loc, 1)
         place_piece(state, WARPARTY_U, loc, 2)
+        push_history(state, f"Card 79 unshaded: placed Village + War Parties in {loc}")
 
 
 # 81  CREEK & SEMINOLE ACTIVE IN SOUTH
 @register(81)
 def evt_081_creek_seminole(state, shaded=False):
-    loc = "South_Carolina"
+    """
+    Unshaded – Place two War Parties, one Raid marker, and one Village
+               in South Carolina or Georgia.
+    Shaded   – Remove two War Parties total in South Carolina and/or Georgia.
+    """
     if shaded:
-        removed = remove_piece(state, WARPARTY_U, loc, 2, to="available")
-        if removed < 2:
-            remove_piece(state, WARPARTY_U, "Georgia", 2 - removed, to="available")
+        remaining = 2
+        for loc in ("South_Carolina", "Georgia"):
+            if remaining <= 0:
+                break
+            removed = remove_piece(state, WARPARTY_U, loc, remaining, to="available")
+            remaining -= removed
+            if remaining > 0:
+                removed = remove_piece(state, WARPARTY_A, loc, remaining, to="available")
+                remaining -= removed
+        push_history(state, f"Card 81 shaded: removed {2 - remaining} War Parties")
     else:
+        loc = state.get("card81_target", "South_Carolina")
+        if loc not in ("South_Carolina", "Georgia"):
+            loc = "South_Carolina"
         place_piece(state, WARPARTY_U, loc, 2)
-        place_marker(state, RAID, loc)
+        place_marker(state, RAID, loc, 1)
         place_piece(state, VILLAGE, loc, 1)
+        push_history(state, f"Card 81 unshaded: War Parties + Raid + Village in {loc}")
 
 
 # 85  INDIANS HELP BRITISH RAIDS ON MISSISSIPPI
 @register(85)
 def evt_085_mississippi_raids(state, shaded=False):
+    """
+    Unshaded – British place a total of three British Regulars and/or Tories in Southwest.
+    Shaded   – Place two Militia or Continentals and two French Regulars in Southwest.
+    """
     loc = "Southwest"
     if shaded:
-        place_piece(state, MILITIA_U, loc, 2)
+        # "two Militia or Continentals" — default Militia; player can choose
+        choice = state.get("card85_shaded_choice", "MILITIA")
+        if choice == "CONTINENTAL":
+            place_piece(state, REGULAR_PAT, loc, 2)
+        else:
+            place_piece(state, MILITIA_U, loc, 2)
         place_piece(state, REGULAR_FRE, loc, 2)
     else:
-        place_piece(state, REGULAR_BRI, loc, 3)
+        # "three British Regulars and/or Tories" — allow mix
+        mix = state.get("card85_mix")
+        if isinstance(mix, dict):
+            reg = int(mix.get(REGULAR_BRI, 0))
+            tory = int(mix.get(TORY, 0))
+            if reg + tory == 3:
+                if reg:
+                    place_piece(state, REGULAR_BRI, loc, reg)
+                if tory:
+                    place_piece(state, TORY, loc, tory)
+            else:
+                place_piece(state, REGULAR_BRI, loc, 3)
+        else:
+            place_piece(state, REGULAR_BRI, loc, 3)
 
 
 # 87  PATRIOTS MASSACRE LENAPE INDIANS
 @register(87)
 def evt_087_lenape(state, shaded=False):
+    """
+    Unshaded – Remove one piece in Pennsylvania. Remain Eligible.
+    Shaded   – (none)
+    """
     if shaded:
         return
-    remove_piece(state, WARPARTY_U, "Pennsylvania", 1, to="available")
+    loc = "Pennsylvania"
+    sp = state.get("spaces", {}).get(loc, {})
+    # Remove one piece of any type (prioritise units before bases)
+    for tag in (WARPARTY_U, WARPARTY_A, MILITIA_U, MILITIA_A, REGULAR_PAT,
+                REGULAR_BRI, REGULAR_FRE, TORY, FORT_BRI, FORT_PAT, VILLAGE):
+        if sp.get(tag, 0):
+            remove_piece(state, tag, loc, 1, to="available")
+            push_history(state, f"Card 87 unshaded: removed 1 {tag} in {loc}")
+            break
+    # Remain Eligible
+    executor = state.get("active")
+    if executor:
+        state.setdefault("remain_eligible", set()).add(str(executor).upper())
 
 
 # 94  HERKIMER’S RELIEF COLUMN
@@ -466,10 +737,26 @@ def evt_094_herkimer(state, shaded=False):
     """
     from lod_ai.util.free_ops import queue_free_op
     if shaded:
-        remove_piece(state, WARPARTY_U, "Pennsylvania", 4, to="available")
+        # "Remove four War Parties in or adjacent to Pennsylvania."
+        remaining = 4
+        candidates = ["Pennsylvania"]
+        meta = map_adj.space_meta("Pennsylvania") or {}
+        for token in meta.get("adj", []):
+            candidates.extend(token.split("|"))
+        for loc in candidates:
+            if remaining <= 0:
+                break
+            if loc not in state.get("spaces", {}):
+                continue
+            removed = remove_piece(state, WARPARTY_U, loc, remaining, to="available")
+            remaining -= removed
+            if remaining > 0:
+                removed = remove_piece(state, WARPARTY_A, loc, remaining, to="available")
+                remaining -= removed
+        push_history(state, f"Card 94 shaded: removed {4 - remaining} War Parties")
         return
-    queue_free_op(state, "INDIANS", "gather", "New_York")
-    queue_free_op(state, "BRITISH", "muster", "New_York")
+    queue_free_op(state, INDIANS, "gather", "New_York")
+    queue_free_op(state, BRITISH, "muster", "New_York")
     remove_piece(state, MILITIA_U, "New_York", 99, to="available")
     remove_piece(state, MILITIA_A, "New_York", 99, to="available")
 
@@ -477,6 +764,13 @@ def evt_094_herkimer(state, shaded=False):
 # 95  OHIO COUNTRY FRONTIER ERUPTS
 @register(95)
 def evt_095_ohio_frontier(state, shaded=False):
+    """
+    Unshaded – In Northwest, remove any one enemy Fort or Village
+               and place three friendly units.
+    Shaded   – (none)
+    """
+    if shaded:
+        return
     loc = "Northwest"
     executor = str(state.get("active", "")).upper()
     patriot_side = executor in (PATRIOTS, FRENCH)
@@ -527,13 +821,18 @@ def evt_095_ohio_frontier(state, shaded=False):
 @register(96)
 def evt_096_iroquois_confederacy(state, shaded=False):
     """
-    Unshaded – Indians free Gather *and* War Path in 2 Provinces.
-    Shaded   – (no free ops)
+    Unshaded – Indians free Gather and War Path in two Indian Reserve Provinces.
+    Shaded   – Remove one Indian Village.
     """
     from lod_ai.util.free_ops import queue_free_op
     if shaded:
         remove_piece(state, VILLAGE, None, 1, to="available")
+        push_history(state, "Card 96 shaded: removed one Indian Village")
     else:
-        for _ in range(2):
-            queue_free_op(state, "INDIANS", "gather")
-            queue_free_op(state, "INDIANS", "war_path")
+        # Free Gather and War Path in 2 Indian Reserve Provinces
+        reserves = [sid for sid in sorted(state.get("spaces", {}))
+                    if _is_reserve_late(sid)]
+        for prov in reserves[:2]:
+            queue_free_op(state, INDIANS, "gather", prov)
+            queue_free_op(state, INDIANS, "war_path", prov)
+        push_history(state, f"Card 96 unshaded: Gather + War Path in {reserves[:2]}")

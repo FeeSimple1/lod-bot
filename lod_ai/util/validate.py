@@ -52,7 +52,7 @@ def _validate_control(state: Dict, valid_spaces: set[str]) -> None:
     for sid, ctrl in state.get("control", {}).items():
         if sid not in valid_spaces:
             raise ValueError(f"Unknown space in control map: {sid}")
-        if ctrl not in ("BRITISH", "REBELLION", None):
+        if ctrl not in (C.BRITISH, "REBELLION", None):
             raise ValueError(f"Invalid control value for {sid}: {ctrl}")
 
 

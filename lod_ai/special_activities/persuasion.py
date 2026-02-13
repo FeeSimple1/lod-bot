@@ -22,6 +22,7 @@ from typing import Dict, List
 from lod_ai.rules_consts import (
     MILITIA_U, MILITIA_A,
     PROPAGANDA, MAX_PROPAGANDA,
+    PATRIOTS,
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
@@ -48,7 +49,7 @@ def execute(
     spaces : list[str]
         1-3 Colony/City IDs meeting the eligibility criteria.
     """
-    if faction != "PATRIOTS":
+    if faction != PATRIOTS:
         raise ValueError("Persuasion is a Patriot-only Special Activity.")
     if not 1 <= len(spaces) <= 3:
         raise ValueError("Persuasion must target 1-3 spaces.")
@@ -77,7 +78,7 @@ def execute(
         add_piece(state,    MILITIA_A, sid, 1)
 
         # ---- Add Patriot Resource --------------------------------------
-        add_res(state, "PATRIOTS", 1)
+        add_res(state, PATRIOTS, 1)
         added_resources += 1
 
 

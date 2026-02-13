@@ -25,10 +25,10 @@ from lod_ai.rules_consts import (
 
 # ------------------------------------------------ helpers ------------------ #
 BS_CARD_BY_FACTION = {
-    105: "PATRIOTS",
-    106: "BRITISH",
-    107: "FRENCH",
-    108: "INDIANS",
+    105: C.PATRIOTS,
+    106: C.BRITISH,
+    107: C.FRENCH,
+    108: C.INDIANS,
 }
 
 
@@ -99,7 +99,7 @@ def apply_treaty_of_alliance(state) -> bool:
     state["treaty_of_alliance"] = True
 
     # French free Muster in the West Indies and Rochambeau arrives there
-    queue_free_op(state, "FRENCH", "muster", WEST_INDIES_ID)
+    queue_free_op(state, C.FRENCH, "muster", WEST_INDIES_ID)
     place_piece(state, LEADER_ROCHAMBEAU, WEST_INDIES_ID)
     state.setdefault("leaders", {})[LEADER_ROCHAMBEAU] = WEST_INDIES_ID
 
