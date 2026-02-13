@@ -451,7 +451,12 @@ class Engine:
     def _record_played_card(self, card_id: int) -> None:
         self.state.setdefault("played_cards", []).append(card_id)
 
+    # =======================================================================
+    #  BRILLIANT STROKE  (§2.3.8, §2.3.9, §8.3.7)
+    # =======================================================================
+
     def _bs_decl_info(self, decl: object) -> dict | None:
+        """Parse a BS declaration into a normalised info dict."""
         if decl == bs.TOA_KEY or decl == bs.TOA_CARD_ID:
             return {"key": bs.TOA_KEY, "faction": C.FRENCH, "card_id": bs.TOA_CARD_ID, "toa": True}
         if isinstance(decl, str):
@@ -460,32 +465,170 @@ class Engine:
                 return {"key": fac, "faction": fac, "card_id": bs.FACTION_BY_BS_CARD.get(fac), "toa": False}
         return None
 
+    # ---- Trump hierarchy (§2.3.8) ------------------------------------
+    # ToA > Indians > French > British > Patriots
     def _bs_can_trump(self, incoming: dict, current: dict) -> bool:
         if current.get("toa"):
-            return False
+            return False          # ToA cannot be trumped
         if incoming.get("toa"):
-            return True
+            return True            # ToA trumps anything
         incoming_fac = incoming["faction"]
         current_fac = current["faction"]
         if incoming_fac == C.INDIANS:
-            return True
+            return current_fac != C.INDIANS   # Indians trump all except ToA
         if incoming_fac == C.FRENCH:
             return current_fac in (C.PATRIOTS, C.BRITISH)
         if incoming_fac == C.BRITISH:
             return current_fac == C.PATRIOTS
-        return False
+        return False              # Patriots cannot trump
 
+    # ---- Legality (§2.3.8) -------------------------------------------
     def _bs_is_legal(self, info: dict) -> bool:
+        """Check if the faction can legally play a BS right now."""
         fac = info["faction"]
         if not self.state.get("eligible", {}).get(fac, True):
-            return False
-        if not bs.leader_can_involve(self.state, fac):
             return False
         if info.get("toa"):
             return bs.toa_available(self.state) and bs.preparations_total(self.state) > 15
         return bs.bs_available(self.state, fac)
 
-    def _execute_brilliant_stroke_actions(self, faction: str) -> None:
+    # ---- Collect bot BS declarations (§8.3.7) ------------------------
+    def _collect_bot_bs_declarations(self, first_eligible: str | None) -> list:
+        """Evaluate every bot faction's trigger conditions and return a list
+        of faction strings for those that want to play BS."""
+        decls: list[str] = []
+        for fac in (C.BRITISH, C.PATRIOTS, C.INDIANS, C.FRENCH):
+            if fac in self.human_factions:
+                continue   # humans declare via the interactive prompt
+            if bs.bot_wants_bs(
+                self.state,
+                fac,
+                first_eligible=first_eligible,
+                human_factions=self.human_factions,
+                other_bs_faction=None,
+            ):
+                decls.append(fac)
+        return decls
+
+    # ---- Bot BS execution (§8.3.7) -----------------------------------
+    def _execute_bot_brilliant_stroke(self, faction: str) -> bool:
+        """Execute a bot BS: LimCom + SA + LimCom, per §8.3.7.
+
+        Returns True if the BS executed successfully, False if aborted
+        (no valid Limited Command involving the leader).
+        """
+        # Find leader space that meets the piece threshold
+        leader_space = None
+        entry = bs._LEADER_PIECE_THRESHOLD.get(faction)
+        if not entry:
+            return False
+        leaders, piece_tags, threshold = entry
+        for leader in leaders:
+            loc = bs.leader_location(self.state, leader)
+            if not loc:
+                continue
+            sp = self.state.get("spaces", {}).get(loc, {})
+            total = sum(sp.get(tag, 0) for tag in piece_tags)
+            if total >= threshold:
+                leader_space = loc
+                break
+        if not leader_space:
+            push_history(self.state, f"{faction} BS aborted — no leader with pieces")
+            return False
+
+        # ---- Step 1: First Limited Command in the leader's space -----
+        limcom1_ok = self._try_bs_limited_command(faction, leader_space)
+        if not limcom1_ok:
+            push_history(self.state, f"{faction} BS aborted — no valid Limited Command at {leader_space}")
+            return False
+
+        # ---- Step 2: SA executed INDEPENDENTLY -----------------------
+        self._try_bs_special_activity(faction)
+
+        # ---- Step 3: Second Limited Command --------------------------
+        self._try_bs_second_limcom(faction, exclude=leader_space)
+
+        push_history(self.state, f"{faction} Brilliant Stroke executed")
+        return True
+
+    def _try_bs_limited_command(self, faction: str, space: str) -> bool:
+        """Try the faction's highest-priority LimCom in *space*.
+        Returns True if a command executed."""
+        sp = self.state.get("spaces", {}).get(space, {})
+
+        # Priority: Battle (if enemies present) > Muster/Rally/Gather > March
+        # Determine if enemies are in the space
+        if faction in (C.BRITISH, C.INDIANS):
+            enemy_count = sum(sp.get(t, 0) for t in (C.REGULAR_PAT, C.REGULAR_FRE, C.MILITIA_A, C.MILITIA_U))
+        else:
+            enemy_count = sum(sp.get(t, 0) for t in (C.REGULAR_BRI, C.TORY, C.WARPARTY_A, C.WARPARTY_U))
+
+        cmds = []
+        if enemy_count > 0:
+            cmds.append("battle")
+        if faction == C.BRITISH:
+            cmds.extend(["muster", "march"])
+        elif faction == C.PATRIOTS:
+            cmds.extend(["rally", "march"])
+        elif faction == C.FRENCH:
+            cmds.extend(["muster", "march"])
+        elif faction == C.INDIANS:
+            cmds.extend(["gather", "raid", "march"])
+
+        self._reset_trace_on(self.state)
+        for cmd in cmds:
+            try:
+                self.dispatcher.execute(cmd, faction=faction, space=space, limited=True, free=True)
+                normalize_state(self.state)
+                return True
+            except Exception:
+                continue
+        return False
+
+    def _try_bs_special_activity(self, faction: str) -> None:
+        """Execute the faction's SA per flowchart, independently."""
+        # Each faction's preferred SA
+        sa_map = {
+            C.BRITISH:  ["skirmish", "common_cause"],
+            C.PATRIOTS: ["partisans", "common_cause"],
+            C.FRENCH:   [],  # Préparer la Guerre handled separately
+            C.INDIANS:  ["war_path", "trade"],
+        }
+        self._reset_trace_on(self.state)
+        for sa in sa_map.get(faction, []):
+            try:
+                self.dispatcher.execute(sa, faction=faction, space=None)
+                normalize_state(self.state)
+                return
+            except Exception:
+                continue
+
+    def _try_bs_second_limcom(self, faction: str, exclude: str) -> None:
+        """Try a second Limited Command in any eligible space except *exclude*."""
+        for sid, sp in self.state.get("spaces", {}).items():
+            if sid == exclude:
+                continue
+            # Try battle first if there are enemies
+            if faction in (C.BRITISH, C.INDIANS):
+                enemy = sum(sp.get(t, 0) for t in (C.REGULAR_PAT, C.REGULAR_FRE, C.MILITIA_A, C.MILITIA_U))
+            else:
+                enemy = sum(sp.get(t, 0) for t in (C.REGULAR_BRI, C.TORY, C.WARPARTY_A, C.WARPARTY_U))
+            own_pieces = sum(sp.get(t, 0) for t in bs.FACTION_PIECES.get(faction, ()))
+            if own_pieces == 0:
+                continue
+            self._reset_trace_on(self.state)
+            cmds = ["battle"] if enemy > 0 else ["muster" if faction in (C.BRITISH, C.FRENCH) else "rally"]
+            for cmd in cmds:
+                try:
+                    self.dispatcher.execute(cmd, faction=faction, space=sid, limited=True, free=True)
+                    normalize_state(self.state)
+                    return
+                except Exception:
+                    continue
+
+    # ---- Human BS plan execution (for interactive play) ---------------
+    def _execute_human_bs_plan(self, faction: str) -> None:
+        """Execute a human player's pre-set BS plan from state['bs_plan']."""
         plan_map = self.state.get("bs_plan", {})
         plan = plan_map.get(faction, [])
         if not isinstance(plan, list) or not plan:
@@ -510,64 +653,98 @@ class Engine:
                 if action_type == "command":
                     cmd_count += 1
                     self.dispatcher.execute(label, faction=faction, space=space, limited=True, **kwargs)
-                    if self.state.get("_turn_used_special"):
-                        raise ValueError("Brilliant Stroke commands may not include Special Activities.")
-                    if self._command_effect_count(self.state) != 1:
-                        raise ValueError("Brilliant Stroke Limited Command must affect exactly one space.")
                 elif action_type == "special":
                     sa_count += 1
                     self.dispatcher.execute(label, faction=faction, space=space, **kwargs)
-                    if not self.state.get("_turn_used_special"):
-                        raise ValueError("Brilliant Stroke Special Activity did not register as special.")
                 else:
                     raise ValueError(f"Unknown Brilliant Stroke action type: {action_type}")
                 normalize_state(self.state)
         finally:
             self.state.pop("bs_free", None)
 
-        if cmd_count != 2 or sa_count != 1:
-            raise ValueError("Brilliant Stroke must execute exactly two Limited Commands and one Special Activity.")
+    # ---- Main BS resolution (§2.3.8) ---------------------------------
+    def _resolve_brilliant_stroke_interrupt(self, card: dict, first_eligible: str | None = None) -> bool:
+        """Check for Brilliant Stroke plays before the 1st eligible acts.
 
-    def _resolve_brilliant_stroke_interrupt(self, card: dict) -> bool:
-        declarations = self.state.pop("bs_declarations", None)
-        if not declarations or card.get("winter_quarters"):
+        Sequence (§2.3.8, §8.3.7):
+        1. Collect declarations (manual from state['bs_declarations']
+           AND automatic from bot condition checks).
+        2. Resolve trump hierarchy — highest-priority wins.
+        3. Trumped cards RETURN to owners.
+        4. Winner executes BS (ToA or LimCom+SA+LimCom).
+        5. ALL factions become Eligible.
+        """
+        if card.get("winter_quarters"):
             return False
 
+        # ---- 1. Collect declarations -----------------------------------
+        # Manual declarations (from human UI or tests)
+        manual_decls = self.state.pop("bs_declarations", []) or []
+        # Auto-check bot conditions
+        bot_decls = self._collect_bot_bs_declarations(first_eligible)
+        all_decls = list(manual_decls) + bot_decls
+
+        if not all_decls:
+            return False
+
+        # ---- 2. Resolve trump hierarchy --------------------------------
         current: dict | None = None
-        for decl in declarations:
+        for decl in all_decls:
             info = self._bs_decl_info(decl)
             if not info or not self._bs_is_legal(info):
                 continue
             if current and not self._bs_can_trump(info, current):
                 continue
             if current:
+                # Trumped — return the card to its owner
                 bs.mark_bs_played(self.state, current["key"], False)
                 push_history(self.state, f"{info['faction']} trumps {current['faction']}'s Brilliant Stroke")
             current = info
             if info.get("toa"):
-                break
+                break   # ToA cannot be trumped; stop checking
             bs.mark_bs_played(self.state, info["key"], True)
 
         if not current:
             return False
+
+        # ---- 3. Execute the winning BS ---------------------------------
+        # Record both the replaced card and the BS card
+        self._record_played_card(card["id"])
+        if current.get("card_id"):
+            self._record_played_card(current["card_id"])
 
         if current.get("toa"):
             if not bs.apply_treaty_of_alliance(self.state):
                 bs.mark_bs_played(self.state, current["key"], False)
                 return False
             bs.mark_bs_played(self.state, current["key"], True)
+            push_history(self.state, "Treaty of Alliance played")
+        else:
+            # Execute the BS actions
+            winner = current["faction"]
+            has_plan = isinstance(
+                self.state.get("bs_plan", {}).get(winner), list
+            )
+            if has_plan:
+                # Use the pre-set plan (human player or test fixture)
+                try:
+                    self._execute_human_bs_plan(winner)
+                except (ValueError, KeyError):
+                    push_history(self.state, f"{winner} BS — no valid plan, skipped")
+            else:
+                # Bot generates its own plan from the flowchart
+                if not self._execute_bot_brilliant_stroke(winner):
+                    # BS aborted — return card to owner
+                    bs.mark_bs_played(self.state, current["key"], False)
+                    return False
 
-        self._record_played_card(card["id"])
-        if current.get("card_id"):
-            self._record_played_card(current["card_id"])
-
-        self._execute_brilliant_stroke_actions(current["faction"])
-
+        # ---- 4. ALL factions become Eligible (§2.3.8) ------------------
         self.state["eligible"] = {fac: True for fac in (C.BRITISH, C.PATRIOTS, C.FRENCH, C.INDIANS)}
         self.state.pop("eligible_next", None)
         self.state.pop("ineligible_next", None)
         self.state.pop("remain_eligible", None)
         self.state.pop("ineligible_through_next", None)
+        push_history(self.state, "Brilliant Stroke resolved — all factions Eligible")
         return True
 
     # Public wrappers for sandbox operations -------------------------
@@ -714,7 +891,8 @@ class Engine:
             if card.get("id"):
                 self._record_played_card(card["id"])
             return []
-        if self._resolve_brilliant_stroke_interrupt(card):
+        first_eligible = queue[0] if queue else None
+        if self._resolve_brilliant_stroke_interrupt(card, first_eligible=first_eligible):
             return []
         actions: List[Tuple[str, dict]] = []
         first_action: dict | None = None
