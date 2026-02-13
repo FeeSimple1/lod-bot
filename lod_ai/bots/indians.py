@@ -142,6 +142,10 @@ class IndianBot(BaseBot):
 
     # ---- I8 War‑Path, else I11 Trade ---------------------------------
     def _war_path_or_trade(self, state: Dict) -> None:
+        # I8: "If Indian Resources = 0, Trade if possible."
+        if state.get("resources", {}).get(C.INDIANS, 0) == 0:
+            self._trade(state)
+            return
         if not self._can_war_path(state) or not self._war_path(state):
             self._trade(state)   # I11 always executes if possible
 
@@ -195,7 +199,7 @@ class IndianBot(BaseBot):
         dc_loc = leader_location(state, "LEADER_DRAGGING_CANOE")
         available_wp = {sid: sp.get(C.WARPARTY_U, 0) for sid, sp in state["spaces"].items()}
 
-        # Priority: first where WP > Rebels after move (for Plunder)
+        # Priority: first where Plunder possible (WP > Rebels), within each highest Pop
         def score(space: str) -> Tuple[int, int]:
             sp = state["spaces"][space]
             rebels = (
@@ -205,7 +209,7 @@ class IndianBot(BaseBot):
                 + sp.get(C.REGULAR_FRE, 0)
             )
             wp_total = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
-            pop = sp.get("population", 0)
+            pop = _MAP_DATA.get(space, {}).get("population", 0)
             return (wp_total - rebels, pop)
 
         targets.sort(key=lambda t: score(t), reverse=True)
@@ -263,9 +267,12 @@ class IndianBot(BaseBot):
         return False
 
     def _plunder(self, state: Dict) -> bool:
-        # choose highest‑population valid space
+        """I5: Plunder in a Raid space with more WP than Rebels, highest Pop."""
+        # Filter to spaces affected by the Raid command
+        raid_spaces = state.get("_turn_affected_spaces", set())
         choices = []
-        for sid, sp in state["spaces"].items():
+        for sid in raid_spaces:
+            sp = state["spaces"].get(sid, {})
             wp = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
             rebels = (
                 sp.get(C.MILITIA_A, 0)
@@ -274,7 +281,7 @@ class IndianBot(BaseBot):
                 + sp.get(C.REGULAR_FRE, 0)
             )
             if wp > rebels and wp > 0:
-                choices.append((sp.get("population", 0), sid))
+                choices.append((_MAP_DATA.get(sid, {}).get("population", 0), sid))
         if not choices:
             return False
         target = max(choices)[1]
@@ -318,7 +325,9 @@ class IndianBot(BaseBot):
         )
 
     def _war_path(self, state: Dict) -> bool:
-        # Target priority: remove Fort, else most enemy pieces
+        """I8: War Path, first to remove a Patriot Fort, then most Rebel pieces,
+        within that first in a Province with 1+ Villages, then random.
+        """
         choices = []
         for sid, sp in state["spaces"].items():
             if sp.get(C.WARPARTY_U, 0) == 0:
@@ -333,7 +342,11 @@ class IndianBot(BaseBot):
             if enemy == 0:
                 continue
             fort = 1 if sp.get(C.FORT_PAT, 0) else 0
-            choices.append((fort, enemy, sp.get(C.VILLAGE, 0), sid))
+            # "within that first in a Province with 1+ Villages"
+            is_prov = 1 if _MAP_DATA.get(sid, {}).get("type") == "Province" else 0
+            has_village = 1 if sp.get(C.VILLAGE, 0) >= 1 else 0
+            prov_vill = is_prov * has_village
+            choices.append((fort, enemy, prov_vill, random.random(), sid))
         if not choices:
             return False
         target = max(choices)[-1]
@@ -345,7 +358,10 @@ class IndianBot(BaseBot):
         return any(sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0) for sp in state["spaces"].values())
 
     def _march(self, state: Dict) -> bool:
-        # Minimal implementation: move 2 WP‑U from largest stack to nearest Neutral/Passive without Village
+        """I10: March to get 3+ WP in Neutral/Passive space with room for Village,
+        then remove most Rebel Control where no Active Support.
+        """
+        # Move Underground then Active WP from largest stack
         origins = [
             (sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0), sid)
             for sid, sp in state["spaces"].items()
@@ -354,12 +370,28 @@ class IndianBot(BaseBot):
         if not origins:
             return False
         _, origin = max(origins)
+        # Destination: Neutral or Passive (0, +1, -1) with room for Village
+        best_dst = None
+        best_key = (-1, -1)
         for dst in _adjacent(origin):
+            if dst not in state.get("spaces", {}):
+                continue
             dsp = state["spaces"][dst]
-            if self._support_level(state, dst) <= C.PASSIVE_OPPOSITION and dsp.get(C.VILLAGE, 0) == 0:
-                march.execute(state, C.INDIANS, {}, [origin], [dst], bring_escorts=False, limited=True)
-                return True
-        return False
+            sup = self._support_level(state, dst)
+            is_neutral_or_passive = sup in (C.NEUTRAL, C.PASSIVE_SUPPORT, C.PASSIVE_OPPOSITION)
+            if not is_neutral_or_passive:
+                continue
+            if dsp.get(C.VILLAGE, 0) > 0:
+                continue  # already has Village, no "room"
+            pop = _MAP_DATA.get(dst, {}).get("population", 0)
+            key = (pop, random.random())
+            if key > best_key:
+                best_key = key
+                best_dst = dst
+        if not best_dst:
+            return False
+        march.execute(state, C.INDIANS, {}, [origin], [best_dst], bring_escorts=False, limited=False)
+        return True
 
     # ------------------------------------------------------------------
     # SCOUT  (Command)  -------------------------------------------------
