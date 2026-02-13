@@ -821,10 +821,17 @@ def evt_059_coudray(state, shaded=False):
 
     target = state.get("card59_space")
     if target not in state.get("spaces", {}):
+        # Prefer a space with both Continentals and French Regulars
         for sid, sp in state.get("spaces", {}).items():
-            if sp.get(REGULAR_PAT, 0) or sp.get(REGULAR_FRE, 0):
+            if sp.get(REGULAR_PAT, 0) and sp.get(REGULAR_FRE, 0):
                 target = sid
                 break
+        # Fall back to any space with either piece type
+        if target not in state.get("spaces", {}):
+            for sid, sp in state.get("spaces", {}).items():
+                if sp.get(REGULAR_PAT, 0) or sp.get(REGULAR_FRE, 0):
+                    target = sid
+                    break
     if target:
         remove_piece(state, REGULAR_PAT, target, 2, to="available")
         remove_piece(state, REGULAR_FRE, target, 2, to="available")

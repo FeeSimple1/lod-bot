@@ -357,11 +357,11 @@ def evt_032_rule_britannia(state, shaded=False):
         Any faction gains Resources equal to half the number of Cities that
         are under British Control (rounded down).
     """
-    # ---- helper to grab from available first, then unavailable -------------
+    # ---- helper: reference says "from Unavailable or Available" — Unavailable first
     def _pull_from_pools(tag, qty):
-        moved = move_piece(state, tag, "available", target, qty)
+        moved = move_piece(state, tag, "unavailable", target, qty)
         if moved < qty:
-            move_piece(state, tag, "unavailable", target, qty - moved)
+            move_piece(state, tag, "available", target, qty - moved)
 
     if shaded:
         cities = pick_cities(state, len(state.get("spaces", {})))
@@ -507,9 +507,10 @@ def evt_046_burke(state, shaded=False):
     else:
         targets = sorted(state.get("spaces", {}))[:3]
         for space in targets:
-            moved = move_piece(state, TORY, "available", space, 1)
+            # Reference says "from Unavailable or Available" — Unavailable first
+            moved = move_piece(state, TORY, "unavailable", space, 1)
             if moved < 1:
-                move_piece(state, TORY, "unavailable", space, 1 - moved)
+                move_piece(state, TORY, "available", space, 1 - moved)
 
 
 # 49 CLAUDE LOUIS, COMTE de SAINT-GERMAIN
