@@ -18,13 +18,13 @@ def _remove_four_patriot_units(state):
     """Remove up to 4 Patriot Militia/Continentals from one Colony."""
     for name, sp in state["spaces"].items():
         pat_total = sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0)
-        pat_total += sp.get("Patriot_Continental", 0)
+        pat_total += sp.get(REGULAR_PAT, 0)
         if pat_total:
             removed = 0
             for tag in (
                 MILITIA_A,
                 MILITIA_U,
-                "Patriot_Continental",
+                REGULAR_PAT,
             ):
                 while sp.get(tag, 0) and removed < 4:
                     remove_piece(state, tag, name, 1, to="available")
@@ -86,8 +86,8 @@ def evt_001_waxhaws(state, shaded=False):
     target = eligible[0]
 
     if shaded:
-        queue_free_op(state, "PATRIOTS", "march",  target)
-        queue_free_op(state, "PATRIOTS", "battle", target)
+        queue_free_op(state, PATRIOTS, "march",  target)
+        queue_free_op(state, PATRIOTS, "battle", target)
         place_marker(state, PROPAGANDA, target, 2)
         shift_support(state, target, -1)     # toward Neutral
         push_history(state, f"Waxhaws (shaded): March/Battle in {target}, +2 PROPAGANDA, Support −1")
@@ -127,7 +127,7 @@ def evt_016_mercy_warren(state, shaded=False):
 # 18  “IF IT HADN’T BEEN SO STORMY…”
 @register(18)
 def evt_018_if_not_stormy(state, shaded=False):
-    affected = "PATRIOTS" if shaded else "BRITISH"
+    affected = PATRIOTS if shaded else BRITISH
     state.setdefault("ineligible_next", set()).add(affected)
 
 
@@ -152,8 +152,8 @@ def evt_021_sumter(state, shaded=False):
     colony = "South_Carolina"
 
     if shaded:
-        queue_free_op(state, "PATRIOTS", "march",  colony)
-        queue_free_op(state, "PATRIOTS", "battle", colony)
+        queue_free_op(state, PATRIOTS, "march",  colony)
+        queue_free_op(state, PATRIOTS, "battle", colony)
     else:
         shift_support(state, colony, +2)
 
@@ -185,7 +185,7 @@ def evt_023_francis_marion(state, shaded=False):
     else:
         src = "South_Carolina"
         dst = "Georgia"
-        for tag in (MILITIA_A, MILITIA_U, "Patriot_Continental"):
+        for tag in (MILITIA_A, MILITIA_U, REGULAR_PAT):
             qty = state["spaces"].get(src, {}).get(tag, 0)
             if qty:
                 move_piece(state, tag, src, dst, qty)
@@ -210,7 +210,7 @@ def evt_031_kings_rangers(state, shaded=False):
     space = "South_Carolina"
     if shaded:
         place_piece(state, MILITIA_U, space, 2)
-        queue_free_op(state, "PATRIOTS", "partisans", space)
+        queue_free_op(state, PATRIOTS, "partisans", space)
     else:
         place_with_caps(state, FORT_BRI, space)
         place_piece(state, TORY, space, 2)
@@ -275,8 +275,8 @@ def evt_048_god_save_king(state, shaded=False):
 
     if not shaded:
         target = None                # let the bot/AI select
-        queue_free_op(state, "BRITISH", "march",  target)
-        queue_free_op(state, "BRITISH", "battle", target)
+        queue_free_op(state, BRITISH, "march",  target)
+        queue_free_op(state, BRITISH, "battle", target)
     else:
         moved = 0
         for name, sp in state["spaces"].items():
@@ -313,17 +313,17 @@ def evt_052_fleet_wrong_spot(state, shaded=False):
             move_piece(state, REGULAR_FRE, name, "available", min(here, 4 - removed))
             removed += min(here, 4 - removed)
 
-    queue_free_op(state, "FRENCH", "battle_plus2")     # anywhere
+    queue_free_op(state, FRENCH, "battle_plus2")     # anywhere
 
 # 57  FRENCH FLEET SAILS FOR THE CARIBBEAN
 @register(57)
 def evt_057_french_caribbean(state, shaded=False):
     if shaded:
         move_piece(state, REGULAR_BRI, None, WEST_INDIES_ID, 2)
-        state.setdefault("ineligible_next", set()).add("BRITISH")
+        state.setdefault("ineligible_next", set()).add(BRITISH)
     else:
         move_piece(state, REGULAR_FRE, "available", WEST_INDIES_ID, 2)
-        state.setdefault("ineligible_next", set()).add("FRENCH")
+        state.setdefault("ineligible_next", set()).add(FRENCH)
         adjust_fni(state, -1)
 
 
@@ -364,7 +364,7 @@ def evt_066_don_bernardo(state, shaded=False):
     from lod_ai.util.free_ops import queue_free_op
 
     if shaded:
-        fac = "FRENCH" if state.get("toa_played") else "PATRIOTS"
+        fac = FRENCH if state.get("toa_played") else PATRIOTS
         queue_free_op(state, fac, "march", "Florida")
         queue_free_op(state, fac, "battle_plus2", "Florida")
     else:
@@ -380,7 +380,7 @@ def evt_067_de_grasse(state, shaded=False):
     """
     from lod_ai.util.free_ops import queue_free_op
     if shaded:
-        fac = "FRENCH" if state.get("toa_played") else "PATRIOTS"
+        fac = FRENCH if state.get("toa_played") else PATRIOTS
         queue_free_op(state, fac, "rally")
         state.setdefault("eligible_next", set()).add(fac)
     else:
@@ -468,8 +468,8 @@ def evt_094_herkimer(state, shaded=False):
     if shaded:
         remove_piece(state, WARPARTY_U, "Pennsylvania", 4, to="available")
         return
-    queue_free_op(state, "INDIANS", "gather", "New_York")
-    queue_free_op(state, "BRITISH", "muster", "New_York")
+    queue_free_op(state, INDIANS, "gather", "New_York")
+    queue_free_op(state, BRITISH, "muster", "New_York")
     remove_piece(state, MILITIA_U, "New_York", 99, to="available")
     remove_piece(state, MILITIA_A, "New_York", 99, to="available")
 
@@ -535,5 +535,5 @@ def evt_096_iroquois_confederacy(state, shaded=False):
         remove_piece(state, VILLAGE, None, 1, to="available")
     else:
         for _ in range(2):
-            queue_free_op(state, "INDIANS", "gather")
-            queue_free_op(state, "INDIANS", "war_path")
+            queue_free_op(state, INDIANS, "gather")
+            queue_free_op(state, INDIANS, "war_path")
