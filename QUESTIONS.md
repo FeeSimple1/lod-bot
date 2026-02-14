@@ -70,28 +70,16 @@ Implemented:
 
 ---
 
-## Q8: Battle Win the Day — adjacent overflow shifts
+## Q8: Battle Win the Day — adjacent overflow shifts — RESOLVED
 
-**Context:** `battle.py` `_shift()` currently applies all support shifts to the Battle space only.
+**Decision:** Implement overflow shifts to adjacent spaces per §3.6.8. For human play, prompt for adjacent space selection. For bot play, auto-select adjacent spaces prioritizing highest population, then largest possible shift toward the winning side's preferred direction.
 
-**What the reference says:** §3.6.8 states "If all shifts are not possible in the Battle space, British (if Royalist winner) or Patriots (if Rebellion winner) may use remaining shifts in adjacent spaces."
-
-**What's ambiguous:** The player selects which adjacent spaces receive the overflow shifts. For bot play, there's no guidance on priority for selecting adjacent spaces. Additionally, this interacts with the support track boundaries per space.
-
-**Options:**
-1. Implement overflow with caller-provided adjacent-space list
-2. Auto-select adjacent spaces based on highest impact for bot play
-3. Skip overflow for now (current behavior) and add later when bot flowcharts are verified
+**Status:** Implemented in `battle.py` `_shift()` — overflow automatically applied to adjacent spaces sorted by population (descending).
 
 ---
 
-## Q9: Battle Win the Day — free Rally and Blockade move for Rebellion winner
+## Q9: Battle Win the Day — free Rally and Blockade move for Rebellion winner — RESOLVED
 
-**Context:** §3.6.8 states that if Rebellion wins, "Patriots may free Rally in any one eligible space" and "the French may move any Blockades from the Battle City to another City."
+**Decision:** Implement both the free Rally and Blockade move per §3.6.8. The free Rally executes immediately as a full Rally command. For bot Patriots, select the Rally space using the Rally priorities from the Patriot bot flowchart node P7. For bot French, move the Blockade to the City with most Support per the Patriot bot flowchart P4. For human players, prompt for space selection. These execute during Battle resolution, not deferred.
 
-**What's ambiguous:** These are complex post-battle actions requiring player decisions. For bot play, the flowcharts may have specific guidance on when/where to Rally and move Blockades. The free Rally is a full Rally command execution in a different space.
-
-**Options:**
-1. Implement with caller-provided parameters for Rally space and Blockade destinations
-2. Defer to bot flowchart integration (Phase 3 work)
-3. Implement Rally-only (simpler) and defer Blockade move
+**Status:** Implemented in `battle.py` — caller provides `win_rally_space`/`win_rally_kwargs` for free Rally and `win_blockade_dest` for Blockade move as parameters to `execute()`.

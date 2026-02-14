@@ -85,6 +85,25 @@ def move_blockades_to_west_indies(state, qty: int) -> int:
 
 
 # ──────────────────────────────────────────────────────────────
+#  City-to-city Blockade movement (§3.6.8 Win the Day)
+# ──────────────────────────────────────────────────────────────
+def move_blockade_city_to_city(state, src_city: str, dst_city: str) -> bool:
+    """Move a Blockade marker from *src_city* to *dst_city*.
+
+    Returns True if a Blockade was actually moved, False if *src_city*
+    had no Blockade to move.
+    """
+    bloc = _blockade_markers(state)
+    on_map = bloc.setdefault("on_map", set())
+    if src_city not in on_map:
+        return False
+    on_map.discard(src_city)
+    on_map.add(dst_city)
+    push_history(state, f"Blockade moved from {src_city} to {dst_city}")
+    return True
+
+
+# ──────────────────────────────────────────────────────────────
 #  Placeholder – full blockade logic not yet needed
 # ──────────────────────────────────────────────────────────────
 def auto_place_blockade(state) -> None:

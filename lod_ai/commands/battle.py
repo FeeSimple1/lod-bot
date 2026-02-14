@@ -20,9 +20,10 @@ Loss Level) are computed per-space based on actual state: piece counts,
 leader locations, terrain, blockade markers, and fortifications.
 
 ---------------------------------------------------------------------------
-This implementation aims for **correctness and stability first**.  Minor
-edge cases (voluntary retreats, adjacent support overflow) are *not* yet
-modelled -- they do not block solo play and can be added later.
+Win the Day (§3.6.8) includes:
+* Support overflow to adjacent spaces (sorted by population for bots)
+* Free Rally for Rebellion winner (caller provides space/kwargs)
+* Blockade move from Battle City to another City (caller provides dest)
 """
 
 from __future__ import annotations
@@ -50,7 +51,7 @@ from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.board.pieces   import remove_piece, add_piece
 from lod_ai.economy.resources import spend, can_afford
 from lod_ai.util.loss_mod  import pop_loss_mod
-from lod_ai.util.naval     import has_blockade
+from lod_ai.util.naval     import has_blockade, move_blockade_city_to_city
 from lod_ai.map             import adjacency as map_adj
 
 COMMAND_NAME = "BATTLE"
@@ -74,6 +75,9 @@ def execute(
     *,
     choices: Dict | None = None,
     free: bool = False,
+    win_rally_space: str | None = None,
+    win_rally_kwargs: Dict | None = None,
+    win_blockade_dest: str | None = None,
 ) -> Dict:
     faction = faction.upper()
     if faction not in (BRITISH, PATRIOTS, FRENCH):
@@ -105,8 +109,31 @@ def execute(
 
     attacker_bonus = (choices or {}).get("force_bonus", 0)
 
+    rebellion_won_in: list[str] = []
     for sid in spaces:
-        _resolve_space(state, ctx, faction, sid, attacker_bonus)
+        winner = _resolve_space(state, ctx, faction, sid, attacker_bonus)
+        if winner == "REBELLION":
+            rebellion_won_in.append(sid)
+
+    # §3.6.8: Post-win actions for Rebellion winner
+    if rebellion_won_in:
+        # Free Rally in any one eligible space
+        if win_rally_space:
+            from lod_ai.commands import rally
+            pre_res = state["resources"].get(PATRIOTS, 0)
+            rally.execute(
+                state, PATRIOTS, {},
+                [win_rally_space],
+                **(win_rally_kwargs or {}),
+            )
+            # Restore resources — this Rally is free (§3.6.8)
+            state["resources"][PATRIOTS] = pre_res
+
+        # Move Blockades from any Battle City to another City
+        if win_blockade_dest:
+            for battle_sid in rebellion_won_in:
+                if map_adj.is_city(battle_sid):
+                    move_blockade_city_to_city(state, battle_sid, win_blockade_dest)
 
     refresh_control(state)
     enforce_global_caps(state)
@@ -237,6 +264,23 @@ def _attacker_loss_mods(
     return mods
 
 
+# -------- Support shift helper (§3.6.8) --------
+def _apply_shifts_to(
+    state: Dict, space_id: str, winner: str, remaining: int,
+) -> int:
+    """Apply up to *remaining* support shifts in *space_id* toward the
+    *winner*'s preferred direction.  Return the number of shifts still unused."""
+    for i in range(remaining):
+        cur = state.get("support", {}).get(space_id, NEUTRAL)
+        if winner == "ROYALIST" and cur > ACTIVE_OPPOSITION:
+            state.setdefault("support", {})[space_id] = cur - 1
+        elif winner == "REBELLION" and cur < ACTIVE_SUPPORT:
+            state.setdefault("support", {})[space_id] = cur + 1
+        else:
+            return remaining - i
+    return 0
+
+
 # -------- Single-space battle --------
 def _resolve_space(
     state: Dict,
@@ -244,7 +288,7 @@ def _resolve_space(
     attacker_faction: str,
     sid: str,
     attacker_bonus: int,
-) -> None:
+) -> str | None:
     sp = state["spaces"][sid]
 
     att_side = "ROYALIST" if attacker_faction == BRITISH else "REBELLION"
@@ -389,12 +433,24 @@ def _resolve_space(
 
         if shifts == 0:
             return
-        for _ in range(shifts):
-            cur = state.get("support", {}).get(sid, NEUTRAL)
-            if winner == "ROYALIST" and cur > ACTIVE_OPPOSITION:
-                state.setdefault("support", {})[sid] = cur - 1
-            elif winner == "REBELLION" and cur < ACTIVE_SUPPORT:
-                state.setdefault("support", {})[sid] = cur + 1
+
+        remaining = _apply_shifts_to(state, sid, winner, shifts)
+
+        # §3.6.8: "If all shifts are not possible in the Battle space,
+        # British (if Royalist winner) or Patriots (if Rebellion winner)
+        # may use remaining shifts in adjacent spaces."
+        if remaining > 0:
+            adj_list = sorted(
+                map_adj.adjacent_spaces(sid),
+                key=lambda s: (map_adj.space_meta(s) or {}).get("population", 0),
+                reverse=True,
+            )
+            for adj_sid in adj_list:
+                if remaining <= 0:
+                    break
+                if adj_sid == WEST_INDIES_ID:
+                    continue
+                remaining = _apply_shifts_to(state, adj_sid, winner, remaining)
 
     # §3.6.8 Winner determination.
     # Check for elimination (excluding Underground pieces).
@@ -438,6 +494,7 @@ def _resolve_space(
         f"BATTLE {sid}: "
         f"{att_side}-loss={pieces_att_lost}, "
         f"{def_side}-loss={pieces_def_lost}, "
-        f"winner={winner or 'DEFENDER'}"
+        f"winner={winner or 'NONE'}"
     )
     push_history(state, msg)
+    return winner
