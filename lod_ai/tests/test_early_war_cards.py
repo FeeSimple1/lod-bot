@@ -178,6 +178,8 @@ def test_card28_moores_creek_any_space():
         "South_Carolina": {MILITIA_U: 1, MILITIA_A: 1},
         "North_Carolina": {TORY: 1},
     }
+    # Replacement draws from Available; provide enough pieces
+    state["available"] = {TORY: 10, MILITIA_U: 10}
 
     early_war.evt_028_moores_creek(state, shaded=False)
 

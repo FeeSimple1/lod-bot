@@ -7,6 +7,7 @@ from lod_ai.board.pieces import (
     remove_piece,
     place_marker,
     place_with_caps,
+    flip_pieces,
 )
 from lod_ai.util.history import push_history
 
@@ -247,8 +248,6 @@ def evt_028_moores_creek(state, shaded=False):
         # Replace every Tory with twice as many Underground Militia
         tories = sp.get(TORY, 0)
         if tories:
-            pool = state.setdefault("available", {})
-            pool[MILITIA_U] = max(pool.get(MILITIA_U, 0), 2 * tories)
             remove_piece(state, TORY, target, tories, to="available")
             place_piece(state, MILITIA_U, target, 2 * tories)
     else:
@@ -257,8 +256,6 @@ def evt_028_moores_creek(state, shaded=False):
         ma = sp.get(MILITIA_A, 0)
         total = mu + ma
         if total:
-            pool = state.setdefault("available", {})
-            pool[TORY] = max(pool.get(TORY, 0), 2 * total)
             if mu:
                 remove_piece(state, MILITIA_U, target, mu, to="available")
             if ma:
@@ -286,17 +283,13 @@ def evt_029_bancroft(state, shaded=False):
         if need == 0:
             return
         flipped = 0
-        for _, sp in state["spaces"].items():
-            if flipped == need:
+        for name in list(state["spaces"]):
+            if flipped >= need:
                 break
-            here = sp.get(hidden_tag, 0)
+            here = state["spaces"][name].get(hidden_tag, 0)
             if here:
                 take = min(here, need - flipped)
-                sp[hidden_tag] -= take
-                if sp[hidden_tag] == 0:
-                    del sp[hidden_tag]
-                sp[active_tag] = sp.get(active_tag, 0) + take
-                flipped += take
+                flipped += flip_pieces(state, hidden_tag, active_tag, name, take)
         push_history(state, f"Bancroft activates {flipped} {faction_name} (to {target_active} Active)")
 
     # Both factions activate their respective pieces
@@ -432,11 +425,9 @@ def evt_035_tryon_plot(state, shaded=False):
                 remove_piece(state, tag, target_space, take, to="available")
                 removed += take
         # Flip any Underground Militia Active
-        sp = state["spaces"][target_space]
-        mu = sp.get(MILITIA_U, 0)
+        mu = state["spaces"][target_space].get(MILITIA_U, 0)
         if mu:
-            sp[MILITIA_U] = 0
-            sp[MILITIA_A] = sp.get(MILITIA_A, 0) + mu
+            flip_pieces(state, MILITIA_U, MILITIA_A, target_space, mu)
 
 # 41  WILLIAM PITT – AMERICA CAN’T BE CONQUERED
 @register(41)
@@ -856,13 +847,12 @@ def evt_086_stockbridge(state, shaded=False):
     Shaded   – Add 3 Militia in the same space.
     """
     target = "Massachusetts"
-    sp = state["spaces"][target]
     if shaded:
         place_piece(state, MILITIA_U, target, 3)
     else:
-        flip = sp.pop(MILITIA_U, 0)
-        sp[MILITIA_A] = sp.get(MILITIA_A, 0) + flip
-        push_history(state, f"Stockbridge flip {flip} Militia in {target}")
+        mu = state["spaces"][target].get(MILITIA_U, 0)
+        if mu:
+            flip_pieces(state, MILITIA_U, MILITIA_A, target, mu)
 
 
 # 90  “THE WORLD TURNED UPSIDE DOWN”
