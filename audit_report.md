@@ -226,23 +226,16 @@ These cards manipulated `sp[tag]` directly instead of using board/pieces helpers
 - `test_early_war_cards.py` (+3 tests): Card 35, Card 86 (2 tests)
 - Test for Card 28 updated to provide Available pool (no more pool inflation hack)
 
-### REMAINING issues (documented, not fixed)
+### REMAINING issues (documented, not fixed) — Session 3
+
+**7 of 9 issues resolved in Session 5 (see below). Remaining 2:**
 
 #### Queued vs. immediate execution
-- **Cards 12, 13**: Set `winter_flag` for Patriot/Tory Desertion instead of executing immediately. The reference says "Execute...as per Winter Quarters Round." Interpretation: the "as per" phrasing may mean "following the same procedure" while deferring to actual WQ timing. Not changed pending clarification.
 - **Card 15 (Morgan's Rifles) shaded**: Uses `queue_free_op` for March/Battle/Partisans. Q3 resolution says engine drains free ops immediately after handler, so this is effectively immediate.
-- **Card 94 (Herkimer) unshaded**: Militia removal executes before queued Gather/Muster. Reference order suggests Gather+Muster first, then Militia removal. Since engine drains free ops after handler, the Militia removal in the handler runs before the queued ops. Requires reordering to match reference.
+- **Card 94 (Herkimer) unshaded**: Militia removal executes before queued Gather/Muster. Reference order suggests Gather+Muster first, then Militia removal. Since engine drains free ops after handler, the Militia removal in the handler runs before the queued ops. No fix needed per user ruling (ordering has no gameplay impact).
 
-#### Faction choice vs. hardcoded selection
-- **Cards 66, 67**: Use `FRENCH if toa_played else PATRIOTS` for faction selection. Reference says "French or Patriots" (player choice). The TOA-gating may be intentional game design (French can only act after ToA) but restricts player choice.
-- **Card 29 (Bancroft)**: Activates BOTH Patriots and Indians. Reference: "Patriots **or** Indians must Activate..." — may be a choice of one faction, or may mean both (ambiguous "or" in COIN phrasing). Left as-is pending clarification.
-- **Card 48 (God Save the King) shaded**: Moves ALL non-British factions' units. Reference: "A non-British **Faction**" (singular) should move only one faction's units.
-
-#### Minor issues
-- **Card 4 (Penobscot) shaded**: Faction-dependent piece choice (Fort vs Village, Militia vs WP) not in reference text — executing player should choose freely.
-- **Card 11 (Kosciuszko) shaded**: Uses `"REBELLION"` control check. "Patriot Controlled" might differ from "Rebellion Control" in edge cases involving French pieces.
-- **Card 84 (Merciless Indian Savages) unshaded**: `queue_free_op` for Gather has no Colony restriction. Reference says "in two Colonies."
-- **Card 87 (Lenape) unshaded**: Fixed removal priority may not match player/bot intent — reference just says "Remove one piece."
+#### Resolved — no fix needed
+- **Card 11 (Kosciuszko) shaded**: Uses `"REBELLION"` control check. User confirmed this is correct.
 
 ---
 
@@ -276,26 +269,39 @@ Full node-by-node comparison of all four bot implementations against their respe
 ### REMAINING HIGH SEVERITY (not fixed — require significant refactoring)
 
 #### British Bot (british_bot.py)
-- **B5 Garrison**: Only targets one city instead of multi-phase operation
-- **B10 March**: Only moves Regulars, never Tories; missing phases 2 and 3; Common Cause timing wrong (after March, should be during)
-- **B13 Common Cause**: No flowchart-specific logic (don't use last WP in March origin, don't use last Underground WP in Battle)
+- **B5 Garrison**: Only targets one city instead of full multi-phase operation — PARTIALLY FIXED (Session 5: control check, retention calc, but not multi-city)
+- **B10 March**: ~~Only moves Regulars, never Tories; missing phases 2 and 3; Common Cause timing wrong~~ — FIXED (Session 5: Tories now move, all 3 phases implemented, correct CC mode)
+- **B13 Common Cause**: ~~No flowchart-specific logic~~ — PARTIALLY FIXED (Session 5: correct mode parameter passed; WP constraints delegated to common_cause.execute)
 - **B38 Howe capability**: FNI not lowered before SAs during Howe's leadership period
 
 #### Patriot Bot (patriot.py)
-- **P4 Battle**: Force level uses total Militia (Active+Underground) instead of Active only; Washington lookup uses wrong data structure (space_id as key in leaders dict); Win-the-Day free Rally not implemented
-- **P5 March**: Missing "lose no Rebel Control" constraint, missing leave-behind logic, missing second phase
-- **P7 Rally**: Missing 4 of 6 bullet points (Continental replacement, Fort Available placement, Control-changing Militia, adjacent Militia gathering); always returns True
-- **P8 Partisans**: Always uses option=1, never targets Villages (option=3)
-- **P12 Skirmish**: Always uses option=1, never removes Forts (option=3)
-- **Event Instructions**: Cards 71, 90 say "use unshaded" but bot plays shaded; Cards 18, 44, 51 ignore conditional fallbacks
+- ~~**P4 Battle**: Force level uses total Militia (Active+Underground) instead of Active only~~ **FIXED** — now counts Active Militia only per §3.6.3
+- ~~Washington lookup uses wrong data structure (space_id as key in leaders dict)~~ **FIXED** — now uses `leader_location()` for both P4 and P6
+- ~~P4 includes Patriot Forts in attacking force level~~ **FIXED** — attacker excludes Forts per §3.6.3
+- ~~P4 caps defending British Tories at Regulars count~~ **FIXED** — Tories uncapped when defending per §3.6.2
+- ~~P4 uses `random.random()` for tiebreaker~~ **FIXED** — now uses `state["rng"].random()` for determinism
+- ~~P4 French Regulars uncapped when Patriots attack~~ **FIXED** — now capped at Patriot cube count per §3.6.3
+- **P4 Battle**: Win-the-Day free Rally not implemented (REMAINING)
+- **P5 March**: Missing "lose no Rebel Control" constraint, missing leave-behind logic, missing second phase (REMAINING)
+- ~~**P5 March** requires group size >= 3 (not in reference)~~ **FIXED** — reduced to >= 1
+- **P7 Rally**: Missing 4 of 6 bullet points (Continental replacement, Fort Available placement, Control-changing Militia, adjacent Militia gathering); always returns True (REMAINING)
+- ~~**P7 Rally** hardcoded to max 2 forts~~ **FIXED** — now up to 4 (Rally Max limit)
+- ~~**P8 Partisans**: Always uses option=1, never targets Villages (option=3)~~ **FIXED** — now uses option=3 when Village present and no WP
+- ~~**P8 Partisans**: WP vs British priority flattened into sum~~ **FIXED** — now separate sort keys (-wp, -british)
+- ~~**P12 Skirmish**: Always uses option=1, never removes Forts (option=3)~~ **FIXED** — now uses option=3 when Fort present and no enemy cubes
+- ~~**Event Instructions**: Cards 71, 90 say "use unshaded" but bot plays shaded~~ **FIXED** — new `force_unshaded` directive
+- ~~Cards 18, 44 ignore conditional fallbacks~~ **FIXED** — new `force_if_eligible_enemy` directive
+- ~~Card 8 ignores "if French is human" condition~~ **FIXED** — new `force_if_french_not_human` directive
+- Card 51 (Bermuda Gunpowder Plot) ignores "March to set up Battle" conditional (REMAINING)
 
-#### French Bot (french.py)
-- **F13 Battle**: Only checks Washington, not all Rebel leaders (Rochambeau, Lauzun)
-- **F16 Battle**: Force level missing modifiers; `crown_cubes > 0` check too narrow (should include Fort/WP-only spaces)
-- **F14 March**: Missing 4 of 5 constraints/priorities (Lose no Rebel Control, include Continentals, march toward nearest British, fallback to shared space)
-- **F12 Skirmish**: Only checks for `REGULAR_BRI`, not other British pieces; no affected-space filter; no Fort-first priority (always uses option=2)
-- **F17 Naval Pressure**: Missing target city priority logic (Battle space first, then most Support)
-- **Event Instructions**: All French cards use `"force"` — missing conditional fallbacks for cards 52, 62, 70, 73, 83, 95
+#### French Bot (french.py) — PARTIALLY FIXED (Session 5)
+- **~~F13 Battle~~**: ~~Only checks Washington~~ → FIXED: checks all Rebel leaders (Washington, Rochambeau, Lauzun); excludes War Parties from British count; includes British Forts
+- **~~F16 Battle~~**: ~~Force level missing modifiers; `crown_cubes > 0` too narrow~~ → FIXED: Active Militia only (not Underground); includes Forts in British pieces filter; tracks affected spaces
+- **F14 March**: Missing 4 of 5 constraints/priorities (Lose no Rebel Control, include Continentals, march toward nearest British, fallback to shared space). RNG determinism FIXED.
+- **~~F12 Skirmish~~**: ~~Only checks REGULAR_BRI; no affected-space filter; no Fort-first~~ → FIXED: checks all British pieces (Regs+Tories+Forts); excludes affected spaces; Fort-first priority (option=3 when applicable)
+- **~~F17 Naval Pressure~~**: ~~Missing target city priority~~ → FIXED: Battle space first, then most Support; full fallback chain F17→F12→F15
+- **~~Event Instructions~~**: ~~All French cards use "force"~~ → FIXED: cards 52, 62, 70, 73, 83, 95 now use conditional force_if_X directives with game-state checks
+- **~~F10 Muster~~**: ~~random.choice; no Colony/City filter~~ → FIXED: uses state["rng"]; filters first priority by Colony/City type
 
 #### Indian Bot (indians.py)
 - **I7 Gather**: Space selection entirely missing — all 4 priority bullets unimplemented
@@ -307,11 +313,11 @@ Full node-by-node comparison of all four bot implementations against their respe
 
 #### British Bot
 - B1 Garrison precondition missing FNI level 3 check
-- B5 Garrison "leave 2 more Royalist" omits Forts from count
+- ~~B5 Garrison "leave 2 more Royalist" omits Forts from count~~ — FIXED (Session 5)
 - B6 Muster precondition consumes die roll on every call
 - B8 Tory placement skips Active Opposition and adjacency checks; only places 1 Tory per space
-- B12 Battle misses Fort-only spaces; force level ignores modifiers
-- B7 Naval Pressure missing Gage/Clinton leader check
+- ~~B12 Battle misses Fort-only spaces~~ — FIXED (Session 5); force level ignores modifiers
+- ~~B7 Naval Pressure missing Gage/Clinton leader check~~ — FIXED (Session 5)
 - B2 Event conditions overly broad text matching
 - B8 Fort target space not passed to muster.execute
 - B10 March always passes bring_escorts=False
@@ -319,21 +325,21 @@ Full node-by-node comparison of all four bot implementations against their respe
 - OPS reference (Supply/Redeploy/Desertion priorities) not in bot
 
 #### Patriot Bot
-- P8 Partisans WP vs British priority flattened into sum
+- ~~P8 Partisans WP vs British priority flattened into sum~~ **FIXED**
 - P2 Event conditions check shaded text only; text matching unreliable
 - Rally/Rabble mutual fallback — potential infinite loop masked by always-True return
 - Rally Persuasion interrupt happens after Rally, not during
 - March destination doesn't verify Rebel Control would actually be gained
-- March requires group size >= 3 (not in reference)
-- British Tory cap applied when defending (should be uncapped)
+- ~~March requires group size >= 3 (not in reference)~~ **FIXED**
+- ~~British Tory cap applied when defending (should be uncapped)~~ **FIXED**
 - Rabble-Rousing arbitrarily capped at 4 spaces
 
-#### French Bot
+#### French Bot — PARTIALLY FIXED (Session 5)
 - F6 Hortalez "up to" 1D3 language (minor)
-- F13 "British pieces" missing Forts and Villages from count
-- F16 Battle doesn't enter F12 Skirmish loop afterward
-- F10 Muster not filtering by Colony/City type
-- Battle counts Underground Militia in force (should be Active only)
+- ~~F13 "British pieces" missing Forts~~ → FIXED: includes Forts, excludes WP
+- ~~F16 Battle doesn't enter F12 Skirmish loop afterward~~ → FIXED: full SA chain
+- ~~F10 Muster not filtering by Colony/City type~~ → FIXED
+- ~~Battle counts Underground Militia in force~~ → FIXED: Active only
 - OPS summary items not implemented (Supply, Redeploy, Desertion, ToA trigger, BS trigger)
 
 #### Indian Bot — FIXED (Session 5)
@@ -355,6 +361,126 @@ Full node-by-node comparison of all four bot implementations against their respe
 - **I8 War Path option**: Now selects correct option (3 for Fort removal, 2 for double removal, 1 default) instead of always option 1
 - **I12 Scout**: Moves exactly 1 WP (not up to 3) + most Regulars+Tories possible without changing Control; includes Tories
 - **Event instructions**: Cards 4/72/90 (Village condition), 18/44 (eligible enemy), 38 (WP placeable), 83 (shaded/unshaded conditional) — all now have proper conditional fallback logic
+- Uses `random.random()` instead of `state["rng"]` in multiple places
+---
+
+## Session 5: British Bot Node-by-Node Review
+
+Full node-by-node comparison of `british_bot.py` against `Reference Documents/british bot flowchart and reference.txt`.
+
+### FIXED issues (this session)
+
+#### B4 `_can_garrison` — Wrong control check
+- **Bug:** Checked `control != BRITISH` — any non-British city (including uncontrolled) triggered Garrison.
+- **Reference:** "Rebels control City w/o Rebel Fort" — must be Rebellion-controlled specifically.
+- **Fix:** Changed to `control == "REBELLION"`. Removed redundant rebel-count check (Rebellion control already implies rebels present).
+
+#### B5 `_select_garrison_city` — Same control check
+- **Bug:** Same `control != BRITISH` check excluded all non-British cities, not just Rebellion-controlled ones.
+- **Fix:** Changed to check `control == "REBELLION"`.
+
+#### B5 `_garrison` — Origin retention omits Forts/Rebel Forts from piece count
+- **Bug:** "Leave 2 more Royalist than Rebel pieces" counted only cubes + War Parties, omitting Forts.
+- **Reference:** Forts are pieces that count toward control.
+- **Fix:** Added `FORT_BRI` to royalist count and `FORT_PAT` to rebel count in the retention calculation.
+
+#### B5 `_garrison` — Muster fallback missing context
+- **Bug:** When no cubes moved, called `self._muster(state)` without `tried_march` context.
+- **Fix:** Now passes `tried_march=False` explicitly.
+
+#### B8 `_muster` — Regular placement uses `random.random()` instead of `state["rng"]`
+- **Bug:** Random tiebreaker used Python's global `random` module, breaking deterministic replay.
+- **Fix:** Changed to `state["rng"].random()`.
+
+#### B8 `_muster` — Regular placement sorting missing Neutral/Passive priority tier
+- **Bug:** Used Neutral/Passive as a hard filter (excluded all non-Neutral/Passive spaces).
+- **Reference:** "first in Neutral or Passive" is a sorting priority, not a filter.
+- **Fix:** Added `neutral_priority` tier to sort key (0=Neutral/Passive, 1=other). Spaces at Active Support/Opposition are now valid but lower priority.
+
+#### B8 `_muster` — Guard against empty regular_plan
+- **Bug:** When no valid Regular candidates exist, passed `regular_plan=None` to `muster.execute()` which requires it for British faction, causing ValueError.
+- **Fix:** Added guard that falls through to March when nothing to muster.
+
+#### B10 `_march` — Only moves Regulars, never Tories
+- **Bug:** Move plan only included `C.REGULAR_BRI` pieces.
+- **Reference:** "Leave last Tory and War Party in each space" implies Tories CAN move (just not the last one).
+- **Fix:** `_movable_from()` now computes available Regulars AND Tories, respecting leave-behind rules.
+
+#### B10 `_march` — Leave-behind rules incomplete
+- **Bug:** Simplistic `can_leave()` function didn't track per-piece-type minimums.
+- **Reference:** "Leave last Tory and War Party in each space, and last Regular if British Control but no Active Support."
+- **Fix:** New `_movable_from()` function computes per-type minimums: min 1 Tory (if any present), min 1 WP (if any present), min 1 Regular (if British Control without Active Support). Also ensures removing pieces doesn't lose British Control.
+
+#### B10 `_march` — Missing Phase 2 (Pop 1+ spaces)
+- **Bug:** Only implemented Phase 1 (add British Control) and a simplified fallback.
+- **Reference:** "Then March to Pop 1+ spaces not at Active Support, first to add Tories where Regulars are the only British units, then to add Regulars where Tories are the only British units."
+- **Fix:** Added full Phase 2 with correct priority sorting.
+
+#### B10 `_march` — Missing Phase 3 (March in place)
+- **Bug:** Not implemented at all.
+- **Reference:** "Then March in place to Activate Militia, first in Support."
+- **Fix:** Added Phase 3 that uses `flip_pieces()` to activate Underground Militia in spaces with British Regulars, prioritized by Support level.
+
+#### B12 `_battle` — Excludes Rebel Fort-only spaces
+- **Bug:** Required `rebel_cubes + total_militia > 0`, excluding spaces with only a Rebel Fort.
+- **Reference:** "spaces with Rebel Forts and/or Rebel cubes" — Fort-only spaces are valid.
+- **Fix:** Changed filter to `rebel_cubes + total_militia + rebel_forts > 0`.
+
+#### B13 `_try_common_cause` — Always passes mode="BATTLE"
+- **Bug:** Hard-coded `mode="BATTLE"` even when called from March context.
+- **Reference:** Common Cause has different constraints for March vs Battle.
+- **Fix:** Added `mode` parameter; March calls with `mode="MARCH"`, Battle uses default `mode="BATTLE"`.
+
+#### B7 `_try_naval_pressure` — Missing Gage/Clinton leader check
+- **Bug:** Delegated entirely to `naval_pressure.execute()` without checking leader requirement.
+- **Reference:** "If FNI > 0 and Gage or Clinton is British Leader, remove 1 Blockade..."
+- **Fix:** Added explicit leader check and city priority selection (Battle space first, then City with most Rebels without Patriot Fort, then most Support). FNI == 0 path (add Resources) does not require leader check.
+
+#### B11 `_try_skirmish` — Improved option selection and Clinton bonus
+- **Bug:** Only used options 1 and 2; never selected option 3 (remove Fort); no Clinton bonus.
+- **Reference:** Option 3 for Fort-only spaces. Clinton in space removes 1 additional Militia.
+- **Fix:** Added option 3 selection when no enemy cubes but enemy Fort exists. Added Clinton bonus check after successful Skirmish.
+
+#### B11 `_try_skirmish` — Improved target prioritization
+- **Bug:** Used additive priority score that didn't correctly implement "first last Rebel in space, within that first in a City."
+- **Reference:** "Remove 1 Rebel piece, first last Rebel in space, within that first in a City."
+- **Fix:** Rewrote priority to (tier, fewest_enemy, city_bonus) where tier is 0=WI, 1=exactly-1-Regular, 2=other.
+
+#### Removed `import random` — global random module
+- **Bug:** `import random` at module level was used for `random.random()` in Muster tiebreaking.
+- **Fix:** Removed import; all randomness now uses `state["rng"]` for deterministic replay.
+
+### REMAINING issues (from audit, not fixed this session)
+
+#### British Bot
+- **B5 Garrison**: Still targets only one city instead of full multi-phase operation (move to multiple cities, then reinforce existing British Control cities). Would require major refactoring of the Garrison command interface.
+- **B38 Howe capability**: FNI not lowered before SAs during Howe's leadership period.
+- **B39 Gage capability**: Free RL not implemented.
+- **B2 Event conditions**: Text matching for bullets 3 and 4 is overly broad — cannot verify game-state conditions (e.g., "Active Opposition with none") from card text alone. Would need per-card lookup table.
+- **B6 Muster precondition**: Consumes a die roll every time `_can_muster` is called, even when it won't lead to Muster. This is functionally correct but wasteful.
+- **B10 March**: `bring_escorts=False` hard-coded — reference doesn't explicitly address this for bot March.
+- **OPS reference**: Supply/Redeploy/Desertion priorities, Indian Trade, Brilliant Stroke trigger conditions — these are year-end/operational mechanics not in the turn flowchart.
+
+### Tests added (22 new)
+
+- `test_brit_bot_review.py`: Comprehensive test file covering all fixes:
+  - B4 Garrison precondition: 3 tests (Rebellion control, uncontrolled city, Rebel Fort exclusion)
+  - B5 Garrison retention: 1 test (Forts in royalist count)
+  - B5 Garrison city selection: 2 tests (Rebellion control requirement, most-rebels priority)
+  - B8 Muster determinism: 1 test (state["rng"] usage)
+  - B9 Battle condition: 2 tests (Active Rebels count, leader bonus)
+  - B10 March leave-behind: 2 tests (last Tory, last Regular)
+  - B10 March in place: 1 test (Militia activation priority)
+  - B11 Skirmish: 2 tests (Fort-only option 3, WI priority)
+  - B12 Battle Fort-only: 1 test (Rebel Fort-only spaces)
+  - B13 Common Cause mode: 2 tests (default BATTLE, MARCH mode)
+  - B7 Naval Pressure: 3 tests (leader check, Clinton + blockade, FNI=0 resources)
+  - B3 Resource gate: 2 tests (pass on zero, continue on positive)
+
+310 tests passing (288 baseline + 22 new).
+
+---
+
 ## Session 4: Full Card Handler Re-Audit
 
 ### Scope
@@ -397,12 +523,265 @@ All previously identified and fixed issues from Sessions 1–3 remain correct. A
 
 ### Confirmed remaining issues (unchanged from Session 3)
 
-All 9 previously documented remaining issues are confirmed still present and accurately described. No new issues to add. These fall into three categories:
-
-1. **Awaiting human clarification** (3): Card 94 execution order, Card 29 "or" ambiguity, Cards 12/13 desertion timing
-2. **Design choices** (4): Card 48 faction scope, Cards 66/67 TOA-gating, Card 4 faction-dependent choice, Card 87 removal priority
-3. **Minor edge cases** (2): Card 11 Rebellion vs Patriot control, Card 84 Colony restriction on Gather
+All 9 previously documented remaining issues were confirmed still present. **7 of 9 resolved in Session 5** (see below).
 
 ### Tests
 
 305 tests passing (Session 5: +17 Indian bot compliance tests, +1 updated I9 test).
+281 tests passing. No new tests needed since no code changes were made.
+
+---
+
+## Session 5: French Bot Flowchart Compliance (Node-by-Node Verification)
+
+Full node-by-node verification of `lod_ai/bots/french.py` against `Reference Documents/french bot flowchart and reference.txt`.
+
+### FIXED issues (this session)
+
+#### F13 `_can_battle` — 3 bugs fixed
+- **Missing Rebel leaders**: Only checked Washington. Now checks all three Rebel leaders (Washington, Rochambeau, Lauzun) via `leader_location()`.
+- **War Parties in British count**: Included `WARPARTY_A` in British pieces count. War Parties are Indian pieces, not British. Removed.
+- **Missing British Forts**: Didn't include `FORT_BRI` in British pieces count. Added.
+
+#### F12 `_try_skirmish` — 3 bugs fixed
+- **Only checked REGULAR_BRI**: Only detected spaces with British Regulars. Now checks all British pieces (Regulars + Tories + Forts).
+- **No Fort-first priority**: Always used option=2 (remove 2 cubes). Now uses option=3 (remove Fort) when no enemy cubes present and Fort exists; option=2 when 2+ cubes; option=1 when 1 cube.
+- **No affected-space filter**: Didn't exclude spaces already selected for Battle or Muster. Now checks `_turn_affected_spaces`.
+
+#### F16 `_battle` — 3 bugs fixed
+- **Underground Militia counted**: Used `MILITIA_A + MILITIA_U` for rebel force. Underground Militia shouldn't count toward force level. Now uses Active Militia only.
+- **`crown_cubes > 0` too narrow**: Only selected spaces with British cubes, missing Fort-only spaces. Changed to check all British pieces (`british_pieces > 0`).
+- **Missing leader modifiers**: Didn't include Rebel leader bonuses in force calculation. Now includes Washington, Rochambeau, Lauzun.
+- **Battle targets tracked**: Now records battle target spaces in `_turn_affected_spaces` so Skirmish can exclude them.
+
+#### F10 `_muster` — 2 bugs fixed
+- **`random.choice` instead of `state["rng"]`**: Broke deterministic reproducibility. Fixed to use `state["rng"].choice()`.
+- **No Colony/City type filter**: First priority "Colony or City with Continentals" wasn't filtering by space type. Province spaces could match. Now filters by `type in ("Colony", "City")`.
+- **Muster target tracked**: Now records muster space in `_turn_affected_spaces`.
+
+#### F14 `_march` — 1 bug fixed
+- **`random.random()` instead of `state["rng"]`**: Broke deterministic reproducibility. Fixed to use `state["rng"].random()`.
+
+#### F17 `_try_naval_pressure` — 2 bugs fixed
+- **No target priority**: Didn't prioritize Battle space first or most Support. Now selects city for Blockade: first a city selected for Battle, then highest Support.
+- **Incomplete SA fallback chain**: Battle path only had F17→F12 fallback. Per flowchart F17→F12→F15. Added Préparer la Guerre (F15) as final fallback.
+
+#### Event Instructions — 6 cards fixed
+- **Cards 52, 62, 70, 73, 83, 95**: All used `"force"` (always play event). Per the French bot special instructions, each has a conditional: play event only if specific game-state condition is met, otherwise fall through to Command & SA.
+- Added `force_if_X` directive pattern to `base_bot._choose_event_vs_flowchart()`.
+- Added `_force_condition_met()` override in FrenchBot with card-specific checks.
+- Removed unused `import random` from french.py.
+
+### Verified nodes (PASS — correct as-is)
+
+| Node | Description | Status |
+|------|-------------|--------|
+| F1 | Sword/SoP check | ✓ Handled by `base_bot._choose_event_vs_flowchart()` |
+| F2 | Event conditions (6 bullets) | ✓ `_faction_event_conditions()` checks all 6 conditions. Text-matching is fragile but functional. |
+| F3 | French Resources > 0 | ✓ `_follow_flowchart()` checks correctly, routes to PASS |
+| F4 | Treaty of Alliance played? | ✓ Branches to `_before_treaty` / `_after_treaty` |
+| F5 | Patriot Resources < 1D3 | ✓ Uses `state["rng"].randint(1,3)` |
+| F6 | Hortalez before Treaty | ✓ Spends min(resources, roll), routes to F8 |
+| F7 | Agent Mobilization | ✓ Correct provinces, correct placement priority, fallback to F6 |
+| F8 | Préparer pre-Treaty | ✓ Blockade then Regulars then nothing |
+| F9 | 1D6 < Available Regulars | ✓ Strict less-than with `state["rng"]` |
+| F11 | Hortalez after Treaty | ✓ "up to" 1D3, routes to F12 |
+| F15 | Préparer post-Treaty | ✓ D6 gate, +2 Resources fallback, correct structure |
+
+### REMAINING issues (not fixed this session)
+
+#### French Bot
+- **F14 March**: Still missing "Lose no Rebel Control" constraint, Continentals in march group, march-toward-nearest-British logic, and March 1 French Regular to shared space fallback.
+- **F2 Event conditions**: Text-matching approach is fragile (matches keywords in card text). A simulation-based approach would be more reliable but complex to implement.
+- **F6 Hortalez**: "Spend 1D3" (before Treaty) vs "Spend up to 1D3" (after Treaty) — code uses `min(resources, roll)` for both. Minor.
+- **OPS summary items**: French Supply/WI priorities, Redeploy leader logic, Loyalist Desertion priority, Treaty of Alliance trigger formula, Brilliant Stroke trigger conditions, Leader Movement during Campaigns — none implemented in the bot.
+
+### Tests added (15 new)
+
+- `test_f13_can_battle_includes_rochambeau` — Verifies Rochambeau + Lauzun leader bonuses
+- `test_f13_can_battle_excludes_war_parties` — Verifies War Parties excluded from British count
+- `test_f13_can_battle_includes_british_forts` — Verifies Forts counted in British pieces
+- `test_f16_battle_active_militia_only` — Verifies Underground Militia excluded from force
+- `test_f12_skirmish_detects_tory_only_space` — Verifies Tory-only spaces detected
+- `test_f12_skirmish_excludes_affected_spaces` — Verifies Battle/Muster spaces excluded
+- `test_f12_skirmish_fort_first_priority` — Verifies Fort removal before cubes
+- `test_f10_muster_deterministic` — Verifies state["rng"] used
+- `test_f10_muster_colony_city_filter` — Verifies Colony/City type filter
+- `test_f14_march_deterministic` — Verifies state["rng"] used
+- `test_event_force_if_73_british_fort_check` — Card 73 conditional
+- `test_event_force_if_62_militia_only` — Card 62 conditional
+- `test_event_force_if_70_british_in_rebel_spaces` — Card 70 conditional
+- `test_event_force_if_83_quebec_city_rebellion` — Card 83 conditional
+- `test_event_force_if_52_battle_target` — Card 52 conditional
+
+303 tests passing total.
+## Session 5: Patriot Bot Node-by-Node Flowchart Compliance
+
+### Scope
+
+Full node-by-node comparison of `lod_ai/bots/patriot.py` against `Reference Documents/patriot bot flowchart and reference.txt`, covering nodes P1–P13, Operations Summary, and bot-specific card instructions.
+
+### FIXED issues (13 bugs across 3 files)
+
+#### patriot.py — Force Level & Leader Lookup
+
+| Node | Bug | Fix |
+|------|-----|-----|
+| P6, P4 | Washington lookup uses `state.get("leaders", {}).get(sid, "")` — wrong format (space→leader instead of leader→space) | Use `leader_location(state, "LEADER_WASHINGTON")` from leaders module |
+| P4 | Force Level counts Underground Militia (`MILITIA_A + MILITIA_U`) | Count only Active Militia (`MILITIA_A`) per §3.6.3 |
+| P4 | Attacker Force Level includes Patriot Forts | Removed — forts only count for defender per §3.6.3 |
+| P4 | British Tories capped at `min(tories, regs)` when defending | Uncapped when defending per §3.6.2 (cap only applies when attacking) |
+| P4 | French Regulars uncapped when Patriots attack | Capped at Patriot cube count per §3.6.3 |
+| P4 | Tiebreaker uses `random.random()` | Changed to `state["rng"].random()` for determinism |
+
+#### patriot.py — Command Selection
+
+| Node | Bug | Fix |
+|------|-----|-----|
+| P8 | Partisans always uses `option=1`, never removes Villages | Now uses `option=3` when Village present and no War Parties in space |
+| P8 | WP and British priority flattened (`-(wp + british)`) | Split into `(-wp, -british)` — prefers War Party removal first per reference |
+| P12 | Skirmish always uses `option=1`, never removes British Forts | Now uses `option=3` when Fort present and no enemy cubes in space |
+| P12 | Skirmish tiebreaker uses `random.random()` | Changed to `state["rng"].random()` |
+| P7 | Fort placement hardcoded to max 2 spaces (`[:2]`) | Changed to `[:4]` (Rally Max 4 limit) |
+| P5 | March requires group size >= 3 (not in reference) | Changed to >= 1 per reference (no minimum stated) |
+
+#### event_instructions.py + base_bot.py — Bot Card Instructions
+
+| Card | Bug | Fix |
+|------|-----|-----|
+| 71 (Treaty of Amity) | "Use the unshaded text" but `force` directive plays shaded | New `force_unshaded` directive; `_execute_event` accepts `force_unshaded=True` |
+| 90 (World Turned Upside Down) | Same as card 71 | Same fix |
+| 8 (Culper Spy Ring) | "If French is a human player, choose C&SA" not checked | New `force_if_french_not_human` directive; checks `state["human_factions"]` |
+| 18, 44 | "Target eligible enemy Faction. If none, C&SA" not checked | New `force_if_eligible_enemy` directive; checks `state["eligible"]` |
+
+#### engine.py
+
+| Issue | Fix |
+|-------|-----|
+| Bot has no access to `human_factions` | Engine now injects `state["human_factions"]` before bot turns |
+
+### Tests added (22 new, 310 total)
+
+All in `test_pat_bot.py`:
+
+| Test | Verifies |
+|------|----------|
+| `test_p6_washington_lookup_uses_leader_location` | Leader→space and leader_locs formats both work |
+| `test_p4_force_level_excludes_underground_militia` | Underground Militia excluded from FL |
+| `test_p4_force_level_attacker_excludes_forts` | Patriot Forts excluded from attacking FL |
+| `test_p4_force_level_defending_tories_uncapped` | Defending Tories not capped at Regulars |
+| `test_p4_force_level_french_capped_at_patriot_cubes` | French Regs capped at Patriot count |
+| `test_p4_uses_deterministic_rng` | Tiebreaker uses state["rng"] |
+| `test_p8_partisans_uses_option3_for_villages` | Option=3 when Village and no WP |
+| `test_p8_partisans_prefers_wp_over_british` | WP priority > British priority |
+| `test_p12_skirmish_uses_option3_for_forts` | Option=3 when Fort and no enemy cubes |
+| `test_p5_march_no_group_size_minimum` | Groups of 1 are accepted |
+| `test_p7_rally_fort_cap_not_hardcoded_to_2` | 3+ fort targets all qualify |
+| `test_card_71_90_force_unshaded_directive` | Directive table updated |
+| `test_card_8_force_if_french_not_human_directive` | Directive table updated |
+| `test_cards_18_44_force_if_eligible_enemy_directive` | Directive table updated |
+| `test_force_unshaded_executes_unshaded` | Handler called with shaded=False |
+| `test_force_if_french_not_human_skips_when_french_human` | Event skipped |
+| `test_force_if_french_not_human_plays_when_french_bot` | Event played |
+| `test_force_if_eligible_enemy_skips_when_none_eligible` | Event skipped |
+| `test_force_if_eligible_enemy_plays_when_enemy_eligible` | Event played |
+| `test_p3_pass_when_no_resources` | Bot PASSes at 0 resources |
+| `test_p9_rally_preferred_when_fort_possible` | Fort-possible triggers Rally |
+| `test_p10_rabble_possible_checks_support` | Support level check |
+
+### REMAINING issues (not fixed — require significant refactoring or are medium severity)
+
+#### High Severity
+- **P4 Win-the-Day**: Free Rally and Blockade move after Rebellion wins not implemented
+- **P5 March**: Missing "lose no Rebel Control" constraint, leave-behind logic, second phase
+- **P7 Rally**: Missing Continental replacement, Fort Available placement, Control-changing Militia, adjacent Militia gathering steps; always returns True
+- **Card 51**: "March to set up Battle per Battle instructions. If not possible, C&SA" conditional not implemented
+
+#### Medium Severity
+- **P2**: Text matching for event conditions is heuristic (unreliable but functional)
+- **P7/P11**: Persuasion interrupt happens after command, not mid-execution when resources reach 0
+- **P7/P11**: Rally/Rabble mutual fallback — potential infinite loop masked by always-True return
+- **P5**: March destination doesn't verify Rebel Control would actually be gained
+- **P11**: Rabble-Rousing arbitrarily capped at 4 spaces
+- **OPS Summary**: Patriot Supply, Redeploy, Desertion, Brilliant Stroke, Leader Movement priorities not implemented in bot
+## Session 5: Fix 7 Audit Issues per User Rulings
+
+User provided definitive rulings on all 9 remaining audit issues. 7 required code fixes, 2 were confirmed as no-fix-needed.
+
+### FIXED (7 cards/groups)
+
+| Card(s) | Issue | Fix |
+|---|---|---|
+| **Card 29 (Bancroft)** | "or" activated BOTH factions | Changed to ONE faction (player choice via `state["card29_target"]`; bot default: British/Indian→Patriots, Patriot/French→Indians) |
+| **Cards 12, 13** | Deferred desertion via `winter_flag` | Now calls `_patriot_desertion()` immediately per §6.6.1 |
+| **Card 48 (God Save the King) shaded** | Moved ALL non-British factions' units | ONE non-British faction (player choice via `state["card48_faction"]`) |
+| **Cards 66, 67** | TOA-gated faction selection (`FRENCH if toa_played else PATRIOTS`) | Player choice regardless of TOA status (via `state["card66_shaded_faction"]`, `state["card67_faction"]`) |
+| **Card 4 (Penobscot) shaded** | Faction-dependent piece type (Fort vs Village, Militia vs WP) | Player chooses freely (via `state["card4_base"]`, `state["card4_units"]`); defaults to faction-aligned |
+| **Card 87 (Lenape) unshaded** | Fixed removal priority | Player chooses piece (via `state["card87_piece"]`); bot retains priority fallback |
+| **Card 84 (Merciless Indian Savages) unshaded** | `queue_free_op` for Gather had no location restriction | Now passes Colony locations (via `state["card84_colonies"]` or `pick_colonies()`) |
+
+### NO FIX NEEDED (2 issues)
+
+| Card | Issue | Ruling |
+|---|---|---|
+| **Card 94 (Herkimer)** | Execution order (Militia removal before Gather/Muster) | No gameplay impact — no fix needed |
+| **Card 11 (Kosciuszko)** | `"REBELLION"` control check vs. "Patriot Controlled" | Rebellion Control is correct |
+
+### Tests
+
+296 tests passing (15 new tests added across 3 test files).
+
+---
+
+## Session 6: Independent Full Card Handler Re-Audit
+
+### Scope
+
+Complete independent line-by-line verification of **all 109 card handlers** across 6 files against `Reference Documents/card reference full.txt`. This audit was performed independently of Session 4's audit to provide a second verification pass.
+
+Files audited:
+- `early_war.py` — 32 cards (2, 4, 6, 10, 13, 15, 20, 24, 28, 29, 30, 32, 33, 35, 41, 43, 46, 49, 51, 53, 54, 56, 68, 72, 75, 82, 83, 84, 86, 90, 91, 92)
+- `middle_war.py` — 32 cards (3, 5, 8, 9, 11, 12, 14, 17, 26, 27, 34, 38, 42, 44, 47, 50, 55, 58, 59, 60, 61, 63, 69, 71, 74, 76, 77, 78, 80, 88, 89, 93)
+- `late_war.py` — 32 cards (1, 7, 16, 18, 19, 21, 22, 23, 25, 31, 36, 37, 39, 40, 45, 48, 52, 57, 62, 64, 65, 66, 67, 70, 73, 79, 81, 85, 87, 94, 95, 96)
+- `brilliant_stroke.py` — 5 cards (105, 106, 107, 108, 109)
+- `winter_quarters.py` — 8 cards (97, 98, 99, 100, 101, 102, 103, 104)
+- `shared.py` — Helper functions (shift_support, add_resource, adjust_fni, pick_cities, pick_colonies)
+
+### Verification checklist applied per card
+
+1. Piece tags use constants from `rules_consts.py` (not string literals)
+2. Resource amounts and recipients match reference exactly
+3. FNI adjustments (direction and magnitude) correct
+4. Support/Opposition shifts (direction, magnitude, "toward X" semantics) correct
+5. Destinations ("to Casualties" vs "to Available") match reference
+6. Free operation types and factions correct
+7. Eligibility flags correct (`ineligible_through_next` not `ineligible_next`)
+8. Piece operations use `board/pieces.py` helpers exclusively (no direct dict manipulation)
+9. Sourcing order (Available vs Unavailable) matches reference text ordering
+10. Shaded = (none) cards correctly return/no-op
+
+### Result: NO NEW ISSUES FOUND
+
+All 109 card handlers match the card reference text. All previously identified and fixed issues from Sessions 1–5 remain correct.
+
+### Verified categories (all PASS)
+
+| Category | Sample verifications | Status |
+|---|---|---|
+| Resource adjustments | Cards 7, 10, 19, 34, 37, 42, 45, 53, 56, 58, 60, 61, 63, 64, 65, 69, 71 — all amounts and recipients correct | PASS |
+| FNI adjustments | Cards 7, 34, 37, 40, 53, 57, 60, 63, 64, 67, 69 — directions and magnitudes correct; absolute-set (Card 40) correct | PASS |
+| Eligibility flags | Cards 5, 18, 34, 38, 44, 50, 57, 61, 67, 87 — all use `ineligible_through_next` or `remain_eligible` correctly | PASS |
+| Piece placement/removal | All 96 cards with piece operations — tags, quantities, destinations verified | PASS |
+| Support/Opposition shifts | Cards 1, 2, 10, 16, 21, 25, 27, 39, 41, 46, 83, 93 — "toward X" semantics verified against numeric targets | PASS |
+| Sourcing order | Card 30 (Available first per "from Available or Unavailable"), Cards 27/32/38/46 (Unavailable first per "from Unavailable or Available") — all match reference text ordering | PASS |
+| Free operations | Cards 1, 5, 9, 14, 15, 21, 26, 31, 33, 48, 51, 52, 55, 66, 67, 75, 84, 94, 96 — faction, op type, and location correct | PASS |
+| Shaded = no effect | Cards 18, 29, 39, 44, 52, 68, 70, 72, 73, 80, 87, 88, 92, 93, 95 — all return/no-op correctly | PASS |
+| Winter Quarters cards | Cards 97–104 — CRC/CBC comparisons, half-difference reductions, second-VC-leader checks all correct | PASS |
+| Brilliant Stroke cards | Cards 105–109 — declarations, eligibility reset, trump hierarchy, ToA preparations formula all correct | PASS |
+| `flip_pieces()` usage | Cards 8, 28, 29, 35, 77, 86 — all use board/pieces helper, no direct dict manipulation | PASS |
+| `place_with_caps()` for bases | Cards 4, 26, 31, 68, 72, 77, 79, 81, 83, 90, 91, 92 — enforces stacking limits | PASS |
+| Shared helpers | `shift_support` clamps [-2,+2]; `adjust_fni` respects ToA gate + clamps [0,3]; `add_resource` clamps [0,50] | PASS |
+
+### Tests
+
+303 tests passing. No new tests needed since no code changes were made.

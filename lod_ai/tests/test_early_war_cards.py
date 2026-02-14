@@ -142,6 +142,39 @@ def test_card4_penobscot_shaded_rebellion_places_fort_and_militia():
     assert state["spaces"]["Massachusetts"].get(MILITIA_U) == 3
 
 
+def test_card4_penobscot_shaded_free_choice_village_and_militia():
+    """Card 4 shaded: Player can freely choose Village + Militia regardless
+    of executing faction."""
+    state = _base_state()
+    state["spaces"] = {"Massachusetts": {}}
+    state["available"] = {VILLAGE: 1, MILITIA_U: 5}
+    state["active"] = "PATRIOTS"  # Rebellion side, but choosing Village + Militia
+    state["card4_base"] = "VILLAGE"
+    state["card4_units"] = "MILITIA"
+
+    early_war.evt_004_penobscot(state, shaded=True)
+
+    assert state["spaces"]["Massachusetts"].get(VILLAGE) == 1
+    assert state["spaces"]["Massachusetts"].get(MILITIA_U) == 3
+    assert state["spaces"]["Massachusetts"].get(FORT_PAT, 0) == 0
+
+
+def test_card4_penobscot_shaded_free_choice_fort_and_warparties():
+    """Card 4 shaded: Player can freely choose Fort_PAT + War Parties."""
+    state = _base_state()
+    state["spaces"] = {"Massachusetts": {}}
+    state["available"] = {FORT_PAT: 1, WARPARTY_U: 5}
+    state["active"] = "BRITISH"  # Crown side, but choosing Fort_PAT + War Parties
+    state["card4_base"] = "FORT_PAT"
+    state["card4_units"] = "WARPARTY"
+
+    early_war.evt_004_penobscot(state, shaded=True)
+
+    assert state["spaces"]["Massachusetts"].get(FORT_PAT) == 1
+    assert state["spaces"]["Massachusetts"].get(WARPARTY_U) == 3
+    assert state["spaces"]["Massachusetts"].get(VILLAGE, 0) == 0
+
+
 def test_card24_declaration_unshaded_removes_correct_pieces():
     state = _base_state()
     state["spaces"] = {
@@ -404,17 +437,35 @@ def test_card54_sartine_unshaded_moves_from_wi_to_unavailable():
     assert total_blockades(state) == 3
 
 
-def test_card29_bancroft_activates_both_factions():
-    """Card 29: Both Patriots (Militia) and Indians (WP) should activate."""
+def test_card29_bancroft_activates_one_faction_patriots():
+    """Card 29: 'or' means ONE faction. British bot targets Patriots."""
     state = _base_state()
     state["spaces"] = {
         "A": {MILITIA_U: 6, MILITIA_A: 0, WARPARTY_U: 4, WARPARTY_A: 0},
     }
+    state["active"] = "BRITISH"
     early_war.evt_029_bancroft(state, shaded=False)
 
     # 6 total Militia → target 3 Active
     assert state["spaces"]["A"].get(MILITIA_A, 0) == 3
     assert state["spaces"]["A"].get(MILITIA_U, 0) == 3
+    # War Parties should be UNTOUCHED (only one faction chosen)
+    assert state["spaces"]["A"].get(WARPARTY_A, 0) == 0
+    assert state["spaces"]["A"].get(WARPARTY_U, 0) == 4
+
+
+def test_card29_bancroft_activates_one_faction_indians():
+    """Card 29: Patriot bot targets Indians (War Parties only)."""
+    state = _base_state()
+    state["spaces"] = {
+        "A": {MILITIA_U: 6, MILITIA_A: 0, WARPARTY_U: 4, WARPARTY_A: 0},
+    }
+    state["active"] = "PATRIOTS"
+    early_war.evt_029_bancroft(state, shaded=False)
+
+    # Militia should be UNTOUCHED (only one faction chosen)
+    assert state["spaces"]["A"].get(MILITIA_A, 0) == 0
+    assert state["spaces"]["A"].get(MILITIA_U, 0) == 6
     # 4 total WP → target 2 Active
     assert state["spaces"]["A"].get(WARPARTY_A, 0) == 2
     assert state["spaces"]["A"].get(WARPARTY_U, 0) == 2
@@ -457,3 +508,89 @@ def test_card86_stockbridge_shaded_places_militia():
     state["available"] = {MILITIA_U: 5}
     early_war.evt_086_stockbridge(state, shaded=True)
     assert state["spaces"]["Massachusetts"].get(MILITIA_U, 0) == 3
+
+
+def test_card13_unshaded_executes_patriot_desertion_immediately():
+    """Card 13 unshaded: Execute Patriot Desertion immediately (§6.6.1),
+    not deferred via winter_flag."""
+    state = _base_state()
+    state["spaces"] = {
+        "Virginia": {"type": "Colony", MILITIA_U: 5, REGULAR_PAT: 5},
+        "Georgia": {"type": "Colony", MILITIA_U: 5},
+    }
+    state["support"] = {"Virginia": 0, "Georgia": 0}
+
+    early_war.evt_013_origin_misfortunes(state, shaded=False)
+
+    # 10 total Militia → remove 2 (1-in-5).  5 Continentals → remove 1.
+    total_mil = sum(
+        sp.get(MILITIA_U, 0) + sp.get(MILITIA_A, 0)
+        for sp in state["spaces"].values()
+    )
+    total_con = sum(
+        sp.get(REGULAR_PAT, 0)
+        for sp in state["spaces"].values()
+    )
+    assert total_mil == 8   # 10 - 2
+    assert total_con == 4   # 5 - 1
+    # Must NOT set winter_flag
+    assert "winter_flag" not in state
+
+
+def test_card13_shaded_does_not_set_winter_flag():
+    """Card 13 shaded: should NOT trigger desertion or set winter_flag."""
+    state = _base_state()
+    state["spaces"] = {
+        "Georgia": {"type": "Colony", MILITIA_U: 2},
+    }
+    state["available"] = {MILITIA_U: 5}
+
+    early_war.evt_013_origin_misfortunes(state, shaded=True)
+
+    # Shaded side must NOT set winter_flag or run desertion
+    assert "winter_flag" not in state
+    # Militia count should stay the same or increase (not deserted)
+    assert state["spaces"]["Georgia"].get(MILITIA_U, 0) >= 2
+
+
+def test_card84_unshaded_gather_restricted_to_colonies():
+    """Card 84 unshaded: 'Indians free Gather in two Colonies' — the queued
+    free ops must specify Colony locations, not be unrestricted."""
+    state = _base_state()
+    state["spaces"] = {
+        "Virginia": {"type": "Colony"},
+        "Georgia": {"type": "Colony"},
+        "Boston": {"type": "City"},
+        "Northwest": {"type": "Reserve"},
+    }
+    state["free_ops"] = []
+
+    early_war.evt_084_six_nations(state, shaded=False)
+
+    # Should queue exactly 2 Gather ops, each with a Colony location
+    ops = state["free_ops"]
+    assert len(ops) == 2
+    for fac, op_name, loc in ops:
+        assert fac == "INDIANS"
+        assert op_name == "gather"
+        assert loc is not None  # must NOT be None (unrestricted)
+        assert loc in ("Virginia", "Georgia")  # must be a Colony
+
+
+def test_card84_unshaded_player_override_colonies():
+    """Card 84 unshaded: Player can specify which colonies via state override."""
+    state = _base_state()
+    state["spaces"] = {
+        "Virginia": {"type": "Colony"},
+        "Georgia": {"type": "Colony"},
+        "South_Carolina": {"type": "Colony"},
+    }
+    state["free_ops"] = []
+    state["card84_colonies"] = ["Georgia", "South_Carolina"]
+
+    early_war.evt_084_six_nations(state, shaded=False)
+
+    ops = state["free_ops"]
+    assert len(ops) == 2
+    assert ops[0] == ("INDIANS", "gather", "Georgia")
+    assert ops[1] == ("INDIANS", "gather", "South_Carolina")

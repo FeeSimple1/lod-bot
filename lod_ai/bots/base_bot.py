@@ -53,12 +53,15 @@ class BaseBot:
         }
         return tables[self.faction].get(card_id, "normal")
 
-    def _execute_event(self, card: Dict, state: Dict) -> None:
+    def _execute_event(self, card: Dict, state: Dict, *, force_unshaded: bool = False) -> None:
         """Dispatch the effect function for *card* using proper shading."""
         handler = CARD_HANDLERS.get(card["id"])
         if not handler:
             return
-        shaded = card.get("dual") and self.faction in {C.PATRIOTS, C.FRENCH}
+        if force_unshaded:
+            shaded = False
+        else:
+            shaded = card.get("dual") and self.faction in {C.PATRIOTS, C.FRENCH}
         previous_active = state.get("active")
         state["active"] = self.faction
         try:
@@ -116,11 +119,33 @@ class BaseBot:
             if directive == "force":
                 self._execute_event(card, state)
                 return True
+            if directive == "force_unshaded":
+                self._execute_event(card, state, force_unshaded=True)
+                return True
+            if directive == "force_if_french_not_human":
+                if not state.get("human_factions", set()) & {C.FRENCH}:
+                    self._execute_event(card, state)
+                    return True
+                return False  # French is human → Command & SA instead
+            if directive == "force_if_eligible_enemy":
+                enemies = {C.BRITISH, C.INDIANS, C.FRENCH} - {self.faction}
+                eligible = state.get("eligible", {})
+                if any(eligible.get(e, False) for e in enemies):
+                    self._execute_event(card, state)
+                    return True
+                return False  # No eligible enemy → Command & SA instead
             if directive.startswith("ignore_if_"):
                 # example for card 29:  'ignore_if_4_militia'
                 if self._condition_satisfied(directive, state, card):
                     return False
                 # otherwise fall through to normal test
+            if directive.startswith("force_if_"):
+                # Conditional force: play event if condition is satisfied, else
+                # fall through to flowchart (Command & SA).
+                if self._force_condition_met(directive, state, card):
+                    self._execute_event(card, state)
+                    return True
+                return False  # condition not met → Command & SA
 
         # 3. Ineffective-event test (Rule 8.3.3)
         if self._is_ineffective_event(card, state):
@@ -147,6 +172,10 @@ class BaseBot:
             to_flip = hidden // 2
             return to_flip < threshold
         return False
+
+    def _force_condition_met(self, directive: str, state: Dict, card: Dict) -> bool:
+        """Evaluate force_if_X directives. Subclass should override."""
+        return True           # default: always force
 
     def _faction_event_conditions(self, state: Dict, card: Dict) -> bool:
         return False          # subclass will override

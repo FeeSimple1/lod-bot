@@ -22,19 +22,19 @@ BRITISH = {
 # pared‑down version of the Brown‑Bess chart used by the simplified bots.
 
 PATRIOTS = {
-    8: "force",   # Culper Spy Ring — skip if French is human (handled at execution)
-    18: "force",  # "If it hadn't been so stormy…"
-    29: "force",  # Edward Bancroft, British Spy
-    44: "force",  # Earl of Mansfield Recalled from Paris
-    51: "force",  # Bermuda Gunpowder Plot
-    52: "force",  # French Fleet Arrives in the Wrong Spot
-    70: "force",  # British Gain From French in India
-    71: "force",  # Treaty of Amity and Commerce
-    80: "force",  # Confusion Allows Slaves to Escape
-    83: "force",  # Guy Carleton and Indians Negotiate
-    86: "force",  # Stockbridge Indians
-    88: "force",  # "If it hadn't been so foggy…"
-    90: "force",  # "The World Turned Upside Down"
+    8: "force_if_french_not_human",   # Culper Spy Ring — skip if French is human
+    18: "force_if_eligible_enemy",    # "If it hadn't been so stormy…" — target eligible enemy, else C&SA
+    29: "force",                      # Edward Bancroft, British Spy — target Indians
+    44: "force_if_eligible_enemy",    # Earl of Mansfield Recalled from Paris — target eligible enemy, else C&SA
+    51: "force",                      # Bermuda Gunpowder Plot
+    52: "force",                      # French Fleet Arrives in the Wrong Spot
+    70: "force",                      # British Gain From French in India
+    71: "force_unshaded",             # Treaty of Amity and Commerce — use unshaded text
+    80: "force",                      # Confusion Allows Slaves to Escape
+    83: "force",                      # Guy Carleton and Indians Negotiate
+    86: "force",                      # Stockbridge Indians
+    88: "force",                      # "If it hadn't been so foggy…"
+    90: "force_unshaded",             # "The World Turned Upside Down" — use unshaded text
 }
 
 INDIANS = {
@@ -56,12 +56,12 @@ INDIANS = {
 }
 
 FRENCH = {
-    52: "force",  # French Fleet Arrives in the Wrong Spot
-    62: "force",  # Charles Michel de Langlade
-    70: "force",  # British Gain From French in India
-    73: "force",  # Sullivan Expedition vs Iroquois and Tories
-    83: "force",  # Guy Carleton and Indians Negotiate
-    88: "force",  # "If it hadn't been so foggy…"
-    89: "force",  # War Damages Colonies' Economy
-    95: "force",  # Ohio Country Frontier Erupts
+    52: "force_if_52",  # French Fleet: Remove no French Regulars. If no Battle space, Command & SA
+    62: "force_if_62",  # Langlade: Place Militia only. If not possible, Command & SA
+    70: "force_if_70",  # British Gain: Remove Brit Regs from rebel spaces. If none, Command & SA
+    73: "force_if_73",  # Sullivan: If no British Fort removed, Command & SA
+    83: "force_if_83",  # Carleton: Select Quebec City. If no Rebellion gain, Command & SA
+    88: "force",        # "If it hadn't been so foggy…"
+    89: "force",        # War Damages Colonies' Economy — Select Active Support spaces first
+    95: "force_if_95",  # Ohio Frontier: If no British Fort removed, Command & SA
 }

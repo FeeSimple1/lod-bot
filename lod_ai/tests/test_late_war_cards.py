@@ -166,15 +166,44 @@ def test_card67_shaded_muster_option():
     assert FRENCH in state["remain_eligible"]
 
 
-def test_card67_shaded_patriots_if_no_toa():
-    """Card 67 shaded: If Treaty not played, Patriots get the free op."""
+def test_card67_shaded_patriots_by_player_choice():
+    """Card 67 shaded: Player can choose Patriots regardless of TOA status."""
     state = _base_state()
     state["spaces"] = {"Virginia": {}}
-    state["toa_played"] = False
+    state["toa_played"] = True  # TOA played, but player still chooses Patriots
+    state["card67_faction"] = "PATRIOTS"
 
     late_war.evt_067_de_grasse(state, shaded=True)
 
     assert PATRIOTS in state["remain_eligible"]
+    ops = state.get("free_ops", [])
+    assert any(op[0] == PATRIOTS for op in ops)
+
+
+def test_card66_shaded_patriots_by_player_choice():
+    """Card 66 shaded: Player can choose Patriots regardless of TOA status."""
+    state = _base_state()
+    state["spaces"] = {"Florida": {}}
+    state["toa_played"] = True  # TOA played, but player still chooses Patriots
+    state["card66_shaded_faction"] = "PATRIOTS"
+
+    late_war.evt_066_don_bernardo(state, shaded=True)
+
+    ops = state.get("free_ops", [])
+    assert any(op[0] == PATRIOTS for op in ops)
+
+
+def test_card66_shaded_french_by_player_choice():
+    """Card 66 shaded: Player can choose French regardless of TOA status."""
+    state = _base_state()
+    state["spaces"] = {"Florida": {}}
+    state["toa_played"] = False  # TOA NOT played, but player still chooses French
+    state["card66_shaded_faction"] = "FRENCH"
+
+    late_war.evt_066_don_bernardo(state, shaded=True)
+
+    ops = state.get("free_ops", [])
+    assert any(op[0] == FRENCH for op in ops)
 
 
 # ---- Card 22: Newburgh Conspiracy ----
@@ -211,3 +240,78 @@ def test_card23_unshaded_does_not_move_forts():
     assert state["spaces"]["South_Carolina"].get(FORT_PAT, 0) == 1
     assert state["spaces"]["Georgia"].get(MILITIA_U, 0) == 1
     assert state["spaces"]["Georgia"].get(FORT_PAT, 0) == 0
+
+
+# ---- Card 48: God Save the King ----
+
+def test_card48_shaded_moves_one_faction_only():
+    """Card 48 shaded: 'A non-British Faction' (singular) moves units from
+    spaces with British Regulars. Only the chosen faction's units move."""
+    state = _base_state()
+    # Virginia adj: Norfolk, Maryland-Delaware, Northwest, Southwest, North_Carolina
+    state["spaces"] = {
+        "Virginia": {REGULAR_BRI: 2, MILITIA_U: 3, WARPARTY_U: 2},
+        "North_Carolina": {},
+    }
+    # Force choosing Patriots
+    state["card48_faction"] = "PATRIOTS"
+
+    late_war.evt_048_god_save_king(state, shaded=True)
+
+    # Patriots (Militia) should have moved out; War Parties should stay
+    assert state["spaces"]["Virginia"].get(MILITIA_U, 0) == 0
+    assert state["spaces"]["Virginia"].get(WARPARTY_U, 0) == 2  # untouched
+    assert state["spaces"]["North_Carolina"].get(MILITIA_U, 0) == 3
+
+
+def test_card48_shaded_indians_only():
+    """Card 48 shaded: If Indians chosen, only War Parties move."""
+    state = _base_state()
+    state["spaces"] = {
+        "Virginia": {REGULAR_BRI: 2, MILITIA_U: 3, WARPARTY_U: 2},
+        "North_Carolina": {},
+    }
+    state["card48_faction"] = "INDIANS"
+
+    late_war.evt_048_god_save_king(state, shaded=True)
+
+    # Only War Parties should have moved
+    assert state["spaces"]["Virginia"].get(WARPARTY_U, 0) == 0
+    assert state["spaces"]["Virginia"].get(MILITIA_U, 0) == 3  # untouched
+    assert state["spaces"]["North_Carolina"].get(WARPARTY_U, 0) == 2
+
+
+# ---- Card 87: Patriots Massacre Lenape Indians ----
+
+def test_card87_unshaded_player_chooses_piece():
+    """Card 87 unshaded: Player chooses which piece to remove in Pennsylvania."""
+    state = _base_state()
+    state["spaces"] = {
+        "Pennsylvania": {REGULAR_BRI: 2, WARPARTY_U: 1, TORY: 1},
+    }
+    state["active"] = "PATRIOTS"
+    # Player specifically chooses to remove a Tory
+    state["card87_piece"] = TORY
+
+    late_war.evt_087_lenape(state, shaded=False)
+
+    assert state["spaces"]["Pennsylvania"].get(TORY, 0) == 0
+    assert state["spaces"]["Pennsylvania"].get(REGULAR_BRI, 0) == 2  # untouched
+    assert state["spaces"]["Pennsylvania"].get(WARPARTY_U, 0) == 1  # untouched
+    assert PATRIOTS in state["remain_eligible"]
+
+
+def test_card87_unshaded_bot_fallback():
+    """Card 87 unshaded: Without player override, bot removes first available."""
+    state = _base_state()
+    state["spaces"] = {
+        "Pennsylvania": {REGULAR_BRI: 2, TORY: 1},
+    }
+    state["active"] = "INDIANS"
+
+    late_war.evt_087_lenape(state, shaded=False)
+
+    # Bot priority: REGULAR_BRI removed first (units before bases)
+    assert state["spaces"]["Pennsylvania"].get(REGULAR_BRI, 0) == 1
+    assert state["spaces"]["Pennsylvania"].get(TORY, 0) == 1
+    assert INDIANS in state["remain_eligible"]

@@ -31,6 +31,7 @@ from lod_ai.commands import rally, march, battle, rabble_rousing
 from lod_ai.special_activities import partisans, skirmish, persuasion
 from lod_ai.board.control import refresh_control
 from lod_ai.util.history import push_history
+from lod_ai.leaders import leader_location
 
 # ---------------------------------------------------------------------------
 #  Helper constants
@@ -154,26 +155,34 @@ class PatriotBot(BaseBot):
 
         Priority: first with Washington, then in highest Pop, then where
         most Villages, then random.
+
+        Force Level per §3.6.2-3.6.3:
+          Rebellion ATTACKING: cubes + min(French, Patriot cubes) + half Active Militia
+            (no forts for attacker)
+          Royalist DEFENDING: Regulars + Tories (uncapped when defending)
+            + half Active WP + Forts
         """
         refresh_control(state)
         targets = []
         for sid, sp in state["spaces"].items():
-            # Rebel Force Level: cubes + floor(Militia/2) + Forts
-            rebel_cubes = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0))
-            total_militia = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
-            rebel_force = rebel_cubes + (total_militia // 2) + sp.get(C.FORT_PAT, 0)
+            # Rebel Force Level (attacking): cubes + half Active Militia only
+            pat_cubes = sp.get(C.REGULAR_PAT, 0)
+            fre_cubes = min(sp.get(C.REGULAR_FRE, 0), pat_cubes)
+            active_mil = sp.get(C.MILITIA_A, 0)
+            rebel_force = pat_cubes + fre_cubes + (active_mil // 2)
 
-            # British Force Level: Regulars + min(Tories, Regulars) + floor(WP/2)
+            # British Force Level (defending): Regs + Tories (uncapped) +
+            # half Active WP + Forts
             regs = sp.get(C.REGULAR_BRI, 0)
-            tories = min(sp.get(C.TORY, 0), regs)
-            brit_force = regs + tories + (sp.get(C.WARPARTY_A, 0) // 2) + sp.get(C.FORT_BRI, 0)
+            tories = sp.get(C.TORY, 0)
+            active_wp = sp.get(C.WARPARTY_A, 0)
+            brit_force = regs + tories + (active_wp // 2) + sp.get(C.FORT_BRI, 0)
 
-            if rebel_force > brit_force and (regs + sp.get(C.TORY, 0) + sp.get(C.WARPARTY_A, 0)) > 0:
-                leader_loc = state.get("leaders", {}).get(sid, "")
-                has_wash = 1 if leader_loc == "LEADER_WASHINGTON" else 0
+            if rebel_force > brit_force and (regs + tories + active_wp) > 0:
+                has_wash = 1 if leader_location(state, "LEADER_WASHINGTON") == sid else 0
                 pop = _MAP_DATA.get(sid, {}).get("population", 0)
                 villages = sp.get(C.VILLAGE, 0)
-                targets.append((-has_wash, -pop, -villages, random.random(), sid))
+                targets.append((-has_wash, -pop, -villages, state["rng"].random(), sid))
         if not targets:
             return False
         targets.sort()
@@ -185,8 +194,7 @@ class PatriotBot(BaseBot):
         """P6: 'Rebel cubes + Leader' = Continentals + French Regulars + leader."""
         sp = state["spaces"].get(sid, {})
         cubes = sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
-        leader_loc = state.get("leaders", {}).get(sid, "")
-        if leader_loc == "LEADER_WASHINGTON":
+        if leader_location(state, "LEADER_WASHINGTON") == sid:
             cubes += 1
         return cubes
 
@@ -200,11 +208,11 @@ class PatriotBot(BaseBot):
     # ---------- March (P5) --------------------------------------------
     def _execute_march(self, state: Dict) -> bool:
         refresh_control(state)
-        # Origins with largest rebel groups
+        # Origins with largest rebel groups (moving largest groups first per P5)
         origins = sorted(
             (self._rebel_group_size(sp), sid)
             for sid, sp in state["spaces"].items()
-            if self._rebel_group_size(sp) >= 3
+            if self._rebel_group_size(sp) >= 1
         )
         if not origins:
             return False
@@ -272,7 +280,8 @@ class PatriotBot(BaseBot):
                self._rebel_group_size(sp) >= 4
         ]
         fort_targets.sort(key=lambda n: (-(_MAP_DATA[n]["type"] == "City"), -_MAP_DATA[n]["population"]))
-        forts_to_build = set(fort_targets[:2])
+        # Rally is Max 4 total spaces; build forts in all qualifying spaces up to that limit
+        forts_to_build = set(fort_targets[:4])
 
         # Militia placement – favour Forts lacking other Patriot pieces
         militia_spaces = []
@@ -337,17 +346,27 @@ class PatriotBot(BaseBot):
             adds_rebel_ctrl = 1 if ctrl.get(sid) != "REBELLION" else 0
             # Would remove British Control?
             removes_brit_ctrl = 1 if ctrl.get(sid) == "BRITISH" else 0
-            # Sort key: village first, then most WP/British, then Rebel
-            # Control gain, then British Control loss, then random
-            key = (-has_village, -(wp + british), -adds_rebel_ctrl,
-                   -removes_brit_ctrl, random.random())
+            # Sort key per reference: village first, then most WP, then
+            # most British; within each: add Rebel Control, then remove
+            # British Control, then random
+            key = (-has_village, -wp, -british, -adds_rebel_ctrl,
+                   -removes_brit_ctrl, state["rng"].random())
             candidates.append((key, sid))
         if not candidates:
             return False
         candidates.sort()
         for _, sid in candidates:
+            sp = state["spaces"][sid]
+            has_village = sp.get(C.VILLAGE, 0)
+            wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
+            # Option 3: remove a Village (requires no WP in space)
+            if has_village and not wp:
+                opt = 3
+            else:
+                # Option 1: activate 1 Underground Militia, remove 1 enemy
+                opt = 1
             try:
-                partisans.execute(state, self.faction, {}, sid, option=1)
+                partisans.execute(state, self.faction, {}, sid, option=opt)
                 return True
             except Exception:
                 continue
@@ -367,19 +386,30 @@ class PatriotBot(BaseBot):
             if not sp.get(C.REGULAR_PAT, 0):
                 continue
             has_fort = sp.get(C.FORT_BRI, 0)
-            has_enemy = has_fort or sp.get(C.REGULAR_BRI, 0) or sp.get(C.TORY, 0)
+            enemy_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+            has_enemy = has_fort or enemy_cubes
             if not has_enemy:
                 continue
             adds_rebel_ctrl = 1 if ctrl.get(sid) != "REBELLION" else 0
             removes_brit_ctrl = 1 if ctrl.get(sid) == "BRITISH" else 0
-            key = (-has_fort, -adds_rebel_ctrl, -removes_brit_ctrl, random.random())
+            key = (-has_fort, -adds_rebel_ctrl, -removes_brit_ctrl, state["rng"].random())
             candidates.append((key, sid))
         if not candidates:
             return False
         candidates.sort()
         for _, sid in candidates:
+            sp = state["spaces"][sid]
+            has_fort = sp.get(C.FORT_BRI, 0)
+            enemy_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+            # Option 3: remove a British Fort (requires no enemy cubes,
+            # costs 1 own Continental)
+            if has_fort and not enemy_cubes:
+                opt = 3
+            else:
+                # Option 1: remove 1 enemy cube (no self-cost)
+                opt = 1
             try:
-                skirmish.execute(state, self.faction, {}, sid, option=1)
+                skirmish.execute(state, self.faction, {}, sid, option=opt)
                 return True
             except Exception:
                 continue
