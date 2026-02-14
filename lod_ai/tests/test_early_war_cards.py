@@ -475,3 +475,46 @@ def test_card86_stockbridge_shaded_places_militia():
     state["available"] = {MILITIA_U: 5}
     early_war.evt_086_stockbridge(state, shaded=True)
     assert state["spaces"]["Massachusetts"].get(MILITIA_U, 0) == 3
+
+
+def test_card13_unshaded_executes_patriot_desertion_immediately():
+    """Card 13 unshaded: Execute Patriot Desertion immediately (§6.6.1),
+    not deferred via winter_flag."""
+    state = _base_state()
+    state["spaces"] = {
+        "Virginia": {"type": "Colony", MILITIA_U: 5, REGULAR_PAT: 5},
+        "Georgia": {"type": "Colony", MILITIA_U: 5},
+    }
+    state["support"] = {"Virginia": 0, "Georgia": 0}
+
+    early_war.evt_013_origin_misfortunes(state, shaded=False)
+
+    # 10 total Militia → remove 2 (1-in-5).  5 Continentals → remove 1.
+    total_mil = sum(
+        sp.get(MILITIA_U, 0) + sp.get(MILITIA_A, 0)
+        for sp in state["spaces"].values()
+    )
+    total_con = sum(
+        sp.get(REGULAR_PAT, 0)
+        for sp in state["spaces"].values()
+    )
+    assert total_mil == 8   # 10 - 2
+    assert total_con == 4   # 5 - 1
+    # Must NOT set winter_flag
+    assert "winter_flag" not in state
+
+
+def test_card13_shaded_does_not_set_winter_flag():
+    """Card 13 shaded: should NOT trigger desertion or set winter_flag."""
+    state = _base_state()
+    state["spaces"] = {
+        "Georgia": {"type": "Colony", MILITIA_U: 2},
+    }
+    state["available"] = {MILITIA_U: 5}
+
+    early_war.evt_013_origin_misfortunes(state, shaded=True)
+
+    # Shaded side must NOT set winter_flag or run desertion
+    assert "winter_flag" not in state
+    # Militia count should stay the same or increase (not deserted)
+    assert state["spaces"]["Georgia"].get(MILITIA_U, 0) >= 2

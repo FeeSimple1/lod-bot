@@ -320,15 +320,16 @@ def evt_011_kosciuszko(state, shaded=False):
 @register(12)
 def evt_012_martha_to_valley_forge(state, shaded=False):
     """
-    Unshaded – Patriot desertion this Winter.
+    Unshaded – Execute Patriot Desertion as per Winter Quarters Round (§6.6.1).
     Shaded   – Patriot Resources +5.
     """
     if shaded:
         add_resource(state, PATRIOTS, +5)
         push_history(state, "Card 12 shaded: Patriots +5 Resources")
     else:
-        state["winter_flag"] = "PAT_DESERTION"
-        push_history(state, "Card 12 unshaded: Patriot desertion this Winter")
+        from lod_ai.util.year_end import _patriot_desertion
+        _patriot_desertion(state)
+        push_history(state, "Card 12 unshaded: Patriot Desertion executed immediately")
 
 
 # 14  OVERMOUNTAIN MEN FIGHT FOR NORTH CAROLINA

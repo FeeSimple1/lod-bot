@@ -155,18 +155,20 @@ def evt_010_franklin_to_france(state, shaded=False):
         shift_support(state, c1, +1)
         shift_support(state, c2, +1)
 
-# 13  “…THE ORIGIN OF ALL OUR MISFORTUNES”
+# 13  "…THE ORIGIN OF ALL OUR MISFORTUNES"
 @register(13)
 def evt_013_origin_misfortunes(state, shaded=False):
     """
-    Unshaded – Patriot desertion this Winter.
+    Unshaded – Execute Patriot Desertion as per Winter Quarters Round (§6.6.1).
     Shaded   – In up to 4 spaces with Militia, Patriots add 1 Active Militia.
     """
     if shaded:
         for space in _pick_spaces_with_militia(state, max_spaces=4):
             place_piece(state, MILITIA_A, space, 1)
     else:
-        state["winter_flag"] = "PAT_DESERTION"
+        from lod_ai.util.year_end import _patriot_desertion
+        _patriot_desertion(state)
+        push_history(state, "Card 13 unshaded: Patriot Desertion executed immediately")
 
 # 15  MORGAN’S RIFLES
 @register(15)
