@@ -226,23 +226,16 @@ These cards manipulated `sp[tag]` directly instead of using board/pieces helpers
 - `test_early_war_cards.py` (+3 tests): Card 35, Card 86 (2 tests)
 - Test for Card 28 updated to provide Available pool (no more pool inflation hack)
 
-### REMAINING issues (documented, not fixed)
+### REMAINING issues (documented, not fixed) — Session 3
+
+**7 of 9 issues resolved in Session 5 (see below). Remaining 2:**
 
 #### Queued vs. immediate execution
-- **Cards 12, 13**: Set `winter_flag` for Patriot/Tory Desertion instead of executing immediately. The reference says "Execute...as per Winter Quarters Round." Interpretation: the "as per" phrasing may mean "following the same procedure" while deferring to actual WQ timing. Not changed pending clarification.
 - **Card 15 (Morgan's Rifles) shaded**: Uses `queue_free_op` for March/Battle/Partisans. Q3 resolution says engine drains free ops immediately after handler, so this is effectively immediate.
-- **Card 94 (Herkimer) unshaded**: Militia removal executes before queued Gather/Muster. Reference order suggests Gather+Muster first, then Militia removal. Since engine drains free ops after handler, the Militia removal in the handler runs before the queued ops. Requires reordering to match reference.
+- **Card 94 (Herkimer) unshaded**: Militia removal executes before queued Gather/Muster. Reference order suggests Gather+Muster first, then Militia removal. Since engine drains free ops after handler, the Militia removal in the handler runs before the queued ops. No fix needed per user ruling (ordering has no gameplay impact).
 
-#### Faction choice vs. hardcoded selection
-- **Cards 66, 67**: Use `FRENCH if toa_played else PATRIOTS` for faction selection. Reference says "French or Patriots" (player choice). The TOA-gating may be intentional game design (French can only act after ToA) but restricts player choice.
-- **Card 29 (Bancroft)**: Activates BOTH Patriots and Indians. Reference: "Patriots **or** Indians must Activate..." — may be a choice of one faction, or may mean both (ambiguous "or" in COIN phrasing). Left as-is pending clarification.
-- **Card 48 (God Save the King) shaded**: Moves ALL non-British factions' units. Reference: "A non-British **Faction**" (singular) should move only one faction's units.
-
-#### Minor issues
-- **Card 4 (Penobscot) shaded**: Faction-dependent piece choice (Fort vs Village, Militia vs WP) not in reference text — executing player should choose freely.
-- **Card 11 (Kosciuszko) shaded**: Uses `"REBELLION"` control check. "Patriot Controlled" might differ from "Rebellion Control" in edge cases involving French pieces.
-- **Card 84 (Merciless Indian Savages) unshaded**: `queue_free_op` for Gather has no Colony restriction. Reference says "in two Colonies."
-- **Card 87 (Lenape) unshaded**: Fixed removal priority may not match player/bot intent — reference just says "Remove one piece."
+#### Resolved — no fix needed
+- **Card 11 (Kosciuszko) shaded**: Uses `"REBELLION"` control check. User confirmed this is correct.
 
 ---
 
@@ -288,12 +281,37 @@ All previously identified and fixed issues from Sessions 1–3 remain correct. A
 
 ### Confirmed remaining issues (unchanged from Session 3)
 
-All 9 previously documented remaining issues are confirmed still present and accurately described. No new issues to add. These fall into three categories:
-
-1. **Awaiting human clarification** (3): Card 94 execution order, Card 29 "or" ambiguity, Cards 12/13 desertion timing
-2. **Design choices** (4): Card 48 faction scope, Cards 66/67 TOA-gating, Card 4 faction-dependent choice, Card 87 removal priority
-3. **Minor edge cases** (2): Card 11 Rebellion vs Patriot control, Card 84 Colony restriction on Gather
+All 9 previously documented remaining issues were confirmed still present. **7 of 9 resolved in Session 5** (see below).
 
 ### Tests
 
 281 tests passing. No new tests needed since no code changes were made.
+
+---
+
+## Session 5: Fix 7 Audit Issues per User Rulings
+
+User provided definitive rulings on all 9 remaining audit issues. 7 required code fixes, 2 were confirmed as no-fix-needed.
+
+### FIXED (7 cards/groups)
+
+| Card(s) | Issue | Fix |
+|---|---|---|
+| **Card 29 (Bancroft)** | "or" activated BOTH factions | Changed to ONE faction (player choice via `state["card29_target"]`; bot default: British/Indian→Patriots, Patriot/French→Indians) |
+| **Cards 12, 13** | Deferred desertion via `winter_flag` | Now calls `_patriot_desertion()` immediately per §6.6.1 |
+| **Card 48 (God Save the King) shaded** | Moved ALL non-British factions' units | ONE non-British faction (player choice via `state["card48_faction"]`) |
+| **Cards 66, 67** | TOA-gated faction selection (`FRENCH if toa_played else PATRIOTS`) | Player choice regardless of TOA status (via `state["card66_shaded_faction"]`, `state["card67_faction"]`) |
+| **Card 4 (Penobscot) shaded** | Faction-dependent piece type (Fort vs Village, Militia vs WP) | Player chooses freely (via `state["card4_base"]`, `state["card4_units"]`); defaults to faction-aligned |
+| **Card 87 (Lenape) unshaded** | Fixed removal priority | Player chooses piece (via `state["card87_piece"]`); bot retains priority fallback |
+| **Card 84 (Merciless Indian Savages) unshaded** | `queue_free_op` for Gather had no location restriction | Now passes Colony locations (via `state["card84_colonies"]` or `pick_colonies()`) |
+
+### NO FIX NEEDED (2 issues)
+
+| Card | Issue | Ruling |
+|---|---|---|
+| **Card 94 (Herkimer)** | Execution order (Militia removal before Gather/Muster) | No gameplay impact — no fix needed |
+| **Card 11 (Kosciuszko)** | `"REBELLION"` control check vs. "Patriot Controlled" | Rebellion Control is correct |
+
+### Tests
+
+296 tests passing (15 new tests added across 3 test files).
