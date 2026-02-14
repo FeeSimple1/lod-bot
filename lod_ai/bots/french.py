@@ -16,7 +16,7 @@ Reference: “french bot flowchart and reference.txt”
 from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Tuple
-import random, json
+import json
 
 from lod_ai.bots.base_bot import BaseBot
 from lod_ai import rules_consts as C
@@ -211,42 +211,92 @@ class FrenchBot(BaseBot):
     def _try_skirmish(self, state: Dict) -> bool:
         """
         F12 rules:
-          – Space with French & British not selected for Command
+          – Space with French & British not selected for Battle or Muster
           – West Indies first
-          – Remove Fort first, else most British cubes
+          – Remove first a British Fort, then most British cubes
         """
-        # 1) West Indies
-        sp = state["spaces"].get(WEST_INDIES)
-        if sp and sp.get(C.REGULAR_FRE, 0) and sp.get(C.REGULAR_BRI, 0):
+        affected = state.get("_turn_affected_spaces", set())
+
+        def _has_british(sp: Dict) -> bool:
+            return (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                    + sp.get(C.FORT_BRI, 0)) > 0
+
+        def _skirmish_option(sp: Dict) -> int:
+            """option=3 if enemy Fort present and no enemy cubes; else option=2 (remove 2 cubes)."""
+            enemy_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+            if enemy_cubes == 0 and sp.get(C.FORT_BRI, 0) > 0:
+                return 3
+            if enemy_cubes >= 2:
+                return 2
+            if enemy_cubes >= 1:
+                return 1
+            return 1  # fallback
+
+        def _try_space(sid: str) -> bool:
+            if sid in affected:
+                return False
+            sp = state["spaces"].get(sid)
+            if not sp or not sp.get(C.REGULAR_FRE, 0) or not _has_british(sp):
+                return False
+            opt = _skirmish_option(sp)
             try:
-                skirmish.execute(state, C.FRENCH, {}, WEST_INDIES, option=2)
+                skirmish.execute(state, C.FRENCH, {}, sid, option=opt)
                 return True
             except Exception:
-                pass
+                return False
 
-        # 2) Any other shared space
+        # 1) West Indies first
+        if _try_space(WEST_INDIES):
+            return True
+
+        # 2) Any other shared space — prefer most British cubes
+        candidates = []
         for sid, sp in state["spaces"].items():
-            if sid == WEST_INDIES:
+            if sid == WEST_INDIES or sid in affected:
                 continue
-            if sp.get(C.REGULAR_FRE, 0) and sp.get(C.REGULAR_BRI, 0):
-                try:
-                    skirmish.execute(state, C.FRENCH, {}, sid, option=2)
-                    return True
-                except Exception:
-                    continue
+            if sp.get(C.REGULAR_FRE, 0) and _has_british(sp):
+                brit_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                candidates.append((-brit_cubes, sid))
+        candidates.sort()
+        for _, sid in candidates:
+            if _try_space(sid):
+                return True
         return False
 
     def _try_naval_pressure(self, state: Dict) -> bool:
         """
-        F17: Add 1 Blockade (Battle space first, else most Support).
-        If none, fallback to Skirmish.
+        F17: Add 1 Blockade, first in a City selected for Battle, then at most Support.
+        If none, Skirmish (F12). If Skirmish also fails, Préparer (F15).
         """
-        try:
-            naval_pressure.execute(state, C.FRENCH, {})
+        # Determine city_choice: first a city selected for Battle, then most Support
+        affected = state.get("_turn_affected_spaces", set())
+        bloc = state.get("markers", {}).get(C.BLOCKADE, {})
+        pool = bloc.get("pool", 0)
+        if pool > 0 and state.get("toa_played"):
+            # Find best city: battle space first, then most Support
+            best_city = None
+            best_score = (-1, -1)
+            for sid in state.get("spaces", {}):
+                if _MAP_DATA.get(sid, {}).get("type") != "City":
+                    continue
+                in_battle = 1 if sid in affected else 0
+                sup = state.get("support", {}).get(sid, 0)
+                score = (in_battle, sup)
+                if score > best_score:
+                    best_score = score
+                    best_city = sid
+            if best_city:
+                try:
+                    naval_pressure.execute(state, C.FRENCH, {}, city_choice=best_city)
+                    return True
+                except Exception:
+                    pass
+
+        # F17 failed → fallback to F12 (Skirmish)
+        if self._try_skirmish(state):
             return True
-        except Exception:
-            # last resort Skirmish
-            return self._try_skirmish(state)
+        # F12 also failed → fallback to F15 (Préparer la Guerre)
+        return _preparer_la_guerre(state, post_treaty=True)
 
     # ===================================================================
     #  COMMAND IMPLEMENTATIONS
@@ -314,12 +364,15 @@ class FrenchBot(BaseBot):
         if avail_regs < 4 and not west_rebel:
             targets = [WEST_INDIES] if west_indies else []
         else:
-            # Muster first in Colony/City with Continentals and Rebel Control
+            # Muster first in a Colony or City with Continentals and Rebel Control
             targets = [
                 sid for sid, sp in state["spaces"].items()
-                if sp.get(C.REGULAR_PAT, 0) > 0 and ctrl.get(sid) == "REBELLION"
+                if (sp.get(C.REGULAR_PAT, 0) > 0
+                    and ctrl.get(sid) == "REBELLION"
+                    and _MAP_DATA.get(sid, {}).get("type") in ("Colony", "City"))
             ]
             if not targets:
+                # Fallback: any space with Rebel Control
                 targets = [
                     sid for sid in state["spaces"]
                     if ctrl.get(sid) == "REBELLION"
@@ -327,7 +380,8 @@ class FrenchBot(BaseBot):
 
         if not targets:
             return False
-        target = random.choice(targets)
+        target = state["rng"].choice(targets)
+        state.setdefault("_turn_affected_spaces", set()).add(target)
         muster.execute(state, C.FRENCH, {}, [target])
         return True
 
@@ -351,7 +405,7 @@ class FrenchBot(BaseBot):
                     dsp = state["spaces"][dst]
                     is_city = 1 if _MAP_DATA.get(dst, {}).get("type") == "City" else 0
                     british = dsp.get(C.REGULAR_BRI, 0) + dsp.get(C.TORY, 0)
-                    candidates.append(((is_city, british, random.random()), src, dst))
+                    candidates.append(((is_city, british, state["rng"].random()), src, dst))
         if not candidates:
             return False
         _, src, dst = max(candidates)
@@ -363,24 +417,39 @@ class FrenchBot(BaseBot):
         """F16: Select spaces where Rebel Force > Royalist Force, highest Pop.
         SA entry at F17 (Naval Pressure), not F12.
         """
+        from lod_ai.leaders import leader_location
         refresh_control(state)
         targets = []
+
+        # Determine Rebel leader locations for force-level bonus
+        rebel_leaders = ["LEADER_WASHINGTON", "LEADER_ROCHAMBEAU", "LEADER_LAUZUN"]
+        leader_locs: Dict[str, int] = {}
+        for ldr in rebel_leaders:
+            loc = leader_location(state, ldr)
+            if loc:
+                leader_locs[loc] = leader_locs.get(loc, 0) + 1
+
         for sid, sp in state["spaces"].items():
-            # Rebel force: cubes + half militia + forts (§3.6.2-3.6.3)
+            # Rebel force: cubes + Active Militia (Underground don't count)
             rebel_cubes = sp.get(C.REGULAR_FRE, 0) + sp.get(C.REGULAR_PAT, 0)
-            total_militia = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
-            rebel_force = rebel_cubes + (total_militia // 2)
+            active_militia = sp.get(C.MILITIA_A, 0)
+            rebel_force = rebel_cubes + active_militia + leader_locs.get(sid, 0)
 
-            # Royalist force: cubes + forts + half WP
-            crown_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
-            crown_force = crown_cubes + sp.get(C.FORT_BRI, 0) + (sp.get(C.WARPARTY_A, 0) // 2)
+            # Royalist force: British cubes + Forts + Active WP
+            british_pieces = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                              + sp.get(C.FORT_BRI, 0))
+            crown_force = british_pieces + sp.get(C.WARPARTY_A, 0)
 
-            if rebel_force > crown_force and crown_cubes > 0:
+            if rebel_force > crown_force and british_pieces > 0:
                 pop = _MAP_DATA.get(sid, {}).get("population", 0)
                 targets.append((pop, sid))
         if not targets:
             return False
         targets.sort(reverse=True)
+        # Track affected spaces so Skirmish can exclude them
+        state.setdefault("_turn_affected_spaces", set()).update(
+            sid for _, sid in targets
+        )
         # F16: "First execute a Special Activity." SA entry at F17 (Naval Pressure)
         self._try_naval_pressure(state)
         battle.execute(state, C.FRENCH, {}, [sid for _, sid in targets])
@@ -395,20 +464,95 @@ class FrenchBot(BaseBot):
     def _can_battle(self, state: Dict) -> bool:
         """F13: Rebel cubes + Leader exceed British pieces in space with both?
         Rebel cubes = Continentals + French Regulars.
-        British pieces = Regulars + Tories + Active WP.
+        British pieces = Regulars + Tories + Forts (British faction only, not Indians).
+        Leader = any Rebel leader present (+1 each).
         """
+        from lod_ai.leaders import leader_location
+        rebel_leaders = ["LEADER_WASHINGTON", "LEADER_ROCHAMBEAU", "LEADER_LAUZUN"]
+        leader_locs: Dict[str, int] = {}
+        for ldr in rebel_leaders:
+            loc = leader_location(state, ldr)
+            if loc:
+                leader_locs[loc] = leader_locs.get(loc, 0) + 1
+
         for sid, sp in state["spaces"].items():
             rebel_cubes = sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
-            leader_loc = state.get("leaders", {}).get(sid, "")
-            has_wash = 1 if leader_loc == "LEADER_WASHINGTON" else 0
-            rebel = rebel_cubes + has_wash
-            british = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0) + sp.get(C.WARPARTY_A, 0)
+            leader_bonus = leader_locs.get(sid, 0)
+            rebel = rebel_cubes + leader_bonus
+            british = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                       + sp.get(C.FORT_BRI, 0))
             if rebel > 0 and british > 0 and rebel > british:
                 return True
         return False
 
     def _can_march(self, state: Dict) -> bool:
         return any(sp.get(C.REGULAR_FRE, 0) for sp in state["spaces"].values())
+
+    # ===================================================================
+    #  FRENCH EVENT INSTRUCTION CONDITIONALS
+    # ===================================================================
+    def _force_condition_met(self, directive: str, state: Dict, card: Dict) -> bool:
+        """Evaluate force_if_X directives from the French instruction sheet.
+
+        Each card instruction specifies a condition; if not met, the bot
+        skips the event and proceeds to Command & SA instead.
+        """
+        if directive == "force_if_52":
+            # Card 52: "Remove no French Regulars. If the Battle Command
+            # instruction would select no Battle space, Command & SA instead."
+            # Check: are there any spaces where French could battle British?
+            for sid, sp in state["spaces"].items():
+                has_french = sp.get(C.REGULAR_FRE, 0) > 0
+                has_british = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                               + sp.get(C.FORT_BRI, 0)) > 0
+                if has_french and has_british:
+                    # Set flag so card handler knows not to remove French Regulars
+                    state["card52_no_remove_french"] = True
+                    return True
+            return False
+
+        if directive == "force_if_62":
+            # Card 62: "Place Militia only. If not possible, Command & SA."
+            # Shaded places 3 Militia in Northwest or 3 French Regs in Quebec.
+            # Bot instruction: only place Militia. Check if Militia available.
+            avail_militia = state.get("available", {}).get(C.MILITIA_U, 0)
+            if avail_militia > 0:
+                state["card62_shaded_choice"] = "MILITIA_NORTHWEST"
+                return True
+            return False
+
+        if directive == "force_if_70":
+            # Card 70: "Remove British Regulars from spaces with Rebels.
+            # If none, Command & SA."
+            for sid, sp in state["spaces"].items():
+                brit_regs = sp.get(C.REGULAR_BRI, 0)
+                rebels = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+                          + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0))
+                if brit_regs > 0 and rebels > 0:
+                    return True
+            return False
+
+        if directive in ("force_if_73", "force_if_95"):
+            # Card 73/95: "If no British Fort is removed, Command & SA."
+            # Check: is there a British Fort on the map that could be removed?
+            for sid, sp in state["spaces"].items():
+                if sp.get(C.FORT_BRI, 0) > 0:
+                    return True
+            return False
+
+        if directive == "force_if_83":
+            # Card 83: "Select Quebec City. If playing the Event does not
+            # gain Rebellion there, Command & SA."
+            ctrl = state.get("control", {})
+            if ctrl.get("Quebec_City") == "REBELLION":
+                return False  # already Rebellion, no gain possible
+            # Would placing up to 3 coalition pieces swing control?
+            # The shaded event places up to 3 pieces (French + Patriot).
+            # If Quebec City is not already Rebellion, the event might gain it.
+            state["card83_target"] = "Quebec_City"
+            return True
+
+        return True  # default: play the event
 
     # ===================================================================
     #  EVENT‑VS‑COMMAND BULLETS  (F2)
