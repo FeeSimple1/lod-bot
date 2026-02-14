@@ -79,7 +79,7 @@
                                 "Patriot_Fort": 0,
                                 "Indian_WP_A": 1, "Indian_WP_U": 0, "Village": 0,
                                 "French_Regular": 0, "Blockade": 0,
-                                "Squadron": 0, "Support": 1, "Opposition": 0 },
+                                "Squadron": 0, "Support": 0, "Opposition": 0 },
 
     "New_Hampshire":          { "British_Regular": 0, "British_Tory": 0, "British_Fort": 0,
                                 "Patriot_Continental": 0, "Patriot_Militia_A": 0, "Patriot_Militia_U": 0,
@@ -135,7 +135,7 @@
                                 "Patriot_Fort": 0,
                                 "Indian_WP_A": 0, "Indian_WP_U": 0, "Village": 0,
                                 "French_Regular": 0, "Blockade": 0,
-                                "Squadron": 0, "Support": 0, "Opposition": 1 },
+                                "Squadron": 0, "Support": 0, "Opposition": 0 },
 
     "Pennsylvania":           { "British_Regular": 0, "British_Tory": 0, "British_Fort": 0,
                                 "Patriot_Continental": 0, "Patriot_Militia_A": 0, "Patriot_Militia_U": 0,
@@ -163,7 +163,7 @@
                                 "Patriot_Fort": 0,
                                 "Indian_WP_A": 0, "Indian_WP_U": 0, "Village": 0,
                                 "French_Regular": 0, "Blockade": 0,
-                                "Squadron": 0, "Support": 0, "Opposition": 1 },
+                                "Squadron": 0, "Support": 0, "Opposition": 0 },
 
     "North_Carolina":         { "British_Regular": 0, "British_Tory": 0, "British_Fort": 0,
                                 "Patriot_Continental": 0, "Patriot_Militia_A": 0, "Patriot_Militia_U": 0,
