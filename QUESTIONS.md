@@ -86,20 +86,8 @@ Implemented:
 
 ---
 
-## Q10: French Naval Pressure (§4.5.3) — FNI cap interpretation — OPEN
+## Q10: French Naval Pressure (§4.5.3) — FNI cap interpretation — RESOLVED
 
-**Context:** §4.5.3 says "FNI may not be higher than the number of Squadron/Blockade available to place on Cities."
+**Decision:** FNI cap = pool + on_map markers (interpretation 2). This is the only reading consistent with Option B existing in the rules — interpretation (1) would make Option B unreachable.
 
-**What the reference says:** The phrase "available to place on Cities" could mean:
-1. Only markers in the West Indies pool (since those are literally "available to place")
-2. All markers in play (pool + on-map), since markers on cities could be rearranged
-3. Total physical markers in the game (3), making this just a restatement of MAX_FNI
-
-**What's ambiguous:** Interpretation (1) makes Option B (rearrange when no markers in WI) impossible — you'd need pool > 0 to satisfy the FNI cap, but Option B triggers only when pool = 0. This seems clearly wrong since Option B exists in the rules.
-
-**Current implementation:** Uses interpretation (2): `max_fni = pool + len(on_map)`. This allows Option B to work and seems the most consistent reading.
-
-**Options:**
-1. Keep interpretation (2): pool + on_map (current)
-2. Use interpretation (3): just cap at MAX_FNI (simplest, already enforced by adjust_fni)
-3. Use interpretation (1): pool only (breaks Option B — seems wrong)
+**Status:** Implemented in `naval_pressure.py` `_exec_french()` — `max_fni = wi_blks + on_map_count`.
