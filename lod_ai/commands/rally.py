@@ -131,46 +131,26 @@ def _move_militia(state: Dict,
                   n: int) -> None:
     """
     Move *n* Militia (any mix, prioritise Underground) from src to dst.
-    All arrive Underground.
+    All arrive Underground.  Uses direct dict manipulation for the
+    Active→Underground flip since the pool system doesn't handle tag
+    changes correctly.
     """
     src = state["spaces"][src_id]
+    dst = state["spaces"][dst_id]
 
     n_u = min(n, src.get(MILITIA_U, 0))
     n_a = n - n_u
     if src.get(MILITIA_A, 0) < n_a:
         raise ValueError("Not enough Militia to move from src.")
 
+    # Remove from source
     if n_u:
-        remove_piece(state, MILITIA_U, src_id, n_u)
-        add_piece(state,    MILITIA_U, dst_id, n_u)
+        src[MILITIA_U] = src.get(MILITIA_U, 0) - n_u
     if n_a:
-        remove_piece(state, MILITIA_A, src_id, n_a)
-        add_piece(state,    MILITIA_U, dst_id, n_a)   # Active flip Underground
+        src[MILITIA_A] = src.get(MILITIA_A, 0) - n_a
 
-def _mid_rally_persuasion(state: Dict) -> None:
-    """
-    If Patriot Resources hit 0 during Rally, trigger Persuasion in up to
-    three eligible spaces (Rebellion Control + Underground Militia).
-    Preference: Patriot Fort present, then higher population.
-    """
-    from lod_ai.special_activities import persuasion
-
-    candidates = []
-    for sid, sp in state.get("spaces", {}).items():
-        if state.get("control", {}).get(sid) != "REBELLION":
-            continue
-        if sp.get(MILITIA_U, 0) <= 0:
-            continue
-        has_fort = sp.get(FORT_PAT, 0) > 0
-        pop = sp.get("population", 0)
-        candidates.append((-int(has_fort), -pop, sid))
-
-    if not candidates:
-        return
-
-    candidates.sort()
-    spaces = [sid for *_, sid in candidates[:3]]
-    persuasion.execute(state, PATRIOTS, {}, spaces=spaces)
+    # All arrive Underground in destination
+    dst[MILITIA_U] = dst.get(MILITIA_U, 0) + n
 
 
 # ---------------------------------------------------------------------------
@@ -188,6 +168,7 @@ def execute(
     bulk_place: Dict[str, int] | None = None,
     move_plan: List[Tuple[str, str, int]] | None = None,
     promote_space: str | None = None,
+    promote_n: int | None = None,
     limited: bool = False,
 ) -> Dict:
     """Perform the Patriot Rally command as directed by the caller."""
@@ -217,8 +198,6 @@ def execute(
     # --- Cost payment -------------------------------------------------
     cost = len(selected)
     spend(state, PATRIOTS, cost)
-    if state["resources"].get(PATRIOTS, 0) == 0:
-        _mid_rally_persuasion(state)
 
     push_history(state, f"PATRIOTS RALLY selected={selected}")
 
@@ -297,6 +276,8 @@ def execute(
             dst[MILITIA_A] = 0
 
     # --- Promotion (Continentals) -----------------------------------------
+    # §3.3.1: "replace any Militia with Continentals"
+    # The caller chooses how many via promote_n; defaults to all if omitted.
     if promote_space:
         if promote_space not in selected:
             raise ValueError("Promote space must be among Rally spaces.")
@@ -306,18 +287,19 @@ def execute(
 
         avail_cont = state["available"].get(REGULAR_PAT, 0)
         militia_tot = sp.get(MILITIA_U, 0) + sp.get(MILITIA_A, 0)
-        promote_n = min(militia_tot, avail_cont)
-        if promote_n == 0:
+        max_promote = min(militia_tot, avail_cont)
+        actual_n = min(promote_n, max_promote) if promote_n is not None else max_promote
+        if actual_n == 0:
             raise ValueError("No Militia to promote or no Continentals available.")
 
         # Remove Militia (Active first), add Continentals
-        remove_first = min(promote_n, sp.get(MILITIA_A, 0))
-        remove_second = promote_n - remove_first
+        remove_first = min(actual_n, sp.get(MILITIA_A, 0))
+        remove_second = actual_n - remove_first
         if remove_first:
             remove_piece(state, MILITIA_A, promote_space, remove_first)
         if remove_second:
             remove_piece(state, MILITIA_U, promote_space, remove_second)
-        add_piece(state, REGULAR_PAT, promote_space, promote_n)
+        add_piece(state, REGULAR_PAT, promote_space, actual_n)
 
     # --- Post book‑keeping --------------------------------------------------
     refresh_control(state)
