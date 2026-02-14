@@ -25,7 +25,7 @@ from typing import Dict
 from lod_ai.rules_consts import WARPARTY_U, WARPARTY_A, VILLAGE, MAX_RESOURCES, INDIANS, BRITISH
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
-from lod_ai.board.pieces      import remove_piece, add_piece
+from lod_ai.board.pieces      import remove_piece, add_piece, flip_pieces
 from lod_ai.economy.resources import spend, add as add_res
 
 SA_NAME = "TRADE"          # auto-registered by special_activities/__init__.py
@@ -82,8 +82,7 @@ def execute(
         push_history(state, f"Indians Trade: +1 Resource (to {state['resources'][INDIANS]})")
 
     # Activate exactly one WP
-    remove_piece(state, WARPARTY_U, space_id, 1)
-    add_piece(state, WARPARTY_A, space_id, 1)
+    flip_pieces(state, WARPARTY_U, WARPARTY_A, space_id, 1)
 
     refresh_control(state)
     enforce_global_caps(state)

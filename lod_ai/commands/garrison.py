@@ -46,7 +46,7 @@ from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent
 from lod_ai.leaders        import apply_leader_modifiers
-from lod_ai.board.pieces      import remove_piece, add_piece
+from lod_ai.board.pieces      import remove_piece, add_piece, flip_pieces
 from lod_ai.economy.resources import spend, can_afford
 
 COMMAND_NAME = "GARRISON"  # auto-registered by commands/__init__.py
@@ -76,8 +76,7 @@ def _activate_militia(state: Dict, city: str) -> None:
     brit_cubes = _count_brit_cubes(sp)
     flips = min(brit_cubes // 3, sp.get(MILITIA_U, 0))
     if flips:
-        remove_piece(state, MILITIA_U, city, flips)
-        add_piece(state, MILITIA_A, city, flips)
+        flip_pieces(state, MILITIA_U, MILITIA_A, city, flips)
 
 def _displace_rebellion(origin: str, target: str, state: Dict):
     """Move all Rebellion pieces from *origin* to *target*."""

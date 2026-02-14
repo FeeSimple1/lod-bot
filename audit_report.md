@@ -348,3 +348,54 @@ Full node-by-node comparison of all four bot implementations against their respe
 - Supply, Patriot Desertion, Redeployment priorities not in bot
 - Brilliant Stroke trigger conditions not implemented
 - Uses `random.random()` instead of `state["rng"]` in multiple places
+## Session 4: Full Card Handler Re-Audit
+
+### Scope
+
+Exhaustive line-by-line comparison of **all 109 card handlers** across 5 files against `Reference Documents/card reference full.txt`:
+
+- `early_war.py` — 32 cards (2, 4, 6, 10, 13, 15, 20, 24, 28, 29, 30, 32, 33, 35, 41, 43, 46, 49, 51, 53, 54, 56, 68, 72, 75, 82, 83, 84, 86, 90, 91, 92)
+- `middle_war.py` — 32 cards (3, 5, 8, 9, 11, 12, 14, 17, 26, 27, 34, 38, 42, 44, 47, 50, 55, 58, 59, 60, 61, 63, 69, 71, 74, 76, 77, 78, 80, 88, 89, 93)
+- `late_war.py` — 32 cards (1, 7, 16, 18, 19, 21, 22, 23, 25, 31, 36, 37, 39, 40, 45, 48, 52, 57, 62, 64, 65, 66, 67, 70, 73, 79, 81, 85, 87, 94, 95, 96)
+- `brilliant_stroke.py` — 5 cards (105, 106, 107, 108, 109)
+- `winter_quarters.py` — 8 cards (97, 98, 99, 100, 101, 102, 103, 104)
+
+Also verified:
+- Label compliance: all piece tags, faction names, and marker references use constants from `rules_consts.py`
+- Piece operations: all placement/removal/movement uses `board/pieces.py` helpers (`place_piece`, `remove_piece`, `move_piece`, `place_with_caps`, `flip_pieces`)
+- No direct dictionary manipulation of piece counts
+- Destination accuracy: all "to Casualties" vs "to Available" destinations match the reference
+- `shift_support()` correctly clamps to [-2, +2], making plain delta shifts equivalent to "toward X" semantics
+- `remove_piece()` default `to="available"` is correct for cards that say "Remove" without specifying destination
+
+### Result: NO NEW ISSUES FOUND
+
+All previously identified and fixed issues from Sessions 1–3 remain correct. All previously documented remaining issues (see Session 3 "REMAINING issues" above) are still accurate and unchanged.
+
+### Verified categories (all PASS)
+
+| Category | Cards checked | Status |
+|---|---|---|
+| Resource adjustments (+/−) | 7, 10, 19, 33, 34, 37, 40, 42, 45, 53, 56, 58, 59, 60, 61, 63, 64, 65, 69, 71 | All amounts and recipients match reference |
+| FNI adjustments | 7, 34, 37, 40, 53, 57, 60, 63, 64, 67, 69 | All deltas and absolute-set values correct |
+| Eligibility flags | 5, 18, 34, 38, 44, 50, 57, 61 | All use `ineligible_through_next` (not `ineligible_next`) |
+| Piece placement/removal | 2, 4, 6, 8, 16, 19, 20, 24, 25, 26, 27, 28, 30, 31, 32, 35, 36, 37, 38, 42, 43, 46, 47, 49, 50, 54, 55, 58, 59, 62, 66, 68, 72, 73, 75, 76, 78, 79, 81, 82, 83, 84, 85, 86, 87, 89, 90, 91, 92, 94, 95 | All piece tags, quantities, and destinations correct |
+| Support/Opposition shifts | 1, 2, 10, 16, 21, 25, 27, 39, 41, 46, 83, 93 | Direction, magnitude, and clamping correct |
+| Free operations (march/battle/etc.) | 1, 5, 9, 14, 15, 21, 26, 31, 33, 48, 51, 52, 55, 66, 67, 75, 84, 94, 96 | Faction, op type, and location all correct |
+| Shaded = no effect | 18, 29, 39, 44, 52, 68, 70, 72, 73, 80, 87, 88, 92, 93, 95 | All return early or no-op correctly |
+| Winter Quarters cards | 97–104 | All queue correct Reset-Phase functions |
+| Brilliant Stroke cards | 105–109 | Declarations, eligibility reset, ToA mechanics all correct |
+| `flip_pieces()` usage | 8, 28, 29, 35, 77, 86 | All use board helper instead of direct dict manipulation |
+| `place_with_caps()` for bases | 4, 26, 31, 68, 72, 77, 79, 81, 83, 90, 91, 92 | Enforces stacking limits correctly |
+
+### Confirmed remaining issues (unchanged from Session 3)
+
+All 9 previously documented remaining issues are confirmed still present and accurately described. No new issues to add. These fall into three categories:
+
+1. **Awaiting human clarification** (3): Card 94 execution order, Card 29 "or" ambiguity, Cards 12/13 desertion timing
+2. **Design choices** (4): Card 48 faction scope, Cards 66/67 TOA-gating, Card 4 faction-dependent choice, Card 87 removal priority
+3. **Minor edge cases** (2): Card 11 Rebellion vs Patriot control, Card 84 Colony restriction on Gather
+
+### Tests
+
+281 tests passing. No new tests needed since no code changes were made.

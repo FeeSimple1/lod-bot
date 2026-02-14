@@ -28,7 +28,7 @@ from typing import List, Tuple, Dict
 
 from lod_ai.util.history import push_history
 from lod_ai.board.pieces import (
-    remove_piece, place_with_caps, return_leaders, lift_casualties
+    remove_piece, place_with_caps, return_leaders, lift_casualties, flip_pieces
 )
 import lod_ai.board.pieces as bp
 from lod_ai.board import control as board_control
@@ -693,13 +693,11 @@ def _reset_phase(state):
     lift_casualties(state)
 
     # Flip Militia & War Parties to Underground (§6.7 step 4)
-    for sp in state["spaces"].values():
+    for sid, sp in state["spaces"].items():
         if sp.get(MILITIA_A):
-            sp[MILITIA_U] = sp.get(MILITIA_U, 0) + sp[MILITIA_A]
-            sp[MILITIA_A] = 0
+            flip_pieces(state, MILITIA_A, MILITIA_U, sid, sp[MILITIA_A])
         if sp.get(WARPARTY_A):
-            sp[WARPARTY_U] = sp.get(WARPARTY_U, 0) + sp[WARPARTY_A]
-            sp[WARPARTY_A] = 0
+            flip_pieces(state, WARPARTY_A, WARPARTY_U, sid, sp[WARPARTY_A])
 
     # Reveal next Ops card (§6.7 step 5)
     deck = state.get("deck", [])

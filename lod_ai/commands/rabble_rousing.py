@@ -37,7 +37,7 @@ from lod_ai.rules_consts import (
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent  # potentially used by callers
-from lod_ai.board.pieces      import remove_piece, add_piece
+from lod_ai.board.pieces      import remove_piece, add_piece, flip_pieces
 from lod_ai.economy.resources import spend
 
 COMMAND_NAME = "RABBLE_ROUSING"  # auto‑registered by commands/__init__.py
@@ -146,8 +146,7 @@ def execute(
 
         # Activate 1 Underground Militia unless Rebellion Control w/ Patriot piece
         if not (rebellion_control and _has_patriot_piece(sp)) and sp.get(MILITIA_U, 0) > 0:
-            remove_piece(state, MILITIA_U, space_id, 1)
-            add_piece(state, MILITIA_A, space_id, 1)
+            flip_pieces(state, MILITIA_U, MILITIA_A, space_id, 1)
         # Log per‑space details (optional)
         state.setdefault("log", []).append(
             f" PAT Rabble ({space_id})  support: {before_support}→{after_support}  "
