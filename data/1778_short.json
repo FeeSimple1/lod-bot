@@ -40,10 +40,10 @@
 
   "available": {
     "British_Regular": 7,
-    "British_Tory": 6,
+    "British_Tory": 8,
     "British_Fort": 3,
     "Patriot_Continental": 11,
-    "Patriot_Militia_A": 0,
+    "Patriot_Militia_A": 1,
     "Patriot_Fort": 2,
     "French_Regular": 8,
     "Indian_WP_A": 8,
@@ -68,7 +68,7 @@
                               "Patriot_Fort": 0,
                               "Indian_WP_A": 1, "Indian_WP_U": 0, "Village": 1,
                               "French_Regular": 0, "Blockade": 0,
-                              "Squadron": 0, "Support": 2, "Opposition": 0 },
+                              "Squadron": 0, "Support": 0, "Opposition": 0 },
 
     "New_Hampshire":        { "British_Regular": 0, "British_Tory": 2, "British_Fort": 0,
                               "Patriot_Continental": 0, "Patriot_Militia_A": 0, "Patriot_Militia_U": 0,
@@ -89,7 +89,7 @@
                               "Patriot_Fort": 0,
                               "Indian_WP_A": 0, "Indian_WP_U": 0, "Village": 0,
                               "French_Regular": 0, "Blockade": 0,
-                              "Squadron": 0, "Support": 0, "Opposition": 2 },
+                              "Squadron": 0, "Support": 0, "Opposition": 1 },
 
     "Connecticut_Rhode_Island":
                              { "British_Regular": 0, "British_Tory": 2, "British_Fort": 0,
@@ -146,28 +146,28 @@
                               "Patriot_Fort": 0,
                               "Indian_WP_A": 0, "Indian_WP_U": 0, "Village": 0,
                               "French_Regular": 0, "Blockade": 0,
-                              "Squadron": 0, "Support": 0, "Opposition": 2 },
+                              "Squadron": 0, "Support": 0, "Opposition": 0 },
 
-    "Virginia":             { "British_Regular": 0, "British_Tory": 2, "British_Fort": 0,
+    "Virginia":             { "British_Regular": 0, "British_Tory": 0, "British_Fort": 0,
                               "Patriot_Continental": 0, "Patriot_Militia_A": 0, "Patriot_Militia_U": 0,
                               "Patriot_Fort": 0,
                               "Indian_WP_A": 0, "Indian_WP_U": 0, "Village": 0,
                               "French_Regular": 0, "Blockade": 0,
-                              "Squadron": 0, "Support": 2, "Opposition": 0 },
+                              "Squadron": 0, "Support": 0, "Opposition": 0 },
 
     "North_Carolina":       { "British_Regular": 0, "British_Tory": 0, "British_Fort": 0,
                               "Patriot_Continental": 0, "Patriot_Militia_A": 2, "Patriot_Militia_U": 0,
                               "Patriot_Fort": 0,
                               "Indian_WP_A": 0, "Indian_WP_U": 0, "Village": 0,
                               "French_Regular": 0, "Blockade": 0,
-                              "Squadron": 0, "Support": 0, "Opposition": 2 },
+                              "Squadron": 0, "Support": 0, "Opposition": 1 },
 
     "South_Carolina":       { "British_Regular": 0, "British_Tory": 0, "British_Fort": 0,
                               "Patriot_Continental": 0, "Patriot_Militia_A": 2, "Patriot_Militia_U": 0,
                               "Patriot_Fort": 0,
                               "Indian_WP_A": 1, "Indian_WP_U": 0, "Village": 1,
                               "French_Regular": 0, "Blockade": 0,
-                              "Squadron": 0, "Support": 0, "Opposition": 2 },
+                              "Squadron": 0, "Support": 0, "Opposition": 0 },
 
     "Charles_Town":         { "British_Regular": 0, "British_Tory": 0, "British_Fort": 0,
                               "Patriot_Continental": 0, "Patriot_Militia_A": 2, "Patriot_Militia_U": 0,
@@ -184,11 +184,11 @@
                               "Squadron": 0, "Support": 1, "Opposition": 0 },
 
     "Georgia":              { "British_Regular": 0, "British_Tory": 0, "British_Fort": 0,
-                              "Patriot_Continental": 0, "Patriot_Militia_A": 1, "Patriot_Militia_U": 0,
+                              "Patriot_Continental": 0, "Patriot_Militia_A": 0, "Patriot_Militia_U": 0,
                               "Patriot_Fort": 0,
                               "Indian_WP_A": 0, "Indian_WP_U": 0, "Village": 0,
                               "French_Regular": 0, "Blockade": 0,
-                              "Squadron": 0, "Support": 0, "Opposition": 1 },
+                              "Squadron": 0, "Support": 0, "Opposition": 0 },
 
     "Northwest":            { "British_Regular": 0, "British_Tory": 0, "British_Fort": 0,
                               "Patriot_Continental": 0, "Patriot_Militia_A": 0, "Patriot_Militia_U": 0,
@@ -209,7 +209,7 @@
                               "Patriot_Fort": 0,
                               "Indian_WP_A": 1, "Indian_WP_U": 0, "Village": 1,
                               "French_Regular": 0, "Blockade": 0,
-                              "Squadron": 0, "Support": 1, "Opposition": 0 },
+                              "Squadron": 0, "Support": 0, "Opposition": 0 },
 
     "West_Indies":          { "British_Regular": 0, "British_Tory": 0, "British_Fort": 0,
                               "Patriot_Continental": 0, "Patriot_Militia_A": 0, "Patriot_Militia_U": 0,
