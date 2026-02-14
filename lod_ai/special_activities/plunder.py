@@ -20,7 +20,7 @@ from typing import Dict
 
 from lod_ai.rules_consts import (
     WARPARTY_U, WARPARTY_A,
-    REGULAR_PAT, REGULAR_FRE, MILITIA_A, FORT_PAT,
+    REGULAR_PAT, REGULAR_FRE, MILITIA_A, MILITIA_U, FORT_PAT,
     INDIANS, PATRIOTS,
 )
 from lod_ai.util.history   import push_history
@@ -30,7 +30,8 @@ from lod_ai.economy.resources import spend, add as add_res
 
 SA_NAME = "PLUNDER"   # auto-registered by special_activities/__init__.py
 
-REB_TAGS = (REGULAR_PAT, REGULAR_FRE, MILITIA_A, FORT_PAT)
+# §4.4.3: "Rebellion pieces" includes all Patriot/French pieces
+REB_TAGS = (REGULAR_PAT, REGULAR_FRE, MILITIA_A, MILITIA_U, FORT_PAT)
 
 
 def _remove_one_wp(state: Dict, province: str) -> None:
