@@ -135,22 +135,37 @@ def test_i2_event_conditions_per_reference():
     assert isinstance(result, bool)  # depends on RNG roll
 
 
-def test_i9_checks_underground_wp_only():
-    """I9: Should check for Underground War Parties, not Active ones."""
+def test_i9_checks_any_wp():
+    """I9: Reference says 'A space has War Party and British Regulars?'
+    — any WP type (Active or Underground) should trigger Scout."""
     from lod_ai.bots.indians import IndianBot
     bot = IndianBot()
-    # Only Active WP with British → should NOT trigger Scout
+    # Active-only WP with British → SHOULD trigger Scout per reference
     state = {
         "spaces": {
             "A": {C.WARPARTY_A: 3, C.WARPARTY_U: 0, C.REGULAR_BRI: 2},
         },
         "resources": {C.INDIANS: 3},
     }
-    assert bot._space_has_wp_and_regulars(state) is False
-
-    # Add Underground WP → should trigger Scout
-    state["spaces"]["A"][C.WARPARTY_U] = 1
     assert bot._space_has_wp_and_regulars(state) is True
+
+    # Underground WP with British → also triggers
+    state2 = {
+        "spaces": {
+            "A": {C.WARPARTY_A: 0, C.WARPARTY_U: 1, C.REGULAR_BRI: 2},
+        },
+        "resources": {C.INDIANS: 3},
+    }
+    assert bot._space_has_wp_and_regulars(state2) is True
+
+    # No WP at all → should NOT trigger
+    state3 = {
+        "spaces": {
+            "A": {C.WARPARTY_A: 0, C.WARPARTY_U: 0, C.REGULAR_BRI: 2},
+        },
+        "resources": {C.INDIANS: 3},
+    }
+    assert bot._space_has_wp_and_regulars(state3) is False
 
 
 def test_i12_scout_destination_priority():
