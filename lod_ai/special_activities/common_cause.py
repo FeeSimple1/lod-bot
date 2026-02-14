@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import Dict, List
 
 from lod_ai.rules_consts import (
-    REGULAR_BRI,
+    REGULAR_BRI, TORY, FORT_BRI,
     WARPARTY_U, WARPARTY_A,
     BRITISH,
 )
@@ -48,7 +48,10 @@ def execute(
     for s in spaces:
         sp = state["spaces"][s]
 
-        if sp.get(REGULAR_BRI, 0) == 0:
+        # §4.2.1: "spaces with British pieces and War Parties"
+        british_present = (sp.get(REGULAR_BRI, 0) + sp.get(TORY, 0)
+                           + sp.get(FORT_BRI, 0))
+        if british_present == 0:
             raise ValueError(f"{s}: needs British piece for Common Cause.")
         if (sp.get(WARPARTY_U, 0) + sp.get(WARPARTY_A, 0)) == 0:
             raise ValueError(f"{s}: no War Parties present.")
@@ -63,8 +66,8 @@ def execute(
 
         # Flip Underground first
         take_u = min(use, sp.get(WARPARTY_U, 0))
-        sp[WARPARTY_U] -= take_u
-        sp[WARPARTY_A] += take_u
+        sp[WARPARTY_U] = sp.get(WARPARTY_U, 0) - take_u
+        sp[WARPARTY_A] = sp.get(WARPARTY_A, 0) + take_u
         # any remainder already Active
 
         ctx["common_cause"][s] = use
