@@ -282,12 +282,24 @@ Full node-by-node comparison of all four bot implementations against their respe
 - **B38 Howe capability**: FNI not lowered before SAs during Howe's leadership period
 
 #### Patriot Bot (patriot.py)
-- **P4 Battle**: Force level uses total Militia (Active+Underground) instead of Active only; Washington lookup uses wrong data structure (space_id as key in leaders dict); Win-the-Day free Rally not implemented
-- **P5 March**: Missing "lose no Rebel Control" constraint, missing leave-behind logic, missing second phase
-- **P7 Rally**: Missing 4 of 6 bullet points (Continental replacement, Fort Available placement, Control-changing Militia, adjacent Militia gathering); always returns True
-- **P8 Partisans**: Always uses option=1, never targets Villages (option=3)
-- **P12 Skirmish**: Always uses option=1, never removes Forts (option=3)
-- **Event Instructions**: Cards 71, 90 say "use unshaded" but bot plays shaded; Cards 18, 44, 51 ignore conditional fallbacks
+- ~~**P4 Battle**: Force level uses total Militia (Active+Underground) instead of Active only~~ **FIXED** — now counts Active Militia only per §3.6.3
+- ~~Washington lookup uses wrong data structure (space_id as key in leaders dict)~~ **FIXED** — now uses `leader_location()` for both P4 and P6
+- ~~P4 includes Patriot Forts in attacking force level~~ **FIXED** — attacker excludes Forts per §3.6.3
+- ~~P4 caps defending British Tories at Regulars count~~ **FIXED** — Tories uncapped when defending per §3.6.2
+- ~~P4 uses `random.random()` for tiebreaker~~ **FIXED** — now uses `state["rng"].random()` for determinism
+- ~~P4 French Regulars uncapped when Patriots attack~~ **FIXED** — now capped at Patriot cube count per §3.6.3
+- **P4 Battle**: Win-the-Day free Rally not implemented (REMAINING)
+- **P5 March**: Missing "lose no Rebel Control" constraint, missing leave-behind logic, missing second phase (REMAINING)
+- ~~**P5 March** requires group size >= 3 (not in reference)~~ **FIXED** — reduced to >= 1
+- **P7 Rally**: Missing 4 of 6 bullet points (Continental replacement, Fort Available placement, Control-changing Militia, adjacent Militia gathering); always returns True (REMAINING)
+- ~~**P7 Rally** hardcoded to max 2 forts~~ **FIXED** — now up to 4 (Rally Max limit)
+- ~~**P8 Partisans**: Always uses option=1, never targets Villages (option=3)~~ **FIXED** — now uses option=3 when Village present and no WP
+- ~~**P8 Partisans**: WP vs British priority flattened into sum~~ **FIXED** — now separate sort keys (-wp, -british)
+- ~~**P12 Skirmish**: Always uses option=1, never removes Forts (option=3)~~ **FIXED** — now uses option=3 when Fort present and no enemy cubes
+- ~~**Event Instructions**: Cards 71, 90 say "use unshaded" but bot plays shaded~~ **FIXED** — new `force_unshaded` directive
+- ~~Cards 18, 44 ignore conditional fallbacks~~ **FIXED** — new `force_if_eligible_enemy` directive
+- ~~Card 8 ignores "if French is human" condition~~ **FIXED** — new `force_if_french_not_human` directive
+- Card 51 (Bermuda Gunpowder Plot) ignores "March to set up Battle" conditional (REMAINING)
 
 #### French Bot (french.py)
 - **F13 Battle**: Only checks Washington, not all Rebel leaders (Rochambeau, Lauzun)
@@ -319,13 +331,13 @@ Full node-by-node comparison of all four bot implementations against their respe
 - OPS reference (Supply/Redeploy/Desertion priorities) not in bot
 
 #### Patriot Bot
-- P8 Partisans WP vs British priority flattened into sum
+- ~~P8 Partisans WP vs British priority flattened into sum~~ **FIXED**
 - P2 Event conditions check shaded text only; text matching unreliable
 - Rally/Rabble mutual fallback — potential infinite loop masked by always-True return
 - Rally Persuasion interrupt happens after Rally, not during
 - March destination doesn't verify Rebel Control would actually be gained
-- March requires group size >= 3 (not in reference)
-- British Tory cap applied when defending (should be uncapped)
+- ~~March requires group size >= 3 (not in reference)~~ **FIXED**
+- ~~British Tory cap applied when defending (should be uncapped)~~ **FIXED**
 - Rabble-Rousing arbitrarily capped at 4 spaces
 
 #### French Bot
@@ -399,3 +411,95 @@ All 9 previously documented remaining issues are confirmed still present and acc
 ### Tests
 
 281 tests passing. No new tests needed since no code changes were made.
+
+---
+
+## Session 5: Patriot Bot Node-by-Node Flowchart Compliance
+
+### Scope
+
+Full node-by-node comparison of `lod_ai/bots/patriot.py` against `Reference Documents/patriot bot flowchart and reference.txt`, covering nodes P1–P13, Operations Summary, and bot-specific card instructions.
+
+### FIXED issues (13 bugs across 3 files)
+
+#### patriot.py — Force Level & Leader Lookup
+
+| Node | Bug | Fix |
+|------|-----|-----|
+| P6, P4 | Washington lookup uses `state.get("leaders", {}).get(sid, "")` — wrong format (space→leader instead of leader→space) | Use `leader_location(state, "LEADER_WASHINGTON")` from leaders module |
+| P4 | Force Level counts Underground Militia (`MILITIA_A + MILITIA_U`) | Count only Active Militia (`MILITIA_A`) per §3.6.3 |
+| P4 | Attacker Force Level includes Patriot Forts | Removed — forts only count for defender per §3.6.3 |
+| P4 | British Tories capped at `min(tories, regs)` when defending | Uncapped when defending per §3.6.2 (cap only applies when attacking) |
+| P4 | French Regulars uncapped when Patriots attack | Capped at Patriot cube count per §3.6.3 |
+| P4 | Tiebreaker uses `random.random()` | Changed to `state["rng"].random()` for determinism |
+
+#### patriot.py — Command Selection
+
+| Node | Bug | Fix |
+|------|-----|-----|
+| P8 | Partisans always uses `option=1`, never removes Villages | Now uses `option=3` when Village present and no War Parties in space |
+| P8 | WP and British priority flattened (`-(wp + british)`) | Split into `(-wp, -british)` — prefers War Party removal first per reference |
+| P12 | Skirmish always uses `option=1`, never removes British Forts | Now uses `option=3` when Fort present and no enemy cubes in space |
+| P12 | Skirmish tiebreaker uses `random.random()` | Changed to `state["rng"].random()` |
+| P7 | Fort placement hardcoded to max 2 spaces (`[:2]`) | Changed to `[:4]` (Rally Max 4 limit) |
+| P5 | March requires group size >= 3 (not in reference) | Changed to >= 1 per reference (no minimum stated) |
+
+#### event_instructions.py + base_bot.py — Bot Card Instructions
+
+| Card | Bug | Fix |
+|------|-----|-----|
+| 71 (Treaty of Amity) | "Use the unshaded text" but `force` directive plays shaded | New `force_unshaded` directive; `_execute_event` accepts `force_unshaded=True` |
+| 90 (World Turned Upside Down) | Same as card 71 | Same fix |
+| 8 (Culper Spy Ring) | "If French is a human player, choose C&SA" not checked | New `force_if_french_not_human` directive; checks `state["human_factions"]` |
+| 18, 44 | "Target eligible enemy Faction. If none, C&SA" not checked | New `force_if_eligible_enemy` directive; checks `state["eligible"]` |
+
+#### engine.py
+
+| Issue | Fix |
+|-------|-----|
+| Bot has no access to `human_factions` | Engine now injects `state["human_factions"]` before bot turns |
+
+### Tests added (22 new, 310 total)
+
+All in `test_pat_bot.py`:
+
+| Test | Verifies |
+|------|----------|
+| `test_p6_washington_lookup_uses_leader_location` | Leader→space and leader_locs formats both work |
+| `test_p4_force_level_excludes_underground_militia` | Underground Militia excluded from FL |
+| `test_p4_force_level_attacker_excludes_forts` | Patriot Forts excluded from attacking FL |
+| `test_p4_force_level_defending_tories_uncapped` | Defending Tories not capped at Regulars |
+| `test_p4_force_level_french_capped_at_patriot_cubes` | French Regs capped at Patriot count |
+| `test_p4_uses_deterministic_rng` | Tiebreaker uses state["rng"] |
+| `test_p8_partisans_uses_option3_for_villages` | Option=3 when Village and no WP |
+| `test_p8_partisans_prefers_wp_over_british` | WP priority > British priority |
+| `test_p12_skirmish_uses_option3_for_forts` | Option=3 when Fort and no enemy cubes |
+| `test_p5_march_no_group_size_minimum` | Groups of 1 are accepted |
+| `test_p7_rally_fort_cap_not_hardcoded_to_2` | 3+ fort targets all qualify |
+| `test_card_71_90_force_unshaded_directive` | Directive table updated |
+| `test_card_8_force_if_french_not_human_directive` | Directive table updated |
+| `test_cards_18_44_force_if_eligible_enemy_directive` | Directive table updated |
+| `test_force_unshaded_executes_unshaded` | Handler called with shaded=False |
+| `test_force_if_french_not_human_skips_when_french_human` | Event skipped |
+| `test_force_if_french_not_human_plays_when_french_bot` | Event played |
+| `test_force_if_eligible_enemy_skips_when_none_eligible` | Event skipped |
+| `test_force_if_eligible_enemy_plays_when_enemy_eligible` | Event played |
+| `test_p3_pass_when_no_resources` | Bot PASSes at 0 resources |
+| `test_p9_rally_preferred_when_fort_possible` | Fort-possible triggers Rally |
+| `test_p10_rabble_possible_checks_support` | Support level check |
+
+### REMAINING issues (not fixed — require significant refactoring or are medium severity)
+
+#### High Severity
+- **P4 Win-the-Day**: Free Rally and Blockade move after Rebellion wins not implemented
+- **P5 March**: Missing "lose no Rebel Control" constraint, leave-behind logic, second phase
+- **P7 Rally**: Missing Continental replacement, Fort Available placement, Control-changing Militia, adjacent Militia gathering steps; always returns True
+- **Card 51**: "March to set up Battle per Battle instructions. If not possible, C&SA" conditional not implemented
+
+#### Medium Severity
+- **P2**: Text matching for event conditions is heuristic (unreliable but functional)
+- **P7/P11**: Persuasion interrupt happens after command, not mid-execution when resources reach 0
+- **P7/P11**: Rally/Rabble mutual fallback — potential infinite loop masked by always-True return
+- **P5**: March destination doesn't verify Rebel Control would actually be gained
+- **P11**: Rabble-Rousing arbitrarily capped at 4 spaces
+- **OPS Summary**: Patriot Supply, Redeploy, Desertion, Brilliant Stroke, Leader Movement priorities not implemented in bot
