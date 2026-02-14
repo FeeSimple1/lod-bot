@@ -67,3 +67,31 @@ Implemented:
 1. Replace hardcoded priorities with calls to each faction's bot `_follow_flowchart()` method
 2. Keep hardcoded order but verify it matches each flowchart's priority ordering
 3. Implement a dedicated `get_bs_limited_command()` method on each bot subclass
+
+---
+
+## Q8: Battle Win the Day — adjacent overflow shifts
+
+**Context:** `battle.py` `_shift()` currently applies all support shifts to the Battle space only.
+
+**What the reference says:** §3.6.8 states "If all shifts are not possible in the Battle space, British (if Royalist winner) or Patriots (if Rebellion winner) may use remaining shifts in adjacent spaces."
+
+**What's ambiguous:** The player selects which adjacent spaces receive the overflow shifts. For bot play, there's no guidance on priority for selecting adjacent spaces. Additionally, this interacts with the support track boundaries per space.
+
+**Options:**
+1. Implement overflow with caller-provided adjacent-space list
+2. Auto-select adjacent spaces based on highest impact for bot play
+3. Skip overflow for now (current behavior) and add later when bot flowcharts are verified
+
+---
+
+## Q9: Battle Win the Day — free Rally and Blockade move for Rebellion winner
+
+**Context:** §3.6.8 states that if Rebellion wins, "Patriots may free Rally in any one eligible space" and "the French may move any Blockades from the Battle City to another City."
+
+**What's ambiguous:** These are complex post-battle actions requiring player decisions. For bot play, the flowcharts may have specific guidance on when/where to Rally and move Blockades. The free Rally is a full Rally command execution in a different space.
+
+**Options:**
+1. Implement with caller-provided parameters for Rally space and Blockade destinations
+2. Defer to bot flowchart integration (Phase 3 work)
+3. Implement Rally-only (simpler) and defer Blockade move

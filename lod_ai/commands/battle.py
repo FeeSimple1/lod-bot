@@ -89,12 +89,14 @@ def execute(
     if not free:
         spend(state, faction, len(spaces))
 
+    # §3.3.3 / §3.5.5: Allied fee is 1 Resource per space where the ally's
+    # pieces are involved, NOT per piece.
     if faction == PATRIOTS:
-        fee = sum(state["spaces"][s].get(REGULAR_FRE, 0) for s in spaces)
+        fee = sum(1 for s in spaces if state["spaces"][s].get(REGULAR_FRE, 0) > 0)
         if fee:
             spend(state, FRENCH, fee)
     elif faction == FRENCH:
-        fee = sum(state["spaces"][s].get(REGULAR_PAT, 0) for s in spaces)
+        fee = sum(1 for s in spaces if state["spaces"][s].get(REGULAR_PAT, 0) > 0)
         if fee:
             spend(state, PATRIOTS, fee)
 
@@ -260,7 +262,16 @@ def _resolve_space(
             active_wp = max(0, sp.get(WARPARTY_A, 0) - cc_wp)
             cubes = regs + tories + _half(active_wp)
         else:
-            regs = sp.get(REGULAR_PAT, 0) + sp.get(REGULAR_FRE, 0)
+            # §3.6.3: "If Rebellion Attack, if that Faction paid, add French
+            # Regulars or Continentals up to the number of own Faction's cubes."
+            pat_cubes = sp.get(REGULAR_PAT, 0)
+            fre_cubes = sp.get(REGULAR_FRE, 0)
+            if not is_defending:
+                if attacker_faction == PATRIOTS:
+                    fre_cubes = min(fre_cubes, pat_cubes)
+                elif attacker_faction == FRENCH:
+                    pat_cubes = min(pat_cubes, fre_cubes)
+            regs = pat_cubes + fre_cubes
             active_mil = sp.get(MILITIA_A, 0)
             cubes = regs + _half(active_mil)
         if is_defending:
@@ -335,9 +346,11 @@ def _resolve_space(
                     removed += 1
                     remaining_loss -= 1
                 while remaining_loss > 0 and sp.get(FORT_BRI, 0) > 0:
-                    remove_piece(state, FORT_BRI, sid, 1, to="casualties")
+                    # §3.6.7: "Forts also count as Casualties but return to
+                    # Available immediately."
+                    remove_piece(state, FORT_BRI, sid, 1, to="available")
                     removed += 1
-                    remaining_loss -= 1
+                    remaining_loss -= loss_value(FORT_BRI)
                     removed_cube_or_fort = True
         else:
             # Phase 1: Alternate French Regulars, Continentals, Active Militia
@@ -350,9 +363,11 @@ def _resolve_space(
             # Phase 2: If Defending only -- Forts
             if is_defending:
                 while remaining_loss > 0 and sp.get(FORT_PAT, 0) > 0:
-                    remove_piece(state, FORT_PAT, sid, 1, to="casualties")
+                    # §3.6.7: "Forts also count as Casualties but return to
+                    # Available immediately."
+                    remove_piece(state, FORT_PAT, sid, 1, to="available")
                     removed += 1
-                    remaining_loss -= 1
+                    remaining_loss -= loss_value(FORT_PAT)
                     removed_cube_or_fort = True
 
         return removed, removed_cube_or_fort
@@ -381,14 +396,37 @@ def _resolve_space(
             elif winner == "REBELLION" and cur < ACTIVE_SUPPORT:
                 state.setdefault("support", {})[sid] = cur + 1
 
+    # §3.6.8 Winner determination.
+    # Check for elimination (excluding Underground pieces).
+    def _side_alive(side: str) -> bool:
+        if side == "ROYALIST":
+            return (sp.get(REGULAR_BRI, 0) + sp.get(TORY, 0)
+                    + sp.get(WARPARTY_A, 0) + sp.get(VILLAGE, 0)
+                    + sp.get(FORT_BRI, 0)) > 0
+        else:
+            return (sp.get(REGULAR_PAT, 0) + sp.get(REGULAR_FRE, 0)
+                    + sp.get(MILITIA_A, 0) + sp.get(FORT_PAT, 0)) > 0
+
+    att_alive = _side_alive(att_side)
+    def_alive = _side_alive(def_side)
+
     winner = None
-    if pieces_att_lost != pieces_def_lost:
-        winner = att_side if pieces_def_lost > pieces_att_lost else def_side
-    elif pieces_att_lost == 0 and pieces_def_lost:
-        winner = att_side
-    elif pieces_def_lost == 0 and pieces_att_lost:
+    if not att_alive and not def_alive:
+        # §3.6.8: "If both sides are eliminated … there is no winner or loser."
+        winner = None
+    elif not att_alive:
         winner = def_side
-    # tie => Defender wins (already def_side)
+    elif not def_alive:
+        winner = att_side
+    elif pieces_att_lost < pieces_def_lost:
+        # Attacker lost fewer → attacker wins
+        winner = att_side
+    elif pieces_def_lost < pieces_att_lost:
+        # Defender lost fewer → defender wins
+        winner = def_side
+    else:
+        # §3.6.8: "Defender is the winner if equal."
+        winner = def_side
 
     if winner:
         loser_removed = pieces_def_lost if winner == att_side else pieces_att_lost
