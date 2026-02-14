@@ -148,3 +148,63 @@ def test_card50_unshaded_ineligible_through_next():
     assert state["spaces"][WEST_INDIES_ID].get(REGULAR_FRE) == 1
     assert state["available"].get(REGULAR_FRE) == 2
     assert FRENCH in state["ineligible_through_next"]
+
+
+def test_card8_culpeper_unshaded_activates_militia():
+    """Card 8 unshaded: Activate three Patriot Militia anywhere.
+    Must use flip_pieces, not direct dict manipulation."""
+    from lod_ai.rules_consts import WARPARTY_U, WARPARTY_A, VILLAGE, FORT_BRI
+    state = _base_state()
+    state["spaces"] = {
+        "Virginia": {MILITIA_U: 2},
+        "New_York": {MILITIA_U: 1, MILITIA_A: 1},
+        "Georgia": {MILITIA_U: 1},
+    }
+    middle_war.evt_008_culpeper_ring(state, shaded=False)
+    # Should flip 3 Underground→Active across spaces (2 in Virginia, 1 in NY)
+    total_active = sum(
+        sp.get(MILITIA_A, 0) for sp in state["spaces"].values()
+    )
+    total_underground = sum(
+        sp.get(MILITIA_U, 0) for sp in state["spaces"].values()
+    )
+    # Started with 4U + 1A, should flip 3 → 1U + 4A
+    assert total_active == 4
+    assert total_underground == 1
+
+
+def test_card8_culpeper_shaded_removes_british():
+    """Card 8 shaded: Remove three British cubes to Casualties."""
+    state = _base_state()
+    state["spaces"] = {
+        "Virginia": {REGULAR_BRI: 2, TORY: 3},
+    }
+    middle_war.evt_008_culpeper_ring(state, shaded=True)
+    # Should remove 2 Regulars + 1 Tory to casualties (Regulars first)
+    assert state["spaces"]["Virginia"].get(REGULAR_BRI, 0) == 0
+    assert state["spaces"]["Virginia"].get(TORY, 0) == 2
+    assert state["casualties"].get(REGULAR_BRI, 0) == 2
+    assert state["casualties"].get(TORY, 0) == 1
+
+
+def test_card77_burgoyne_unshaded_flips_warparties_underground():
+    """Card 77 unshaded: All Active War Parties go Underground.
+    Must use flip_pieces to avoid corrupting Available pool."""
+    from lod_ai.rules_consts import WARPARTY_U, WARPARTY_A, VILLAGE, FORT_BRI
+    state = _base_state()
+    state["spaces"] = {
+        "New_York": {REGULAR_BRI: 1, WARPARTY_A: 3, WARPARTY_U: 1, VILLAGE: 1},
+        "Quebec": {WARPARTY_A: 2, REGULAR_BRI: 1},
+    }
+    state["available"] = {VILLAGE: 2, WARPARTY_U: 0}
+    state["card77_space"] = "New_York"
+
+    middle_war.evt_077_burgoyne(state, shaded=False)
+
+    # All Active War Parties should be Underground
+    assert state["spaces"]["New_York"].get(WARPARTY_A, 0) == 0
+    assert state["spaces"]["New_York"].get(WARPARTY_U, 0) == 4  # 1 orig + 3 flipped
+    assert state["spaces"]["Quebec"].get(WARPARTY_A, 0) == 0
+    assert state["spaces"]["Quebec"].get(WARPARTY_U, 0) == 2
+    # Available pool should NOT be corrupted (no WP stolen from map)
+    assert state["available"].get(WARPARTY_U, 0) == 0
