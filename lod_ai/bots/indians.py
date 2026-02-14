@@ -20,7 +20,6 @@ existing command / special‑activity modules under ``lod_ai``.
 
 from __future__ import annotations
 
-import random
 from typing import Dict, List, Tuple
 from pathlib import Path
 import json
@@ -233,15 +232,24 @@ class IndianBot(BaseBot):
         for tgt in targets:
             if len(selected) >= 3:
                 break
-            if state["spaces"][tgt].get(C.WARPARTY_U, 0) > 0:
+            tgt_sp = state["spaces"][tgt]
+            wp_in_tgt = tgt_sp.get(C.WARPARTY_U, 0) + tgt_sp.get(C.WARPARTY_A, 0)
+            rebels_in_tgt = (tgt_sp.get(C.MILITIA_A, 0) + tgt_sp.get(C.MILITIA_U, 0)
+                             + tgt_sp.get(C.REGULAR_PAT, 0) + tgt_sp.get(C.REGULAR_FRE, 0))
+            # Move a WP into target if: none present OR WP don't exceed Rebels
+            needs_move = (wp_in_tgt == 0) or (wp_in_tgt <= rebels_in_tgt)
+            if needs_move:
+                src = _reserve_source(tgt)
+                if src is None and tgt_sp.get(C.WARPARTY_U, 0) == 0:
+                    continue  # can't raid without any WP present
+                if src is not None:
+                    selected.append(tgt)
+                    move_plan.append((src, tgt))
+                    available_wp[src] -= 1
+                elif tgt_sp.get(C.WARPARTY_U, 0) > 0:
+                    selected.append(tgt)  # has UG WP, no move needed
+            else:
                 selected.append(tgt)
-                continue
-            src = _reserve_source(tgt)
-            if src is None:
-                continue
-            selected.append(tgt)
-            move_plan.append((src, tgt))
-            available_wp[src] -= 1
 
         if not selected:
             return False
@@ -292,11 +300,24 @@ class IndianBot(BaseBot):
     # GATHER  (Command)  -----------------------------------------------
     def _gather_worthwhile(self, state: Dict) -> bool:
         """
-        I6 test: would Gather place ≥2 Villages OR 1D6 < Available War Parties?
+        I6 test: Gather would place 2+ Villages, OR 1D6 < Available War Parties?
+        "Would place" means: 2+ Available Villages AND 2+ eligible spaces.
         """
         avail_villages = state["available"].get(C.VILLAGE, 0)
         if avail_villages >= 2:
-            return True
+            corn_loc = leader_location(state, "LEADER_CORNPLANTER")
+            eligible_count = 0
+            for sid, sp in state["spaces"].items():
+                if not self._village_room(state, sid):
+                    continue
+                if sp.get(C.VILLAGE, 0) > 0:
+                    continue
+                total_wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
+                threshold = 2 if sid == corn_loc else 3
+                if total_wp >= threshold:
+                    eligible_count += 1
+                    if eligible_count >= 2:
+                        return True
         avail_wp = state["available"].get(C.WARPARTY_U, 0) + state["available"].get(C.WARPARTY_A, 0)
         roll = state["rng"].randint(1, 6)
         state.setdefault("rng_log", []).append(("Gather test 1D6", roll))
@@ -305,46 +326,191 @@ class IndianBot(BaseBot):
     def _can_gather(self, state: Dict) -> bool:
         return True  # always allowed
 
+    def _village_room(self, state: Dict, sid: str) -> bool:
+        """Return True if *sid* has room for a Village (bases < 2 stacking limit)."""
+        sp = state["spaces"][sid]
+        bases = sp.get(C.VILLAGE, 0) + sp.get(C.FORT_BRI, 0) + sp.get(C.FORT_PAT, 0)
+        return bases < 2
+
     def _gather(self, state: Dict) -> bool:
         """I7: Gather (Max 4 spaces).
 
-        Priority bullets:
-        1. Cornplanter active → spaces with 2+ WP; else 3+ WP
-        2. First in a Province with 1+ Villages, then highest Pop
-        3. Place Villages, then place War Parties
-        4. Build a Village in each space with 3+ WP and no Village
+        Reference bullets:
+        1. Place Villages where room and 3+ War Parties (2+ if Cornplanter
+           in the space), first with Indian Leader.
+        2. Then place War Parties at Villages, first where enemies, then
+           where no Underground War Parties, then with Indian Leader, then random.
+        3. If any Villages Available: Place War Parties in 2 spaces with room
+           for a Village, first where exactly 2 WP already, then where exactly
+           1 WP, then random.
+        4. Then if no more WP Available, in 1 Village space move in all
+           adjacent Active War Parties possible without adding any Rebel
+           Control, then flip them Underground.
         """
-        # Determine WP threshold based on Cornplanter
         corn_loc = leader_location(state, "LEADER_CORNPLANTER")
-        wp_threshold = 2 if corn_loc else 3
+        brant_loc = leader_location(state, "LEADER_BRANT")
+        dc_loc = leader_location(state, "LEADER_DRAGGING_CANOE")
+        leader_locs = {loc for loc in (corn_loc, brant_loc, dc_loc) if loc}
 
-        # Select spaces with enough WP, prioritising Village provinces then Pop
-        candidates = []
+        avail_villages = state["available"].get(C.VILLAGE, 0)
+        avail_wp = state["available"].get(C.WARPARTY_U, 0) + state["available"].get(C.WARPARTY_A, 0)
+
+        selected: List[str] = []
+        build_village: set = set()
+        bulk_place: Dict[str, int] = {}
+
+        # --- Bullet 1: Place Villages where room and 3+ WP (2+ if Cornplanter) ---
+        village_cands = []
         for sid, sp in state["spaces"].items():
-            total_wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
-            if total_wp < wp_threshold:
+            if not self._village_room(state, sid):
                 continue
-            is_prov = 1 if _MAP_DATA.get(sid, {}).get("type") == "Province" else 0
-            has_village = 1 if sp.get(C.VILLAGE, 0) >= 1 else 0
-            pop = _MAP_DATA.get(sid, {}).get("population", 0)
-            candidates.append((-is_prov * has_village, -pop, state["rng"].random(), sid))
-        candidates.sort()
+            if sp.get(C.VILLAGE, 0) > 0:
+                continue  # already has a Village; build_village replaces 2 WP
+            total_wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
+            threshold = 2 if sid == corn_loc else 3
+            if total_wp < threshold:
+                continue
+            has_leader = 1 if sid in leader_locs else 0
+            village_cands.append((-has_leader, state["rng"].random(), sid))
+        village_cands.sort()
 
-        selected = [sid for _, _, _, sid in candidates[:4]]
+        villages_placed = 0
+        for _, _, sid in village_cands:
+            if villages_placed >= avail_villages:
+                break
+            if len(selected) >= 4:
+                break
+            selected.append(sid)
+            build_village.add(sid)
+            villages_placed += 1
+
+        # --- Bullet 2: Place War Parties at Villages ---
+        if avail_wp > 0:
+            wp_cands = []
+            for sid, sp in state["spaces"].items():
+                if sp.get(C.VILLAGE, 0) == 0 and sid not in build_village:
+                    continue  # needs a Village (or about to get one)
+                enemies = (sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                           + sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0))
+                has_ug = 1 if sp.get(C.WARPARTY_U, 0) > 0 else 0
+                has_leader = 1 if sid in leader_locs else 0
+                # Priority: enemies first, then no UG WP, then leader, then random
+                wp_cands.append((-enemies, has_ug, -has_leader, state["rng"].random(), sid))
+            wp_cands.sort()
+            for _, _, _, _, sid in wp_cands:
+                if len(selected) >= 4:
+                    break
+                if avail_wp <= 0:
+                    break
+                if sid not in selected:
+                    selected.append(sid)
+                # Determine how many WP to place: villages + 1
+                sp = state["spaces"][sid]
+                villages_in_space = sp.get(C.VILLAGE, 0) + (1 if sid in build_village else 0)
+                n_place = min(avail_wp, villages_in_space + 1)
+                if n_place > 0:
+                    bulk_place[sid] = bulk_place.get(sid, 0) + n_place
+                    avail_wp -= n_place
+
+        # --- Bullet 3: If any Villages Available, place WP in 2 spaces with
+        #     room for a Village (exactly 2 WP first, then 1, then random) ---
+        remaining_avail_villages = state["available"].get(C.VILLAGE, 0) - villages_placed
+        if remaining_avail_villages > 0 and avail_wp > 0:
+            room_cands = []
+            for sid, sp in state["spaces"].items():
+                if not self._village_room(state, sid):
+                    continue
+                if sp.get(C.VILLAGE, 0) > 0:
+                    continue
+                if sid in build_village:
+                    continue
+                total_wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
+                # Priority: exactly 2 WP first, then 1 WP, then random
+                if total_wp == 2:
+                    pri = 0
+                elif total_wp == 1:
+                    pri = 1
+                else:
+                    pri = 2
+                room_cands.append((pri, state["rng"].random(), sid))
+            room_cands.sort()
+            placed_count = 0
+            for _, _, sid in room_cands:
+                if placed_count >= 2:
+                    break
+                if len(selected) >= 4:
+                    break
+                if avail_wp <= 0:
+                    break
+                if sid not in selected:
+                    selected.append(sid)
+                bulk_place[sid] = bulk_place.get(sid, 0) + 1
+                avail_wp -= 1
+                placed_count += 1
+
+        # --- Bullet 4: If no more WP Available, in 1 Village space move in
+        #     all adjacent Active WP without adding Rebel Control, flip UG ---
+        final_avail_wp = state["available"].get(C.WARPARTY_U, 0) + state["available"].get(C.WARPARTY_A, 0)
+        # Subtract what we plan to place
+        final_avail_wp -= sum(bulk_place.values())
+        move_plan_list: List[Tuple[str, str, int]] = []
+        if final_avail_wp <= 0:
+            refresh_control(state)
+            ctrl = state.get("control", {})
+            best_dst = None
+            best_moves: List[Tuple[str, int]] = []
+            best_total = 0
+            for sid, sp in state["spaces"].items():
+                if sp.get(C.VILLAGE, 0) == 0:
+                    continue
+                moves = []
+                total = 0
+                for nbr in _adjacent(sid):
+                    nsp = state["spaces"].get(nbr, {})
+                    active_wp = nsp.get(C.WARPARTY_A, 0)
+                    if active_wp == 0:
+                        continue
+                    # "without adding any Rebel Control" — skip if moving
+                    # WP out would cause Rebellion to gain control in nbr
+                    # (simplified: skip if nbr would lose all Indian pieces)
+                    remaining = (nsp.get(C.WARPARTY_U, 0) + active_wp - active_wp
+                                 + nsp.get(C.VILLAGE, 0))
+                    if remaining == 0 and ctrl.get(nbr) != "REBELLION":
+                        # Moving all WP_A out might flip control
+                        rebel_pieces = (nsp.get(C.MILITIA_A, 0) + nsp.get(C.MILITIA_U, 0)
+                                        + nsp.get(C.REGULAR_PAT, 0) + nsp.get(C.REGULAR_FRE, 0)
+                                        + nsp.get(C.FORT_PAT, 0))
+                        if rebel_pieces > 0:
+                            continue  # would add Rebel Control
+                    moves.append((nbr, active_wp))
+                    total += active_wp
+                if total > best_total:
+                    best_total = total
+                    best_dst = sid
+                    best_moves = moves
+            if best_dst and best_moves:
+                if best_dst not in selected:
+                    if len(selected) < 4:
+                        selected.append(best_dst)
+                    else:
+                        best_dst = None
+                if best_dst:
+                    for src, n in best_moves:
+                        move_plan_list.append((src, best_dst, n))
+
         if not selected:
             return False
 
-        # Determine which spaces should get a Village
-        build_village = set()
-        for sid in selected:
-            sp = state["spaces"][sid]
-            total_wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
-            if total_wp >= 3 and sp.get(C.VILLAGE, 0) == 0:
-                build_village.add(sid)
+        # Remove spaces from build_village that aren't in selected
+        build_village = build_village & set(selected)
+        # Remove bulk_place entries for spaces not selected
+        bulk_place = {s: n for s, n in bulk_place.items() if s in selected}
 
         gather.execute(
             state, C.INDIANS, {}, selected,
             build_village=build_village if build_village else None,
+            bulk_place=bulk_place if bulk_place else None,
+            move_plan=move_plan_list if move_plan_list else None,
         )
         return True
 
@@ -385,11 +551,23 @@ class IndianBot(BaseBot):
             is_prov = 1 if _MAP_DATA.get(sid, {}).get("type") == "Province" else 0
             has_village = 1 if sp.get(C.VILLAGE, 0) >= 1 else 0
             prov_vill = is_prov * has_village
-            choices.append((fort, enemy, prov_vill, random.random(), sid))
+            choices.append((fort, enemy, prov_vill, state["rng"].random(), sid))
         if not choices:
             return False
         target = max(choices)[-1]
-        return war_path.execute(state, C.INDIANS, {}, target)
+        tsp = state["spaces"][target]
+        # Select the correct War Path option per §4.4.2:
+        #   option 3 = remove Patriot Fort (requires no Rebel cubes, 2+ WP_U)
+        #   option 2 = activate 2 WP, remove 1, remove 2 Rebel units (need 2+ WP_U)
+        #   option 1 = activate 1 WP, remove 1 Rebel unit (default)
+        rebel_cubes = sum(tsp.get(t, 0) for t in (C.MILITIA_A, C.MILITIA_U, C.REGULAR_PAT, C.REGULAR_FRE))
+        if tsp.get(C.FORT_PAT, 0) and rebel_cubes == 0 and tsp.get(C.WARPARTY_U, 0) >= 2:
+            option = 3
+        elif rebel_cubes >= 2 and tsp.get(C.WARPARTY_U, 0) >= 2:
+            option = 2
+        else:
+            option = 1
+        return war_path.execute(state, C.INDIANS, {}, target, option=option)
 
     # ------------------------------------------------------------------
     # MARCH  (Command)  -------------------------------------------------
@@ -423,7 +601,7 @@ class IndianBot(BaseBot):
             if dsp.get(C.VILLAGE, 0) > 0:
                 continue  # already has Village, no "room"
             pop = _MAP_DATA.get(dst, {}).get("population", 0)
-            key = (pop, random.random())
+            key = (pop, state["rng"].random())
             if key > best_key:
                 best_key = key
                 best_dst = dst
@@ -435,9 +613,10 @@ class IndianBot(BaseBot):
     # ------------------------------------------------------------------
     # SCOUT  (Command)  -------------------------------------------------
     def _space_has_wp_and_regulars(self, state: Dict) -> bool:
-        """I9: Space with Underground War Party and British Regulars?"""
+        """I9: A space has War Party and British Regulars?"""
         return any(
-            sp.get(C.REGULAR_BRI, 0) and sp.get(C.WARPARTY_U, 0)
+            sp.get(C.REGULAR_BRI, 0)
+            and (sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0))
             for sp in state["spaces"].values()
         )
 
@@ -445,22 +624,28 @@ class IndianBot(BaseBot):
         return self._space_has_wp_and_regulars(state)
 
     def _scout(self, state: Dict) -> bool:
-        """I12: Scout (Max 3 WP moved).
-        Origin: space with Underground WP + British Regulars.
-        Destination priority: first to space with Patriot Fort, then
-        Villages with enemy, then most Rebel Control, then random.
+        """I12: Scout (Max 1).
+        Move 1 War Party + most Regulars+Tories possible without changing
+        Control in origin space.
+        Destination priority: first to a Patriot Fort, then to a Village
+        with enemy, then to remove most Rebel Control.
+        Skirmish to remove first a Patriot Fort then most enemy pieces.
         """
         refresh_control(state)
         ctrl = state.get("control", {})
+
+        # Origin: space with WP (any type) + British Regulars
         choices = []
         for sid, sp in state["spaces"].items():
-            if sp.get(C.REGULAR_BRI, 0) == 0:
+            n_regs = sp.get(C.REGULAR_BRI, 0)
+            if n_regs == 0:
                 continue
-            wp_u = sp.get(C.WARPARTY_U, 0)
-            if wp_u == 0:
+            total_wp = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
+            if total_wp == 0:
                 continue
-            fort = 1 if sp.get(C.FORT_PAT, 0) else 0
-            choices.append((fort, wp_u, sid))
+            # Prefer origin with most Regulars+Tories (to move most pieces)
+            n_tories = sp.get(C.TORY, 0)
+            choices.append((n_regs + n_tories, total_wp, sid))
         if not choices:
             return False
         _, _, origin = max(choices)
@@ -479,64 +664,176 @@ class IndianBot(BaseBot):
             has_enemy = (dsp.get(C.REGULAR_PAT, 0) + dsp.get(C.REGULAR_FRE, 0)
                          + dsp.get(C.MILITIA_A, 0) + dsp.get(C.MILITIA_U, 0))
             village_enemy = 1 if (has_village and has_enemy > 0) else 0
-            # "most Rebel Control" → rebellion-controlled spaces first
             rebel_ctrl = 1 if ctrl.get(dst) == "REBELLION" else 0
-            key = (has_pat_fort, village_enemy, rebel_ctrl, random.random())
+            key = (has_pat_fort, village_enemy, rebel_ctrl, state["rng"].random())
             dest_scores.append((key, dst))
         if not dest_scores:
             return False
         _, target = max(dest_scores)
+
         sp = state["spaces"][origin]
-        # Calculate how many WP to move (Max 3 per Scout)
-        wp_u = sp.get(C.WARPARTY_U, 0)
-        n_wp = min(wp_u, 3)
-        if n_wp == 0:
-            return False
-        # Scout requires at least 1 British Regular (§3.2.4)
-        n_regs = min(sp.get(C.REGULAR_BRI, 0), n_wp)
+        # Reference: "Move 1 War Party" — exactly 1 WP
+        n_wp = 1
+
+        # "most Regulars+Tories possible without changing Control in origin"
+        n_regs = sp.get(C.REGULAR_BRI, 0)
+        n_tories = sp.get(C.TORY, 0)
+
+        # Check control preservation: compute how many pieces we can remove
+        # without flipping control.  We need at least 1 Regular for Scout.
         if n_regs == 0:
             return False
+
+        # Simplified control check: count all Royalist pieces in origin.
+        # If removing pieces would let Rebellion gain control, reduce count.
+        royalist = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                    + sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
+                    + sp.get(C.FORT_BRI, 0) + sp.get(C.VILLAGE, 0))
+        rebel = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+                 + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                 + sp.get(C.FORT_PAT, 0))
+        moveable = royalist - rebel - 1  # keep 1 more than rebels
+        if moveable < 2:  # need at least 1 WP + 1 Regular
+            # Try moving just 1 WP + 1 Regular (minimum)
+            n_regs = 1
+            n_tories = 0
+        else:
+            # Cap to what we can move: 1 WP + regs + tories ≤ moveable
+            total_desired = n_wp + n_regs + n_tories
+            if total_desired > moveable:
+                # Reduce tories first, then regulars
+                excess = total_desired - moveable
+                tory_cut = min(excess, n_tories)
+                n_tories -= tory_cut
+                excess -= tory_cut
+                if excess > 0:
+                    n_regs = max(1, n_regs - excess)
+
         scout.execute(
             state, C.INDIANS, {}, origin, target,
-            n_warparties=n_wp, n_regulars=n_regs, skirmish=True,
+            n_warparties=n_wp, n_regulars=n_regs, n_tories=n_tories,
+            skirmish=True,
         )
         return True
 
     # ------------------------------------------------------------------
     # TRADE  (Special Activity)  ---------------------------------------
     def _trade(self, state: Dict) -> bool:
-        """I11: Trade in up to 3 spaces with Underground WP and a Village."""
+        """I11: Trade (Max 1).
+        First request Resources from British.  If no Resources given,
+        Trade in the Village space with most Underground War Parties.
+        """
         spaces = [
-            sid for sid, sp in state.get("spaces", {}).items()
+            (sp.get(C.WARPARTY_U, 0), sid)
+            for sid, sp in state.get("spaces", {}).items()
             if sp.get(C.WARPARTY_U, 0) > 0 and sp.get(C.VILLAGE, 0) > 0
         ]
         if not spaces:
             return False
+        # Sort by most Underground WP (descending)
+        spaces.sort(reverse=True)
+        target = spaces[0][1]
 
-        # British bot OPS: "roll 1D6; if result < Brit Resources, offer to
-        # transfer half (round up) rolled Resources to Indians."
+        # I11: "first request Resources from the British"
         transfer = 0
         brit_res = state.get("resources", {}).get(C.BRITISH, 0)
-        if state.get("resources", {}).get(C.INDIANS, 0) < brit_res:
+        if brit_res > 0:
             roll = state["rng"].randint(1, 6)
             state.setdefault("rng_log", []).append(("Indian Trade D6", roll))
             if roll < brit_res:
                 transfer = -(-roll // 2)  # ceil(roll / 2)
                 push_history(state, f"Indian Trade: British offer {transfer} (rolled {roll})")
 
-        traded = False
-        for target in spaces[:3]:
-            try:
-                trade.execute(state, C.INDIANS, {}, target, transfer=transfer)
-                traded = True
-                transfer = 0  # Only first trade gets British offer
-            except Exception:
-                continue
-        return traded
+        try:
+            trade.execute(state, C.INDIANS, {}, target, transfer=transfer)
+            return True
+        except Exception:
+            return False
 
     # ==================================================================
-    #  EVENT‑VS‑COMMAND BULLETS (I2)
+    #  EVENT‑VS‑COMMAND  (I1 / I2)
     # ==================================================================
+    # Cards where the Indian special instruction says
+    # "If no Village can be placed, Command & SA instead."
+    _VILLAGE_REQUIRED_CARDS = {4, 72, 90}
+    # Cards: "Target an Eligible enemy Faction. If none, Command & SA."
+    _ELIGIBLE_ENEMY_CARDS = {18, 44}
+    # Card 38: "Place War Parties; if not possible, Command & SA instead."
+    _WP_REQUIRED_CARDS = {38}
+    # Card 83: "Use shaded if Village can be placed, otherwise unshaded."
+    _CARD_83 = 83
+
+    def _can_place_village(self, state: Dict) -> bool:
+        """Return True if at least one Village could be placed on the map."""
+        if state["available"].get(C.VILLAGE, 0) == 0:
+            return False
+        for sid, sp in state["spaces"].items():
+            if not self._village_room(state, sid):
+                continue
+            if sp.get(C.VILLAGE, 0) > 0:
+                continue
+            # Need WP to build (Gather places where 3+ WP / 2+ if Cornplanter)
+            # but for the "can a Village be placed" check, just check stacking
+            return True
+        return False
+
+    def _has_eligible_enemy(self, state: Dict) -> bool:
+        """Return True if any enemy faction is currently Eligible."""
+        elig_map = state.get("eligible", {})
+        for fac in (C.PATRIOTS, C.FRENCH):
+            if elig_map.get(fac, True):  # default True if not tracked
+                return True
+        return False
+
+    def _can_place_war_parties(self, state: Dict) -> bool:
+        """Return True if War Parties can be placed (any available)."""
+        return (state["available"].get(C.WARPARTY_U, 0)
+                + state["available"].get(C.WARPARTY_A, 0)) > 0
+
+    def _choose_event_vs_flowchart(self, state: Dict, card: Dict) -> bool:
+        """Override base to handle Indian conditional event instructions.
+        Cards 4/72/90: play event only if Village can be placed.
+        Cards 18/44: play event only if eligible enemy exists.
+        Card 38: play event only if War Parties can be placed.
+        Card 83: shaded if Village placeable, else unshaded.
+        """
+        cid = card.get("id")
+
+        # Card 83 special: always play, but pick the side
+        if cid == self._CARD_83:
+            if card.get("sword"):
+                return False
+            from lod_ai.cards import CARD_HANDLERS
+            handler = CARD_HANDLERS.get(cid)
+            if not handler:
+                return False
+            shaded = self._can_place_village(state)
+            previous_active = state.get("active")
+            state["active"] = self.faction
+            try:
+                handler(state, shaded=shaded)
+            finally:
+                if previous_active is None:
+                    state.pop("active", None)
+                else:
+                    state["active"] = previous_active
+            self._apply_eligibility_effects(state, card, shaded)
+            return True
+
+        # Cards with "if condition not met, Command & SA instead"
+        if cid in self._VILLAGE_REQUIRED_CARDS:
+            if not self._can_place_village(state):
+                return False  # fall through to flowchart (Command & SA)
+        elif cid in self._ELIGIBLE_ENEMY_CARDS:
+            if not self._has_eligible_enemy(state):
+                return False
+        elif cid in self._WP_REQUIRED_CARDS:
+            if not self._can_place_war_parties(state):
+                return False
+
+        # Delegate to base class for normal processing
+        return super()._choose_event_vs_flowchart(state, card)
+
     def _faction_event_conditions(self, state: Dict, card: Dict) -> bool:
         """Apply the unshaded‑event bullets from node I2."""
         text = card.get("unshaded_event", "")

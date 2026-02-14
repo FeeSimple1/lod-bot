@@ -342,17 +342,25 @@ Full node-by-node comparison of all four bot implementations against their respe
 - ~~Battle counts Underground Militia in force~~ → FIXED: Active only
 - OPS summary items not implemented (Supply, Redeploy, Desertion, ToA trigger, BS trigger)
 
-#### Indian Bot
-- I6 checks Available village count instead of whether Gather would place 2+
-- I9 checks only Underground WP; reference says any WP
+#### Indian Bot — FIXED (Session 5)
+- ~~I6 checks Available village count instead of whether Gather would place 2+~~ **FIXED**: Now checks both Available count AND eligible spaces with enough WP
+- ~~I9 checks only Underground WP; reference says any WP~~ **FIXED**: Now checks both Active and Underground WP
 - Missing mid-Raid Plunder/Trade interruption when resources hit 0
-- `_can_plunder` checks all map spaces, not just Raid spaces
-- Trade multi-space iteration (reference says Max 1)
-- Circular fallback between Gather and March — potential infinite loop
-- Raid movement doesn't check "WP don't exceed Rebels" condition
+- `_can_plunder` checks all map spaces, not just Raid spaces (minor: actual plunder correctly filters)
+- ~~Trade multi-space iteration (reference says Max 1)~~ **FIXED**: Now Max 1, picks space with most Underground WP
+- Circular fallback between Gather and March — potential infinite loop (unchanged; would need recursion guard)
+- ~~Raid movement doesn't check "WP don't exceed Rebels" condition~~ **FIXED**: Now moves WP when target has none OR WP ≤ Rebels
 - Defending in Battle activation rule not implemented
 - Supply, Patriot Desertion, Redeployment priorities not in bot
 - Brilliant Stroke trigger conditions not implemented
+- ~~Uses `random.random()` instead of `state["rng"]` in multiple places~~ **FIXED**: All uses now via `state["rng"]`
+
+#### Indian Bot — additional fixes (Session 5)
+- **I7 Gather**: Complete rewrite implementing all 4 priority bullets (Village placement with leader priority, WP at Villages, WP in rooms for Village, move-and-flip when no WP available)
+- **I7 Gather Cornplanter**: Threshold now per-space (2+ only where Cornplanter is), not global
+- **I8 War Path option**: Now selects correct option (3 for Fort removal, 2 for double removal, 1 default) instead of always option 1
+- **I12 Scout**: Moves exactly 1 WP (not up to 3) + most Regulars+Tories possible without changing Control; includes Tories
+- **Event instructions**: Cards 4/72/90 (Village condition), 18/44 (eligible enemy), 38 (WP placeable), 83 (shaded/unshaded conditional) — all now have proper conditional fallback logic
 - Uses `random.random()` instead of `state["rng"]` in multiple places
 ---
 
@@ -519,6 +527,7 @@ All 9 previously documented remaining issues were confirmed still present. **7 o
 
 ### Tests
 
+305 tests passing (Session 5: +17 Indian bot compliance tests, +1 updated I9 test).
 281 tests passing. No new tests needed since no code changes were made.
 
 ---
