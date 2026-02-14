@@ -276,9 +276,9 @@ Full node-by-node comparison of all four bot implementations against their respe
 ### REMAINING HIGH SEVERITY (not fixed — require significant refactoring)
 
 #### British Bot (british_bot.py)
-- **B5 Garrison**: Only targets one city instead of multi-phase operation
-- **B10 March**: Only moves Regulars, never Tories; missing phases 2 and 3; Common Cause timing wrong (after March, should be during)
-- **B13 Common Cause**: No flowchart-specific logic (don't use last WP in March origin, don't use last Underground WP in Battle)
+- **B5 Garrison**: Only targets one city instead of full multi-phase operation — PARTIALLY FIXED (Session 5: control check, retention calc, but not multi-city)
+- **B10 March**: ~~Only moves Regulars, never Tories; missing phases 2 and 3; Common Cause timing wrong~~ — FIXED (Session 5: Tories now move, all 3 phases implemented, correct CC mode)
+- **B13 Common Cause**: ~~No flowchart-specific logic~~ — PARTIALLY FIXED (Session 5: correct mode parameter passed; WP constraints delegated to common_cause.execute)
 - **B38 Howe capability**: FNI not lowered before SAs during Howe's leadership period
 
 #### Patriot Bot (patriot.py)
@@ -307,11 +307,11 @@ Full node-by-node comparison of all four bot implementations against their respe
 
 #### British Bot
 - B1 Garrison precondition missing FNI level 3 check
-- B5 Garrison "leave 2 more Royalist" omits Forts from count
+- ~~B5 Garrison "leave 2 more Royalist" omits Forts from count~~ — FIXED (Session 5)
 - B6 Muster precondition consumes die roll on every call
 - B8 Tory placement skips Active Opposition and adjacency checks; only places 1 Tory per space
-- B12 Battle misses Fort-only spaces; force level ignores modifiers
-- B7 Naval Pressure missing Gage/Clinton leader check
+- ~~B12 Battle misses Fort-only spaces~~ — FIXED (Session 5); force level ignores modifiers
+- ~~B7 Naval Pressure missing Gage/Clinton leader check~~ — FIXED (Session 5)
 - B2 Event conditions overly broad text matching
 - B8 Fort target space not passed to muster.execute
 - B10 March always passes bring_escorts=False
@@ -348,6 +348,125 @@ Full node-by-node comparison of all four bot implementations against their respe
 - Supply, Patriot Desertion, Redeployment priorities not in bot
 - Brilliant Stroke trigger conditions not implemented
 - Uses `random.random()` instead of `state["rng"]` in multiple places
+---
+
+## Session 5: British Bot Node-by-Node Review
+
+Full node-by-node comparison of `british_bot.py` against `Reference Documents/british bot flowchart and reference.txt`.
+
+### FIXED issues (this session)
+
+#### B4 `_can_garrison` — Wrong control check
+- **Bug:** Checked `control != BRITISH` — any non-British city (including uncontrolled) triggered Garrison.
+- **Reference:** "Rebels control City w/o Rebel Fort" — must be Rebellion-controlled specifically.
+- **Fix:** Changed to `control == "REBELLION"`. Removed redundant rebel-count check (Rebellion control already implies rebels present).
+
+#### B5 `_select_garrison_city` — Same control check
+- **Bug:** Same `control != BRITISH` check excluded all non-British cities, not just Rebellion-controlled ones.
+- **Fix:** Changed to check `control == "REBELLION"`.
+
+#### B5 `_garrison` — Origin retention omits Forts/Rebel Forts from piece count
+- **Bug:** "Leave 2 more Royalist than Rebel pieces" counted only cubes + War Parties, omitting Forts.
+- **Reference:** Forts are pieces that count toward control.
+- **Fix:** Added `FORT_BRI` to royalist count and `FORT_PAT` to rebel count in the retention calculation.
+
+#### B5 `_garrison` — Muster fallback missing context
+- **Bug:** When no cubes moved, called `self._muster(state)` without `tried_march` context.
+- **Fix:** Now passes `tried_march=False` explicitly.
+
+#### B8 `_muster` — Regular placement uses `random.random()` instead of `state["rng"]`
+- **Bug:** Random tiebreaker used Python's global `random` module, breaking deterministic replay.
+- **Fix:** Changed to `state["rng"].random()`.
+
+#### B8 `_muster` — Regular placement sorting missing Neutral/Passive priority tier
+- **Bug:** Used Neutral/Passive as a hard filter (excluded all non-Neutral/Passive spaces).
+- **Reference:** "first in Neutral or Passive" is a sorting priority, not a filter.
+- **Fix:** Added `neutral_priority` tier to sort key (0=Neutral/Passive, 1=other). Spaces at Active Support/Opposition are now valid but lower priority.
+
+#### B8 `_muster` — Guard against empty regular_plan
+- **Bug:** When no valid Regular candidates exist, passed `regular_plan=None` to `muster.execute()` which requires it for British faction, causing ValueError.
+- **Fix:** Added guard that falls through to March when nothing to muster.
+
+#### B10 `_march` — Only moves Regulars, never Tories
+- **Bug:** Move plan only included `C.REGULAR_BRI` pieces.
+- **Reference:** "Leave last Tory and War Party in each space" implies Tories CAN move (just not the last one).
+- **Fix:** `_movable_from()` now computes available Regulars AND Tories, respecting leave-behind rules.
+
+#### B10 `_march` — Leave-behind rules incomplete
+- **Bug:** Simplistic `can_leave()` function didn't track per-piece-type minimums.
+- **Reference:** "Leave last Tory and War Party in each space, and last Regular if British Control but no Active Support."
+- **Fix:** New `_movable_from()` function computes per-type minimums: min 1 Tory (if any present), min 1 WP (if any present), min 1 Regular (if British Control without Active Support). Also ensures removing pieces doesn't lose British Control.
+
+#### B10 `_march` — Missing Phase 2 (Pop 1+ spaces)
+- **Bug:** Only implemented Phase 1 (add British Control) and a simplified fallback.
+- **Reference:** "Then March to Pop 1+ spaces not at Active Support, first to add Tories where Regulars are the only British units, then to add Regulars where Tories are the only British units."
+- **Fix:** Added full Phase 2 with correct priority sorting.
+
+#### B10 `_march` — Missing Phase 3 (March in place)
+- **Bug:** Not implemented at all.
+- **Reference:** "Then March in place to Activate Militia, first in Support."
+- **Fix:** Added Phase 3 that uses `flip_pieces()` to activate Underground Militia in spaces with British Regulars, prioritized by Support level.
+
+#### B12 `_battle` — Excludes Rebel Fort-only spaces
+- **Bug:** Required `rebel_cubes + total_militia > 0`, excluding spaces with only a Rebel Fort.
+- **Reference:** "spaces with Rebel Forts and/or Rebel cubes" — Fort-only spaces are valid.
+- **Fix:** Changed filter to `rebel_cubes + total_militia + rebel_forts > 0`.
+
+#### B13 `_try_common_cause` — Always passes mode="BATTLE"
+- **Bug:** Hard-coded `mode="BATTLE"` even when called from March context.
+- **Reference:** Common Cause has different constraints for March vs Battle.
+- **Fix:** Added `mode` parameter; March calls with `mode="MARCH"`, Battle uses default `mode="BATTLE"`.
+
+#### B7 `_try_naval_pressure` — Missing Gage/Clinton leader check
+- **Bug:** Delegated entirely to `naval_pressure.execute()` without checking leader requirement.
+- **Reference:** "If FNI > 0 and Gage or Clinton is British Leader, remove 1 Blockade..."
+- **Fix:** Added explicit leader check and city priority selection (Battle space first, then City with most Rebels without Patriot Fort, then most Support). FNI == 0 path (add Resources) does not require leader check.
+
+#### B11 `_try_skirmish` — Improved option selection and Clinton bonus
+- **Bug:** Only used options 1 and 2; never selected option 3 (remove Fort); no Clinton bonus.
+- **Reference:** Option 3 for Fort-only spaces. Clinton in space removes 1 additional Militia.
+- **Fix:** Added option 3 selection when no enemy cubes but enemy Fort exists. Added Clinton bonus check after successful Skirmish.
+
+#### B11 `_try_skirmish` — Improved target prioritization
+- **Bug:** Used additive priority score that didn't correctly implement "first last Rebel in space, within that first in a City."
+- **Reference:** "Remove 1 Rebel piece, first last Rebel in space, within that first in a City."
+- **Fix:** Rewrote priority to (tier, fewest_enemy, city_bonus) where tier is 0=WI, 1=exactly-1-Regular, 2=other.
+
+#### Removed `import random` — global random module
+- **Bug:** `import random` at module level was used for `random.random()` in Muster tiebreaking.
+- **Fix:** Removed import; all randomness now uses `state["rng"]` for deterministic replay.
+
+### REMAINING issues (from audit, not fixed this session)
+
+#### British Bot
+- **B5 Garrison**: Still targets only one city instead of full multi-phase operation (move to multiple cities, then reinforce existing British Control cities). Would require major refactoring of the Garrison command interface.
+- **B38 Howe capability**: FNI not lowered before SAs during Howe's leadership period.
+- **B39 Gage capability**: Free RL not implemented.
+- **B2 Event conditions**: Text matching for bullets 3 and 4 is overly broad — cannot verify game-state conditions (e.g., "Active Opposition with none") from card text alone. Would need per-card lookup table.
+- **B6 Muster precondition**: Consumes a die roll every time `_can_muster` is called, even when it won't lead to Muster. This is functionally correct but wasteful.
+- **B10 March**: `bring_escorts=False` hard-coded — reference doesn't explicitly address this for bot March.
+- **OPS reference**: Supply/Redeploy/Desertion priorities, Indian Trade, Brilliant Stroke trigger conditions — these are year-end/operational mechanics not in the turn flowchart.
+
+### Tests added (22 new)
+
+- `test_brit_bot_review.py`: Comprehensive test file covering all fixes:
+  - B4 Garrison precondition: 3 tests (Rebellion control, uncontrolled city, Rebel Fort exclusion)
+  - B5 Garrison retention: 1 test (Forts in royalist count)
+  - B5 Garrison city selection: 2 tests (Rebellion control requirement, most-rebels priority)
+  - B8 Muster determinism: 1 test (state["rng"] usage)
+  - B9 Battle condition: 2 tests (Active Rebels count, leader bonus)
+  - B10 March leave-behind: 2 tests (last Tory, last Regular)
+  - B10 March in place: 1 test (Militia activation priority)
+  - B11 Skirmish: 2 tests (Fort-only option 3, WI priority)
+  - B12 Battle Fort-only: 1 test (Rebel Fort-only spaces)
+  - B13 Common Cause mode: 2 tests (default BATTLE, MARCH mode)
+  - B7 Naval Pressure: 3 tests (leader check, Clinton + blockade, FNI=0 resources)
+  - B3 Resource gate: 2 tests (pass on zero, continue on positive)
+
+310 tests passing (288 baseline + 22 new).
+
+---
+
 ## Session 4: Full Card Handler Re-Audit
 
 ### Scope
