@@ -32,7 +32,7 @@ from lod_ai.rules_consts import (
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
-from lod_ai.board.pieces      import remove_piece, add_piece
+from lod_ai.board.pieces      import remove_piece, add_piece, flip_pieces
 from lod_ai.leaders          import apply_leader_modifiers, leader_location
 
 REB_CUBE_TAGS = (MILITIA_A, MILITIA_U, REGULAR_PAT, REGULAR_FRE)
@@ -85,10 +85,8 @@ def execute(
 
     # ---- execute chosen option ---------------------------------------------
     if option == 1:
-        # Activate 1 WP-U
         # flip 1 WP-U → WP-A
-        remove_piece(state, WARPARTY_U, space_id, 1)
-        add_piece(state,    WARPARTY_A, space_id, 1)
+        flip_pieces(state, WARPARTY_U, WARPARTY_A, space_id, 1)
 
         # remove 1 Rebellion unit (§4.4.2: cubes and Forts → Casualties;
         # Militia are not cubes → Available; Forts handled by option 3 only)
@@ -101,8 +99,7 @@ def execute(
 
     elif option == 2:
         # flip 2 WP-U → WP-A
-        remove_piece(state, WARPARTY_U, space_id, 2)
-        add_piece(state,    WARPARTY_A, space_id, 2)
+        flip_pieces(state, WARPARTY_U, WARPARTY_A, space_id, 2)
 
         # remove one of the freshly-activated WP-A to Available
         remove_piece(state, WARPARTY_A, space_id, 1, to="available")
@@ -117,9 +114,8 @@ def execute(
                 removed += 1
 
     else:   # option 3
-        # Activate 2 WP-U
-        remove_piece(state, WARPARTY_U, space_id, 2)
-        add_piece(state,    WARPARTY_A, space_id, 2)
+        # flip 2 WP-U → WP-A
+        flip_pieces(state, WARPARTY_U, WARPARTY_A, space_id, 2)
 
         remove_piece(state, WARPARTY_A, space_id, 1, to="available")
         # §4.4.2: "cubes and Forts are removed to Casualties"

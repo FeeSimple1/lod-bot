@@ -31,7 +31,7 @@ from lod_ai.rules_consts import (
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
-from lod_ai.board.pieces      import remove_piece, add_piece
+from lod_ai.board.pieces      import remove_piece, add_piece, flip_pieces
 
 SA_NAME = "PARTISANS"      # auto-registered by special_activities/__init__.py
 
@@ -89,9 +89,7 @@ def execute(
     # ---- Perform chosen option ---------------------------------------------
     if option == 1:
         # Activate 1 Militia U → A
-        # Activate 1 Militia U → A
-        remove_piece(state, MILITIA_U, space_id, 1)
-        add_piece(state,    MILITIA_A, space_id, 1)
+        flip_pieces(state, MILITIA_U, MILITIA_A, space_id, 1)
         # Remove 1 Royalist unit (cubes → Casualties, others → Available)
         for tag in (TORY, WARPARTY_A, REGULAR_BRI, VILLAGE, FORT_BRI, WARPARTY_U):
             if sp.get(tag, 0):
@@ -100,9 +98,7 @@ def execute(
 
     elif option == 2:
         # Activate 2 Militia U → A
-        # Activate 2 Militia U → A
-        remove_piece(state, MILITIA_U, space_id, 2)
-        add_piece(state,    MILITIA_A, space_id, 2)
+        flip_pieces(state, MILITIA_U, MILITIA_A, space_id, 2)
         # Remove 1 of those Militia A (Militia not cubes → Available)
         remove_piece(state, MILITIA_A, space_id, 1, to="available")
         # Remove 2 Royalist units (cubes → Casualties, others → Available)
@@ -114,8 +110,7 @@ def execute(
 
     else:  # option 3
         # Activate 2 Militia U → A
-        remove_piece(state, MILITIA_U, space_id, 2)
-        add_piece(state,    MILITIA_A, space_id, 2)
+        flip_pieces(state, MILITIA_U, MILITIA_A, space_id, 2)
 
         # Remove 1 of those newly-activated Militia A (Militia not cubes → Available)
         remove_piece(state, MILITIA_A, space_id, 1, to="available")
