@@ -865,19 +865,27 @@ def evt_085_mississippi_raids(state, shaded=False):
 def evt_087_lenape(state, shaded=False):
     """
     Unshaded – Remove one piece in Pennsylvania. Remain Eligible.
+               Player chooses which piece (bot: §8.3.8 or card instruction).
     Shaded   – (none)
     """
     if shaded:
         return
     loc = "Pennsylvania"
     sp = state.get("spaces", {}).get(loc, {})
-    # Remove one piece of any type (prioritise units before bases)
-    for tag in (WARPARTY_U, WARPARTY_A, MILITIA_U, MILITIA_A, REGULAR_PAT,
-                REGULAR_BRI, REGULAR_FRE, TORY, FORT_BRI, FORT_PAT, VILLAGE):
-        if sp.get(tag, 0):
-            remove_piece(state, tag, loc, 1, to="available")
-            push_history(state, f"Card 87 unshaded: removed 1 {tag} in {loc}")
-            break
+
+    # Player chooses which piece to remove via state override
+    chosen = state.get("card87_piece", "").strip()
+    if chosen and sp.get(chosen, 0):
+        remove_piece(state, chosen, loc, 1, to="available")
+        push_history(state, f"Card 87 unshaded: removed 1 {chosen} in {loc}")
+    else:
+        # Bot fallback: remove first piece found (units before bases)
+        for tag in (WARPARTY_U, WARPARTY_A, MILITIA_U, MILITIA_A, REGULAR_PAT,
+                    REGULAR_BRI, REGULAR_FRE, TORY, FORT_BRI, FORT_PAT, VILLAGE):
+            if sp.get(tag, 0):
+                remove_piece(state, tag, loc, 1, to="available")
+                push_history(state, f"Card 87 unshaded: removed 1 {tag} in {loc}")
+                break
     # Remain Eligible
     executor = state.get("active")
     if executor:

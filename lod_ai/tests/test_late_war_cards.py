@@ -279,3 +279,39 @@ def test_card48_shaded_indians_only():
     assert state["spaces"]["Virginia"].get(WARPARTY_U, 0) == 0
     assert state["spaces"]["Virginia"].get(MILITIA_U, 0) == 3  # untouched
     assert state["spaces"]["North_Carolina"].get(WARPARTY_U, 0) == 2
+
+
+# ---- Card 87: Patriots Massacre Lenape Indians ----
+
+def test_card87_unshaded_player_chooses_piece():
+    """Card 87 unshaded: Player chooses which piece to remove in Pennsylvania."""
+    state = _base_state()
+    state["spaces"] = {
+        "Pennsylvania": {REGULAR_BRI: 2, WARPARTY_U: 1, TORY: 1},
+    }
+    state["active"] = "PATRIOTS"
+    # Player specifically chooses to remove a Tory
+    state["card87_piece"] = TORY
+
+    late_war.evt_087_lenape(state, shaded=False)
+
+    assert state["spaces"]["Pennsylvania"].get(TORY, 0) == 0
+    assert state["spaces"]["Pennsylvania"].get(REGULAR_BRI, 0) == 2  # untouched
+    assert state["spaces"]["Pennsylvania"].get(WARPARTY_U, 0) == 1  # untouched
+    assert PATRIOTS in state["remain_eligible"]
+
+
+def test_card87_unshaded_bot_fallback():
+    """Card 87 unshaded: Without player override, bot removes first available."""
+    state = _base_state()
+    state["spaces"] = {
+        "Pennsylvania": {REGULAR_BRI: 2, TORY: 1},
+    }
+    state["active"] = "INDIANS"
+
+    late_war.evt_087_lenape(state, shaded=False)
+
+    # Bot priority: REGULAR_BRI removed first (units before bases)
+    assert state["spaces"]["Pennsylvania"].get(REGULAR_BRI, 0) == 1
+    assert state["spaces"]["Pennsylvania"].get(TORY, 0) == 1
+    assert INDIANS in state["remain_eligible"]
