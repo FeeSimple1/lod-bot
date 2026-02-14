@@ -3,7 +3,9 @@ lod_ai.special_activities.preparer
 ==================================
 French **Préparer la Guerre** SA  (§4.5.1).
 
-* May accompany any Command **after the Treaty of Alliance**.
+* May accompany any Command.
+* Available BOTH before and after Treaty of Alliance.
+  (§4.5: "French may choose only Préparer la Guerre before Treaty of Alliance.")
 * Exactly ONE of the three effects must be chosen:
 
   1) "BLOCKADE"  – Move 1 Squadron/Blockade marker *to* the West Indies pool.
@@ -62,8 +64,8 @@ def execute(
     if faction != FRENCH:
         raise ValueError("Préparer la Guerre is French-only.")
 
-    if not state.get("toa_played"):
-        raise ValueError("Préparer la Guerre requires Treaty of Alliance.")
+    # §4.5: Préparer la Guerre is available both before and after TOA.
+    # Before TOA it is the *only* French SA; after TOA others unlock too.
 
     choice = choice.upper()
     if choice not in ("BLOCKADE", "REGULARS", "RESOURCES"):
@@ -73,11 +75,8 @@ def execute(
     push_history(state, f"FRENCH PREPARER choice={choice}")
 
     if choice == "BLOCKADE":
-        total = _count_all_blockades(state)
-        if total >= _BLOCKADE_CAP:
-            raise ValueError("No unused Blockade markers remain to add.")
         if unavailable_blockades(state) <= 0:
-            raise ValueError("No unused Blockade markers remain to add.")
+            raise ValueError("No Blockade markers in Unavailable to move.")
         moved = move_blockades_to_west_indies(state, 1)
         if moved == 0:
             raise ValueError("West Indies Blockade pool is at capacity.")
