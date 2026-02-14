@@ -56,14 +56,30 @@ def _preparer_la_guerre(state: Dict, post_treaty: bool) -> bool:
     Execute the Préparer la Guerre special activity.
 
     Logic (flow‑chart F8 & F15):
-        • Move 1 Blockade from Unavailable → West Indies.
-        • If none, up to 3 French Regulars Unavailable → Available.
-        • Post Treaty extra: if nothing moved and Resources==0 → +2 Resources.
+        • Pre-Treaty (F8): Move 1 Blockade → WI, or up to 3 Regulars Unavailable → Available.
+        • Post-Treaty (F15): Only if 1D6 <= Unavailable French Regulars + Blockades.
+          Move 1 Blockade → WI, or up to 3 Regulars Unavailable → Available.
+          If nothing moved and Resources==0 → +2 Resources.
     Return True if *anything* was done.
     """
     moved = False
     unavail = state.setdefault("unavailable", {})
     avail_pool = state.setdefault("available", {})
+
+    # F15 post-Treaty D6 gate
+    if post_treaty:
+        unavail_regs = unavail.get(C.REGULAR_FRE, 0)
+        unavail_blk = unavailable_blockades(state)
+        roll = state["rng"].randint(1, 6)
+        state.setdefault("rng_log", []).append(("Preparer D6", roll))
+        if roll > (unavail_regs + unavail_blk):
+            # D6 exceeded threshold — nothing happens
+            if state["resources"][C.FRENCH] == 0:
+                state["resources"][C.FRENCH] += 2
+                push_history(state, "Préparer la Guerre: +2 Resources (post‑Treaty bonus)")
+                return True
+            return False
+
     if unavailable_blockades(state) > 0:
         count = move_blockades_to_west_indies(state, 1)
         if count > 0:
@@ -271,7 +287,9 @@ class FrenchBot(BaseBot):
 
     # ----- Hortalez (F6 / F11) ---------------------------------
     def _hortelez(self, state: Dict, *, before_treaty: bool) -> None:
-        pay = min(state["resources"][C.FRENCH], random.randint(1, 3))
+        roll = state["rng"].randint(1, 3)
+        state.setdefault("rng_log", []).append(("Hortalez 1D3", roll))
+        pay = min(state["resources"][C.FRENCH], roll)
         hortelez.execute(state, C.FRENCH, {}, pay=pay)
         phase = "pre‑Treaty" if before_treaty else "post‑Treaty"
         push_history(state, f"Roderigue Hortalez et Cie ({phase}): Pay {pay}")

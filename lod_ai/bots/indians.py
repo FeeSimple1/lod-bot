@@ -285,7 +285,7 @@ class IndianBot(BaseBot):
         if not choices:
             return False
         target = max(choices)[1]
-        plunder.execute(state, C.INDIANS, {}, target)
+        plunder.execute(state, C.INDIANS, {"raid_active": True}, target)
         return True
 
     # ------------------------------------------------------------------
@@ -306,8 +306,47 @@ class IndianBot(BaseBot):
         return True  # always allowed
 
     def _gather(self, state: Dict) -> bool:
-        # very high‑level: delegate detailed bullet logic to command module
-        return gather.execute(state, C.INDIANS, {}, max_spaces=4)
+        """I7: Gather (Max 4 spaces).
+
+        Priority bullets:
+        1. Cornplanter active → spaces with 2+ WP; else 3+ WP
+        2. First in a Province with 1+ Villages, then highest Pop
+        3. Place Villages, then place War Parties
+        4. Build a Village in each space with 3+ WP and no Village
+        """
+        # Determine WP threshold based on Cornplanter
+        corn_loc = leader_location(state, "LEADER_CORNPLANTER")
+        wp_threshold = 2 if corn_loc else 3
+
+        # Select spaces with enough WP, prioritising Village provinces then Pop
+        candidates = []
+        for sid, sp in state["spaces"].items():
+            total_wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
+            if total_wp < wp_threshold:
+                continue
+            is_prov = 1 if _MAP_DATA.get(sid, {}).get("type") == "Province" else 0
+            has_village = 1 if sp.get(C.VILLAGE, 0) >= 1 else 0
+            pop = _MAP_DATA.get(sid, {}).get("population", 0)
+            candidates.append((-is_prov * has_village, -pop, state["rng"].random(), sid))
+        candidates.sort()
+
+        selected = [sid for _, _, _, sid in candidates[:4]]
+        if not selected:
+            return False
+
+        # Determine which spaces should get a Village
+        build_village = set()
+        for sid in selected:
+            sp = state["spaces"][sid]
+            total_wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
+            if total_wp >= 3 and sp.get(C.VILLAGE, 0) == 0:
+                build_village.add(sid)
+
+        gather.execute(
+            state, C.INDIANS, {}, selected,
+            build_village=build_village if build_village else None,
+        )
+        return True
 
     # ------------------------------------------------------------------
     # WAR‑PATH  (Command)  ---------------------------------------------
@@ -447,7 +486,20 @@ class IndianBot(BaseBot):
         if not dest_scores:
             return False
         _, target = max(dest_scores)
-        scout.execute(state, C.INDIANS, {}, origin, target)
+        sp = state["spaces"][origin]
+        # Calculate how many WP to move (Max 3 per Scout)
+        wp_u = sp.get(C.WARPARTY_U, 0)
+        n_wp = min(wp_u, 3)
+        if n_wp == 0:
+            return False
+        # Scout requires at least 1 British Regular (§3.2.4)
+        n_regs = min(sp.get(C.REGULAR_BRI, 0), n_wp)
+        if n_regs == 0:
+            return False
+        scout.execute(
+            state, C.INDIANS, {}, origin, target,
+            n_warparties=n_wp, n_regulars=n_regs, skirmish=True,
+        )
         return True
 
     # ------------------------------------------------------------------
@@ -492,31 +544,21 @@ class IndianBot(BaseBot):
         support = sum(max(0, lvl) for lvl in support_map.values())
         opposition = sum(max(0, -lvl) for lvl in support_map.values())
 
-        # • Opposition > Support and Event shifts toward Royalists
+        # I2 bullets (from indian bot flowchart and reference.txt):
+        # • Opposition > Support and Event shifts Support/Opposition in Royalist favor
         if opposition > support and any(k in text for k in ("Support", "Opposition")):
             return True
-        # • Places a Village or grants free Gather
+        # • Event places at least one Indian Village or grants free Gather
         if "Village" in text or "Gather" in text:
             return True
-        # • Removes a Patriot Fort
+        # • Event removes a Patriot Fort
         if "Fort" in text and "Patriot" in text and "remove" in text.lower():
             return True
-        # • Adds Indian Resources, places War Parties from Unavailable,
-        #   or grants a free War Path
-        if ("Resources" in text and "Indian" in text):
-            return True
-        if "Unavailable" in text and ("War" in text or "Indian" in text):
-            return True
-        if "War Path" in text:
-            return True
-        # • Event is effective, Indian pieces >= British Regulars on map,
-        #   and D6 rolls 5+
-        indian_pieces = sum(
-            sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0) + sp.get(C.VILLAGE, 0)
-            for sp in state["spaces"].values()
+        # • Event is effective, 4+ Villages on the map, and a D6 rolls 5+
+        villages_on_map = sum(
+            sp.get(C.VILLAGE, 0) for sp in state["spaces"].values()
         )
-        british_regs = sum(sp.get(C.REGULAR_BRI, 0) for sp in state["spaces"].values())
-        if indian_pieces >= british_regs:
+        if villages_on_map >= 4:
             roll = state["rng"].randint(1, 6)
             state.setdefault("rng_log", []).append(("Event D6", roll))
             if roll >= 5:

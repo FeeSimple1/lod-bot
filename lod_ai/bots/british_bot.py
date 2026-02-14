@@ -162,10 +162,27 @@ class BritishBot(BaseBot):
         """
         excluded = state.get("_turn_affected_spaces", set())
 
+        def _best_skirmish_option(sp):
+            """B11: Remove as many Rebel cubes as possible.
+            Option 2 (remove 2 + sacrifice 1 Regular) if 2+ enemy cubes and 2+ own Regs.
+            Option 1 (remove 1, no cost) otherwise.
+            """
+            enemy_cubes = (
+                sp.get(C.REGULAR_PAT, 0)
+                + sp.get(C.REGULAR_FRE, 0)
+                + sp.get(C.MILITIA_A, 0)
+            )
+            own_regs = sp.get(C.REGULAR_BRI, 0)
+            if enemy_cubes >= 2 and own_regs >= 2:
+                return 2  # remove 2 cubes, sacrifice 1 Regular
+            return 1
+
         # 1) West Indies check
         if WEST_INDIES not in excluded and state["spaces"].get(WEST_INDIES, {}).get(C.REGULAR_BRI, 0):
+            sp = state["spaces"][WEST_INDIES]
+            opt = _best_skirmish_option(sp)
             try:
-                skirmish.execute(state, C.BRITISH, {}, WEST_INDIES, option=1)
+                skirmish.execute(state, C.BRITISH, {}, WEST_INDIES, option=opt)
                 return True
             except Exception:
                 pass
@@ -194,8 +211,10 @@ class BritishBot(BaseBot):
 
         targets.sort()
         for _, sid in targets:
+            sp = state["spaces"][sid]
+            opt = _best_skirmish_option(sp)
             try:
-                skirmish.execute(state, C.BRITISH, {}, sid, option=1)
+                skirmish.execute(state, C.BRITISH, {}, sid, option=opt)
                 return True
             except Exception:
                 continue
@@ -222,6 +241,7 @@ class BritishBot(BaseBot):
     def _garrison(self, state: Dict) -> bool:
         # Flow‑chart: "First execute a Special Activity."
         self._skirmish_then_naval(state)   # B5 edge "With: B11" → Skirmish first
+        state["_sa_done_this_turn"] = True  # prevent double SA if falling to Muster
 
         refresh_control(state)
 
@@ -480,14 +500,15 @@ class BritishBot(BaseBot):
                 and sp.get(C.REGULAR_BRI, 0) >= 1
                 and sp.get(C.TORY, 0) >= 1
             ]
-            # "Do not RL where only Raid/Propaganda markers would be removed"
+            # "Do not RL in a space where only Raid/Propaganda markers would be removed"
+            # (i.e., already at Active Support with markers — removing markers is the only effect)
             rl_candidates = [
                 sid for sid in rl_candidates
-                if not (self._support_level(state, sid) == C.PASSIVE_SUPPORT
-                        and sid not in raid_on_map and sid not in prop_on_map)
+                if not (self._support_level(state, sid) == C.ACTIVE_SUPPORT
+                        and (sid in raid_on_map or sid in prop_on_map))
             ]
             if rl_candidates:
-                chosen_rl_space = max(rl_candidates, key=_rl_key)
+                chosen_rl_space = min(rl_candidates, key=_rl_key)
                 reward_levels = 1
 
         if chosen_rl_space is None and state["available"].get(C.FORT_BRI, 0):
@@ -525,7 +546,9 @@ class BritishBot(BaseBot):
             return False
 
         # Execute Special-Activity: B11 arrow (Skirmish first)
-        self._skirmish_then_naval(state)
+        # (skip if SA was already done during Garrison that fell through to Muster)
+        if not state.get("_sa_done_this_turn"):
+            self._skirmish_then_naval(state)
         return True
 
     # =======================================================================
@@ -712,9 +735,23 @@ class BritishBot(BaseBot):
 
     # -------------------------------------------------------------------
     def _try_common_cause(self, state: Dict) -> bool:
-        """Return True if Common Cause executed successfully."""
+        """B13: Common Cause — use War Parties (Active first) as Tories
+        where British Regulars > Tories, up to the number of Regulars.
+        Return True if Common Cause executed successfully.
+        """
+        # Find spaces where British Regulars > Tories and War Parties exist
+        spaces = []
+        for sid, sp in state["spaces"].items():
+            regs = sp.get(C.REGULAR_BRI, 0)
+            tories = sp.get(C.TORY, 0)
+            wp_a = sp.get(C.WARPARTY_A, 0)
+            wp_u = sp.get(C.WARPARTY_U, 0)
+            if regs > tories and (wp_a + wp_u) > 0:
+                spaces.append(sid)
+        if not spaces:
+            return False
         try:
-            common_cause.execute(state, C.BRITISH, {})
+            common_cause.execute(state, C.BRITISH, {}, spaces, mode="BATTLE")
             return True
         except Exception:
             return False

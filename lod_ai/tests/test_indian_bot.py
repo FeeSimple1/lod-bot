@@ -90,50 +90,49 @@ def test_march_neutral_or_passive_destination():
     assert 0 in (C.NEUTRAL, C.PASSIVE_SUPPORT, C.PASSIVE_OPPOSITION)
 
 
-def test_i2_event_conditions_resources_and_war_parties():
-    """I2 bullet 4: Event adds Indian Resources or places WP from Unavailable."""
+def test_i2_event_conditions_per_reference():
+    """I2 conditions per indian bot flowchart reference:
+    1. Opp > Sup and event shifts S/O in Royalist favor
+    2. Event places Village or grants free Gather
+    3. Event removes a Patriot Fort
+    4. 4+ Villages on map and D6 >= 5
+    """
     from lod_ai.bots.indians import IndianBot
     bot = IndianBot()
-    state = {
+    base_state = lambda: {
         "spaces": {"A": {C.WARPARTY_A: 1, C.WARPARTY_U: 1, C.VILLAGE: 1}},
         "resources": {C.INDIANS: 3},
         "support": {},
         "available": {},
         "rng": __import__("random").Random(42),
     }
-    # Card adds Indian Resources
-    card_res = {
-        "id": 9999,
-        "unshaded_event": "Add 3 Indian Resources.",
-        "shaded_event": "Nothing.",
-    }
-    assert bot._faction_event_conditions(state, card_res) is True
 
-    # Card places War Parties from Unavailable
-    card_wp = {
-        "id": 9998,
-        "unshaded_event": "Place 2 War Parties from Unavailable.",
-        "shaded_event": "Nothing.",
-    }
-    assert bot._faction_event_conditions(state, card_wp) is True
+    # Bullet 2: Event places a Village → True
+    state = base_state()
+    card_village = {"id": 9999, "unshaded_event": "Place 1 Village.", "shaded_event": "Nothing."}
+    assert bot._faction_event_conditions(state, card_village) is True
 
-    # Card grants free War Path
-    card_warpath = {
-        "id": 9997,
-        "unshaded_event": "Execute a free War Path.",
-        "shaded_event": "Nothing.",
-    }
-    assert bot._faction_event_conditions(state, card_warpath) is True
+    # Bullet 2: Event grants free Gather → True
+    state = base_state()
+    card_gather = {"id": 9998, "unshaded_event": "Free Gather in 2 Colonies.", "shaded_event": "Nothing."}
+    assert bot._faction_event_conditions(state, card_gather) is True
 
-    # Unrelated card
-    card_noop = {
-        "id": 9996,
-        "unshaded_event": "Draw a card.",
-        "shaded_event": "Draw a card.",
-    }
-    # This will exercise the die-roll check (Indian pieces >= British Regulars)
+    # Bullet 3: Event removes a Patriot Fort → True
+    state = base_state()
+    card_fort = {"id": 9997, "unshaded_event": "Remove a Patriot Fort.", "shaded_event": "Nothing."}
+    assert bot._faction_event_conditions(state, card_fort) is True
+
+    # Non-matching card with < 4 Villages → should NOT match bullet 4
+    state = base_state()
+    card_noop = {"id": 9996, "unshaded_event": "Draw a card.", "shaded_event": "Draw a card."}
+    assert bot._faction_event_conditions(state, card_noop) is False
+
+    # Non-matching card with 4+ Villages → exercises D6 check (bullet 4)
+    state = base_state()
+    state["spaces"]["B"] = {C.VILLAGE: 2}
+    state["spaces"]["C"] = {C.VILLAGE: 1}
     result = bot._faction_event_conditions(state, card_noop)
-    assert isinstance(result, bool)
+    assert isinstance(result, bool)  # depends on RNG roll
 
 
 def test_i9_checks_underground_wp_only():

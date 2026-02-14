@@ -246,6 +246,108 @@ These cards manipulated `sp[tag]` directly instead of using board/pieces helpers
 
 ---
 
+## Session 4: Bot Flowchart Compliance Audit
+
+Full node-by-node comparison of all four bot implementations against their respective flowchart reference documents.
+
+### RUNTIME CRASH BUGS (fixed this session)
+
+| File | Line | Description |
+|------|------|-------------|
+| `indians.py` | 310 | `_gather` passes `max_spaces=4` instead of required `selected: List[str]` — TypeError |
+| `indians.py` | 450 | `_scout` missing required `n_warparties`/`n_regulars` kwargs — TypeError |
+| `indians.py` | 288 | `_plunder` passes empty ctx without `raid_active` — ValueError |
+| `british_bot.py` | 717 | `_try_common_cause` calls `common_cause.execute()` without required `spaces` arg — TypeError |
+| `french_agent_mobilization.py` | 35 | `_VALID_PROVINCES` uses `"Quebec"` (Reserve Province) instead of `"Quebec_City"` (City) — mismatch with bot's correct list |
+| `french.py` | 274 | `_hortelez` uses `random.randint` instead of `state["rng"]` — breaks determinism |
+| `french.py` | 54-85 | `_preparer_la_guerre` post-Treaty missing D6 roll gate per F15 |
+
+### HIGH SEVERITY LOGIC BUGS (fixed this session)
+
+| File | Line | Description |
+|------|------|-------------|
+| `british_bot.py` | 490 | Reward Loyalty uses `max()` instead of `min()` — picks worst RL space every time |
+| `british_bot.py` | 484-488 | RL filter logic inverted — excludes valid targets, includes invalid ones |
+| `british_bot.py` | 224+528 | Double SA execution when Garrison falls back to Muster |
+| `british_bot.py` | 198 | Skirmish always uses option=1 — never maximizes casualties per B11 |
+| `indians.py` | 506-511 | Extra I2 event conditions not in reference (Resources, Unavailable, War Path) |
+| `indians.py` | 514-523 | Wrong I2 condition 4: checks piece count vs British Regs instead of 4+ Villages |
+
+### REMAINING HIGH SEVERITY (not fixed — require significant refactoring)
+
+#### British Bot (british_bot.py)
+- **B5 Garrison**: Only targets one city instead of multi-phase operation
+- **B10 March**: Only moves Regulars, never Tories; missing phases 2 and 3; Common Cause timing wrong (after March, should be during)
+- **B13 Common Cause**: No flowchart-specific logic (don't use last WP in March origin, don't use last Underground WP in Battle)
+- **B38 Howe capability**: FNI not lowered before SAs during Howe's leadership period
+
+#### Patriot Bot (patriot.py)
+- **P4 Battle**: Force level uses total Militia (Active+Underground) instead of Active only; Washington lookup uses wrong data structure (space_id as key in leaders dict); Win-the-Day free Rally not implemented
+- **P5 March**: Missing "lose no Rebel Control" constraint, missing leave-behind logic, missing second phase
+- **P7 Rally**: Missing 4 of 6 bullet points (Continental replacement, Fort Available placement, Control-changing Militia, adjacent Militia gathering); always returns True
+- **P8 Partisans**: Always uses option=1, never targets Villages (option=3)
+- **P12 Skirmish**: Always uses option=1, never removes Forts (option=3)
+- **Event Instructions**: Cards 71, 90 say "use unshaded" but bot plays shaded; Cards 18, 44, 51 ignore conditional fallbacks
+
+#### French Bot (french.py)
+- **F13 Battle**: Only checks Washington, not all Rebel leaders (Rochambeau, Lauzun)
+- **F16 Battle**: Force level missing modifiers; `crown_cubes > 0` check too narrow (should include Fort/WP-only spaces)
+- **F14 March**: Missing 4 of 5 constraints/priorities (Lose no Rebel Control, include Continentals, march toward nearest British, fallback to shared space)
+- **F12 Skirmish**: Only checks for `REGULAR_BRI`, not other British pieces; no affected-space filter; no Fort-first priority (always uses option=2)
+- **F17 Naval Pressure**: Missing target city priority logic (Battle space first, then most Support)
+- **Event Instructions**: All French cards use `"force"` — missing conditional fallbacks for cards 52, 62, 70, 73, 83, 95
+
+#### Indian Bot (indians.py)
+- **I7 Gather**: Space selection entirely missing — all 4 priority bullets unimplemented
+- **I10 March**: Severely simplified — single move, missing priorities and constraints
+- **I12 Scout**: No piece count calculation, no Control preservation check; never triggers Skirmish
+- **I11 Trade**: Executes in up to 3 spaces; reference says Max 1
+
+### MEDIUM SEVERITY (documented, not fixed)
+
+#### British Bot
+- B1 Garrison precondition missing FNI level 3 check
+- B5 Garrison "leave 2 more Royalist" omits Forts from count
+- B6 Muster precondition consumes die roll on every call
+- B8 Tory placement skips Active Opposition and adjacency checks; only places 1 Tory per space
+- B12 Battle misses Fort-only spaces; force level ignores modifiers
+- B7 Naval Pressure missing Gage/Clinton leader check
+- B2 Event conditions overly broad text matching
+- B8 Fort target space not passed to muster.execute
+- B10 March always passes bring_escorts=False
+- B39 Gage leader capability (free RL) not implemented
+- OPS reference (Supply/Redeploy/Desertion priorities) not in bot
+
+#### Patriot Bot
+- P8 Partisans WP vs British priority flattened into sum
+- P2 Event conditions check shaded text only; text matching unreliable
+- Rally/Rabble mutual fallback — potential infinite loop masked by always-True return
+- Rally Persuasion interrupt happens after Rally, not during
+- March destination doesn't verify Rebel Control would actually be gained
+- March requires group size >= 3 (not in reference)
+- British Tory cap applied when defending (should be uncapped)
+- Rabble-Rousing arbitrarily capped at 4 spaces
+
+#### French Bot
+- F6 Hortalez "up to" 1D3 language (minor)
+- F13 "British pieces" missing Forts and Villages from count
+- F16 Battle doesn't enter F12 Skirmish loop afterward
+- F10 Muster not filtering by Colony/City type
+- Battle counts Underground Militia in force (should be Active only)
+- OPS summary items not implemented (Supply, Redeploy, Desertion, ToA trigger, BS trigger)
+
+#### Indian Bot
+- I6 checks Available village count instead of whether Gather would place 2+
+- I9 checks only Underground WP; reference says any WP
+- Missing mid-Raid Plunder/Trade interruption when resources hit 0
+- `_can_plunder` checks all map spaces, not just Raid spaces
+- Trade multi-space iteration (reference says Max 1)
+- Circular fallback between Gather and March — potential infinite loop
+- Raid movement doesn't check "WP don't exceed Rebels" condition
+- Defending in Battle activation rule not implemented
+- Supply, Patriot Desertion, Redeployment priorities not in bot
+- Brilliant Stroke trigger conditions not implemented
+- Uses `random.random()` instead of `state["rng"]` in multiple places
 ## Session 4: Full Card Handler Re-Audit
 
 ### Scope
