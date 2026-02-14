@@ -207,10 +207,9 @@ def evt_020_continental_marines(state, shaded=False):
 def evt_024_declaration(state, shaded=False):
     """Declaration of Independence."""
     if shaded:
+        # "Place up to three Militia anywhere, one Propaganda with each.
+        #  Place one Fort anywhere."
         targets = list(state["spaces"])[:3]
-        pool = state.setdefault("available", {})
-        pool[MILITIA_U] = max(pool.get(MILITIA_U, 0), 3)
-        pool[FORT_PAT] = max(pool.get(FORT_PAT, 0), 1)
         for sid in targets:
             place_piece(state, MILITIA_U, sid, 1)
             place_marker(state, PROPAGANDA, sid, 1)
