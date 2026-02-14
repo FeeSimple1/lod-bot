@@ -173,6 +173,18 @@ def test_card8_culpeper_unshaded_activates_militia():
     assert total_underground == 1
 
 
+def test_card8_culpeper_unshaded_multi_flip_per_space():
+    """Card 8 unshaded: Should flip multiple Militia in one space, not just 1."""
+    state = _base_state()
+    state["spaces"] = {
+        "Virginia": {MILITIA_U: 3},
+    }
+    middle_war.evt_008_culpeper_ring(state, shaded=False)
+    # All 3 should flip in Virginia (no need to look at other spaces)
+    assert state["spaces"]["Virginia"].get(MILITIA_A, 0) == 3
+    assert state["spaces"]["Virginia"].get(MILITIA_U, 0) == 0
+
+
 def test_card8_culpeper_shaded_removes_british():
     """Card 8 shaded: Remove three British cubes to Casualties."""
     state = _base_state()

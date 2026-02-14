@@ -17,6 +17,8 @@ from .shared import (
 def _remove_four_patriot_units(state):
     """Remove up to 4 Patriot Militia/Continentals from one Colony."""
     for name, sp in state["spaces"].items():
+        if not _is_colony_late(name):
+            continue
         pat_total = sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0)
         pat_total += sp.get(REGULAR_PAT, 0)
         if pat_total:
@@ -283,7 +285,7 @@ def evt_023_francis_marion(state, shaded=False):
             # Default: pick whichever has Patriot units (NC first)
             for cand in ("North_Carolina", "South_Carolina"):
                 sp = state["spaces"].get(cand, {})
-                if any(sp.get(t, 0) for t in (MILITIA_A, MILITIA_U, REGULAR_PAT, FORT_PAT)):
+                if any(sp.get(t, 0) for t in (MILITIA_A, MILITIA_U, REGULAR_PAT)):
                     src = cand
                     break
         if not src:
@@ -303,7 +305,8 @@ def evt_023_francis_marion(state, shaded=False):
             push_history(state, f"Card 23 unshaded: no adjacent space for {src}")
             return
 
-        for tag in (MILITIA_A, MILITIA_U, REGULAR_PAT, FORT_PAT):
+        # Move all Patriot *units* (cubes only, not Forts/bases)
+        for tag in (MILITIA_A, MILITIA_U, REGULAR_PAT):
             qty = state["spaces"].get(src, {}).get(tag, 0)
             if qty:
                 move_piece(state, tag, src, dst, qty)
@@ -760,7 +763,7 @@ def evt_079_tuscarora_oneida(state, shaded=False):
             remove_piece(state, WARPARTY_A, loc, 2 - removed, to="available")
         push_history(state, f"Card 79 shaded: removed Village + War Parties in {loc}")
     else:
-        place_piece(state, VILLAGE, loc, 1)
+        place_with_caps(state, VILLAGE, loc)
         place_piece(state, WARPARTY_U, loc, 2)
         push_history(state, f"Card 79 unshaded: placed Village + War Parties in {loc}")
 
@@ -790,7 +793,7 @@ def evt_081_creek_seminole(state, shaded=False):
             loc = "South_Carolina"
         place_piece(state, WARPARTY_U, loc, 2)
         place_marker(state, RAID, loc, 1)
-        place_piece(state, VILLAGE, loc, 1)
+        place_with_caps(state, VILLAGE, loc)
         push_history(state, f"Card 81 unshaded: War Parties + Raid + Village in {loc}")
 
 

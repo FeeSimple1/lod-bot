@@ -175,3 +175,39 @@ def test_card67_shaded_patriots_if_no_toa():
     late_war.evt_067_de_grasse(state, shaded=True)
 
     assert PATRIOTS in state["remain_eligible"]
+
+
+# ---- Card 22: Newburgh Conspiracy ----
+
+def test_card22_unshaded_removes_from_colony_only():
+    """Card 22 unshaded: Must remove Patriot units from a Colony, not a City."""
+    state = _base_state()
+    state["spaces"] = {
+        "Boston": {MILITIA_U: 5},      # City — should be skipped
+        "Virginia": {MILITIA_A: 3},    # Colony — should be selected
+    }
+
+    late_war.evt_022_newburgh_conspiracy(state, shaded=False)
+
+    # Boston (City) should be untouched; Virginia (Colony) should lose units
+    assert state["spaces"]["Boston"].get(MILITIA_U, 0) == 5
+    removed = 3 - state["spaces"]["Virginia"].get(MILITIA_A, 0)
+    assert removed == 3  # only 3 available, not 4
+
+
+def test_card23_unshaded_does_not_move_forts():
+    """Card 23 unshaded: Moves Patriot *units* (cubes) only, not Forts (bases)."""
+    state = _base_state()
+    state["spaces"] = {
+        "South_Carolina": {MILITIA_U: 1, FORT_PAT: 1},
+        "Georgia": {},
+    }
+    state["card23_src"] = "South_Carolina"
+    state["card23_dst"] = "Georgia"
+
+    late_war.evt_023_francis_marion(state, shaded=False)
+
+    # Fort should stay in SC; only Militia moves to GA
+    assert state["spaces"]["South_Carolina"].get(FORT_PAT, 0) == 1
+    assert state["spaces"]["Georgia"].get(MILITIA_U, 0) == 1
+    assert state["spaces"]["Georgia"].get(FORT_PAT, 0) == 0

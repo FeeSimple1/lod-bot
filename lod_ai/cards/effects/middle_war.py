@@ -227,8 +227,10 @@ def evt_008_culpeper_ring(state, shaded=False):
         for name in list(state.get("spaces", {})):
             if flipped >= 3:
                 break
-            count = flip_pieces(state, MILITIA_U, MILITIA_A, name, 1)
-            flipped += count
+            avail = state.get("spaces", {}).get(name, {}).get(MILITIA_U, 0)
+            to_flip = min(avail, 3 - flipped)
+            if to_flip:
+                flipped += flip_pieces(state, MILITIA_U, MILITIA_A, name, to_flip)
 
 
 # 9  FRIEDRICH WILHELM VON STEUBEN
