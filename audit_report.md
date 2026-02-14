@@ -187,3 +187,59 @@ Cards 2, 6, 24, 28, 80 use hardcoded/alphabetical defaults for player/bot select
 
 ### Pre-existing Issues Documented
 - **Q7** (QUESTIONS.md): _execute_bot_brilliant_stroke() hardcodes command priorities instead of consulting faction flowcharts per §8.3.7.
+
+---
+
+## Session 3: Line-by-Line Card Handler Audit
+
+### Infrastructure
+
+- **New helper: `flip_pieces()`** in `board/pieces.py` — In-place variant flip (e.g., Militia_U → Militia_A) without routing through the Available pool. Prevents pool corruption that occurred when remove_piece + place_piece was used for activation/deactivation.
+- **Re-exported via `shared.py`** for use by all card effect modules.
+
+### FIXED cards (13 cards across 3 files)
+
+#### Direct dict manipulation → flip_pieces (6 cards)
+
+These cards manipulated `sp[tag]` directly instead of using board/pieces helpers:
+
+- **Card 8 (Culpeper Spy Ring) unshaded**: `sp[MILITIA_U] -= 1; sp[MILITIA_A] += 1` → `flip_pieces()`. Also fixed: was only flipping 1 Militia per space; now flips `min(available, 3 - flipped)` per space.
+- **Card 29 (Edward Bancroft) unshaded**: `sp[hidden_tag] -= take; sp[active_tag] += take` → `flip_pieces()`.
+- **Card 35 (Tryon Plot) unshaded**: `sp[MILITIA_U] = 0; sp[MILITIA_A] += mu` → `flip_pieces()`.
+- **Card 77 (Gen. Burgoyne) unshaded**: Used `remove_piece(WARPARTY_A, ..., to="available")` + `place_piece(WARPARTY_U, ...)` for Underground flip. This corrupted the Available pool: WARPARTY_A pieces in Available couldn't be found as WARPARTY_U by `place_piece`, causing `_ensure_available` to reclaim War Parties from OTHER map spaces. → `flip_pieces()`.
+- **Card 86 (Stockbridge Indians) unshaded**: `sp.pop(MILITIA_U, 0); sp[MILITIA_A] += flip` → `flip_pieces()`.
+- **Card 28 (Moore's Creek Bridge)**: Removed illegal pool inflation hack `pool[TORY] = max(pool.get(TORY, 0), 2 * total)` that created pieces from nothing. Replacement now properly draws from Available via `remove_piece` + `place_piece`.
+
+#### Reference mismatches (7 cards)
+
+- **Card 23 (Francis Marion) unshaded**: Hardcoded South_Carolina → Georgia. Reference: "move all Patriot units in **North Carolina or South Carolina** into an adjacent Province." Fixed to support both colonies, with `card23_src` / `card23_dst` overrides. Also: was moving FORT_PAT (a base); reference says "units" (cubes only). Removed FORT_PAT from move list.
+- **Card 23 (Francis Marion) shaded**: Only checked South_Carolina. Reference: "If Militia occupy **North Carolina or South Carolina**, remove four British units." Fixed to check both colonies.
+- **Card 67 (De Grasse) shaded**: Only queued "rally." Reference: "free **Rally or Muster** in one space." Added `card67_op` override for muster. Also fixed eligibility key from `eligible_next` → `remain_eligible` (reference: "remain or become Eligible").
+- **Card 22 (Newburgh Conspiracy) unshaded**: `_remove_four_patriot_units()` did not verify target was a Colony. Reference: "in any one **Colony**." Added `_is_colony_late()` check.
+- **Card 79 (Tuscarora) unshaded**: Village placed via `place_piece` (no cap check). Changed to `place_with_caps` to enforce MAX_VILLAGE=12.
+- **Card 81 (Creek & Seminole) unshaded**: Same Village cap issue. Changed to `place_with_caps`.
+
+### Tests added (18 new)
+
+- `test_late_war_cards.py` (new file, 10 tests): Card 23 (4 tests), Card 67 (4 tests), Card 22 (1 test), Card 23 Fort exclusion (1 test)
+- `test_middle_war_cards.py` (+5 tests): Card 8 (3 tests including multi-flip), Card 77 (1 test verifying no pool corruption)
+- `test_early_war_cards.py` (+3 tests): Card 35, Card 86 (2 tests)
+- Test for Card 28 updated to provide Available pool (no more pool inflation hack)
+
+### REMAINING issues (documented, not fixed)
+
+#### Queued vs. immediate execution
+- **Cards 12, 13**: Set `winter_flag` for Patriot/Tory Desertion instead of executing immediately. The reference says "Execute...as per Winter Quarters Round." Interpretation: the "as per" phrasing may mean "following the same procedure" while deferring to actual WQ timing. Not changed pending clarification.
+- **Card 15 (Morgan's Rifles) shaded**: Uses `queue_free_op` for March/Battle/Partisans. Q3 resolution says engine drains free ops immediately after handler, so this is effectively immediate.
+- **Card 94 (Herkimer) unshaded**: Militia removal executes before queued Gather/Muster. Reference order suggests Gather+Muster first, then Militia removal. Since engine drains free ops after handler, the Militia removal in the handler runs before the queued ops. Requires reordering to match reference.
+
+#### Faction choice vs. hardcoded selection
+- **Cards 66, 67**: Use `FRENCH if toa_played else PATRIOTS` for faction selection. Reference says "French or Patriots" (player choice). The TOA-gating may be intentional game design (French can only act after ToA) but restricts player choice.
+- **Card 29 (Bancroft)**: Activates BOTH Patriots and Indians. Reference: "Patriots **or** Indians must Activate..." — may be a choice of one faction, or may mean both (ambiguous "or" in COIN phrasing). Left as-is pending clarification.
+- **Card 48 (God Save the King) shaded**: Moves ALL non-British factions' units. Reference: "A non-British **Faction**" (singular) should move only one faction's units.
+
+#### Minor issues
+- **Card 4 (Penobscot) shaded**: Faction-dependent piece choice (Fort vs Village, Militia vs WP) not in reference text — executing player should choose freely.
+- **Card 11 (Kosciuszko) shaded**: Uses `"REBELLION"` control check. "Patriot Controlled" might differ from "Rebellion Control" in edge cases involving French pieces.
+- **Card 84 (Merciless Indian Savages) unshaded**: `queue_free_op` for Gather has no Colony restriction. Reference says "in two Colonies."
+- **Card 87 (Lenape) unshaded**: Fixed removal priority may not match player/bot intent — reference just says "Remove one piece."
