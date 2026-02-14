@@ -183,9 +183,12 @@ def execute(
             raise ValueError("Limited Gather: all moves must end in the single Province.")
         if not is_adjacent(src, dst):
             raise ValueError(f"{src} is not adjacent to {dst}.")
+        # §3.4.1: Move-and-flip is only available "If the Province already
+        # has at least one Village."
+        if state["spaces"][dst].get(VILLAGE, 0) == 0:
+            raise ValueError(f"{dst} has no Village; move action requires one.")
         dst_to_moves.setdefault(dst, []).append((src, n))
 
-    # Perform movements
     # Perform movements
     for dst, moves in dst_to_moves.items():
         sp_dst = state["spaces"][dst]

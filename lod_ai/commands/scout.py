@@ -128,17 +128,15 @@ def execute(
     # -------- Execute move ---------------------------------------------------
     push_history(state, f"INDIANS SCOUT {src} → {dst}")
 
-    # War Parties: prefer Underground first, all arrive Active
-    wp_to_move = n_warparties
-    take_u = min(wp_to_move, sp_src.get(WARPARTY_U, 0))
-    if take_u:
-        _move(state, WARPARTY_U, take_u, src, dst)    # still Underground for a moment
-        wp_to_move -= take_u
-    if wp_to_move:
-        _move(state, WARPARTY_A, wp_to_move, src, dst)  # already Active
-    # Now flip ALL moved WP Active
+    # §3.4.3: War Parties all arrive Active.  Use direct dict manipulation
+    # because the pool system conflates WARPARTY_U/A and causes reclaim
+    # issues during multi-step moves.
+    take_u = min(n_warparties, sp_src.get(WARPARTY_U, 0))
+    take_a = n_warparties - take_u
+    sp_src[WARPARTY_U] = sp_src.get(WARPARTY_U, 0) - take_u
+    sp_src[WARPARTY_A] = sp_src.get(WARPARTY_A, 0) - take_a
+    # All arrive Active in destination
     sp_dst[WARPARTY_A] = sp_dst.get(WARPARTY_A, 0) + n_warparties
-    sp_dst[WARPARTY_U] = sp_dst.get(WARPARTY_U, 0) - take_u  # remove leftovers Underground
 
     # British pieces
     _move(state, REGULAR_BRI, n_regulars, src, dst)
