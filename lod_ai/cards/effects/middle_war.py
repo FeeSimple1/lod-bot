@@ -16,6 +16,7 @@ from .shared import (
     place_with_caps,
     place_marker,
     adjust_fni,
+    flip_pieces,
 )
 from lod_ai.rules_consts import (
     WEST_INDIES_ID,
@@ -223,14 +224,13 @@ def evt_008_culpeper_ring(state, shaded=False):
         push_history(state, "Card 8 shaded: removed British cubes")
     else:
         flipped = 0
-        for name, sp in state.get("spaces", {}).items():
-            if flipped == 3:
+        for name in list(state.get("spaces", {})):
+            if flipped >= 3:
                 break
-            if sp.get(MILITIA_U, 0):
-                sp[MILITIA_U] -= 1
-                sp[MILITIA_A] = sp.get(MILITIA_A, 0) + 1
-                push_history(state, f"Card 8 unshaded: activated Militia in {name}")
-                flipped += 1
+            avail = state.get("spaces", {}).get(name, {}).get(MILITIA_U, 0)
+            to_flip = min(avail, 3 - flipped)
+            if to_flip:
+                flipped += flip_pieces(state, MILITIA_U, MILITIA_A, name, to_flip)
 
 
 # 9  FRIEDRICH WILHELM VON STEUBEN
@@ -1030,11 +1030,11 @@ def evt_077_burgoyne(state, shaded=False):
                     break
         if target:
             place_with_caps(state, VILLAGE, target)
-        for name, sp in state.get("spaces", {}).items():
+        for name in list(state.get("spaces", {})):
+            sp = _safe_get_space(state, name)
             count = sp.get(WARPARTY_A, 0)
             if count:
-                remove_piece(state, WARPARTY_A, name, count, to="available")
-                place_piece(state, WARPARTY_U, name, count)
+                flip_pieces(state, WARPARTY_A, WARPARTY_U, name, count)
         push_history(state, "Card 77 unshaded: Village placed, War Parties underground")
 
 

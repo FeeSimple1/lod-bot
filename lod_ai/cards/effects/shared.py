@@ -13,7 +13,8 @@ Feel free to extend this file whenever another one-liner proves handy.
 
 from lod_ai.util.history import push_history  # adjust if your path differs
 from lod_ai.board.pieces import (
-    move_piece, place_piece, remove_piece, place_with_caps, place_marker
+    move_piece, place_piece, remove_piece, place_with_caps, place_marker,
+    flip_pieces,
 )
 from lod_ai.rules_consts import MAX_FNI, MIN_RESOURCES, MAX_RESOURCES, BRITISH, PATRIOTS, FRENCH, INDIANS
 from lod_ai.util.loss_mod import queue_loss_mod

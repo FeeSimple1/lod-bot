@@ -178,6 +178,8 @@ def test_card28_moores_creek_any_space():
         "South_Carolina": {MILITIA_U: 1, MILITIA_A: 1},
         "North_Carolina": {TORY: 1},
     }
+    # Replacement draws from Available; provide enough pieces
+    state["available"] = {TORY: 10, MILITIA_U: 10}
 
     early_war.evt_028_moores_creek(state, shaded=False)
 
@@ -416,3 +418,42 @@ def test_card29_bancroft_activates_both_factions():
     # 4 total WP → target 2 Active
     assert state["spaces"]["A"].get(WARPARTY_A, 0) == 2
     assert state["spaces"]["A"].get(WARPARTY_U, 0) == 2
+
+
+def test_card35_tryon_activates_militia_via_flip():
+    """Card 35 unshaded: Remove 2 Patriot pieces in NY, then activate all
+    remaining Militia in that space. Verify flip_pieces is used."""
+    state = _base_state()
+    state["spaces"] = {
+        "New_York": {REGULAR_PAT: 2, MILITIA_U: 3},
+    }
+    state["card35_target"] = "New_York"
+    early_war.evt_035_tryon_plot(state, shaded=False)
+    # 2 Continentals removed, then all Underground Militia activated
+    assert state["spaces"]["New_York"].get(REGULAR_PAT, 0) == 0
+    assert state["spaces"]["New_York"].get(MILITIA_A, 0) == 3
+    assert state["spaces"]["New_York"].get(MILITIA_U, 0) == 0
+
+
+def test_card86_stockbridge_unshaded_activates_militia():
+    """Card 86 unshaded: Activate all Militia in Massachusetts.
+    Must use flip_pieces, not direct dict manipulation."""
+    state = _base_state()
+    state["spaces"] = {
+        "Massachusetts": {MILITIA_U: 4, MILITIA_A: 1},
+    }
+    early_war.evt_086_stockbridge(state, shaded=False)
+    # All Underground Militia should flip to Active
+    assert state["spaces"]["Massachusetts"].get(MILITIA_A, 0) == 5
+    assert state["spaces"]["Massachusetts"].get(MILITIA_U, 0) == 0
+
+
+def test_card86_stockbridge_shaded_places_militia():
+    """Card 86 shaded: Place 3 Militia in Massachusetts."""
+    state = _base_state()
+    state["spaces"] = {
+        "Massachusetts": {},
+    }
+    state["available"] = {MILITIA_U: 5}
+    early_war.evt_086_stockbridge(state, shaded=True)
+    assert state["spaces"]["Massachusetts"].get(MILITIA_U, 0) == 3

@@ -120,6 +120,29 @@ def _available_base_slots(state: Dict[str, Any], loc: str) -> int:
 # --------------------------------------------------------------------------- #
 # public primitive movers
 # --------------------------------------------------------------------------- #
+def flip_pieces(state: Dict[str, Any], from_tag: str, to_tag: str,
+                loc: str, qty: int = 1) -> int:
+    """Flip pieces in-place from *from_tag* to *to_tag* at *loc*.
+
+    Used for activation/deactivation (e.g., Militia_U → Militia_A) where
+    pieces stay in the same space but change variant.  Does **not** route
+    through the Available pool, so it cannot corrupt pool state.
+
+    Returns the number of pieces actually flipped.
+    """
+    if qty <= 0 or from_tag == to_tag:
+        return 0
+    sp = _space_dict(state, loc)
+    actual = min(qty, sp.get(from_tag, 0))
+    if actual:
+        sp[from_tag] -= actual
+        if sp[from_tag] == 0:
+            del sp[from_tag]
+        sp[to_tag] = sp.get(to_tag, 0) + actual
+        push_history(state, f"Flipped {actual}×{from_tag}→{to_tag} in {loc}")
+    return actual
+
+
 def move_piece(state: Dict[str, Any], tag: str, src: str, dst: str, qty: int = 1) -> int:
     if qty <= 0:
         return 0
