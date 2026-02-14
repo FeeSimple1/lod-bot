@@ -83,3 +83,23 @@ Implemented:
 **Decision:** Implement both the free Rally and Blockade move per §3.6.8. The free Rally executes immediately as a full Rally command. For bot Patriots, select the Rally space using the Rally priorities from the Patriot bot flowchart node P7. For bot French, move the Blockade to the City with most Support per the Patriot bot flowchart P4. For human players, prompt for space selection. These execute during Battle resolution, not deferred.
 
 **Status:** Implemented in `battle.py` — caller provides `win_rally_space`/`win_rally_kwargs` for free Rally and `win_blockade_dest` for Blockade move as parameters to `execute()`.
+
+---
+
+## Q10: French Naval Pressure (§4.5.3) — FNI cap interpretation — OPEN
+
+**Context:** §4.5.3 says "FNI may not be higher than the number of Squadron/Blockade available to place on Cities."
+
+**What the reference says:** The phrase "available to place on Cities" could mean:
+1. Only markers in the West Indies pool (since those are literally "available to place")
+2. All markers in play (pool + on-map), since markers on cities could be rearranged
+3. Total physical markers in the game (3), making this just a restatement of MAX_FNI
+
+**What's ambiguous:** Interpretation (1) makes Option B (rearrange when no markers in WI) impossible — you'd need pool > 0 to satisfy the FNI cap, but Option B triggers only when pool = 0. This seems clearly wrong since Option B exists in the rules.
+
+**Current implementation:** Uses interpretation (2): `max_fni = pool + len(on_map)`. This allows Option B to work and seems the most consistent reading.
+
+**Options:**
+1. Keep interpretation (2): pool + on_map (current)
+2. Use interpretation (3): just cap at MAX_FNI (simplest, already enforced by adjust_fni)
+3. Use interpretation (1): pool only (breaks Option B — seems wrong)
