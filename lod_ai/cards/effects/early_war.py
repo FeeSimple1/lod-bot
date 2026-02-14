@@ -266,35 +266,48 @@ def evt_028_moores_creek(state, shaded=False):
 @register(29)
 def evt_029_bancroft(state, shaded=False):
     """
-    Unshaded – Patriots AND Indians must Activate their Militia or
+    Unshaded – Patriots OR Indians must Activate their Militia or
     War Parties until 1/2 of them are Active (rounded down).
+    Card says "or" — choose ONE faction (not both).
+    Bot: British/Indian bot targets Patriots; Patriot/French bot targets Indians.
     """
     if shaded:
         return
 
-    def _activate_faction(hidden_tag, active_tag, faction_name):
-        total = sum(sp.get(hidden_tag, 0) + sp.get(active_tag, 0)
-                    for sp in state["spaces"].values())
-        if total == 0:
-            return
-        target_active = total // 2
-        cur_active = sum(sp.get(active_tag, 0) for sp in state["spaces"].values())
-        need = max(0, target_active - cur_active)
-        if need == 0:
-            return
-        flipped = 0
-        for name in list(state["spaces"]):
-            if flipped >= need:
-                break
-            here = state["spaces"][name].get(hidden_tag, 0)
-            if here:
-                take = min(here, need - flipped)
-                flipped += flip_pieces(state, hidden_tag, active_tag, name, take)
-        push_history(state, f"Bancroft activates {flipped} {faction_name} (to {target_active} Active)")
+    # "Patriots or Indians" — choose ONE faction
+    target_fac = state.get("card29_target", "").upper()
+    if target_fac not in (PATRIOTS, INDIANS):
+        # Bot default per ruling: British/Indian bot targets Patriots,
+        # Patriot/French bot targets Indians.
+        active = str(state.get("active", "")).upper()
+        if active in (BRITISH, INDIANS):
+            target_fac = PATRIOTS
+        else:
+            target_fac = INDIANS
 
-    # Both factions activate their respective pieces
-    _activate_faction(MILITIA_U, MILITIA_A, "Militia")
-    _activate_faction(WARPARTY_U, WARPARTY_A, "War Parties")
+    if target_fac == PATRIOTS:
+        hidden_tag, active_tag, label = MILITIA_U, MILITIA_A, "Militia"
+    else:
+        hidden_tag, active_tag, label = WARPARTY_U, WARPARTY_A, "War Parties"
+
+    total = sum(sp.get(hidden_tag, 0) + sp.get(active_tag, 0)
+                for sp in state["spaces"].values())
+    if total == 0:
+        return
+    target_active = total // 2
+    cur_active = sum(sp.get(active_tag, 0) for sp in state["spaces"].values())
+    need = max(0, target_active - cur_active)
+    if need == 0:
+        return
+    flipped = 0
+    for name in list(state["spaces"]):
+        if flipped >= need:
+            break
+        here = state["spaces"][name].get(hidden_tag, 0)
+        if here:
+            take = min(here, need - flipped)
+            flipped += flip_pieces(state, hidden_tag, active_tag, name, take)
+    push_history(state, f"Bancroft activates {flipped} {label} (to {target_active} Active)")
 
 # 30  HESSIANS
 @register(30)
