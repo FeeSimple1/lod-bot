@@ -121,6 +121,13 @@ class BaseBot:
                 if self._condition_satisfied(directive, state, card):
                     return False
                 # otherwise fall through to normal test
+            if directive.startswith("force_if_"):
+                # Conditional force: play event if condition is satisfied, else
+                # fall through to flowchart (Command & SA).
+                if self._force_condition_met(directive, state, card):
+                    self._execute_event(card, state)
+                    return True
+                return False  # condition not met → Command & SA
 
         # 3. Ineffective-event test (Rule 8.3.3)
         if self._is_ineffective_event(card, state):
@@ -147,6 +154,10 @@ class BaseBot:
             to_flip = hidden // 2
             return to_flip < threshold
         return False
+
+    def _force_condition_met(self, directive: str, state: Dict, card: Dict) -> bool:
+        """Evaluate force_if_X directives. Subclass should override."""
+        return True           # default: always force
 
     def _faction_event_conditions(self, state: Dict, card: Dict) -> bool:
         return False          # subclass will override

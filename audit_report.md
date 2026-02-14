@@ -289,13 +289,14 @@ Full node-by-node comparison of all four bot implementations against their respe
 - **P12 Skirmish**: Always uses option=1, never removes Forts (option=3)
 - **Event Instructions**: Cards 71, 90 say "use unshaded" but bot plays shaded; Cards 18, 44, 51 ignore conditional fallbacks
 
-#### French Bot (french.py)
-- **F13 Battle**: Only checks Washington, not all Rebel leaders (Rochambeau, Lauzun)
-- **F16 Battle**: Force level missing modifiers; `crown_cubes > 0` check too narrow (should include Fort/WP-only spaces)
-- **F14 March**: Missing 4 of 5 constraints/priorities (Lose no Rebel Control, include Continentals, march toward nearest British, fallback to shared space)
-- **F12 Skirmish**: Only checks for `REGULAR_BRI`, not other British pieces; no affected-space filter; no Fort-first priority (always uses option=2)
-- **F17 Naval Pressure**: Missing target city priority logic (Battle space first, then most Support)
-- **Event Instructions**: All French cards use `"force"` — missing conditional fallbacks for cards 52, 62, 70, 73, 83, 95
+#### French Bot (french.py) — PARTIALLY FIXED (Session 5)
+- **~~F13 Battle~~**: ~~Only checks Washington~~ → FIXED: checks all Rebel leaders (Washington, Rochambeau, Lauzun); excludes War Parties from British count; includes British Forts
+- **~~F16 Battle~~**: ~~Force level missing modifiers; `crown_cubes > 0` too narrow~~ → FIXED: Active Militia only (not Underground); includes Forts in British pieces filter; tracks affected spaces
+- **F14 March**: Missing 4 of 5 constraints/priorities (Lose no Rebel Control, include Continentals, march toward nearest British, fallback to shared space). RNG determinism FIXED.
+- **~~F12 Skirmish~~**: ~~Only checks REGULAR_BRI; no affected-space filter; no Fort-first~~ → FIXED: checks all British pieces (Regs+Tories+Forts); excludes affected spaces; Fort-first priority (option=3 when applicable)
+- **~~F17 Naval Pressure~~**: ~~Missing target city priority~~ → FIXED: Battle space first, then most Support; full fallback chain F17→F12→F15
+- **~~Event Instructions~~**: ~~All French cards use "force"~~ → FIXED: cards 52, 62, 70, 73, 83, 95 now use conditional force_if_X directives with game-state checks
+- **~~F10 Muster~~**: ~~random.choice; no Colony/City filter~~ → FIXED: uses state["rng"]; filters first priority by Colony/City type
 
 #### Indian Bot (indians.py)
 - **I7 Gather**: Space selection entirely missing — all 4 priority bullets unimplemented
@@ -328,12 +329,12 @@ Full node-by-node comparison of all four bot implementations against their respe
 - British Tory cap applied when defending (should be uncapped)
 - Rabble-Rousing arbitrarily capped at 4 spaces
 
-#### French Bot
+#### French Bot — PARTIALLY FIXED (Session 5)
 - F6 Hortalez "up to" 1D3 language (minor)
-- F13 "British pieces" missing Forts and Villages from count
-- F16 Battle doesn't enter F12 Skirmish loop afterward
-- F10 Muster not filtering by Colony/City type
-- Battle counts Underground Militia in force (should be Active only)
+- ~~F13 "British pieces" missing Forts~~ → FIXED: includes Forts, excludes WP
+- ~~F16 Battle doesn't enter F12 Skirmish loop afterward~~ → FIXED: full SA chain
+- ~~F10 Muster not filtering by Colony/City type~~ → FIXED
+- ~~Battle counts Underground Militia in force~~ → FIXED: Active only
 - OPS summary items not implemented (Supply, Redeploy, Desertion, ToA trigger, BS trigger)
 
 #### Indian Bot
@@ -399,3 +400,89 @@ All 9 previously documented remaining issues are confirmed still present and acc
 ### Tests
 
 281 tests passing. No new tests needed since no code changes were made.
+
+---
+
+## Session 5: French Bot Flowchart Compliance (Node-by-Node Verification)
+
+Full node-by-node verification of `lod_ai/bots/french.py` against `Reference Documents/french bot flowchart and reference.txt`.
+
+### FIXED issues (this session)
+
+#### F13 `_can_battle` — 3 bugs fixed
+- **Missing Rebel leaders**: Only checked Washington. Now checks all three Rebel leaders (Washington, Rochambeau, Lauzun) via `leader_location()`.
+- **War Parties in British count**: Included `WARPARTY_A` in British pieces count. War Parties are Indian pieces, not British. Removed.
+- **Missing British Forts**: Didn't include `FORT_BRI` in British pieces count. Added.
+
+#### F12 `_try_skirmish` — 3 bugs fixed
+- **Only checked REGULAR_BRI**: Only detected spaces with British Regulars. Now checks all British pieces (Regulars + Tories + Forts).
+- **No Fort-first priority**: Always used option=2 (remove 2 cubes). Now uses option=3 (remove Fort) when no enemy cubes present and Fort exists; option=2 when 2+ cubes; option=1 when 1 cube.
+- **No affected-space filter**: Didn't exclude spaces already selected for Battle or Muster. Now checks `_turn_affected_spaces`.
+
+#### F16 `_battle` — 3 bugs fixed
+- **Underground Militia counted**: Used `MILITIA_A + MILITIA_U` for rebel force. Underground Militia shouldn't count toward force level. Now uses Active Militia only.
+- **`crown_cubes > 0` too narrow**: Only selected spaces with British cubes, missing Fort-only spaces. Changed to check all British pieces (`british_pieces > 0`).
+- **Missing leader modifiers**: Didn't include Rebel leader bonuses in force calculation. Now includes Washington, Rochambeau, Lauzun.
+- **Battle targets tracked**: Now records battle target spaces in `_turn_affected_spaces` so Skirmish can exclude them.
+
+#### F10 `_muster` — 2 bugs fixed
+- **`random.choice` instead of `state["rng"]`**: Broke deterministic reproducibility. Fixed to use `state["rng"].choice()`.
+- **No Colony/City type filter**: First priority "Colony or City with Continentals" wasn't filtering by space type. Province spaces could match. Now filters by `type in ("Colony", "City")`.
+- **Muster target tracked**: Now records muster space in `_turn_affected_spaces`.
+
+#### F14 `_march` — 1 bug fixed
+- **`random.random()` instead of `state["rng"]`**: Broke deterministic reproducibility. Fixed to use `state["rng"].random()`.
+
+#### F17 `_try_naval_pressure` — 2 bugs fixed
+- **No target priority**: Didn't prioritize Battle space first or most Support. Now selects city for Blockade: first a city selected for Battle, then highest Support.
+- **Incomplete SA fallback chain**: Battle path only had F17→F12 fallback. Per flowchart F17→F12→F15. Added Préparer la Guerre (F15) as final fallback.
+
+#### Event Instructions — 6 cards fixed
+- **Cards 52, 62, 70, 73, 83, 95**: All used `"force"` (always play event). Per the French bot special instructions, each has a conditional: play event only if specific game-state condition is met, otherwise fall through to Command & SA.
+- Added `force_if_X` directive pattern to `base_bot._choose_event_vs_flowchart()`.
+- Added `_force_condition_met()` override in FrenchBot with card-specific checks.
+- Removed unused `import random` from french.py.
+
+### Verified nodes (PASS — correct as-is)
+
+| Node | Description | Status |
+|------|-------------|--------|
+| F1 | Sword/SoP check | ✓ Handled by `base_bot._choose_event_vs_flowchart()` |
+| F2 | Event conditions (6 bullets) | ✓ `_faction_event_conditions()` checks all 6 conditions. Text-matching is fragile but functional. |
+| F3 | French Resources > 0 | ✓ `_follow_flowchart()` checks correctly, routes to PASS |
+| F4 | Treaty of Alliance played? | ✓ Branches to `_before_treaty` / `_after_treaty` |
+| F5 | Patriot Resources < 1D3 | ✓ Uses `state["rng"].randint(1,3)` |
+| F6 | Hortalez before Treaty | ✓ Spends min(resources, roll), routes to F8 |
+| F7 | Agent Mobilization | ✓ Correct provinces, correct placement priority, fallback to F6 |
+| F8 | Préparer pre-Treaty | ✓ Blockade then Regulars then nothing |
+| F9 | 1D6 < Available Regulars | ✓ Strict less-than with `state["rng"]` |
+| F11 | Hortalez after Treaty | ✓ "up to" 1D3, routes to F12 |
+| F15 | Préparer post-Treaty | ✓ D6 gate, +2 Resources fallback, correct structure |
+
+### REMAINING issues (not fixed this session)
+
+#### French Bot
+- **F14 March**: Still missing "Lose no Rebel Control" constraint, Continentals in march group, march-toward-nearest-British logic, and March 1 French Regular to shared space fallback.
+- **F2 Event conditions**: Text-matching approach is fragile (matches keywords in card text). A simulation-based approach would be more reliable but complex to implement.
+- **F6 Hortalez**: "Spend 1D3" (before Treaty) vs "Spend up to 1D3" (after Treaty) — code uses `min(resources, roll)` for both. Minor.
+- **OPS summary items**: French Supply/WI priorities, Redeploy leader logic, Loyalist Desertion priority, Treaty of Alliance trigger formula, Brilliant Stroke trigger conditions, Leader Movement during Campaigns — none implemented in the bot.
+
+### Tests added (15 new)
+
+- `test_f13_can_battle_includes_rochambeau` — Verifies Rochambeau + Lauzun leader bonuses
+- `test_f13_can_battle_excludes_war_parties` — Verifies War Parties excluded from British count
+- `test_f13_can_battle_includes_british_forts` — Verifies Forts counted in British pieces
+- `test_f16_battle_active_militia_only` — Verifies Underground Militia excluded from force
+- `test_f12_skirmish_detects_tory_only_space` — Verifies Tory-only spaces detected
+- `test_f12_skirmish_excludes_affected_spaces` — Verifies Battle/Muster spaces excluded
+- `test_f12_skirmish_fort_first_priority` — Verifies Fort removal before cubes
+- `test_f10_muster_deterministic` — Verifies state["rng"] used
+- `test_f10_muster_colony_city_filter` — Verifies Colony/City type filter
+- `test_f14_march_deterministic` — Verifies state["rng"] used
+- `test_event_force_if_73_british_fort_check` — Card 73 conditional
+- `test_event_force_if_62_militia_only` — Card 62 conditional
+- `test_event_force_if_70_british_in_rebel_spaces` — Card 70 conditional
+- `test_event_force_if_83_quebec_city_rebellion` — Card 83 conditional
+- `test_event_force_if_52_battle_target` — Card 52 conditional
+
+303 tests passing total.
