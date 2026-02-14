@@ -52,6 +52,44 @@ class BritishBot(BaseBot):
         return state.get("control", {}).get(sid)
 
     # =======================================================================
+    #  EVENT‑VS‑COMMAND BULLETS (B2)
+    # =======================================================================
+    def _faction_event_conditions(self, state: Dict, card: Dict) -> bool:
+        """B2: Check unshaded Event conditions for British bot."""
+        text = card.get("unshaded_event", "") or ""
+        support_map = state.get("support", {})
+        sup = sum(max(0, lvl) for lvl in support_map.values())
+        opp = sum(max(0, -lvl) for lvl in support_map.values())
+
+        # • Opposition > Support, and Event shifts Support/Opposition in
+        #   Royalist favor (including by removing a Blockade)?
+        if opp > sup and any(k in text for k in ("Support", "Opposition", "Blockade")):
+            return True
+        # • Event places British pieces from Unavailable?
+        if any(k in text for k in ("Unavailable",)):
+            if any(k in text for k in ("Regular", "Tory", "British")):
+                return True
+        # • Event places Tories in Active Opposition with none, a British Fort
+        #   in a Colony with none, or British Regulars in a City or Colony?
+        if "Tory" in text or "Tories" in text or "Fort" in text or "Regular" in text:
+            return True
+        # • Event inflicts Rebel Casualties (including free Skirmish or Battle)?
+        if any(k in text.lower() for k in ("casualt", "skirmish", "battle")):
+            if any(k in text for k in ("Rebel", "Patriot", "French", "Indian", "Militia", "Continental")):
+                return True
+        # • British Control 5+ Cities, the Event is effective, and a D6 rolls 5+?
+        controlled_cities = sum(
+            1 for name in CITIES
+            if self._control(state, name) == C.BRITISH
+        )
+        if controlled_cities >= 5:
+            roll = state["rng"].randint(1, 6)
+            state.setdefault("rng_log", []).append(("Event D6", roll))
+            if roll >= 5:
+                return True
+        return False
+
+    # =======================================================================
     #  MAIN FLOW‑CHART DRIVER  (§8.4 nodes B4 → B13)
     # =======================================================================
     def _follow_flowchart(self, state: Dict) -> None:
@@ -60,21 +98,39 @@ class BritishBot(BaseBot):
             push_history(state, "BRITISH PASS (no Resources)")
             return
 
+        # Track which commands have been tried to implement mutual fallbacks
+        tried_muster = False
+        tried_march = False
+
         # --- B4  : GARRISON decision --------------------------------------
         if self._can_garrison(state) and self._garrison(state):
             return
 
         # --- B6–B8 : MUSTER decision --------------------------------------
-        if self._can_muster(state) and self._muster(state):
-            return
+        if self._can_muster(state):
+            tried_muster = True
+            if self._muster(state, tried_march=tried_march):
+                return
+            # B8 "If none" → B10 (March)
+            tried_march = True
+            if self._march(state, tried_muster=tried_muster):
+                return
 
         # --- B9 / B12 : BATTLE decision -----------------------------------
-        if self._can_battle(state) and self._battle(state):
-            return
+        if self._can_battle(state):
+            if self._battle(state):
+                return
+            # B12 "If none" → B10 (March)
+            if not tried_march:
+                tried_march = True
+                if self._march(state, tried_muster=tried_muster):
+                    return
 
         # --- B10 : MARCH decision -----------------------------------------
-        if self._can_march(state) and self._march(state):
-            return
+        if not tried_march:
+            tried_march = True
+            if self._march(state, tried_muster=tried_muster):
+                return
 
         # --- Otherwise PASS ------------------------------------------------
         push_history(state, "BRITISH PASS")
@@ -174,15 +230,19 @@ class BritishBot(BaseBot):
         if not target:
             return False  # nothing to do → flow‑chart directs to MUSTER
 
-        # ----- step 2: build move-map respecting “leave 2 more pieces” -----
+        # ----- step 2: build move-map respecting "leave 2 more pieces" -----
+        # Reference: "leave 2 more Royalist than Rebel pieces and remove last
+        # Regular only if Pop 0 or Active Support"
         move_map: Dict[str, Dict[str, int]] = {}
         moved_cubes = 0
         for sid, sp in state["spaces"].items():
             if sid == target or self._control(state, sid) != C.BRITISH:
                 continue
-            brit_units = (
+            royalist_units = (
                 sp.get(C.REGULAR_BRI, 0)
                 + sp.get(C.TORY, 0)
+                + sp.get(C.WARPARTY_A, 0)
+                + sp.get(C.WARPARTY_U, 0)
             )
             rebel_units = (
                 sp.get(C.REGULAR_PAT, 0)
@@ -191,16 +251,18 @@ class BritishBot(BaseBot):
                 + sp.get(C.MILITIA_U, 0)
             )
             # must leave 2 more Crown than Rebel pieces
-            must_leave = max(0, rebel_units) + 2
-            movable = max(0, sp.get(C.REGULAR_BRI, 0) - must_leave)
+            must_leave_royalist = rebel_units + 2
+            spare_royalist = max(0, royalist_units - must_leave_royalist)
+            # Only move Regulars; can't move last Regular unless Pop 0 or Active Support
+            regs = sp.get(C.REGULAR_BRI, 0)
+            pop = _MAP_DATA.get(sid, {}).get("population", 0)
+            at_active_support = self._support_level(state, sid) >= C.ACTIVE_SUPPORT
+            min_regs = 0 if (pop == 0 or at_active_support) else 1
+            movable = min(spare_royalist, max(0, regs - min_regs))
             if movable <= 0:
                 continue
-            qty = 1 if moved_cubes < 3 else 0  # seldom need more than 3 cubes
-            if qty:
-                move_map[sid] = {target: qty}
-                moved_cubes += qty
-            if moved_cubes >= 3:
-                break
+            move_map[sid] = {target: movable}
+            moved_cubes += movable
 
         if moved_cubes == 0:
             # “If no cubes have moved yet, instead Muster.”
@@ -270,7 +332,7 @@ class BritishBot(BaseBot):
     # =======================================================================
     #  NODE B8  :  MUSTER Command
     # =======================================================================
-    def _muster(self, state: Dict) -> bool:
+    def _muster(self, state: Dict, *, tried_march: bool = False) -> bool:
         """Full bullet-list implementation for node B8 (Max 4 spaces).
 
         Reference priorities:
@@ -397,12 +459,17 @@ class BritishBot(BaseBot):
             prop_on_map = state.get("markers", {}).get(C.PROPAGANDA, {}).get("on_map", set())
 
             def _rl_key(n):
+                # RL info box: "First where fewest Raid + Propaganda markers,
+                # within that for largest shift in (Support – Opposition)."
+                # Muster: "in 1 space, first one already selected above"
                 markers = (1 if n in raid_on_map else 0) + (1 if n in prop_on_map else 0)
                 sup = self._support_level(state, n)
-                shift = -sup  # more opposition → larger shift toward support
-                # Prefer spaces already selected ("first one already selected above")
+                # Largest shift = most negative support level (biggest
+                # improvement toward Active Support)
+                shift = -sup
                 already = 0 if n in all_selected else 1
-                return (-already, -markers, shift)
+                # Sort: already selected first (0), fewest markers, largest shift
+                return (already, markers, -shift)
 
             # RL requires British Control + 1+ Regular + 1+ Tory (§3.2.1)
             # and room to shift (not at Active Support)
@@ -452,8 +519,10 @@ class BritishBot(BaseBot):
         )
 
         if not did_something:
-            # "If not possible, March unless already tried"
-            return self._march(state)
+            # "If not possible, March unless already tried, else Pass."
+            if not tried_march:
+                return self._march(state, tried_muster=True)
+            return False
 
         # Execute Special-Activity: B11 arrow (Skirmish first)
         self._skirmish_then_naval(state)
@@ -462,57 +531,102 @@ class BritishBot(BaseBot):
     # =======================================================================
     #  NODE B10 :  MARCH Command
     # =======================================================================
-    def _march(self, state: Dict) -> bool:
-        """Implements all four bullet blocks of node B10."""
+    def _march(self, state: Dict, *, tried_muster: bool = False) -> bool:
+        """Implements node B10 (Max 4).
+
+        Reference bullets:
+        • Lose no British Control. Leave last Tory and War Party in each space,
+          and last Regular if British Control but no Active Support.
+        • Moving the largest groups first, add British Control to up to 2 Cities
+          then Colonies, within each first where Rebel cubes then highest Pop.
+        • Then March to Pop 1+ spaces not at Active Support, first to add Tories
+          where Regulars are the only British units, then to add Regulars where
+          Tories are the only British units, within each first in the above destinations.
+        • Then March in place to Activate Militia, first in Support.
+        • If no Common Cause used, execute a Special Activity.
+        • If not possible, Muster unless already tried, else Pass.
+        """
         refresh_control(state)
 
-        # Collect origin spaces with spare Regulars
+        # Collect origin spaces with British pieces
         origins: List[str] = []
         for sid, sp in state["spaces"].items():
-            if sp.get(C.REGULAR_BRI, 0) > 0:
+            brit = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+            if brit > 0:
                 origins.append(sid)
 
         if not origins:
+            # "If not possible, Muster unless already tried, else Pass."
+            if not tried_muster:
+                return self._muster(state, tried_march=True)
             return False
 
-        # Helper: ensure we lose no British Control in origin
+        # Helper: how many pieces can leave without losing British Control
         def can_leave(sid: str) -> bool:
             sp = state["spaces"][sid]
-            if self._control(state, sid) != C.BRITISH:
-                return False
-            cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+            ctrl = self._control(state, sid)
+            regs = sp.get(C.REGULAR_BRI, 0)
+            tories = sp.get(C.TORY, 0)
+            wp_a = sp.get(C.WARPARTY_A, 0)
+            wp_u = sp.get(C.WARPARTY_U, 0)
+            royalist = regs + tories + wp_a + wp_u
             rebel = (
                 sp.get(C.REGULAR_PAT, 0)
+                + sp.get(C.REGULAR_FRE, 0)
                 + sp.get(C.MILITIA_A, 0)
                 + sp.get(C.MILITIA_U, 0)
-                + sp.get(C.WARPARTY_A, 0)
-                + sp.get(C.WARPARTY_U, 0)
             )
-            return cubes - 1 >= rebel  # leave at least parity
+            # Must leave last Tory and last War Party
+            # Must leave last Regular if British Control but no Active Support
+            if ctrl == C.BRITISH and royalist - 1 < rebel:
+                return False
+            return royalist > rebel
 
-        # Primary goal: add British Control to up to two Cities / Colonies
-        target_spaces: List[str] = []
+        # Primary goal: add British Control to up to 2 Cities then Colonies
+        # Priority: Cities first, then Colonies; within each first where
+        # Rebel cubes, then highest Pop
+        control_targets: List[Tuple[tuple, str]] = []
         for sid in origins:
-            if len(target_spaces) >= 2:
-                break
             for dst in _adjacent(sid):
-                if dst not in state.get("spaces", {}) or dst in target_spaces:
+                if dst not in state.get("spaces", {}):
                     continue
-                if state.get("control", {}).get(dst) == "REBELLION":
-                    target_spaces.append(dst)
-        # Fallback – Pop 1+ spaces not at Active Support
+                if self._control(state, dst) == C.BRITISH:
+                    continue
+                dsp = state["spaces"][dst]
+                is_city = 1 if _MAP_DATA.get(dst, {}).get("type") == "City" else 0
+                rebel_cubes = dsp.get(C.REGULAR_PAT, 0) + dsp.get(C.REGULAR_FRE, 0)
+                pop = _MAP_DATA.get(dst, {}).get("population", 0)
+                control_targets.append(((-is_city, -rebel_cubes, -pop), dst))
+        control_targets.sort()
+        # Deduplicate, keep first 2
+        seen = set()
+        target_spaces: List[str] = []
+        for _, dst in control_targets:
+            if dst not in seen and len(target_spaces) < 2:
+                seen.add(dst)
+                target_spaces.append(dst)
+
+        # Fallback: Pop 1+ spaces not at Active Support
         if not target_spaces:
+            fallback: List[Tuple[tuple, str]] = []
             for sid in origins:
                 for dst in _adjacent(sid):
-                    if dst not in state.get("spaces", {}) or dst in target_spaces:
+                    if dst not in state.get("spaces", {}) or dst in seen:
                         continue
-                    if self._support_level(state, dst) != C.ACTIVE_SUPPORT and _MAP_DATA[dst].get("population", 0) >= 1:
-                        target_spaces.append(dst)
-                        if len(target_spaces) >= 2:
-                            break
+                    if self._support_level(state, dst) != C.ACTIVE_SUPPORT and _MAP_DATA.get(dst, {}).get("population", 0) >= 1:
+                        pop = _MAP_DATA[dst].get("population", 0)
+                        fallback.append((-pop, dst))
+            fallback.sort()
+            for _, dst in fallback:
+                if dst not in seen and len(target_spaces) < 2:
+                    seen.add(dst)
+                    target_spaces.append(dst)
 
         if not target_spaces:
-            return False  # nothing worth marching
+            # "If not possible, Muster unless already tried, else Pass."
+            if not tried_muster:
+                return self._muster(state, tried_march=True)
+            return False
 
         # Build move plan (largest origin groups first)
         origins.sort(
@@ -527,16 +641,19 @@ class BritishBot(BaseBot):
             move_plan.append({"src": best_origin, "dst": dst, "pieces": {C.REGULAR_BRI: qty}})
 
         if not move_plan:
+            # "If not possible, Muster unless already tried, else Pass."
+            if not tried_muster:
+                return self._muster(state, tried_march=True)
             return False
 
-        # Execute the March
+        # Execute the March (Max 4 spaces)
         march.execute(
             state,
             C.BRITISH,
             {},
-            list({p["src"] for p in move_plan}),
-            list({p["dst"] for p in move_plan}),
-            plan=move_plan,
+            list({p["src"] for p in move_plan})[:4],
+            list({p["dst"] for p in move_plan})[:4],
+            plan=move_plan[:4],
             bring_escorts=False,
             limited=False,
         )
@@ -611,9 +728,13 @@ class BritishBot(BaseBot):
         if regs_on_map < 10:
             return False
         for name in CITIES:
-            sp = state["spaces"][name]
-            if self._control(state, name) == "REBELLION" and sp.get(C.FORT_PAT, 0) == 0:
-                return True
+            sp = state["spaces"].get(name, {})
+            # B4: "Rebels control City w/o Rebel Fort"
+            if self._control(state, name) != C.BRITISH and sp.get(C.FORT_PAT, 0) == 0:
+                rebel = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+                         + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0))
+                if rebel > 0:
+                    return True
         return False
 
     def _can_muster(self, state: Dict) -> bool:

@@ -396,8 +396,9 @@ class IndianBot(BaseBot):
     # ------------------------------------------------------------------
     # SCOUT  (Command)  -------------------------------------------------
     def _space_has_wp_and_regulars(self, state: Dict) -> bool:
+        """I9: Space with Underground War Party and British Regulars?"""
         return any(
-            sp.get(C.REGULAR_BRI, 0) and (sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0))
+            sp.get(C.REGULAR_BRI, 0) and sp.get(C.WARPARTY_U, 0)
             for sp in state["spaces"].values()
         )
 
@@ -405,39 +406,60 @@ class IndianBot(BaseBot):
         return self._space_has_wp_and_regulars(state)
 
     def _scout(self, state: Dict) -> bool:
-        # Choose origin with WP + Regulars, prefer Patriot Fort
+        """I12: Scout (Max 3 WP moved).
+        Origin: space with Underground WP + British Regulars.
+        Destination priority: first to space with Patriot Fort, then
+        Villages with enemy, then most Rebel Control, then random.
+        """
+        refresh_control(state)
+        ctrl = state.get("control", {})
         choices = []
         for sid, sp in state["spaces"].items():
             if sp.get(C.REGULAR_BRI, 0) == 0:
                 continue
-            wp = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
-            if wp == 0:
+            wp_u = sp.get(C.WARPARTY_U, 0)
+            if wp_u == 0:
                 continue
             fort = 1 if sp.get(C.FORT_PAT, 0) else 0
-            choices.append((fort, wp, sid))
+            choices.append((fort, wp_u, sid))
         if not choices:
             return False
         _, _, origin = max(choices)
 
-        # Destination preference: Fort first, then Village with enemy, else most Rebel Control
+        # Destination priority per reference
         dests = _adjacent(origin)
         if not dests:
             return False
-        target = dests[0]
+        dest_scores = []
+        for dst in dests:
+            if dst not in state.get("spaces", {}):
+                continue
+            dsp = state["spaces"][dst]
+            has_pat_fort = 1 if dsp.get(C.FORT_PAT, 0) else 0
+            has_village = dsp.get(C.VILLAGE, 0)
+            has_enemy = (dsp.get(C.REGULAR_PAT, 0) + dsp.get(C.REGULAR_FRE, 0)
+                         + dsp.get(C.MILITIA_A, 0) + dsp.get(C.MILITIA_U, 0))
+            village_enemy = 1 if (has_village and has_enemy > 0) else 0
+            # "most Rebel Control" → rebellion-controlled spaces first
+            rebel_ctrl = 1 if ctrl.get(dst) == "REBELLION" else 0
+            key = (has_pat_fort, village_enemy, rebel_ctrl, random.random())
+            dest_scores.append((key, dst))
+        if not dest_scores:
+            return False
+        _, target = max(dest_scores)
         scout.execute(state, C.INDIANS, {}, origin, target)
         return True
 
     # ------------------------------------------------------------------
     # TRADE  (Special Activity)  ---------------------------------------
     def _trade(self, state: Dict) -> bool:
+        """I11: Trade in up to 3 spaces with Underground WP and a Village."""
         spaces = [
             sid for sid, sp in state.get("spaces", {}).items()
             if sp.get(C.WARPARTY_U, 0) > 0 and sp.get(C.VILLAGE, 0) > 0
         ]
         if not spaces:
             return False
-
-        target = spaces[0]
 
         # British bot OPS: "roll 1D6; if result < Brit Resources, offer to
         # transfer half (round up) rolled Resources to Indians."
@@ -450,19 +472,21 @@ class IndianBot(BaseBot):
                 transfer = -(-roll // 2)  # ceil(roll / 2)
                 push_history(state, f"Indian Trade: British offer {transfer} (rolled {roll})")
 
-        try:
-            trade.execute(state, C.INDIANS, {}, target, transfer=transfer)
-            return True
-        except Exception:
-            return False
+        traded = False
+        for target in spaces[:3]:
+            try:
+                trade.execute(state, C.INDIANS, {}, target, transfer=transfer)
+                traded = True
+                transfer = 0  # Only first trade gets British offer
+            except Exception:
+                continue
+        return traded
 
     # ==================================================================
     #  EVENT‑VS‑COMMAND BULLETS (I2)
     # ==================================================================
     def _faction_event_conditions(self, state: Dict, card: Dict) -> bool:
-        """
-        Apply the unshaded‑event bullets from node I2.
-        """
+        """Apply the unshaded‑event bullets from node I2."""
         text = card.get("unshaded_event", "")
         support_map = state.get("support", {})
         support = sum(max(0, lvl) for lvl in support_map.values())
@@ -477,7 +501,26 @@ class IndianBot(BaseBot):
         # • Removes a Patriot Fort
         if "Fort" in text and "Patriot" in text and "remove" in text.lower():
             return True
-        # • Ineffective die-roll rule (handled by BaseBot already)
+        # • Adds Indian Resources, places War Parties from Unavailable,
+        #   or grants a free War Path
+        if ("Resources" in text and "Indian" in text):
+            return True
+        if "Unavailable" in text and ("War" in text or "Indian" in text):
+            return True
+        if "War Path" in text:
+            return True
+        # • Event is effective, Indian pieces >= British Regulars on map,
+        #   and D6 rolls 5+
+        indian_pieces = sum(
+            sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0) + sp.get(C.VILLAGE, 0)
+            for sp in state["spaces"].values()
+        )
+        british_regs = sum(sp.get(C.REGULAR_BRI, 0) for sp in state["spaces"].values())
+        if indian_pieces >= british_regs:
+            roll = state["rng"].randint(1, 6)
+            state.setdefault("rng_log", []).append(("Event D6", roll))
+            if roll >= 5:
+                return True
         return False
 
 

@@ -194,7 +194,7 @@ def _supply_phase(state):
 
     # West Indies battle + garrison payment
     wi = state["spaces"][WEST_INDIES_ID]
-    if wi.get(REGULAR_FRE) and wi.get(REGULAR_BRI):
+    if wi.get(REGULAR_FRE) and wi.get(REGULAR_BRI) and state.get("toa_played", False):
         battle_execute(state, FRENCH, {}, [WEST_INDIES_ID])
         push_history(state, "Free Battle in West Indies (6.2.2)")
     def _wi_cleanup(pid, faction):

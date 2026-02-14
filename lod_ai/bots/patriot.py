@@ -113,8 +113,8 @@ class PatriotBot(BaseBot):
     def _rabble_chain(self, state: Dict) -> bool:
         used_persuasion = False
         if not self._execute_rabble(state):
-            # If Rabble‑Rousing impossible → Rally
-            return self._execute_rally(state)
+            # P11 "If none" → P7 (Rally with its own fallback chain)
+            return self._rally_chain(state)
         # P11: resources may reach 0
         if state["resources"][self.faction] == 0:
             used_persuasion = self._try_persuasion(state)
@@ -149,17 +149,26 @@ class PatriotBot(BaseBot):
         return False
 
     def _execute_battle(self, state: Dict) -> bool:
-        """P4: Select targets per priority bullets and resolve Battle.
+        """P4: Select all spaces where Rebel Force Level (if possible
+        including French) + modifiers exceeds British Force Level + modifiers.
 
-        Sort: first with Washington, then highest Pop, then most Villages,
-        then random.
+        Priority: first with Washington, then in highest Pop, then where
+        most Villages, then random.
         """
         refresh_control(state)
         targets = []
         for sid, sp in state["spaces"].items():
-            rebel = self._rebel_cube_count(state, sid)
-            royal = self._active_royal_count(sp)
-            if rebel > royal and royal > 0:
+            # Rebel Force Level: cubes + floor(Militia/2) + Forts
+            rebel_cubes = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0))
+            total_militia = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+            rebel_force = rebel_cubes + (total_militia // 2) + sp.get(C.FORT_PAT, 0)
+
+            # British Force Level: Regulars + min(Tories, Regulars) + floor(WP/2)
+            regs = sp.get(C.REGULAR_BRI, 0)
+            tories = min(sp.get(C.TORY, 0), regs)
+            brit_force = regs + tories + (sp.get(C.WARPARTY_A, 0) // 2) + sp.get(C.FORT_BRI, 0)
+
+            if rebel_force > brit_force and (regs + sp.get(C.TORY, 0) + sp.get(C.WARPARTY_A, 0)) > 0:
                 leader_loc = state.get("leaders", {}).get(sid, "")
                 has_wash = 1 if leader_loc == "LEADER_WASHINGTON" else 0
                 pop = _MAP_DATA.get(sid, {}).get("population", 0)
@@ -305,34 +314,75 @@ class PatriotBot(BaseBot):
     #  SPECIAL‑ACTIVITY HELPERS
     # ===================================================================
     def _try_partisans(self, state: Dict) -> bool:
+        """P8: Partisans (Max 1).
+        Priority: first to remove a Village, then to remove most War Parties
+        then British; within each first to add most Rebel Control then to
+        remove most British Control, then random.
+        """
         if state["resources"][self.faction] == 0:
             return False  # rule: Persuasion instead
+        refresh_control(state)
+        candidates = []
+        ctrl = state.get("control", {})
         for sid, sp in state["spaces"].items():
-            if sp.get(C.MILITIA_U, 0) and (
-                sp.get(C.VILLAGE, 0) or
-                sp.get(C.WARPARTY_A, 0) or
-                sp.get(C.REGULAR_BRI, 0) or
-                sp.get(C.TORY, 0)
-            ):
-                try:
-                    partisans.execute(state, self.faction, {}, sid, option=1)
-                    return True
-                except Exception:
-                    continue
+            if not sp.get(C.MILITIA_U, 0):
+                continue
+            has_village = sp.get(C.VILLAGE, 0)
+            wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
+            british = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+            enemy = has_village + wp + british
+            if enemy == 0:
+                continue
+            # Would add Rebel Control? (not already REBELLION)
+            adds_rebel_ctrl = 1 if ctrl.get(sid) != "REBELLION" else 0
+            # Would remove British Control?
+            removes_brit_ctrl = 1 if ctrl.get(sid) == "BRITISH" else 0
+            # Sort key: village first, then most WP/British, then Rebel
+            # Control gain, then British Control loss, then random
+            key = (-has_village, -(wp + british), -adds_rebel_ctrl,
+                   -removes_brit_ctrl, random.random())
+            candidates.append((key, sid))
+        if not candidates:
+            return False
+        candidates.sort()
+        for _, sid in candidates:
+            try:
+                partisans.execute(state, self.faction, {}, sid, option=1)
+                return True
+            except Exception:
+                continue
         return False
 
     def _try_skirmish(self, state: Dict) -> bool:
+        """P12: Skirmish (Max 1).
+        Priority: first to remove a British Fort; within that first to add
+        most Rebel Control then to remove most British Control, then random.
+        """
         if state["resources"][self.faction] == 0:
             return False
+        refresh_control(state)
+        ctrl = state.get("control", {})
+        candidates = []
         for sid, sp in state["spaces"].items():
-            if sp.get(C.REGULAR_PAT, 0) and (
-                sp.get(C.FORT_BRI, 0) or sp.get(C.REGULAR_BRI, 0) or sp.get(C.TORY, 0)
-            ):
-                try:
-                    skirmish.execute(state, self.faction, {}, sid, option=1)
-                    return True
-                except Exception:
-                    continue
+            if not sp.get(C.REGULAR_PAT, 0):
+                continue
+            has_fort = sp.get(C.FORT_BRI, 0)
+            has_enemy = has_fort or sp.get(C.REGULAR_BRI, 0) or sp.get(C.TORY, 0)
+            if not has_enemy:
+                continue
+            adds_rebel_ctrl = 1 if ctrl.get(sid) != "REBELLION" else 0
+            removes_brit_ctrl = 1 if ctrl.get(sid) == "BRITISH" else 0
+            key = (-has_fort, -adds_rebel_ctrl, -removes_brit_ctrl, random.random())
+            candidates.append((key, sid))
+        if not candidates:
+            return False
+        candidates.sort()
+        for _, sid in candidates:
+            try:
+                skirmish.execute(state, self.faction, {}, sid, option=1)
+                return True
+            except Exception:
+                continue
         return False
 
     def _try_persuasion(self, state: Dict) -> bool:
@@ -382,11 +432,24 @@ class PatriotBot(BaseBot):
         # • Support > Opposition & event shifts Support/Opposition in Rebel favor
         if sup > opp and any(k in text for k in ("Support", "Opposition")):
             return True
-        # • Places Underground Militia, Patriot Fort, or removes Village
-        if any(k in text for k in ("Militia", "Fort", "Village")):
+        # • Places Underground Militia in Active Opposition or Village space with none
+        if "Militia" in text:
+            return True
+        # • Places a Patriot Fort or removes an Indian Village
+        if "Fort" in text or "Village" in text:
             return True
         # • Adds 3+ Patriot Resources
-        if "Resources" in text:
+        if "Resources" in text and "Patriot" in text:
             return True
-        # • Ineffective die-roll bullet handled by BaseBot after effectiveness test
+        # • Event is effective, Patriots have 25+ pieces on the map, and D6 rolls 5+
+        pieces_on_map = sum(
+            sp.get(C.REGULAR_PAT, 0) + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+            + sp.get(C.FORT_PAT, 0)
+            for sp in state["spaces"].values()
+        )
+        if pieces_on_map >= 25:
+            roll = state["rng"].randint(1, 6)
+            state.setdefault("rng_log", []).append(("Event D6", roll))
+            if roll >= 5:
+                return True
         return False

@@ -4,15 +4,17 @@
 # ------------------------------------------------------------
 
 BRITISH = {
-    18: "ignore",               # “If it hadn’t been so stormy…”
+    18: "force",                # "If it hadn't been so stormy…" — target eligible enemy
     23: "force",                # Lt Col Francis Marion
     29: "ignore_if_4_militia",  # Edward Bancroft, British Spy
     30: "force",                # Hessians
-    44: "ignore",               # Earl of Mansfield Recalled
+    44: "force",                # Earl of Mansfield Recalled — target eligible enemy
+    51: "force",                # Bermuda Gunpowder Plot — March to set up Battle
     52: "force",                # French Fleet Arrives in the Wrong Spot
+    62: "force",                # Charles Michel de Langlade
     70: "force",                # British Gain From French in India
-    83: "ignore",               # Guy Carleton and Indians Negotiate
-    88: "force",                # “If it hadn’t been so foggy…”
+    80: "force",                # Confusion Allows Slaves to Escape
+    88: "force",                # "If it hadn't been so foggy…"
     95: "force",                # Ohio Country Frontier Erupts
 }
 
@@ -20,8 +22,7 @@ BRITISH = {
 # pared‑down version of the Brown‑Bess chart used by the simplified bots.
 
 PATRIOTS = {
-    # Always attempt to play these Events using the instructions from the
-    # reference sheet.
+    8: "force",   # Culper Spy Ring — skip if French is human (handled at execution)
     18: "force",  # "If it hadn't been so stormy…"
     29: "force",  # Edward Bancroft, British Spy
     44: "force",  # Earl of Mansfield Recalled from Paris

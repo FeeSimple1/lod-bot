@@ -45,7 +45,7 @@ _MAP_DATA = json.load(
     open(Path(__file__).resolve().parents[1] / "map" / "data" / "map.json")
 )
 WEST_INDIES = C.WEST_INDIES_ID
-_VALID_PROVINCES: List[str] = ["Quebec", "New_York", "New_Hampshire", "Massachusetts"]
+_VALID_PROVINCES: List[str] = ["Quebec_City", "New_York", "New_Hampshire", "Massachusetts"]
 
 
 # ---------------------------------------------------------------------------
@@ -65,12 +65,12 @@ def _preparer_la_guerre(state: Dict, post_treaty: bool) -> bool:
     unavail = state.setdefault("unavailable", {})
     avail_pool = state.setdefault("available", {})
     if unavailable_blockades(state) > 0:
-        moved = move_blockades_to_west_indies(state, 1)
-        if moved == 0:
-            return False
-        push_history(state, "Préparer la Guerre: Blockade to West Indies")
-        moved = True
-    elif unavail.get(C.REGULAR_FRE, 0) > 0:
+        count = move_blockades_to_west_indies(state, 1)
+        if count > 0:
+            push_history(state, "Préparer la Guerre: Blockade to West Indies")
+            moved = True
+    # If no Blockade moved, try up to 3 Regulars from Unavailable to Available
+    if not moved and unavail.get(C.REGULAR_FRE, 0) > 0:
         avail = min(3, unavail[C.REGULAR_FRE])
         unavail[C.REGULAR_FRE] -= avail
         avail_pool[C.REGULAR_FRE] = avail_pool.get(C.REGULAR_FRE, 0) + avail
@@ -179,13 +179,15 @@ class FrenchBot(BaseBot):
         self._try_naval_pressure(state)    # F17 (may fall back to Skirmish)
 
     def _battle_chain(self, state: Dict) -> bool:
-        # F13 check already passed; decide Battle vs March
+        # F13: Rebel cubes + Leader exceed British?
         if self._can_battle(state) and self._battle(state):  # F16
             return True
+        # F13 No (or F16 none) → F14 March
         if self._can_march(state) and self._march(state):    # F14
             self._skirmish_loop(state)                       # F12 loop
             return True
-        return False
+        # F14 "If none" → F10 (Muster)
+        return self._muster_chain(state)
 
     # ===================================================================
     #  SPECIAL‑ACTIVITY HELPERS
@@ -235,7 +237,10 @@ class FrenchBot(BaseBot):
     # ===================================================================
     # ----- Agent Mobilisation (F7) ------------------------------
     def _agent_mobilization(self, state: Dict) -> bool:
-        """Place 2 Militia or 1 Continental per F7 priorities."""
+        """F7: Place 2 Militia, or—if not possible—1 Continental.
+        In Quebec City, New York, New Hampshire, or Massachusetts;
+        first to add most Rebel Control, then where most Patriot units.
+        """
         best, best_score = None, -1
         ctrl = state.get("control", {})
         for prov in _VALID_PROVINCES:
@@ -250,7 +255,10 @@ class FrenchBot(BaseBot):
                 best, best_score = prov, score
         if not best:
             return False
-        fam.execute(state, C.FRENCH, {}, best, place_continental=False)
+        # Try 2 Militia first; if Militia not available, place 1 Continental
+        avail_militia = state.get("available", {}).get(C.MILITIA_U, 0)
+        place_continental = avail_militia < 2
+        fam.execute(state, C.FRENCH, {}, best, place_continental=place_continental)
         return True
 
     def _can_agent_mobilization(self, state: Dict) -> bool:
@@ -367,8 +375,17 @@ class FrenchBot(BaseBot):
         return state["available"].get(C.REGULAR_FRE, 0) > 0
 
     def _can_battle(self, state: Dict) -> bool:
-        for sp in state["spaces"].values():
-            if sp.get(C.REGULAR_FRE, 0) and sp.get(C.REGULAR_BRI, 0):
+        """F13: Rebel cubes + Leader exceed British pieces in space with both?
+        Rebel cubes = Continentals + French Regulars.
+        British pieces = Regulars + Tories + Active WP.
+        """
+        for sid, sp in state["spaces"].items():
+            rebel_cubes = sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+            leader_loc = state.get("leaders", {}).get(sid, "")
+            has_wash = 1 if leader_loc == "LEADER_WASHINGTON" else 0
+            rebel = rebel_cubes + has_wash
+            british = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0) + sp.get(C.WARPARTY_A, 0)
+            if rebel > 0 and british > 0 and rebel > british:
                 return True
         return False
 
@@ -395,9 +412,9 @@ class FrenchBot(BaseBot):
         if "British" in text and "casualt" in text.lower():
             return True
         # • Adds French Resources
-        if "Resources" in text:
+        if "Resources" in text and "French" in text:
             return True
-        # • Treaty played & Die roll
+        # • Treaty of Alliance played, Event is effective, and D6 rolls 5+
         if state.get("toa_played") and self._event_die_roll(state):
             return True
         return False

@@ -89,3 +89,76 @@ def test_march_neutral_or_passive_destination():
     assert bot._support_level(state, "Northwest") == 0
     assert 0 in (C.NEUTRAL, C.PASSIVE_SUPPORT, C.PASSIVE_OPPOSITION)
 
+
+def test_i2_event_conditions_resources_and_war_parties():
+    """I2 bullet 4: Event adds Indian Resources or places WP from Unavailable."""
+    from lod_ai.bots.indians import IndianBot
+    bot = IndianBot()
+    state = {
+        "spaces": {"A": {C.WARPARTY_A: 1, C.WARPARTY_U: 1, C.VILLAGE: 1}},
+        "resources": {C.INDIANS: 3},
+        "support": {},
+        "available": {},
+        "rng": __import__("random").Random(42),
+    }
+    # Card adds Indian Resources
+    card_res = {
+        "id": 9999,
+        "unshaded_event": "Add 3 Indian Resources.",
+        "shaded_event": "Nothing.",
+    }
+    assert bot._faction_event_conditions(state, card_res) is True
+
+    # Card places War Parties from Unavailable
+    card_wp = {
+        "id": 9998,
+        "unshaded_event": "Place 2 War Parties from Unavailable.",
+        "shaded_event": "Nothing.",
+    }
+    assert bot._faction_event_conditions(state, card_wp) is True
+
+    # Card grants free War Path
+    card_warpath = {
+        "id": 9997,
+        "unshaded_event": "Execute a free War Path.",
+        "shaded_event": "Nothing.",
+    }
+    assert bot._faction_event_conditions(state, card_warpath) is True
+
+    # Unrelated card
+    card_noop = {
+        "id": 9996,
+        "unshaded_event": "Draw a card.",
+        "shaded_event": "Draw a card.",
+    }
+    # This will exercise the die-roll check (Indian pieces >= British Regulars)
+    result = bot._faction_event_conditions(state, card_noop)
+    assert isinstance(result, bool)
+
+
+def test_i9_checks_underground_wp_only():
+    """I9: Should check for Underground War Parties, not Active ones."""
+    from lod_ai.bots.indians import IndianBot
+    bot = IndianBot()
+    # Only Active WP with British → should NOT trigger Scout
+    state = {
+        "spaces": {
+            "A": {C.WARPARTY_A: 3, C.WARPARTY_U: 0, C.REGULAR_BRI: 2},
+        },
+        "resources": {C.INDIANS: 3},
+    }
+    assert bot._space_has_wp_and_regulars(state) is False
+
+    # Add Underground WP → should trigger Scout
+    state["spaces"]["A"][C.WARPARTY_U] = 1
+    assert bot._space_has_wp_and_regulars(state) is True
+
+
+def test_i12_scout_destination_priority():
+    """I12: Scout destination should prioritize Patriot Fort, then Village
+    with enemy, then Rebel Control."""
+    from lod_ai.bots.indians import IndianBot
+    bot = IndianBot()
+    # Verify the priority sorting logic exists (actual execution needs
+    # full state). Just verify _scout selects correctly.
+

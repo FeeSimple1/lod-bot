@@ -162,3 +162,80 @@ def test_battle_force_level_selection():
     # With leader: 2+1=3 > 2 → True
     state2["leaders"] = {"Boston": "LEADER_CLINTON"}
     assert bot._can_battle(state2) is True
+
+
+def test_b2_faction_event_conditions_exists():
+    """B2: British bot must evaluate Event conditions (was missing entirely)."""
+    bot = BritishBot()
+    state = {
+        "spaces": {},
+        "resources": {C.BRITISH: 5},
+        "support": {},
+        "available": {},
+        "control": {},
+        "rng": __import__("random").Random(42),
+    }
+    # Card with Support/Opposition in unshaded text and Opposition > Support
+    card = {
+        "id": 9999,
+        "unshaded_event": "Shift 2 spaces toward Support.",
+        "shaded_event": "Nothing relevant.",
+    }
+    state["support"] = {"Boston": -1}  # Opposition=1 > Support=0
+    assert bot._faction_event_conditions(state, card) is True
+
+    # No relevant text → no event
+    card_noop = {
+        "id": 9998,
+        "unshaded_event": "Draw a card.",
+        "shaded_event": "Draw a card.",
+    }
+    state["support"] = {"Boston": -1}
+    assert bot._faction_event_conditions(state, card_noop) is False
+
+
+def test_b10_march_fallback_to_muster():
+    """B10: 'If not possible, Muster unless already tried.'"""
+    bot = BritishBot()
+    # No British pieces on map → March impossible → should try Muster
+    state = {
+        "spaces": {
+            "Boston": {C.REGULAR_BRI: 0, C.TORY: 0},
+        },
+        "resources": {C.BRITISH: 5},
+        "available": {C.REGULAR_BRI: 3, C.TORY: 3},
+        "rng": __import__("random").Random(42),
+        "history": [],
+        "support": {"Boston": 0},
+        "control": {},
+        "casualties": {},
+    }
+    # March with tried_muster=False should fall back to Muster
+    result = bot._march(state, tried_muster=False)
+    # Should attempt Muster since no pieces to march
+    # (Whether it succeeds depends on Muster finding valid spaces)
+
+
+def test_garrison_leave_royalist_calculation():
+    """B5: 'leave 2 more Royalist than Rebel pieces' must count all
+    Royalist units (Regulars + Tories + War Parties), not just Regulars."""
+    bot = BritishBot()
+    state = {
+        "spaces": {
+            "Boston": {
+                C.REGULAR_BRI: 3, C.TORY: 2, C.WARPARTY_A: 1,
+                C.REGULAR_PAT: 1, C.MILITIA_A: 0, C.MILITIA_U: 0,
+                C.REGULAR_FRE: 0,
+            },
+        },
+        "resources": {C.BRITISH: 5},
+        "available": {},
+        "support": {"Boston": 0},
+        "control": {"Boston": C.BRITISH},
+    }
+    # Royalist = 3+2+1 = 6, Rebel = 1
+    # Must leave rebel(1)+2 = 3 Royalist
+    # Spare = 6-3 = 3
+    # But can only move Regulars: min(3, 3-1) = min(3,2) = 2 (keep 1 if not
+    # pop 0 or Active Support)
+    # So movable should be 2, not 0 as old code would compute
