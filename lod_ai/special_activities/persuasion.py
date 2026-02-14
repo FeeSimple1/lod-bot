@@ -26,7 +26,7 @@ from lod_ai.rules_consts import (
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
-from lod_ai.board.pieces      import remove_piece, add_piece
+from lod_ai.board.pieces      import remove_piece, add_piece, flip_pieces
 from lod_ai.economy.resources import add as add_res
 from lod_ai.map import adjacency as map_adj
 
@@ -74,8 +74,7 @@ def execute(
             raise ValueError(f"{sid}: Persuasion only in Colonies/Cities.")
 
         # ---- Flip exactly one Underground Militia ----------------------
-        remove_piece(state, MILITIA_U, sid, 1)
-        add_piece(state,    MILITIA_A, sid, 1)
+        flip_pieces(state, MILITIA_U, MILITIA_A, sid, 1)
 
         # ---- Add Patriot Resource --------------------------------------
         add_res(state, PATRIOTS, 1)
