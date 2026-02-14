@@ -113,7 +113,8 @@ def _reward_loyalty(state: Dict, sp: Dict, space_id: str, levels: int) -> None:
     """
     if levels <= 0:
         return
-    levels = min(2, levels)
+    # §3.2.1: "There is no limit to the number of levels shifted when
+    # Rewarding Loyalty during Muster."  Do NOT cap.
 
     # Checks – Regulars, Tories, Control
     if (sp.get(REGULAR_BRI, 0) == 0) or (sp.get(TORY, 0) == 0):
@@ -192,7 +193,8 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
             regular_plan: Optional[Dict] = None,
             tory_plan: Optional[Dict[str, int]] = None,
             build_fort: bool = False,
-            reward_levels: int = 0) -> Dict:
+            reward_levels: int = 0,
+            french_fort: bool = False) -> Dict:
     """Perform the Muster Command for *faction* in *selected* spaces."""
     # Treaty gate
     if faction == FRENCH and not state.get("toa_played"):
@@ -257,14 +259,31 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
         if len(selected) != 1:
             raise ValueError("French Muster selects exactly one space.")
         sp_id = selected[0]
+
+        # §3.5.3: "Select any one Colony or City with Rebellion Control
+        # or the West Indies."
+        if sp_id != WEST_INDIES_ID:
+            if state.get("control", {}).get(sp_id) != "REBELLION":
+                raise ValueError(
+                    "French Muster requires Rebellion Control (or West Indies)."
+                )
+
         n_reg = _draw_from_pool(state, REGULAR_FRE, 4)
         add_piece(state, REGULAR_FRE, sp_id, n_reg)
 
-        # Optional Patriot Fort substitution if Patriots have Resources
-        sp = state["spaces"][sp_id]
-        if sp.get(REGULAR_FRE, 0) >= 2 and can_afford(state, PATRIOTS, 1):
+        # §3.5.3: "if desired … replace two French Regulars with one
+        # Patriot Fort and Patriots pay one Resource."  Caller-controlled
+        # via french_fort parameter.
+        if french_fort:
+            sp = state["spaces"][sp_id]
+            if sp_id == WEST_INDIES_ID:
+                raise ValueError("Cannot build Patriot Fort in West Indies.")
+            if sp.get(REGULAR_FRE, 0) < 2:
+                raise ValueError("Need ≥2 French Regulars for Fort replacement.")
+            if not can_afford(state, PATRIOTS, 1):
+                raise ValueError("Patriots cannot afford Fort replacement.")
             remove_piece(state, REGULAR_FRE, sp_id, 2)
-            add_piece(state, FORT_PAT,       sp_id, 1)          # Patriot Fort
+            add_piece(state, FORT_PAT, sp_id, 1)
             spend(state, PATRIOTS, 1)
 
     # -------------------------------------------------------------------
