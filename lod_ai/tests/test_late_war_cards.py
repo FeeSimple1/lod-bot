@@ -211,3 +211,42 @@ def test_card23_unshaded_does_not_move_forts():
     assert state["spaces"]["South_Carolina"].get(FORT_PAT, 0) == 1
     assert state["spaces"]["Georgia"].get(MILITIA_U, 0) == 1
     assert state["spaces"]["Georgia"].get(FORT_PAT, 0) == 0
+
+
+# ---- Card 48: God Save the King ----
+
+def test_card48_shaded_moves_one_faction_only():
+    """Card 48 shaded: 'A non-British Faction' (singular) moves units from
+    spaces with British Regulars. Only the chosen faction's units move."""
+    state = _base_state()
+    # Virginia adj: Norfolk, Maryland-Delaware, Northwest, Southwest, North_Carolina
+    state["spaces"] = {
+        "Virginia": {REGULAR_BRI: 2, MILITIA_U: 3, WARPARTY_U: 2},
+        "North_Carolina": {},
+    }
+    # Force choosing Patriots
+    state["card48_faction"] = "PATRIOTS"
+
+    late_war.evt_048_god_save_king(state, shaded=True)
+
+    # Patriots (Militia) should have moved out; War Parties should stay
+    assert state["spaces"]["Virginia"].get(MILITIA_U, 0) == 0
+    assert state["spaces"]["Virginia"].get(WARPARTY_U, 0) == 2  # untouched
+    assert state["spaces"]["North_Carolina"].get(MILITIA_U, 0) == 3
+
+
+def test_card48_shaded_indians_only():
+    """Card 48 shaded: If Indians chosen, only War Parties move."""
+    state = _base_state()
+    state["spaces"] = {
+        "Virginia": {REGULAR_BRI: 2, MILITIA_U: 3, WARPARTY_U: 2},
+        "North_Carolina": {},
+    }
+    state["card48_faction"] = "INDIANS"
+
+    late_war.evt_048_god_save_king(state, shaded=True)
+
+    # Only War Parties should have moved
+    assert state["spaces"]["Virginia"].get(WARPARTY_U, 0) == 0
+    assert state["spaces"]["Virginia"].get(MILITIA_U, 0) == 3  # untouched
+    assert state["spaces"]["North_Carolina"].get(WARPARTY_U, 0) == 2
