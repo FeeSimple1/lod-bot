@@ -31,6 +31,7 @@ from lod_ai.rules_consts import (
     TORY, MILITIA_A, MILITIA_U,
     FORT_BRI, FORT_PAT,
     BRITISH, PATRIOTS, FRENCH,
+    WEST_INDIES_ID,
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import enforce_global_caps, refresh_control
@@ -63,6 +64,11 @@ def execute(
 
     if faction == FRENCH and not state.get("toa_played"):
         raise ValueError("FRENCH cannot Skirmish before Treaty of Alliance.")
+
+    # §4.3.3 says "In any one space" (no West Indies); §4.2.2 and §4.5.2
+    # explicitly say "one space or West Indies".
+    if faction == PATRIOTS and space_id == WEST_INDIES_ID:
+        raise ValueError("Patriot Skirmish cannot occur in West Indies (§4.3.3).")
 
     if option not in (1, 2, 3):
         raise ValueError("option must be 1, 2, or 3.")
