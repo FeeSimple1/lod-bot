@@ -417,3 +417,58 @@ User provided definitive rulings on all 9 remaining audit issues. 7 required cod
 ### Tests
 
 296 tests passing (15 new tests added across 3 test files).
+
+---
+
+## Session 6: Independent Full Card Handler Re-Audit
+
+### Scope
+
+Complete independent line-by-line verification of **all 109 card handlers** across 6 files against `Reference Documents/card reference full.txt`. This audit was performed independently of Session 4's audit to provide a second verification pass.
+
+Files audited:
+- `early_war.py` — 32 cards (2, 4, 6, 10, 13, 15, 20, 24, 28, 29, 30, 32, 33, 35, 41, 43, 46, 49, 51, 53, 54, 56, 68, 72, 75, 82, 83, 84, 86, 90, 91, 92)
+- `middle_war.py` — 32 cards (3, 5, 8, 9, 11, 12, 14, 17, 26, 27, 34, 38, 42, 44, 47, 50, 55, 58, 59, 60, 61, 63, 69, 71, 74, 76, 77, 78, 80, 88, 89, 93)
+- `late_war.py` — 32 cards (1, 7, 16, 18, 19, 21, 22, 23, 25, 31, 36, 37, 39, 40, 45, 48, 52, 57, 62, 64, 65, 66, 67, 70, 73, 79, 81, 85, 87, 94, 95, 96)
+- `brilliant_stroke.py` — 5 cards (105, 106, 107, 108, 109)
+- `winter_quarters.py` — 8 cards (97, 98, 99, 100, 101, 102, 103, 104)
+- `shared.py` — Helper functions (shift_support, add_resource, adjust_fni, pick_cities, pick_colonies)
+
+### Verification checklist applied per card
+
+1. Piece tags use constants from `rules_consts.py` (not string literals)
+2. Resource amounts and recipients match reference exactly
+3. FNI adjustments (direction and magnitude) correct
+4. Support/Opposition shifts (direction, magnitude, "toward X" semantics) correct
+5. Destinations ("to Casualties" vs "to Available") match reference
+6. Free operation types and factions correct
+7. Eligibility flags correct (`ineligible_through_next` not `ineligible_next`)
+8. Piece operations use `board/pieces.py` helpers exclusively (no direct dict manipulation)
+9. Sourcing order (Available vs Unavailable) matches reference text ordering
+10. Shaded = (none) cards correctly return/no-op
+
+### Result: NO NEW ISSUES FOUND
+
+All 109 card handlers match the card reference text. All previously identified and fixed issues from Sessions 1–5 remain correct.
+
+### Verified categories (all PASS)
+
+| Category | Sample verifications | Status |
+|---|---|---|
+| Resource adjustments | Cards 7, 10, 19, 34, 37, 42, 45, 53, 56, 58, 60, 61, 63, 64, 65, 69, 71 — all amounts and recipients correct | PASS |
+| FNI adjustments | Cards 7, 34, 37, 40, 53, 57, 60, 63, 64, 67, 69 — directions and magnitudes correct; absolute-set (Card 40) correct | PASS |
+| Eligibility flags | Cards 5, 18, 34, 38, 44, 50, 57, 61, 67, 87 — all use `ineligible_through_next` or `remain_eligible` correctly | PASS |
+| Piece placement/removal | All 96 cards with piece operations — tags, quantities, destinations verified | PASS |
+| Support/Opposition shifts | Cards 1, 2, 10, 16, 21, 25, 27, 39, 41, 46, 83, 93 — "toward X" semantics verified against numeric targets | PASS |
+| Sourcing order | Card 30 (Available first per "from Available or Unavailable"), Cards 27/32/38/46 (Unavailable first per "from Unavailable or Available") — all match reference text ordering | PASS |
+| Free operations | Cards 1, 5, 9, 14, 15, 21, 26, 31, 33, 48, 51, 52, 55, 66, 67, 75, 84, 94, 96 — faction, op type, and location correct | PASS |
+| Shaded = no effect | Cards 18, 29, 39, 44, 52, 68, 70, 72, 73, 80, 87, 88, 92, 93, 95 — all return/no-op correctly | PASS |
+| Winter Quarters cards | Cards 97–104 — CRC/CBC comparisons, half-difference reductions, second-VC-leader checks all correct | PASS |
+| Brilliant Stroke cards | Cards 105–109 — declarations, eligibility reset, trump hierarchy, ToA preparations formula all correct | PASS |
+| `flip_pieces()` usage | Cards 8, 28, 29, 35, 77, 86 — all use board/pieces helper, no direct dict manipulation | PASS |
+| `place_with_caps()` for bases | Cards 4, 26, 31, 68, 72, 77, 79, 81, 83, 90, 91, 92 — enforces stacking limits | PASS |
+| Shared helpers | `shift_support` clamps [-2,+2]; `adjust_fni` respects ToA gate + clamps [0,3]; `add_resource` clamps [0,50] | PASS |
+
+### Tests
+
+303 tests passing. No new tests needed since no code changes were made.
