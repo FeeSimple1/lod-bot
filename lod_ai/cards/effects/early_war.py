@@ -83,22 +83,41 @@ def evt_004_penobscot(state, shaded=False):
     """
     Unshaded – Expedition fails: Patriot Resources -2; remove 3 Patriot Militia.
     Shaded   – Expedition succeeds: place 1 Fort or Village and 3 Militia or
-               War Parties in Massachusetts.
+               War Parties in Massachusetts.  Player chooses piece type freely.
     """
     if shaded:
-        executor = str(state.get("active", "")).upper()
         target = "Massachusetts"
-        if executor in (PATRIOTS, FRENCH):
+        # "Fort or Village" — player chooses freely via state override
+        base_choice = state.get("card4_base", "").upper()
+        if base_choice == "VILLAGE":
+            place_with_caps(state, VILLAGE, target)
+        elif base_choice == "FORT_BRI":
+            place_with_caps(state, FORT_BRI, target)
+        elif base_choice == "FORT_PAT":
             place_with_caps(state, FORT_PAT, target)
-            place_piece(state, MILITIA_U, target, 3)
-        elif executor in (BRITISH, INDIANS):
-            # "Fort or Village": try Village first, fall back to Fort_BRI
-            placed = place_with_caps(state, VILLAGE, target)
-            if placed == 0:
-                place_with_caps(state, FORT_BRI, target)
-            place_piece(state, WARPARTY_U, target, 3)
         else:
-            push_history(state, "Penobscot shaded: no executing faction; no pieces placed")
+            # Default: faction-aligned base
+            executor = str(state.get("active", "")).upper()
+            if executor in (BRITISH, INDIANS):
+                placed = place_with_caps(state, VILLAGE, target)
+                if placed == 0:
+                    place_with_caps(state, FORT_BRI, target)
+            else:
+                place_with_caps(state, FORT_PAT, target)
+
+        # "Militia or War Parties" — player chooses freely via state override
+        unit_choice = state.get("card4_units", "").upper()
+        if unit_choice == "WARPARTY":
+            place_piece(state, WARPARTY_U, target, 3)
+        elif unit_choice == "MILITIA":
+            place_piece(state, MILITIA_U, target, 3)
+        else:
+            # Default: faction-aligned units
+            executor = str(state.get("active", "")).upper()
+            if executor in (BRITISH, INDIANS):
+                place_piece(state, WARPARTY_U, target, 3)
+            else:
+                place_piece(state, MILITIA_U, target, 3)
     else:
         add_resource(state, PATRIOTS, -2)
         # Remove 3 Militia anywhere on the map, preferring Underground

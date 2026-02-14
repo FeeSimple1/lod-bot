@@ -142,6 +142,39 @@ def test_card4_penobscot_shaded_rebellion_places_fort_and_militia():
     assert state["spaces"]["Massachusetts"].get(MILITIA_U) == 3
 
 
+def test_card4_penobscot_shaded_free_choice_village_and_militia():
+    """Card 4 shaded: Player can freely choose Village + Militia regardless
+    of executing faction."""
+    state = _base_state()
+    state["spaces"] = {"Massachusetts": {}}
+    state["available"] = {VILLAGE: 1, MILITIA_U: 5}
+    state["active"] = "PATRIOTS"  # Rebellion side, but choosing Village + Militia
+    state["card4_base"] = "VILLAGE"
+    state["card4_units"] = "MILITIA"
+
+    early_war.evt_004_penobscot(state, shaded=True)
+
+    assert state["spaces"]["Massachusetts"].get(VILLAGE) == 1
+    assert state["spaces"]["Massachusetts"].get(MILITIA_U) == 3
+    assert state["spaces"]["Massachusetts"].get(FORT_PAT, 0) == 0
+
+
+def test_card4_penobscot_shaded_free_choice_fort_and_warparties():
+    """Card 4 shaded: Player can freely choose Fort_PAT + War Parties."""
+    state = _base_state()
+    state["spaces"] = {"Massachusetts": {}}
+    state["available"] = {FORT_PAT: 1, WARPARTY_U: 5}
+    state["active"] = "BRITISH"  # Crown side, but choosing Fort_PAT + War Parties
+    state["card4_base"] = "FORT_PAT"
+    state["card4_units"] = "WARPARTY"
+
+    early_war.evt_004_penobscot(state, shaded=True)
+
+    assert state["spaces"]["Massachusetts"].get(FORT_PAT) == 1
+    assert state["spaces"]["Massachusetts"].get(WARPARTY_U) == 3
+    assert state["spaces"]["Massachusetts"].get(VILLAGE, 0) == 0
+
+
 def test_card24_declaration_unshaded_removes_correct_pieces():
     state = _base_state()
     state["spaces"] = {
