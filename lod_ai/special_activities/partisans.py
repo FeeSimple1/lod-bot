@@ -15,7 +15,9 @@ Options (choose exactly one):
   ─ option=3  →  If **no War Parties** present: Activate 2 Underground
                  Militia; remove one of them *and* remove 1 Village.
 
-All removed cubes/Villages go to casualties or pool as per piece type.
+§4.3.2 parenthetical: "cubes are removed to Casualties" — only cubes
+(REGULAR_BRI, TORY) go to Casualties; all other pieces (War Parties,
+Villages, Forts, Militia) go to Available.
 """
 
 from __future__ import annotations
@@ -40,6 +42,14 @@ SA_NAME = "PARTISANS"      # auto-registered by special_activities/__init__.py
 ROYALIST_TAGS = (
     REGULAR_BRI, TORY, WARPARTY_A, WARPARTY_U, VILLAGE, FORT_BRI
 )
+
+# §4.3.2: "cubes are removed to Casualties" — only cubes.
+_CUBE_TAGS = frozenset((REGULAR_BRI, TORY))
+
+
+def _removal_dest(tag: str) -> str:
+    """Return 'casualties' for cubes, 'available' for everything else."""
+    return "casualties" if tag in _CUBE_TAGS else "available"
 
 
 # ---------------------------------------------------------------------------
@@ -82,10 +92,10 @@ def execute(
         # Activate 1 Militia U → A
         remove_piece(state, MILITIA_U, space_id, 1)
         add_piece(state,    MILITIA_A, space_id, 1)
-        # Remove 1 Royalist unit (priority: Tory, WarParty_A, Regular, Village, Fort)
+        # Remove 1 Royalist unit (cubes → Casualties, others → Available)
         for tag in (TORY, WARPARTY_A, REGULAR_BRI, VILLAGE, FORT_BRI, WARPARTY_U):
             if sp.get(tag, 0):
-                remove_piece(state, tag, space_id, 1, to="casualties")
+                remove_piece(state, tag, space_id, 1, to=_removal_dest(tag))
                 break
 
     elif option == 2:
@@ -93,13 +103,13 @@ def execute(
         # Activate 2 Militia U → A
         remove_piece(state, MILITIA_U, space_id, 2)
         add_piece(state,    MILITIA_A, space_id, 2)
-        # Remove 1 of those Militia A
-        remove_piece(state, MILITIA_A, space_id, 1, to="casualties")
-        # Remove 2 Royalist units (same priority order)
+        # Remove 1 of those Militia A (Militia not cubes → Available)
+        remove_piece(state, MILITIA_A, space_id, 1, to="available")
+        # Remove 2 Royalist units (cubes → Casualties, others → Available)
         removed = 0
         for tag in (TORY, WARPARTY_A, REGULAR_BRI, VILLAGE, FORT_BRI, WARPARTY_U):
             while sp.get(tag, 0) and removed < 2:
-                remove_piece(state, tag, space_id, 1, to="casualties")
+                remove_piece(state, tag, space_id, 1, to=_removal_dest(tag))
                 removed += 1
 
     else:  # option 3
@@ -107,8 +117,8 @@ def execute(
         remove_piece(state, MILITIA_U, space_id, 2)
         add_piece(state,    MILITIA_A, space_id, 2)
 
-        # Remove 1 of those newly-activated Militia A
-        remove_piece(state, MILITIA_A, space_id, 1, to="casualties")
+        # Remove 1 of those newly-activated Militia A (Militia not cubes → Available)
+        remove_piece(state, MILITIA_A, space_id, 1, to="available")
 
         # Remove 1 Village
         if sp.get(VILLAGE, 0) == 0:
