@@ -846,6 +846,10 @@ class Engine:
             "event_allowed": True,
         }
 
+        # Make human_factions available to bots via state for conditional
+        # event instructions (e.g., Card 8: "if French is a human player").
+        self.state["human_factions"] = self.human_factions
+
         if faction in self.human_factions and human_decider:
             result, legal, sandbox_state, sandbox_ctx = human_decider(faction, card, allowed, self)
             if not legal:
