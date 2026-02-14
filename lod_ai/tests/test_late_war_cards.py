@@ -166,15 +166,44 @@ def test_card67_shaded_muster_option():
     assert FRENCH in state["remain_eligible"]
 
 
-def test_card67_shaded_patriots_if_no_toa():
-    """Card 67 shaded: If Treaty not played, Patriots get the free op."""
+def test_card67_shaded_patriots_by_player_choice():
+    """Card 67 shaded: Player can choose Patriots regardless of TOA status."""
     state = _base_state()
     state["spaces"] = {"Virginia": {}}
-    state["toa_played"] = False
+    state["toa_played"] = True  # TOA played, but player still chooses Patriots
+    state["card67_faction"] = "PATRIOTS"
 
     late_war.evt_067_de_grasse(state, shaded=True)
 
     assert PATRIOTS in state["remain_eligible"]
+    ops = state.get("free_ops", [])
+    assert any(op[0] == PATRIOTS for op in ops)
+
+
+def test_card66_shaded_patriots_by_player_choice():
+    """Card 66 shaded: Player can choose Patriots regardless of TOA status."""
+    state = _base_state()
+    state["spaces"] = {"Florida": {}}
+    state["toa_played"] = True  # TOA played, but player still chooses Patriots
+    state["card66_shaded_faction"] = "PATRIOTS"
+
+    late_war.evt_066_don_bernardo(state, shaded=True)
+
+    ops = state.get("free_ops", [])
+    assert any(op[0] == PATRIOTS for op in ops)
+
+
+def test_card66_shaded_french_by_player_choice():
+    """Card 66 shaded: Player can choose French regardless of TOA status."""
+    state = _base_state()
+    state["spaces"] = {"Florida": {}}
+    state["toa_played"] = False  # TOA NOT played, but player still chooses French
+    state["card66_shaded_faction"] = "FRENCH"
+
+    late_war.evt_066_don_bernardo(state, shaded=True)
+
+    ops = state.get("free_ops", [])
+    assert any(op[0] == FRENCH for op in ops)
 
 
 # ---- Card 22: Newburgh Conspiracy ----

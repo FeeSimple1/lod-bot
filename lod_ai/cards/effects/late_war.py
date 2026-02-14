@@ -603,14 +603,18 @@ def evt_065_necker(state, shaded=False):
 @register(66)
 def evt_066_don_bernardo(state, shaded=False):
     """
-    Shaded – French (or Patriots if no Treaty) free March to and free
-             Battle in Florida with +2 Force Level.
-    (Card’s unshaded side has no free ops.)
+    Shaded – French or Patriots free March to and free Battle in
+             Florida with +2 Force Level (player choice, regardless
+             of Treaty of Alliance status).
+    (Card's unshaded side has no free ops.)
     """
     from lod_ai.util.free_ops import queue_free_op
 
     if shaded:
-        fac = FRENCH if state.get("toa_played") else PATRIOTS
+        # "French or Patriots" — player choice regardless of TOA
+        fac = state.get("card66_shaded_faction", "").upper()
+        if fac not in (FRENCH, PATRIOTS):
+            fac = FRENCH  # default
         queue_free_op(state, fac, "march", "Florida")
         queue_free_op(state, fac, "battle_plus2", "Florida")
     else:
@@ -640,11 +644,16 @@ def evt_066_don_bernardo(state, shaded=False):
 def evt_067_de_grasse(state, shaded=False):
     """
     Unshaded – Lower FNI 1; move 3 French Regulars from West Indies to Available.
-    Shaded   – French (or Patriots) free Rally or Muster in 1 space and remain Eligible.
+    Shaded   – French or Patriots free Rally or Muster in 1 space and
+               remain or become Eligible (player choice, regardless
+               of Treaty of Alliance status).
     """
     from lod_ai.util.free_ops import queue_free_op
     if shaded:
-        fac = FRENCH if state.get("toa_played") else PATRIOTS
+        # "French or Patriots" — player choice regardless of TOA
+        fac = state.get("card67_faction", "").upper()
+        if fac not in (FRENCH, PATRIOTS):
+            fac = FRENCH  # default
         # "free Rally or Muster in one space" — bot/player chooses
         op = state.get("card67_op", "rally")
         if op not in ("rally", "muster"):
