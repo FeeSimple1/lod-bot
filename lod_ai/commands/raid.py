@@ -38,7 +38,7 @@ from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent
 from lod_ai.map.adjacency import shortest_path
-from lod_ai.board.pieces      import remove_piece, add_piece      # NEW
+from lod_ai.board.pieces      import remove_piece, add_piece, flip_pieces  # NEW
 from lod_ai.economy.resources import spend                       # NEW
 
 COMMAND_NAME = "RAID"      # auto-registered by commands/__init__.py
@@ -152,8 +152,7 @@ def execute(
         # Activate one Underground WP (must exist after optional move)
         if sp.get(WARPARTY_U, 0) == 0:
             raise ValueError(f"{prov}: no Underground WP to Activate.")
-        sp[WARPARTY_U] -= 1
-        sp[WARPARTY_A] = sp.get(WARPARTY_A, 0) + 1
+        flip_pieces(state, WARPARTY_U, WARPARTY_A, prov, 1)
 
         # Place marker if pool available
         if raids_state.get("pool", 0) > 0:
