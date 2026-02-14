@@ -448,10 +448,31 @@ def evt_048_god_save_king(state, shaded=False):
         queue_free_op(state, BRITISH, "march",  target)
         queue_free_op(state, BRITISH, "battle", target)
     else:
-        # A non-British Faction moves units from three spaces containing
-        # British Regulars into any adjacent spaces.
-        non_brit_tags = [REGULAR_PAT, REGULAR_FRE, MILITIA_U, MILITIA_A,
-                         WARPARTY_U, WARPARTY_A]
+        # "A non-British Faction" (singular) moves its units from three
+        # spaces containing British Regulars into any adjacent spaces.
+        # Choose ONE non-British faction (player choice; bot: §8.3.8 random).
+        faction_unit_map = {
+            PATRIOTS: [REGULAR_PAT, MILITIA_U, MILITIA_A],
+            FRENCH: [REGULAR_FRE],
+            INDIANS: [WARPARTY_U, WARPARTY_A],
+        }
+        chosen_fac = state.get("card48_faction", "").upper()
+        if chosen_fac not in faction_unit_map:
+            # Bot default: pick the first non-British faction with units
+            # in a space containing British Regulars (§8.3.8 random in
+            # practice; deterministic fallback here).
+            for fac, tags in faction_unit_map.items():
+                for sp in state.get("spaces", {}).values():
+                    if sp.get(REGULAR_BRI, 0) and any(sp.get(t, 0) for t in tags):
+                        chosen_fac = fac
+                        break
+                if chosen_fac:
+                    break
+        if not chosen_fac:
+            push_history(state, "Card 48 shaded: no non-British faction present")
+            return
+
+        unit_tags = faction_unit_map[chosen_fac]
         moved_spaces = 0
         for name in list(state.get("spaces", {})):
             if moved_spaces == 3:
@@ -459,8 +480,8 @@ def evt_048_god_save_king(state, shaded=False):
             sp = state["spaces"].get(name, {})
             if not sp.get(REGULAR_BRI, 0):
                 continue
-            has_non_brit = any(sp.get(tag, 0) for tag in non_brit_tags)
-            if not has_non_brit:
+            has_units = any(sp.get(tag, 0) for tag in unit_tags)
+            if not has_units:
                 continue
             # Find an adjacent space to move into
             neighbors = map_adj.space_meta(name) or {}
@@ -474,12 +495,12 @@ def evt_048_god_save_king(state, shaded=False):
                     break
             if not dest:
                 continue
-            for tag in non_brit_tags:
+            for tag in unit_tags:
                 qty = sp.get(tag, 0)
                 if qty:
                     move_piece(state, tag, name, dest, qty)
             moved_spaces += 1
-            push_history(state, f"Card 48 shaded: non-British units move from {name} to {dest}")
+            push_history(state, f"Card 48 shaded: {chosen_fac} units move from {name} to {dest}")
 
 
 # 52  FRENCH FLEET ARRIVES IN THE WRONG SPOT
@@ -582,14 +603,18 @@ def evt_065_necker(state, shaded=False):
 @register(66)
 def evt_066_don_bernardo(state, shaded=False):
     """
-    Shaded – French (or Patriots if no Treaty) free March to and free
-             Battle in Florida with +2 Force Level.
-    (Card’s unshaded side has no free ops.)
+    Shaded – French or Patriots free March to and free Battle in
+             Florida with +2 Force Level (player choice, regardless
+             of Treaty of Alliance status).
+    (Card's unshaded side has no free ops.)
     """
     from lod_ai.util.free_ops import queue_free_op
 
     if shaded:
-        fac = FRENCH if state.get("toa_played") else PATRIOTS
+        # "French or Patriots" — player choice regardless of TOA
+        fac = state.get("card66_shaded_faction", "").upper()
+        if fac not in (FRENCH, PATRIOTS):
+            fac = FRENCH  # default
         queue_free_op(state, fac, "march", "Florida")
         queue_free_op(state, fac, "battle_plus2", "Florida")
     else:
@@ -619,11 +644,16 @@ def evt_066_don_bernardo(state, shaded=False):
 def evt_067_de_grasse(state, shaded=False):
     """
     Unshaded – Lower FNI 1; move 3 French Regulars from West Indies to Available.
-    Shaded   – French (or Patriots) free Rally or Muster in 1 space and remain Eligible.
+    Shaded   – French or Patriots free Rally or Muster in 1 space and
+               remain or become Eligible (player choice, regardless
+               of Treaty of Alliance status).
     """
     from lod_ai.util.free_ops import queue_free_op
     if shaded:
-        fac = FRENCH if state.get("toa_played") else PATRIOTS
+        # "French or Patriots" — player choice regardless of TOA
+        fac = state.get("card67_faction", "").upper()
+        if fac not in (FRENCH, PATRIOTS):
+            fac = FRENCH  # default
         # "free Rally or Muster in one space" — bot/player chooses
         op = state.get("card67_op", "rally")
         if op not in ("rally", "muster"):
@@ -835,19 +865,27 @@ def evt_085_mississippi_raids(state, shaded=False):
 def evt_087_lenape(state, shaded=False):
     """
     Unshaded – Remove one piece in Pennsylvania. Remain Eligible.
+               Player chooses which piece (bot: §8.3.8 or card instruction).
     Shaded   – (none)
     """
     if shaded:
         return
     loc = "Pennsylvania"
     sp = state.get("spaces", {}).get(loc, {})
-    # Remove one piece of any type (prioritise units before bases)
-    for tag in (WARPARTY_U, WARPARTY_A, MILITIA_U, MILITIA_A, REGULAR_PAT,
-                REGULAR_BRI, REGULAR_FRE, TORY, FORT_BRI, FORT_PAT, VILLAGE):
-        if sp.get(tag, 0):
-            remove_piece(state, tag, loc, 1, to="available")
-            push_history(state, f"Card 87 unshaded: removed 1 {tag} in {loc}")
-            break
+
+    # Player chooses which piece to remove via state override
+    chosen = state.get("card87_piece", "").strip()
+    if chosen and sp.get(chosen, 0):
+        remove_piece(state, chosen, loc, 1, to="available")
+        push_history(state, f"Card 87 unshaded: removed 1 {chosen} in {loc}")
+    else:
+        # Bot fallback: remove first piece found (units before bases)
+        for tag in (WARPARTY_U, WARPARTY_A, MILITIA_U, MILITIA_A, REGULAR_PAT,
+                    REGULAR_BRI, REGULAR_FRE, TORY, FORT_BRI, FORT_PAT, VILLAGE):
+            if sp.get(tag, 0):
+                remove_piece(state, tag, loc, 1, to="available")
+                push_history(state, f"Card 87 unshaded: removed 1 {tag} in {loc}")
+                break
     # Remain Eligible
     executor = state.get("active")
     if executor:

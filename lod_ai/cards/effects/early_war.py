@@ -83,22 +83,41 @@ def evt_004_penobscot(state, shaded=False):
     """
     Unshaded – Expedition fails: Patriot Resources -2; remove 3 Patriot Militia.
     Shaded   – Expedition succeeds: place 1 Fort or Village and 3 Militia or
-               War Parties in Massachusetts.
+               War Parties in Massachusetts.  Player chooses piece type freely.
     """
     if shaded:
-        executor = str(state.get("active", "")).upper()
         target = "Massachusetts"
-        if executor in (PATRIOTS, FRENCH):
+        # "Fort or Village" — player chooses freely via state override
+        base_choice = state.get("card4_base", "").upper()
+        if base_choice == "VILLAGE":
+            place_with_caps(state, VILLAGE, target)
+        elif base_choice == "FORT_BRI":
+            place_with_caps(state, FORT_BRI, target)
+        elif base_choice == "FORT_PAT":
             place_with_caps(state, FORT_PAT, target)
-            place_piece(state, MILITIA_U, target, 3)
-        elif executor in (BRITISH, INDIANS):
-            # "Fort or Village": try Village first, fall back to Fort_BRI
-            placed = place_with_caps(state, VILLAGE, target)
-            if placed == 0:
-                place_with_caps(state, FORT_BRI, target)
-            place_piece(state, WARPARTY_U, target, 3)
         else:
-            push_history(state, "Penobscot shaded: no executing faction; no pieces placed")
+            # Default: faction-aligned base
+            executor = str(state.get("active", "")).upper()
+            if executor in (BRITISH, INDIANS):
+                placed = place_with_caps(state, VILLAGE, target)
+                if placed == 0:
+                    place_with_caps(state, FORT_BRI, target)
+            else:
+                place_with_caps(state, FORT_PAT, target)
+
+        # "Militia or War Parties" — player chooses freely via state override
+        unit_choice = state.get("card4_units", "").upper()
+        if unit_choice == "WARPARTY":
+            place_piece(state, WARPARTY_U, target, 3)
+        elif unit_choice == "MILITIA":
+            place_piece(state, MILITIA_U, target, 3)
+        else:
+            # Default: faction-aligned units
+            executor = str(state.get("active", "")).upper()
+            if executor in (BRITISH, INDIANS):
+                place_piece(state, WARPARTY_U, target, 3)
+            else:
+                place_piece(state, MILITIA_U, target, 3)
     else:
         add_resource(state, PATRIOTS, -2)
         # Remove 3 Militia anywhere on the map, preferring Underground
@@ -155,18 +174,20 @@ def evt_010_franklin_to_france(state, shaded=False):
         shift_support(state, c1, +1)
         shift_support(state, c2, +1)
 
-# 13  “…THE ORIGIN OF ALL OUR MISFORTUNES”
+# 13  "…THE ORIGIN OF ALL OUR MISFORTUNES"
 @register(13)
 def evt_013_origin_misfortunes(state, shaded=False):
     """
-    Unshaded – Patriot desertion this Winter.
+    Unshaded – Execute Patriot Desertion as per Winter Quarters Round (§6.6.1).
     Shaded   – In up to 4 spaces with Militia, Patriots add 1 Active Militia.
     """
     if shaded:
         for space in _pick_spaces_with_militia(state, max_spaces=4):
             place_piece(state, MILITIA_A, space, 1)
     else:
-        state["winter_flag"] = "PAT_DESERTION"
+        from lod_ai.util.year_end import _patriot_desertion
+        _patriot_desertion(state)
+        push_history(state, "Card 13 unshaded: Patriot Desertion executed immediately")
 
 # 15  MORGAN’S RIFLES
 @register(15)
@@ -266,35 +287,48 @@ def evt_028_moores_creek(state, shaded=False):
 @register(29)
 def evt_029_bancroft(state, shaded=False):
     """
-    Unshaded – Patriots AND Indians must Activate their Militia or
+    Unshaded – Patriots OR Indians must Activate their Militia or
     War Parties until 1/2 of them are Active (rounded down).
+    Card says "or" — choose ONE faction (not both).
+    Bot: British/Indian bot targets Patriots; Patriot/French bot targets Indians.
     """
     if shaded:
         return
 
-    def _activate_faction(hidden_tag, active_tag, faction_name):
-        total = sum(sp.get(hidden_tag, 0) + sp.get(active_tag, 0)
-                    for sp in state["spaces"].values())
-        if total == 0:
-            return
-        target_active = total // 2
-        cur_active = sum(sp.get(active_tag, 0) for sp in state["spaces"].values())
-        need = max(0, target_active - cur_active)
-        if need == 0:
-            return
-        flipped = 0
-        for name in list(state["spaces"]):
-            if flipped >= need:
-                break
-            here = state["spaces"][name].get(hidden_tag, 0)
-            if here:
-                take = min(here, need - flipped)
-                flipped += flip_pieces(state, hidden_tag, active_tag, name, take)
-        push_history(state, f"Bancroft activates {flipped} {faction_name} (to {target_active} Active)")
+    # "Patriots or Indians" — choose ONE faction
+    target_fac = state.get("card29_target", "").upper()
+    if target_fac not in (PATRIOTS, INDIANS):
+        # Bot default per ruling: British/Indian bot targets Patriots,
+        # Patriot/French bot targets Indians.
+        active = str(state.get("active", "")).upper()
+        if active in (BRITISH, INDIANS):
+            target_fac = PATRIOTS
+        else:
+            target_fac = INDIANS
 
-    # Both factions activate their respective pieces
-    _activate_faction(MILITIA_U, MILITIA_A, "Militia")
-    _activate_faction(WARPARTY_U, WARPARTY_A, "War Parties")
+    if target_fac == PATRIOTS:
+        hidden_tag, active_tag, label = MILITIA_U, MILITIA_A, "Militia"
+    else:
+        hidden_tag, active_tag, label = WARPARTY_U, WARPARTY_A, "War Parties"
+
+    total = sum(sp.get(hidden_tag, 0) + sp.get(active_tag, 0)
+                for sp in state["spaces"].values())
+    if total == 0:
+        return
+    target_active = total // 2
+    cur_active = sum(sp.get(active_tag, 0) for sp in state["spaces"].values())
+    need = max(0, target_active - cur_active)
+    if need == 0:
+        return
+    flipped = 0
+    for name in list(state["spaces"]):
+        if flipped >= need:
+            break
+        here = state["spaces"][name].get(hidden_tag, 0)
+        if here:
+            take = min(here, need - flipped)
+            flipped += flip_pieces(state, hidden_tag, active_tag, name, take)
+    push_history(state, f"Bancroft activates {flipped} {label} (to {target_active} Active)")
 
 # 30  HESSIANS
 @register(30)
@@ -819,7 +853,7 @@ def evt_083_carleton_negotiates(state, shaded=False):
 @register(84)
 def evt_084_six_nations(state, shaded=False):
     """
-    Unshaded – Indians free Gather in two Colonies.
+    Unshaded – Indians free Gather in two Colonies (Colony restriction).
     Shaded   – Patriots remove one Village.
     """
     from lod_ai.util.free_ops import queue_free_op
@@ -834,8 +868,15 @@ def evt_084_six_nations(state, shaded=False):
             f"Merciless Indian Savages (shaded): removed {removed} Village" + (f" in {target}" if target else ""),
         )
         return
-    queue_free_op(state, INDIANS, "gather")
-    queue_free_op(state, INDIANS, "gather")
+
+    # "in two Colonies" — player/bot selects which Colonies
+    override = state.get("card84_colonies")
+    if isinstance(override, list) and len(override) >= 2:
+        colonies = override[:2]
+    else:
+        colonies = pick_colonies(state, 2)
+    for col in colonies:
+        queue_free_op(state, INDIANS, "gather", col)
 
 
 # 86  STOCKBRIDGE INDIANS
