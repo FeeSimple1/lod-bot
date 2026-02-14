@@ -853,7 +853,7 @@ def evt_083_carleton_negotiates(state, shaded=False):
 @register(84)
 def evt_084_six_nations(state, shaded=False):
     """
-    Unshaded – Indians free Gather in two Colonies.
+    Unshaded – Indians free Gather in two Colonies (Colony restriction).
     Shaded   – Patriots remove one Village.
     """
     from lod_ai.util.free_ops import queue_free_op
@@ -868,8 +868,15 @@ def evt_084_six_nations(state, shaded=False):
             f"Merciless Indian Savages (shaded): removed {removed} Village" + (f" in {target}" if target else ""),
         )
         return
-    queue_free_op(state, INDIANS, "gather")
-    queue_free_op(state, INDIANS, "gather")
+
+    # "in two Colonies" — player/bot selects which Colonies
+    override = state.get("card84_colonies")
+    if isinstance(override, list) and len(override) >= 2:
+        colonies = override[:2]
+    else:
+        colonies = pick_colonies(state, 2)
+    for col in colonies:
+        queue_free_op(state, INDIANS, "gather", col)
 
 
 # 86  STOCKBRIDGE INDIANS

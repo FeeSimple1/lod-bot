@@ -551,3 +551,46 @@ def test_card13_shaded_does_not_set_winter_flag():
     assert "winter_flag" not in state
     # Militia count should stay the same or increase (not deserted)
     assert state["spaces"]["Georgia"].get(MILITIA_U, 0) >= 2
+
+
+def test_card84_unshaded_gather_restricted_to_colonies():
+    """Card 84 unshaded: 'Indians free Gather in two Colonies' — the queued
+    free ops must specify Colony locations, not be unrestricted."""
+    state = _base_state()
+    state["spaces"] = {
+        "Virginia": {"type": "Colony"},
+        "Georgia": {"type": "Colony"},
+        "Boston": {"type": "City"},
+        "Northwest": {"type": "Reserve"},
+    }
+    state["free_ops"] = []
+
+    early_war.evt_084_six_nations(state, shaded=False)
+
+    # Should queue exactly 2 Gather ops, each with a Colony location
+    ops = state["free_ops"]
+    assert len(ops) == 2
+    for fac, op_name, loc in ops:
+        assert fac == "INDIANS"
+        assert op_name == "gather"
+        assert loc is not None  # must NOT be None (unrestricted)
+        assert loc in ("Virginia", "Georgia")  # must be a Colony
+
+
+def test_card84_unshaded_player_override_colonies():
+    """Card 84 unshaded: Player can specify which colonies via state override."""
+    state = _base_state()
+    state["spaces"] = {
+        "Virginia": {"type": "Colony"},
+        "Georgia": {"type": "Colony"},
+        "South_Carolina": {"type": "Colony"},
+    }
+    state["free_ops"] = []
+    state["card84_colonies"] = ["Georgia", "South_Carolina"]
+
+    early_war.evt_084_six_nations(state, shaded=False)
+
+    ops = state["free_ops"]
+    assert len(ops) == 2
+    assert ops[0] == ("INDIANS", "gather", "Georgia")
+    assert ops[1] == ("INDIANS", "gather", "South_Carolina")
