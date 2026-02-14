@@ -40,6 +40,11 @@ def is_adjacent(a: str, b: str) -> bool:
     return b in _ADJ.get(a, set())
 
 
+def adjacent_spaces(space_id: str) -> Set[str]:
+    """Return the set of spaces adjacent to *space_id*."""
+    return set(_ADJ.get(space_id, set()))
+
+
 def space_type(space_id: str) -> str | None:
     """Return 'City', 'Colony', or 'Reserve' for the given space."""
     return _TYPE.get(space_id)
