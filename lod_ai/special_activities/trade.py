@@ -77,10 +77,9 @@ def execute(
         spend(state, BRITISH, transfer)
         add_res(state, INDIANS, transfer)
     else:           # transfer == 0
-        gain = state["rng"].randint(1, 3)
-        state.setdefault("rng_log", []).append(("Trade D3", gain))
-        state["resources"][INDIANS] = min(MAX_RESOURCES, state["resources"][INDIANS] + gain)
-        push_history(state, f"Indians Trade: +{gain} Resources (to {state['resources'][INDIANS]})")
+        # §4.4.1: "add one Resource" — flat +1, not a dice roll
+        add_res(state, INDIANS, 1)
+        push_history(state, f"Indians Trade: +1 Resource (to {state['resources'][INDIANS]})")
 
     # Activate exactly one WP
     remove_piece(state, WARPARTY_U, space_id, 1)

@@ -70,12 +70,14 @@ def execute(
     if sp.get(WARPARTY_U, 0) == 0:
         raise ValueError("War Path needs an Underground War-Party.")
 
-    rebel_cubes = sum(sp.get(t, 0) for t in REB_CUBE_TAGS)
-    if option != 3 and rebel_cubes == 0 and sp.get(FORT_PAT, 0) == 0:
+    rebel_units = sum(sp.get(t, 0) for t in REB_CUBE_TAGS)
+    if option in (1, 2) and rebel_units == 0:
+        raise ValueError("Options 1/2 require Rebellion units (cubes/Militia) present.")
+    if option != 3 and rebel_units == 0 and sp.get(FORT_PAT, 0) == 0:
         raise ValueError("No Rebellion pieces here for War Path.")
 
-    if option == 3 and rebel_cubes > 0:
-        raise ValueError("Option 3 only when no Rebellion cubes are present.")
+    if option == 3 and rebel_units > 0:
+        raise ValueError("Option 3 only when no Rebellion units are present.")
     if option == 3 and sp.get(FORT_PAT, 0) == 0:
         raise ValueError("Option 3 requires a Patriot Fort present.")
 
@@ -88,10 +90,12 @@ def execute(
         remove_piece(state, WARPARTY_U, space_id, 1)
         add_piece(state,    WARPARTY_A, space_id, 1)
 
-        # remove 1 Rebellion piece (priority order)
-        for tag in (MILITIA_A, MILITIA_U, REGULAR_PAT, REGULAR_FRE, FORT_PAT):
+        # remove 1 Rebellion unit (§4.4.2: cubes and Forts → Casualties;
+        # Militia are not cubes → Available; Forts handled by option 3 only)
+        _REB_UNIT_TAGS = (REGULAR_PAT, REGULAR_FRE, MILITIA_A, MILITIA_U)
+        for tag in _REB_UNIT_TAGS:
             if sp.get(tag, 0):
-                box = "available" if tag == FORT_PAT else "casualties"
+                box = "casualties" if tag in (REGULAR_PAT, REGULAR_FRE) else "available"
                 remove_piece(state, tag, space_id, 1, to=box)
                 break
 
@@ -103,11 +107,12 @@ def execute(
         # remove one of the freshly-activated WP-A to Available
         remove_piece(state, WARPARTY_A, space_id, 1, to="available")
 
-        # remove 2 Rebellion pieces
+        # remove 2 Rebellion units (cubes → Casualties, Militia → Available)
         removed = 0
-        for tag in (MILITIA_A, MILITIA_U, REGULAR_PAT, REGULAR_FRE, FORT_PAT):
+        _REB_UNIT_TAGS = (REGULAR_PAT, REGULAR_FRE, MILITIA_A, MILITIA_U)
+        for tag in _REB_UNIT_TAGS:
             while sp.get(tag, 0) and removed < 2:
-                box = "available" if tag == FORT_PAT else "casualties"
+                box = "casualties" if tag in (REGULAR_PAT, REGULAR_FRE) else "available"
                 remove_piece(state, tag, space_id, 1, to=box)
                 removed += 1
 
@@ -117,20 +122,23 @@ def execute(
         add_piece(state,    WARPARTY_A, space_id, 2)
 
         remove_piece(state, WARPARTY_A, space_id, 1, to="available")
-        remove_piece(state, FORT_PAT,        space_id, 1, to="available")
+        # §4.4.2: "cubes and Forts are removed to Casualties"
+        remove_piece(state, FORT_PAT,        space_id, 1, to="casualties")
 
-    # Base War Path militia removal (plus Brant capability)
+    # Brant capability (leader_capabilities.txt):
+    # "War Path removes 1 additional Militia in the space."
     brant_here = leader_location(state, "LEADER_BRANT") == space_id
-    extra_militia = 1 + ctx.get("war_path_extra_militia", 0)
+    extra_militia = ctx.get("war_path_extra_militia", 0)
     if brant_here:
         extra_militia += 1
 
     removed_bonus = 0
     while extra_militia and (sp.get(MILITIA_A, 0) or sp.get(MILITIA_U, 0)):
+        # Militia are not cubes → Available
         if sp.get(MILITIA_A, 0):
-            remove_piece(state, MILITIA_A, space_id, 1, to="casualties")
+            remove_piece(state, MILITIA_A, space_id, 1, to="available")
         else:
-            remove_piece(state, MILITIA_U, space_id, 1, to="casualties")
+            remove_piece(state, MILITIA_U, space_id, 1, to="available")
         extra_militia -= 1
         removed_bonus += 1
 

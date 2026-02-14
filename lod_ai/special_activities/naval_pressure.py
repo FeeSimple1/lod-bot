@@ -150,11 +150,14 @@ def _exec_french(
     bloc = state.setdefault("markers", {}).setdefault(BLOCKADE, {"pool": 0, "on_map": set()})
     bloc.setdefault("on_map", set())
 
-    # Raise FNI but cap at # markers in W.I.
+    # §4.5.3: "FNI may not be higher than the number of Squadron/Blockade
+    # available to place on Cities."  The total in-play markers (pool + on
+    # cities) sets the ceiling — markers still in Unavailable don't count.
     wi_blks = bloc.get("pool", 0)
-    max_fni = wi_blks
+    on_map_count = len(bloc.get("on_map", set()))
+    max_fni = wi_blks + on_map_count
     if state.get("fni_level", 0) + 1 > max_fni:
-        raise ValueError(f"Cannot raise FNI above {max_fni} (limited by markers).")
+        raise ValueError(f"Cannot raise FNI above {max_fni} (limited by markers in play).")
     adjust_fni(state, +1)
 
     if wi_blks:   # Option A: move one marker from W.I. to a city
