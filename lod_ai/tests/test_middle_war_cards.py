@@ -220,3 +220,37 @@ def test_card77_burgoyne_unshaded_flips_warparties_underground():
     assert state["spaces"]["Quebec"].get(WARPARTY_U, 0) == 2
     # Available pool should NOT be corrupted (no WP stolen from map)
     assert state["available"].get(WARPARTY_U, 0) == 0
+
+
+def test_card12_unshaded_executes_patriot_desertion_immediately():
+    """Card 12 unshaded: Execute Patriot Desertion immediately (§6.6.1),
+    not deferred via winter_flag."""
+    state = _base_state()
+    state["spaces"] = {
+        "Virginia": {"type": "Colony", MILITIA_U: 5, REGULAR_PAT: 5},
+        "Georgia": {"type": "Colony", MILITIA_U: 5},
+    }
+    state["support"] = {"Virginia": 0, "Georgia": 0}
+
+    middle_war.evt_012_martha_to_valley_forge(state, shaded=False)
+
+    # 10 total Militia → remove 2 (1-in-5).  5 Continentals → remove 1.
+    total_mil = sum(
+        sp.get(MILITIA_U, 0) + sp.get(MILITIA_A, 0)
+        for sp in state["spaces"].values()
+    )
+    total_con = sum(
+        sp.get(REGULAR_PAT, 0)
+        for sp in state["spaces"].values()
+    )
+    assert total_mil == 8   # 10 - 2
+    assert total_con == 4   # 5 - 1
+    # Must NOT set winter_flag
+    assert "winter_flag" not in state
+
+
+def test_card12_shaded_resources():
+    """Card 12 shaded: Patriot Resources +5."""
+    state = _base_state()
+    middle_war.evt_012_martha_to_valley_forge(state, shaded=True)
+    assert state["resources"][PATRIOTS] == 5
