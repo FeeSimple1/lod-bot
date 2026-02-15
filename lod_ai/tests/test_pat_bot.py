@@ -826,3 +826,275 @@ def test_p10_rabble_possible_checks_support():
         "support": {"Boston": C.ACTIVE_OPPOSITION, "New_York": C.NEUTRAL},
     }
     assert bot._rabble_possible(state_mixed) is True
+
+
+# ===================================================================
+# Tests for audit-report fixes
+# ===================================================================
+
+def _full_state(**overrides):
+    """Build a well-formed state dict for Patriot bot tests."""
+    base = {
+        "spaces": {
+            "Boston": {},
+            "New_York": {},
+            "Massachusetts": {},
+            "Connecticut_Rhode_Island": {},
+            "Philadelphia": {},
+            "Virginia": {},
+        },
+        "resources": {C.PATRIOTS: 10, C.BRITISH: 10, C.FRENCH: 10, C.INDIANS: 10},
+        "available": {C.MILITIA_U: 10, C.FORT_PAT: 3, C.REGULAR_PAT: 10},
+        "unavailable": {},
+        "support": {},
+        "control": {},
+        "rng": random.Random(42),
+        "history": [],
+        "casualties": {},
+        "markers": {},
+    }
+    base.update(overrides)
+    return base
+
+
+# ---------- Rally/Rabble recursion guard ----------
+
+def test_rally_rabble_no_infinite_loop():
+    """Rally<->Rabble fallback must not recurse infinitely.
+    With no spaces at all, both chains fail and terminate cleanly."""
+    bot = PatriotBot()
+    state = _full_state()
+    state["spaces"] = {}  # No spaces → both Rally and Rabble fail
+    state["available"] = {}
+    # Both chains should terminate without hanging
+    assert bot._rally_chain(state) is False
+    assert bot._rabble_chain(state) is False
+
+
+def test_rally_chain_from_rabble_stops_recursion():
+    """When Rally fails with _from_rabble=True, it returns False instead of
+    recursing into Rabble (which would cause an infinite loop)."""
+    bot = PatriotBot()
+    state = _full_state()
+    state["spaces"] = {}  # No spaces → Rally fails
+    state["available"] = {}
+    assert bot._rally_chain(state, _from_rabble=True) is False
+    assert bot._rabble_chain(state, _from_rally=True) is False
+
+
+# ---------- Rally returns False when nothing can be done ----------
+
+def test_rally_returns_false_when_nothing_possible():
+    """_execute_rally should return False when no spaces can be rallied."""
+    bot = PatriotBot()
+    state = _full_state()
+    # Set everything to Active Support → can't rally there
+    for sid in state["spaces"]:
+        state["support"][sid] = C.ACTIVE_SUPPORT
+    assert bot._execute_rally(state) is False
+
+
+# ---------- Rabble-Rousing has no 4-space cap ----------
+
+def test_rabble_no_4space_cap():
+    """P11: Rabble-Rousing should select all eligible spaces (limited by resources only)."""
+    bot = PatriotBot()
+    state = _full_state(
+        resources={C.PATRIOTS: 6, C.BRITISH: 10, C.FRENCH: 10, C.INDIANS: 10},
+    )
+    # 6 spaces not at Active Opposition → all should be selectable with 6 resources
+    for sid in state["spaces"]:
+        state["support"][sid] = C.NEUTRAL
+        state["spaces"][sid][C.MILITIA_U] = 1  # needs Underground Militia for eligibility
+    result = bot._execute_rabble(state)
+    assert result is True
+    # Resources should be spent (6 spaces × 1 = 6)
+    assert state["resources"][C.PATRIOTS] == 0
+
+
+# ---------- Control simulation helpers ----------
+
+def test_rebel_pieces_count():
+    """_rebel_pieces_in should count all Rebellion pieces."""
+    sp = {
+        C.REGULAR_PAT: 3, C.REGULAR_FRE: 2,
+        C.MILITIA_A: 1, C.MILITIA_U: 2,
+        C.FORT_PAT: 1,
+    }
+    assert PatriotBot._rebel_pieces_in(sp) == 9
+
+
+def test_royalist_pieces_count():
+    """_royalist_pieces_in should count all Royalist pieces."""
+    sp = {
+        C.REGULAR_BRI: 2, C.TORY: 3,
+        C.WARPARTY_A: 1, C.WARPARTY_U: 1,
+        C.FORT_BRI: 1, C.VILLAGE: 2,
+    }
+    assert PatriotBot._royalist_pieces_in(sp) == 10
+
+
+def test_would_gain_rebel_control():
+    """_would_gain_rebel_control returns True when adding pieces tips the balance."""
+    bot = PatriotBot()
+    state = _full_state()
+    state["spaces"]["Boston"] = {
+        C.REGULAR_PAT: 1, C.REGULAR_BRI: 2,
+    }
+    state["control"] = {"Boston": "BRITISH"}
+    # 1 rebel vs 2 royalist: need 2 more to gain (3 > 2)
+    assert bot._would_gain_rebel_control(state, "Boston", to_add=2) is True
+    assert bot._would_gain_rebel_control(state, "Boston", to_add=1) is False
+
+
+def test_would_lose_rebel_control():
+    """_would_lose_rebel_control returns True when removing pieces loses control."""
+    bot = PatriotBot()
+    state = _full_state()
+    state["spaces"]["Boston"] = {
+        C.REGULAR_PAT: 2, C.REGULAR_BRI: 1,
+    }
+    state["control"] = {"Boston": "REBELLION"}
+    # 2 rebel - 1 removed = 1 vs 1 royalist → tie → control lost (need strict majority)
+    assert bot._would_lose_rebel_control(state, "Boston", {C.REGULAR_PAT: 1}) is True
+    # Removing 0 should keep control
+    assert bot._would_lose_rebel_control(state, "Boston", {}) is False
+
+
+# ---------- March leave-behind rules ----------
+
+def test_march_movable_from_keeps_fort_guard():
+    """_movable_from should leave 1 unit with Patriot Fort."""
+    bot = PatriotBot()
+    state = _full_state()
+    state["spaces"]["Boston"] = {
+        C.REGULAR_PAT: 2, C.MILITIA_A: 1, C.FORT_PAT: 1,
+    }
+    state["support"]["Boston"] = C.ACTIVE_OPPOSITION
+    state["control"]["Boston"] = "REBELLION"
+    movable = bot._movable_from(state, "Boston")
+    total = sum(movable.values())
+    # Should leave at least 1 unit behind for the Fort
+    remaining = 3 - total
+    assert remaining >= 1
+
+
+def test_march_movable_from_keeps_control():
+    """_movable_from should not allow losing Rebel Control."""
+    bot = PatriotBot()
+    state = _full_state()
+    state["spaces"]["Boston"] = {
+        C.REGULAR_PAT: 2, C.REGULAR_BRI: 1,
+    }
+    state["control"]["Boston"] = "REBELLION"
+    state["support"]["Boston"] = C.ACTIVE_OPPOSITION
+    movable = bot._movable_from(state, "Boston")
+    total = sum(movable.values())
+    # 2 rebel - moved must stay > 1 royalist. So max move = 2-1-1 = 0
+    assert total == 0
+
+
+# ---------- Card 51 force_if_51 ----------
+
+def test_card_51_directive_is_force_if_51():
+    """Card 51 should use force_if_51 directive (conditional on March-to-Battle)."""
+    from lod_ai.bots.event_instructions import PATRIOTS
+    assert PATRIOTS[51] == "force_if_51"
+
+
+def test_card_51_force_condition_met_when_battle_possible():
+    """Card 51: force_if_51 returns True when March could set up a Battle."""
+    bot = PatriotBot()
+    state = _full_state()
+    # Boston has 3 British (target), adjacent Massachusetts has 5 Rebels (can march in)
+    state["spaces"]["Boston"] = {
+        C.REGULAR_BRI: 3, C.TORY: 0, C.WARPARTY_A: 0,
+        C.REGULAR_PAT: 1, C.MILITIA_A: 0,
+    }
+    state["spaces"]["Massachusetts"] = {
+        C.REGULAR_PAT: 3, C.MILITIA_A: 3,
+    }
+    card = {"id": 51}
+    assert bot._force_condition_met("force_if_51", state, card) is True
+
+
+def test_card_51_force_condition_not_met():
+    """Card 51: force_if_51 returns False when no March-to-Battle is possible."""
+    bot = PatriotBot()
+    state = _full_state()
+    # No British pieces anywhere → no Battle target
+    for sid in state["spaces"]:
+        state["spaces"][sid] = {}
+    card = {"id": 51}
+    assert bot._force_condition_met("force_if_51", state, card) is False
+
+
+# ---------- Win-the-Day helpers ----------
+
+def test_best_blockade_city_selects_most_support():
+    """_best_blockade_city should pick the City with the highest Support level."""
+    bot = PatriotBot()
+    state = _full_state()
+    state["support"] = {
+        "Boston": C.ACTIVE_SUPPORT,
+        "New_York_City": C.PASSIVE_SUPPORT,
+        "Philadelphia": C.NEUTRAL,
+    }
+    result = bot._best_blockade_city(state)
+    assert result == "Boston"
+
+
+# ---------- OPS Summary methods ----------
+
+def test_ops_redeploy_washington():
+    """ops_redeploy_washington should return the space with most Continentals."""
+    bot = PatriotBot()
+    state = _full_state()
+    state["spaces"]["Boston"] = {C.REGULAR_PAT: 3}
+    state["spaces"]["New_York"] = {C.REGULAR_PAT: 5}
+    state["spaces"]["Philadelphia"] = {C.REGULAR_PAT: 1}
+    result = bot.ops_redeploy_washington(state)
+    assert result == "New_York"
+
+
+def test_ops_bs_trigger_needs_toa_and_washington():
+    """ops_bs_trigger should only return True after ToA with 4+ Continentals at Washington."""
+    bot = PatriotBot()
+    state = _full_state()
+    state["spaces"]["Boston"] = {C.REGULAR_PAT: 4}
+    state["leaders"] = {"LEADER_WASHINGTON": "Boston"}
+
+    # No ToA → False
+    state["toa_played"] = False
+    assert bot.ops_bs_trigger(state) is False
+
+    # ToA but Washington not at 4+ Continentals
+    state["toa_played"] = True
+    state["spaces"]["Boston"][C.REGULAR_PAT] = 3
+    assert bot.ops_bs_trigger(state) is False
+
+    # ToA + 4+ Continentals → True
+    state["spaces"]["Boston"][C.REGULAR_PAT] = 4
+    assert bot.ops_bs_trigger(state) is True
+
+
+def test_ops_patriot_desertion_priority():
+    """ops_patriot_desertion_priority should prefer removals that don't change control."""
+    bot = PatriotBot()
+    state = _full_state()
+    state["spaces"]["Boston"] = {
+        C.REGULAR_PAT: 3, C.MILITIA_A: 2,
+        C.REGULAR_BRI: 1,
+    }
+    state["spaces"]["New_York"] = {
+        C.REGULAR_PAT: 2,
+        C.REGULAR_BRI: 1,
+    }
+    state["control"] = {"Boston": "REBELLION", "New_York": "REBELLION"}
+    result = bot.ops_patriot_desertion_priority(state)
+    assert len(result) > 0
+    # First entries should be those that don't change control (changes=0)
+    # Boston with 5 rebels vs 1 royalist: removing 1 won't change control
+    # New_York with 2 rebels vs 1 royalist: removing 1 changes control (2-1=1, not > 1)
+    first_sid, first_tag = result[0]
+    assert first_sid == "Boston"  # safe removal first
