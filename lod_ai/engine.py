@@ -514,32 +514,35 @@ class Engine:
     def _execute_bot_brilliant_stroke(self, faction: str) -> bool:
         """Execute a bot BS: LimCom + SA + LimCom, per §8.3.7.
 
+        Consults the faction's bot flowchart via get_bs_limited_command()
+        to determine the first valid Limited Command involving the Leader.
+
         Returns True if the BS executed successfully, False if aborted
         (no valid Limited Command involving the leader).
         """
-        # Find leader space that meets the piece threshold
-        leader_space = None
-        entry = bs._LEADER_PIECE_THRESHOLD.get(faction)
-        if not entry:
+        bot = self.bots.get(faction)
+        if not bot:
+            push_history(self.state, f"{faction} BS aborted — no bot instance")
             return False
-        leaders, piece_tags, threshold = entry
-        for leader in leaders:
-            loc = bs.leader_location(self.state, leader)
-            if not loc:
-                continue
-            sp = self.state.get("spaces", {}).get(loc, {})
-            total = sum(sp.get(tag, 0) for tag in piece_tags)
-            if total >= threshold:
-                leader_space = loc
-                break
+
+        # Find leader space that meets the piece threshold
+        leader_space = bot._find_bs_leader_space(self.state)
         if not leader_space:
             push_history(self.state, f"{faction} BS aborted — no leader with pieces")
             return False
 
-        # ---- Step 1: First Limited Command in the leader's space -----
-        limcom1_ok = self._try_bs_limited_command(faction, leader_space)
-        if not limcom1_ok:
+        # ---- Step 1: First Limited Command per flowchart priorities ---
+        cmd = bot.get_bs_limited_command(self.state)
+        if not cmd:
             push_history(self.state, f"{faction} BS aborted — no valid Limited Command at {leader_space}")
+            return False
+
+        self._reset_trace_on(self.state)
+        try:
+            self.dispatcher.execute(cmd, faction=faction, space=leader_space, limited=True, free=True)
+            normalize_state(self.state)
+        except Exception:
+            push_history(self.state, f"{faction} BS aborted — {cmd} failed at {leader_space}")
             return False
 
         # ---- Step 2: SA executed INDEPENDENTLY -----------------------
@@ -550,40 +553,6 @@ class Engine:
 
         push_history(self.state, f"{faction} Brilliant Stroke executed")
         return True
-
-    def _try_bs_limited_command(self, faction: str, space: str) -> bool:
-        """Try the faction's highest-priority LimCom in *space*.
-        Returns True if a command executed."""
-        sp = self.state.get("spaces", {}).get(space, {})
-
-        # Priority: Battle (if enemies present) > Muster/Rally/Gather > March
-        # Determine if enemies are in the space
-        if faction in (C.BRITISH, C.INDIANS):
-            enemy_count = sum(sp.get(t, 0) for t in (C.REGULAR_PAT, C.REGULAR_FRE, C.MILITIA_A, C.MILITIA_U))
-        else:
-            enemy_count = sum(sp.get(t, 0) for t in (C.REGULAR_BRI, C.TORY, C.WARPARTY_A, C.WARPARTY_U))
-
-        cmds = []
-        if enemy_count > 0:
-            cmds.append("battle")
-        if faction == C.BRITISH:
-            cmds.extend(["muster", "march"])
-        elif faction == C.PATRIOTS:
-            cmds.extend(["rally", "march"])
-        elif faction == C.FRENCH:
-            cmds.extend(["muster", "march"])
-        elif faction == C.INDIANS:
-            cmds.extend(["gather", "raid", "march"])
-
-        self._reset_trace_on(self.state)
-        for cmd in cmds:
-            try:
-                self.dispatcher.execute(cmd, faction=faction, space=space, limited=True, free=True)
-                normalize_state(self.state)
-                return True
-            except Exception:
-                continue
-        return False
 
     def _try_bs_special_activity(self, faction: str) -> None:
         """Execute the faction's SA per flowchart, independently."""

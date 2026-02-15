@@ -158,6 +158,36 @@ class BaseBot:
         return False
 
     # --- stubs for subclass override ---
+    def get_bs_limited_command(self, state: Dict) -> str | None:
+        """Walk this faction's flowchart for the first valid Limited Command
+        that can involve the faction's Leader in the Leader's current space.
+
+        Returns a command name string (e.g. "battle", "muster", "march") or
+        None if no valid LimCom is found (which aborts the BS).
+
+        Subclasses must override this with faction-specific flowchart logic.
+        """
+        return None
+
+    def _find_bs_leader_space(self, state: Dict) -> str | None:
+        """Return the space ID of this faction's leader that meets the BS
+        piece threshold, or None."""
+        from lod_ai.cards.effects.brilliant_stroke import _LEADER_PIECE_THRESHOLD
+        entry = _LEADER_PIECE_THRESHOLD.get(self.faction)
+        if not entry:
+            return None
+        leaders, piece_tags, threshold = entry
+        from lod_ai.leaders import leader_location
+        for leader in leaders:
+            loc = leader_location(state, leader)
+            if not loc:
+                continue
+            sp = state.get("spaces", {}).get(loc, {})
+            total = sum(sp.get(tag, 0) for tag in piece_tags)
+            if total >= threshold:
+                return loc
+        return None
+
     def _follow_flowchart(self, state: Dict) -> None:
         raise NotImplementedError
 

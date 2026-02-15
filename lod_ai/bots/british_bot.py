@@ -51,6 +51,60 @@ class BritishBot(BaseBot):
         return state.get("control", {}).get(sid)
 
     # =======================================================================
+    #  BRILLIANT STROKE LimCom  (§8.3.7)
+    # =======================================================================
+    def get_bs_limited_command(self, state: Dict) -> str | None:
+        """Walk British flowchart for the first valid Limited Command
+        that can involve the British Leader in the Leader's current space.
+
+        Flowchart order: B3 → B4 (Garrison) → B6 (Muster) → B9 (Battle) → B10 (March).
+        Returns a command name or None.
+        """
+        leader_space = self._find_bs_leader_space(state)
+        if not leader_space:
+            return None
+
+        # B3: Resources > 0?
+        if state.get("resources", {}).get(C.BRITISH, 0) <= 0:
+            return None
+
+        sp = state["spaces"].get(leader_space, {})
+        refresh_control(state)
+
+        # B4: Garrison — valid if 10+ Regulars on map AND leader is in a
+        # Rebellion-controlled City without Rebel Fort (the garrison target).
+        if self._can_garrison(state):
+            ctrl = state.get("control", {}).get(leader_space)
+            if (ctrl == "REBELLION"
+                    and sp.get(C.FORT_PAT, 0) == 0
+                    and leader_space in CITIES):
+                return "garrison"
+
+        # B6: Muster — Available Regulars > 1D6?  (consume a die roll)
+        avail_regs = state["available"].get(C.REGULAR_BRI, 0)
+        avail_tories = state["available"].get(C.TORY, 0)
+        if avail_regs > 0 or avail_tories > 0:
+            # Muster can always target the leader's space (City/Colony)
+            stype = _MAP_DATA.get(leader_space, {}).get("type", "")
+            if stype in ("City", "Colony"):
+                return "muster"
+
+        # B9: Battle — 2+ Active Rebels in leader's space outnumbered by
+        # British Regulars + Leader?
+        active_rebel = (sp.get(C.REGULAR_PAT, 0)
+                        + sp.get(C.MILITIA_A, 0)
+                        + sp.get(C.REGULAR_FRE, 0))
+        regs = sp.get(C.REGULAR_BRI, 0)
+        if active_rebel >= 2 and regs > active_rebel:
+            return "battle"
+
+        # B10: March — can march from leader's space if pieces exist
+        if sp.get(C.REGULAR_BRI, 0) > 0 or sp.get(C.TORY, 0) > 0:
+            return "march"
+
+        return None
+
+    # =======================================================================
     #  EVENT‑VS‑COMMAND BULLETS (B2)
     # =======================================================================
     def _faction_event_conditions(self, state: Dict, card: Dict) -> bool:

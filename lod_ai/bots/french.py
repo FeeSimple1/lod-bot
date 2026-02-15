@@ -108,6 +108,54 @@ class FrenchBot(BaseBot):
         return state.get("support", {}).get(sid, 0)
 
     # ===================================================================
+    #  BRILLIANT STROKE LimCom  (§8.3.7)
+    # ===================================================================
+    def get_bs_limited_command(self, state: Dict) -> str | None:
+        """Walk French flowchart for the first valid Limited Command
+        that can involve the French Leader in the Leader's current space.
+
+        BS requires ToA played, so only post-Treaty branch applies.
+        Flowchart order: F3 → F9 (Muster) → F13 (Battle) → F14 (March).
+        Returns a command name or None.
+        """
+        leader_space = self._find_bs_leader_space(state)
+        if not leader_space:
+            return None
+
+        # F3: Resources > 0?
+        if state.get("resources", {}).get(C.FRENCH, 0) <= 0:
+            return None
+
+        sp = state["spaces"].get(leader_space, {})
+        refresh_control(state)
+
+        # F9/F10: Muster — Available French Regulars > 0?
+        # Muster can target the leader's space.
+        if state["available"].get(C.REGULAR_FRE, 0) > 0:
+            return "muster"
+
+        # F13: Battle — Rebel cubes + Leader exceed British pieces
+        # in the leader's space?
+        from lod_ai.leaders import leader_location
+        rebel_leaders = ["LEADER_WASHINGTON", "LEADER_ROCHAMBEAU", "LEADER_LAUZUN"]
+        leader_bonus = 0
+        for ldr in rebel_leaders:
+            if leader_location(state, ldr) == leader_space:
+                leader_bonus += 1
+        rebel_cubes = sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+        rebel = rebel_cubes + leader_bonus
+        british = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                   + sp.get(C.FORT_BRI, 0))
+        if rebel > 0 and british > 0 and rebel > british:
+            return "battle"
+
+        # F14: March — French Regulars in leader's space can march
+        if sp.get(C.REGULAR_FRE, 0) > 0:
+            return "march"
+
+        return None
+
+    # ===================================================================
     #  FLOW‑CHART DRIVER
     # ===================================================================
     def _follow_flowchart(self, state: Dict) -> None:

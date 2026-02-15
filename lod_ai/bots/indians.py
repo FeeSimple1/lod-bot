@@ -54,6 +54,60 @@ class IndianBot(BaseBot):
         return state.get("support", {}).get(sid, 0)
 
     # ==================================================================
+    #  BRILLIANT STROKE LimCom  (§8.3.7)
+    # ==================================================================
+    def get_bs_limited_command(self, state: Dict) -> str | None:
+        """Walk Indian flowchart for the first valid Limited Command
+        that can involve the Indian Leader in the Leader's current space.
+
+        Flowchart order: I3 → I4 (Raid) / I6 (Gather) → I9 (Scout) → I10 (March).
+        Returns a command name or None.
+        """
+        leader_space = self._find_bs_leader_space(state)
+        if not leader_space:
+            return None
+
+        sp = state["spaces"].get(leader_space, {})
+        wp_total = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
+
+        # I3: (Support + 1D6) > Opposition?  Determines Raid vs Gather branch.
+        support_map = state.get("support", {})
+        support = sum(max(0, lvl) for lvl in support_map.values())
+        opposition = sum(max(0, -lvl) for lvl in support_map.values())
+        # Don't consume a die roll; check both branches
+
+        # --- Raid branch (I3 No) ---
+        # I4: Raid — leader's space must be an Opposition Colony with or
+        # adjacent to Underground War Parties
+        stype = _MAP_DATA.get(leader_space, {}).get("type", "")
+        sup_level = self._support_level(state, leader_space)
+        if (stype == "Colony"
+                and sup_level <= C.PASSIVE_OPPOSITION
+                and sp.get(C.WARPARTY_U, 0) > 0):
+            return "raid"
+
+        # --- Gather branch (I3 Yes) ---
+        # I6/I7: Gather — leader's space has room for Village or WP can be
+        # placed there
+        avail_wp = (state["available"].get(C.WARPARTY_U, 0)
+                    + state["available"].get(C.WARPARTY_A, 0))
+        avail_villages = state["available"].get(C.VILLAGE, 0)
+        if avail_wp > 0 or avail_villages > 0:
+            # Gather is viable if we can place WP or Villages at leader's space
+            if self._village_room(state, leader_space) or wp_total > 0:
+                return "gather"
+
+        # I9: Scout — leader's space has War Party AND British Regulars?
+        if wp_total > 0 and sp.get(C.REGULAR_BRI, 0) > 0:
+            return "scout"
+
+        # I10: March — War Parties exist in leader's space
+        if wp_total > 0:
+            return "march"
+
+        return None
+
+    # ==================================================================
     #  FLOW‑CHART DRIVER
     # ==================================================================
     def _follow_flowchart(self, state: Dict) -> None:
