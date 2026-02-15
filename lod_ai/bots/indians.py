@@ -154,6 +154,12 @@ class IndianBot(BaseBot):
         if not self._raid(state):            # nothing moved → treat as failure
             return False
 
+        # I4: "If Resources fall to zero, Plunder then Trade before completing"
+        if state["resources"].get(C.INDIANS, 0) == 0:
+            if self._can_plunder(state):
+                self._plunder(state)
+            self._trade(state)
+
         # optional Plunder (I5)
         if self._can_plunder(state):
             if not self._plunder(state):
@@ -164,12 +170,17 @@ class IndianBot(BaseBot):
         return True
 
     # ---- I7 Gather then I8 / I10 -------------------------------------
-    def _gather_sequence(self, state: Dict) -> bool:
+    def _gather_sequence(self, state: Dict, _visited: set | None = None) -> bool:
+        if _visited is None:
+            _visited = set()
+        if "gather" in _visited:
+            return False
+        _visited.add("gather")
         if not self._can_gather(state):
             return False
         if not self._gather(state):
             # If Gather impossible → I10 March
-            return self._march_sequence(state)
+            return self._march_sequence(state, _visited)
         # After Gather comes War‑Path (I8) then Trade fallback
         self._war_path_or_trade(state)
         return True
@@ -186,11 +197,16 @@ class IndianBot(BaseBot):
         return True
 
     # ---- I10 March then I8 / I7 --------------------------------------
-    def _march_sequence(self, state: Dict) -> bool:
+    def _march_sequence(self, state: Dict, _visited: set | None = None) -> bool:
+        if _visited is None:
+            _visited = set()
+        if "march" in _visited:
+            return False
+        _visited.add("march")
         if not self._can_march(state):
-            return self._gather_sequence(state)  # arrow “If none → Gather”
+            return self._gather_sequence(state, _visited)  # arrow "If none → Gather"
         if not self._march(state):
-            return self._gather_sequence(state)
+            return self._gather_sequence(state, _visited)
         self._war_path_or_trade(state)
         return True
 
@@ -225,7 +241,7 @@ class IndianBot(BaseBot):
             sp = state["spaces"][col]
             has_u = sp.get(C.WARPARTY_U, 0) > 0
             adj_u = any(
-                state["spaces"][nbr].get(C.WARPARTY_U, 0) > 0
+                state["spaces"].get(nbr, {}).get(C.WARPARTY_U, 0) > 0
                 for nbr in _adjacent(col)
             )
             dc_range = False
@@ -284,8 +300,9 @@ class IndianBot(BaseBot):
                     return dc_loc
             return None
 
+        max_raid = min(3, state["resources"].get(C.INDIANS, 0))
         for tgt in targets:
-            if len(selected) >= 3:
+            if len(selected) >= max_raid:
                 break
             tgt_sp = state["spaces"][tgt]
             wp_in_tgt = tgt_sp.get(C.WARPARTY_U, 0) + tgt_sp.get(C.WARPARTY_A, 0)
@@ -317,7 +334,10 @@ class IndianBot(BaseBot):
     def _can_plunder(self, state: Dict) -> bool:
         if state["resources"][C.PATRIOTS] == 0:
             return False
-        for sid, sp in state["spaces"].items():
+        # I5: Plunder candidates restricted to Raid spaces only
+        raid_spaces = state.get("_turn_affected_spaces", set())
+        for sid in raid_spaces:
+            sp = state["spaces"].get(sid, {})
             wp = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
             rebels = (
                 sp.get(C.MILITIA_A, 0)
@@ -325,7 +345,7 @@ class IndianBot(BaseBot):
                 + sp.get(C.REGULAR_PAT, 0)
                 + sp.get(C.REGULAR_FRE, 0)
             )
-            if wp > rebels and wp > 0 and _MAP_DATA[sid]["type"] == "Colony":
+            if wp > rebels and wp > 0:
                 return True
         return False
 
@@ -499,7 +519,9 @@ class IndianBot(BaseBot):
                     break
                 if sid not in selected:
                     selected.append(sid)
-                bulk_place[sid] = bulk_place.get(sid, 0) + 1
+                # Bullet 3 places WP in spaces without Village yet, so use
+                # place_one (gather.execute default) instead of bulk_place
+                # which requires an existing Village.
                 avail_wp -= 1
                 placed_count += 1
 
@@ -630,39 +652,177 @@ class IndianBot(BaseBot):
         return any(sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0) for sp in state["spaces"].values())
 
     def _march(self, state: Dict) -> bool:
-        """I10: March to get 3+ WP in Neutral/Passive space with room for Village,
-        then remove most Rebel Control where no Active Support.
+        """I10: March (Max 3).
+
+        Reference bullets:
+        * With: Underground then Active WP, without moving last WP from
+          any Village or adding any Rebel Control.
+        * If 1+ Villages Available, March to get 3+ WP in 1 additional
+          Neutral or Passive space with room for a Village.
+        * Then to remove most Rebel Control, first where no Active Support.
+        If no March possible, Gather.
         """
-        # Move Underground then Active WP from largest stack
-        origins = [
-            (sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0), sid)
-            for sid, sp in state["spaces"].items()
-            if (sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)) >= 2
+        refresh_control(state)
+        ctrl = state.get("control", {})
+        indian_res = state["resources"].get(C.INDIANS, 0)
+        max_dests = min(3, indian_res)
+        if max_dests <= 0:
+            return False
+
+        # ---- Snapshot of WP counts for planning (decremented as we go) ----
+        wp_snap = {}
+        for sid, sp in state["spaces"].items():
+            wp_snap[sid] = [sp.get(C.WARPARTY_U, 0), sp.get(C.WARPARTY_A, 0)]
+
+        def _total(sid):
+            return wp_snap[sid][0] + wp_snap[sid][1]
+
+        def _can_remove(src):
+            """Can we take 1 WP from *src* without violating constraints?"""
+            u, a = wp_snap[src]
+            if u + a == 0:
+                return False
+            sp = state["spaces"][src]
+            # Don't move last WP from Village
+            if sp.get(C.VILLAGE, 0) > 0 and (u + a) <= 1:
+                return False
+            # Don't add Rebel Control (Village starts with "V", not counted)
+            if ctrl.get(src) != "REBELLION":
+                reb = sum(sp.get(t, 0) for t in (
+                    C.REGULAR_PAT, C.REGULAR_FRE, C.MILITIA_A, C.MILITIA_U, C.FORT_PAT))
+                bri = sum(sp.get(t, 0) for t in (C.REGULAR_BRI, C.TORY, C.FORT_BRI))
+                royalist_after = bri + (u + a - 1)
+                if reb > royalist_after:
+                    return False
+            return True
+
+        def _take(src):
+            """Take 1 WP from *src* (Underground first). Returns tag."""
+            if wp_snap[src][0] > 0:
+                wp_snap[src][0] -= 1
+                return C.WARPARTY_U
+            elif wp_snap[src][1] > 0:
+                wp_snap[src][1] -= 1
+                return C.WARPARTY_A
+            return None
+
+        planned = {}   # (src, dst) → {tag: count}
+        destinations = []
+
+        def _add(src, dst, tag):
+            key = (src, dst)
+            if key not in planned:
+                planned[key] = {}
+            planned[key][tag] = planned[key].get(tag, 0) + 1
+
+        def _adj_supply(dst):
+            """Return [(nbr, can_give)] for adjacent sources of *dst*."""
+            result = []
+            for nbr in _adjacent(dst):
+                if nbr not in wp_snap:
+                    continue
+                nbr_sp = state["spaces"].get(nbr, {})
+                nbr_total = _total(nbr)
+                min_keep = 1 if nbr_sp.get(C.VILLAGE, 0) > 0 else 0
+                can_give = max(0, nbr_total - min_keep)
+                if can_give > 0:
+                    result.append((nbr, can_give))
+            return result
+
+        # === Phase 1: If 1+ Villages Available, get 3+ WP in 1 additional
+        # Neutral/Passive space with room for Village ===
+        avail_villages = state["available"].get(C.VILLAGE, 0)
+        if avail_villages > 0 and len(destinations) < max_dests:
+            candidates = []
+            for sid in state["spaces"]:
+                mdata = _MAP_DATA.get(sid, {})
+                if mdata.get("type") == "City":
+                    continue
+                sup = self._support_level(state, sid)
+                if sup not in (C.NEUTRAL, C.PASSIVE_SUPPORT, C.PASSIVE_OPPOSITION):
+                    continue
+                if not self._village_room(state, sid):
+                    continue
+                if state["spaces"][sid].get(C.VILLAGE, 0) > 0:
+                    continue
+                current = _total(sid)
+                if current >= 3:
+                    continue
+                needed = 3 - current
+                adj = _adj_supply(sid)
+                total_supply = sum(n for _, n in adj)
+                if total_supply >= needed:
+                    candidates.append((needed, state["rng"].random(), sid, adj))
+            candidates.sort()
+            if candidates:
+                needed, _, target, adj = candidates[0]
+                destinations.append(target)
+                for src, max_give in adj:
+                    if needed <= 0:
+                        break
+                    for _ in range(min(needed, max_give)):
+                        if not _can_remove(src):
+                            break
+                        tag = _take(src)
+                        if tag:
+                            _add(src, target, tag)
+                            wp_snap[target][0] += 1
+                            needed -= 1
+
+        # === Phase 2: Remove most Rebel Control, first no Active Support ===
+        while len(destinations) < max_dests:
+            candidates = []
+            for sid in state["spaces"]:
+                if sid in destinations:
+                    continue
+                mdata = _MAP_DATA.get(sid, {})
+                if mdata.get("type") == "City":
+                    continue
+                if ctrl.get(sid) != "REBELLION":
+                    continue
+                sp = state["spaces"][sid]
+                reb = sum(sp.get(t, 0) for t in (
+                    C.REGULAR_PAT, C.REGULAR_FRE, C.MILITIA_A, C.MILITIA_U, C.FORT_PAT))
+                bri = sum(sp.get(t, 0) for t in (C.REGULAR_BRI, C.TORY, C.FORT_BRI))
+                current_royalist = bri + _total(sid)
+                if reb <= current_royalist:
+                    continue
+                wp_needed = reb - current_royalist + 1
+                adj = _adj_supply(sid)
+                total_supply = sum(n for _, n in adj)
+                if total_supply < wp_needed:
+                    continue
+                sup = self._support_level(state, sid)
+                no_active = 0 if sup >= C.ACTIVE_SUPPORT else 1
+                rebel_excess = reb - current_royalist
+                candidates.append((
+                    -no_active, -rebel_excess,
+                    state["rng"].random(), sid, wp_needed, adj))
+            if not candidates:
+                break
+            candidates.sort()
+            _, _, _, target, wp_needed, adj = candidates[0]
+            destinations.append(target)
+            for src, max_give in adj:
+                if wp_needed <= 0:
+                    break
+                for _ in range(min(wp_needed, max_give)):
+                    if not _can_remove(src):
+                        break
+                    tag = _take(src)
+                    if tag:
+                        _add(src, target, tag)
+                        wp_snap[target][0] += 1
+                        wp_needed -= 1
+
+        if not planned:
+            return False
+
+        plan = [
+            {"src": src, "dst": dst, "pieces": pieces}
+            for (src, dst), pieces in planned.items()
         ]
-        if not origins:
-            return False
-        _, origin = max(origins)
-        # Destination: Neutral or Passive (0, +1, -1) with room for Village
-        best_dst = None
-        best_key = (-1, -1)
-        for dst in _adjacent(origin):
-            if dst not in state.get("spaces", {}):
-                continue
-            dsp = state["spaces"][dst]
-            sup = self._support_level(state, dst)
-            is_neutral_or_passive = sup in (C.NEUTRAL, C.PASSIVE_SUPPORT, C.PASSIVE_OPPOSITION)
-            if not is_neutral_or_passive:
-                continue
-            if dsp.get(C.VILLAGE, 0) > 0:
-                continue  # already has Village, no "room"
-            pop = _MAP_DATA.get(dst, {}).get("population", 0)
-            key = (pop, state["rng"].random())
-            if key > best_key:
-                best_key = key
-                best_dst = dst
-        if not best_dst:
-            return False
-        march.execute(state, C.INDIANS, {}, [origin], [best_dst], bring_escorts=False, limited=False)
+        march.execute(state, C.INDIANS, {}, [], [], plan=plan)
         return True
 
     # ------------------------------------------------------------------
@@ -764,10 +924,24 @@ class IndianBot(BaseBot):
                 if excess > 0:
                     n_regs = max(1, n_regs - excess)
 
+        # I12: Skirmish option — "first a Patriot Fort then most enemy pieces"
+        # Calculate post-move enemy cubes (Scout flips all Militia Active)
+        dsp = state["spaces"][target]
+        enemy_after = (dsp.get(C.REGULAR_PAT, 0) + dsp.get(C.REGULAR_FRE, 0)
+                       + dsp.get(C.MILITIA_A, 0) + dsp.get(C.MILITIA_U, 0))
+        has_pat_fort = dsp.get(C.FORT_PAT, 0) > 0
+        do_skirmish = has_pat_fort or enemy_after > 0
+        if has_pat_fort and enemy_after == 0:
+            skirmish_opt = 3
+        elif enemy_after >= 2:
+            skirmish_opt = 2
+        else:
+            skirmish_opt = 1
+
         scout.execute(
             state, C.INDIANS, {}, origin, target,
             n_warparties=n_wp, n_regulars=n_regs, n_tories=n_tories,
-            skirmish=True,
+            skirmish=do_skirmish, skirmish_option=skirmish_opt,
         )
         return True
 
@@ -804,6 +978,147 @@ class IndianBot(BaseBot):
             return True
         except Exception:
             return False
+
+    # ==================================================================
+    #  OPS SUMMARY METHODS  (year-end / operational helpers)
+    # ==================================================================
+    def ops_supply_priority(self, state: Dict, spaces: List[str]) -> List[str]:
+        """OPS: Supply payment priority.
+        First where necessary to prevent Rebel Control,
+        then where Gather could place a Village.
+        """
+        refresh_control(state)
+        prevent_rebel = []
+        gather_village = []
+        other = []
+        for sid in spaces:
+            sp = state["spaces"].get(sid, {})
+            reb = sum(sp.get(t, 0) for t in (
+                C.REGULAR_PAT, C.REGULAR_FRE, C.MILITIA_A, C.MILITIA_U, C.FORT_PAT))
+            bri = sum(sp.get(t, 0) for t in (C.REGULAR_BRI, C.TORY, C.FORT_BRI))
+            ind_wp = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
+            royalist = bri + ind_wp
+            if reb > 0 and royalist > 0 and reb <= royalist:
+                prevent_rebel.append(sid)
+            elif self._village_room(state, sid) and sp.get(C.VILLAGE, 0) == 0:
+                gather_village.append(sid)
+            else:
+                other.append(sid)
+        return prevent_rebel + gather_village + other
+
+    def ops_patriot_desertion_priority(
+        self, state: Dict, candidates: List[Tuple[str, str]]
+    ) -> List[Tuple[str, str]]:
+        """OPS: Patriot Desertion removal priority.
+        First from Village spaces, then remove most Rebel Control,
+        then last of type in space, then random.
+        """
+        refresh_control(state)
+        ctrl = state.get("control", {})
+
+        def sort_key(item):
+            sid, tag = item
+            sp = state["spaces"].get(sid, {})
+            has_village = 1 if sp.get(C.VILLAGE, 0) > 0 else 0
+            is_rebel = 1 if ctrl.get(sid) == "REBELLION" else 0
+            reb = sum(sp.get(t, 0) for t in (
+                C.REGULAR_PAT, C.REGULAR_FRE, C.MILITIA_A, C.MILITIA_U, C.FORT_PAT))
+            is_last = 1 if sp.get(tag, 0) == 1 else 0
+            return (-has_village, -is_rebel, -reb, -is_last, state["rng"].random())
+
+        return sorted(candidates, key=sort_key)
+
+    def ops_redeploy(self, state: Dict) -> Dict[str, str | None]:
+        """OPS: Leader redeployment destinations.
+        Brant/Dragging Canoe: space with most WP.
+        Cornplanter: Neutral/Passive Province with 2+ WP and room for Village;
+        if none, space with most WP.
+        """
+        result: Dict[str, str | None] = {}
+
+        def _most_wp_space():
+            best_sid, best_n = None, -1
+            for sid, sp in state["spaces"].items():
+                n = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
+                if n > best_n:
+                    best_n = n
+                    best_sid = sid
+            return best_sid
+
+        for leader in ("LEADER_BRANT", "LEADER_DRAGGING_CANOE"):
+            result[leader] = _most_wp_space()
+
+        corn_target = None
+        for sid, sp in state["spaces"].items():
+            mdata = _MAP_DATA.get(sid, {})
+            if mdata.get("type") == "City":
+                continue
+            sup = self._support_level(state, sid)
+            if sup not in (C.NEUTRAL, C.PASSIVE_SUPPORT, C.PASSIVE_OPPOSITION):
+                continue
+            wp = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
+            if wp < 2:
+                continue
+            if not self._village_room(state, sid):
+                continue
+            corn_target = sid
+            break
+        if corn_target is None:
+            corn_target = _most_wp_space()
+        result["LEADER_CORNPLANTER"] = corn_target
+
+        return result
+
+    def ops_bs_should_trigger(self, state: Dict) -> bool:
+        """OPS: Brilliant Stroke trigger conditions.
+        Use after Treaty of Alliance when Indian Leader is in a space
+        with 3+ War Parties.
+        """
+        if not state.get("toa_played"):
+            return False
+        for leader in ("LEADER_BRANT", "LEADER_CORNPLANTER", "LEADER_DRAGGING_CANOE"):
+            loc = leader_location(state, leader)
+            if not loc:
+                continue
+            sp = state["spaces"].get(loc, {})
+            wp = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
+            if wp >= 3:
+                return True
+        return False
+
+    def ops_leader_movement(self, state: Dict, leader: str) -> str | None:
+        """OPS: Leader Movement during Campaigns.
+        Leaders accompany the largest group of units from their Faction
+        that moves from (or stays in) their origin space.
+        """
+        loc = leader_location(state, leader)
+        if not loc:
+            return None
+        sp = state["spaces"].get(loc, {})
+        origin_wp = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
+        best_dst = None
+        best_wp = origin_wp
+        for nbr in _adjacent(loc):
+            nsp = state["spaces"].get(nbr, {})
+            nbr_wp = nsp.get(C.WARPARTY_U, 0) + nsp.get(C.WARPARTY_A, 0)
+            if nbr_wp > best_wp:
+                best_wp = nbr_wp
+                best_dst = nbr
+        return best_dst
+
+    def _indian_defending_activation(self, state: Dict, space_id: str) -> None:
+        """§8.7.9: Defending in Battle activation.
+        If Village in Battle space, Activate all but 1 Underground WP.
+        Otherwise, Activate no Underground WP.
+        """
+        sp = state["spaces"].get(space_id, {})
+        if sp.get(C.WARPARTY_U, 0) == 0:
+            return
+        if sp.get(C.VILLAGE, 0) > 0:
+            activate = sp.get(C.WARPARTY_U, 0) - 1
+            if activate > 0:
+                sp[C.WARPARTY_U] -= activate
+                sp[C.WARPARTY_A] = sp.get(C.WARPARTY_A, 0) + activate
 
     # ==================================================================
     #  EVENT‑VS‑COMMAND  (I1 / I2)

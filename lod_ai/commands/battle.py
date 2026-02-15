@@ -42,7 +42,7 @@ from lod_ai.rules_consts import (
     PASSIVE_OPPOSITION, ACTIVE_OPPOSITION,
     WEST_INDIES_ID,
     # Factions
-    BRITISH, PATRIOTS, FRENCH,
+    BRITISH, PATRIOTS, FRENCH, INDIANS,
 )
 from lod_ai.leaders        import apply_leader_modifiers, leader_location
 from lod_ai.util.piece_kinds import is_cube, loss_value
@@ -295,6 +295,18 @@ def _resolve_space(
     def_side = "REBELLION" if att_side == "ROYALIST" else "ROYALIST"
 
     cc_wp = ctx.get("common_cause", {}).get(sid, 0)
+
+    # §8.7.9 Indian bot defending activation:
+    # If Village in Battle space, Activate all but 1 Underground WP.
+    # Otherwise, Activate no Underground WP.
+    if def_side == "ROYALIST" and sp.get(WARPARTY_U, 0) > 0:
+        if INDIANS not in state.get("human_factions", set()):
+            if sp.get(VILLAGE, 0) > 0:
+                activate_n = sp.get(WARPARTY_U, 0) - 1
+                if activate_n > 0:
+                    sp[WARPARTY_U] -= activate_n
+                    sp[WARPARTY_A] = sp.get(WARPARTY_A, 0) + activate_n
+            # else: Activate no Underground WP (leave them as-is)
 
     def _force(side: str, is_defending: bool) -> int:
         """S3.6.2-3.6.3: cubes + half Active guerrillas + Forts if Defending."""

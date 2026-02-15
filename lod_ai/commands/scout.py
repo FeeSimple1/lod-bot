@@ -72,6 +72,7 @@ def execute(
     n_regulars: int,
     n_tories: int = 0,
     skirmish: bool = False,
+    skirmish_option: int = 1,
     free: bool = False,
 ) -> Dict:
     """
@@ -151,7 +152,7 @@ def execute(
     # -------- Optional Skirmish ---------------------------------------------
     if skirmish:
         from lod_ai.special_activities import skirmish as sa_skirmish
-        ctx = sa_skirmish.execute(state, BRITISH, ctx, dst)
+        ctx = sa_skirmish.execute(state, BRITISH, ctx, dst, option=skirmish_option)
 
     # -------- Final housekeeping --------------------------------------------
     refresh_control(state)
