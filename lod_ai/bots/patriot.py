@@ -57,6 +57,59 @@ class PatriotBot(BaseBot):
         return EI.PATRIOTS.get(card_id, "normal")
 
     # ===================================================================
+    #  BRILLIANT STROKE LimCom  (§8.3.7)
+    # ===================================================================
+    def get_bs_limited_command(self, state: Dict) -> str | None:
+        """Walk Patriot flowchart for the first valid Limited Command
+        that can involve Washington in his current space.
+
+        Flowchart order: P3 → P6 (Battle) → P9 (Rally) → P10 (Rabble-Rousing) → P5 (March).
+        Returns a command name or None.
+        """
+        leader_space = self._find_bs_leader_space(state)
+        if not leader_space:
+            return None
+
+        # P3: Resources > 0?
+        if state.get("resources", {}).get(C.PATRIOTS, 0) <= 0:
+            return None
+
+        sp = state["spaces"].get(leader_space, {})
+        refresh_control(state)
+
+        # P6: Battle — Rebel cubes + Leader > Active British/Indian pieces
+        # in the leader's space (with both sides present)?
+        rebel = self._rebel_cube_count(state, leader_space)
+        royal = self._active_royal_count(sp)
+        if rebel > 0 and royal > 0 and rebel > royal:
+            return "battle"
+
+        # P9: Rally — would place Fort OR 1D6 > Underground Militia on map?
+        # Check if Rally is valid in the leader's space.
+        avail_forts = state["available"].get(C.FORT_PAT, 0)
+        rebel_group = self._rebel_group_size(sp)
+        if avail_forts and rebel_group >= 4 and sp.get(C.FORT_PAT, 0) == 0:
+            return "rally"
+        # Also check the 1D6 > Underground Militia condition
+        hidden = sum(s.get(C.MILITIA_U, 0) for s in state["spaces"].values())
+        # Don't consume a die roll here — just check if Rally is plausible
+        # (Militia can be placed in the leader's space)
+        avail_militia = state["available"].get(C.MILITIA_U, 0)
+        if avail_militia > 0 or rebel_group >= 4:
+            return "rally"
+
+        # P10: Rabble-Rousing — can shift leader's space toward Active Opposition?
+        support = self._support_level(state, leader_space)
+        if support > C.ACTIVE_OPPOSITION:
+            return "rabble_rousing"
+
+        # P5: March — can march from leader's space
+        if rebel_group >= 1:
+            return "march"
+
+        return None
+
+    # ===================================================================
     #  FLOW‑CHART DRIVER
     # ===================================================================
     def _follow_flowchart(self, state: Dict) -> None:
