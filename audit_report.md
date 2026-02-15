@@ -71,8 +71,11 @@ Source: `Reference Documents/card reference full.txt`
 - Trumped cards return to owners; all factions become Eligible after BS
 - 7 new tests covering conditions, triggers, and execution
 
-#### Deterministic bot choices
-Cards 2, 6, 24, 28, 80 use hardcoded/alphabetical defaults for player/bot selections.
+#### Deterministic bot choices — MOSTLY RESOLVED
+~~Cards 2, 6, 24, 28, 80 use hardcoded/alphabetical defaults for player/bot selections.~~
+- Cards 2, 6, 80: **FIXED** — now use `pick_cities`/`pick_colonies` helpers with state override support
+- Card 24: Unshaded fixed; shaded still takes first 3 spaces alphabetically (minor)
+- Card 28: Uses preference filtering but no state override for final selection (minor)
 
 ---
 
@@ -228,11 +231,11 @@ These cards manipulated `sp[tag]` directly instead of using board/pieces helpers
 
 ### REMAINING issues (documented, not fixed) — Session 3
 
-**7 of 9 issues resolved in Session 5 (see below). Remaining 2:**
+**All 9 issues resolved (7 in Session 5, 2 confirmed no-fix-needed):**
 
-#### Queued vs. immediate execution
+#### Queued vs. immediate execution — NO FIX NEEDED
 - **Card 15 (Morgan's Rifles) shaded**: Uses `queue_free_op` for March/Battle/Partisans. Q3 resolution says engine drains free ops immediately after handler, so this is effectively immediate.
-- **Card 94 (Herkimer) unshaded**: Militia removal executes before queued Gather/Muster. Reference order suggests Gather+Muster first, then Militia removal. Since engine drains free ops after handler, the Militia removal in the handler runs before the queued ops. No fix needed per user ruling (ordering has no gameplay impact).
+- **Card 94 (Herkimer) unshaded**: Militia removal executes before queued Gather/Muster. No fix needed per user ruling (ordering has no gameplay impact).
 
 #### Resolved — no fix needed
 - **Card 11 (Kosciuszko) shaded**: Uses `"REBELLION"` control check. User confirmed this is correct.
@@ -304,29 +307,29 @@ Full node-by-node comparison of all four bot implementations against their respe
 - **~~F10 Muster~~**: ~~random.choice; no Colony/City filter~~ → FIXED: uses state["rng"]; filters first priority by Colony/City type
 
 #### Indian Bot (indians.py)
-- **I7 Gather**: Space selection entirely missing — all 4 priority bullets unimplemented
-- **I10 March**: Severely simplified — single move, missing priorities and constraints
-- **I12 Scout**: No piece count calculation, no Control preservation check; never triggers Skirmish
-- **I11 Trade**: Executes in up to 3 spaces; reference says Max 1
+- ~~**I7 Gather**: Space selection entirely missing — all 4 priority bullets unimplemented~~ — **FIXED** (Session 5: complete rewrite implementing all 4 priority bullets with Cornplanter threshold, leader priority, move-and-flip fallback)
+- **I10 March**: Severely simplified — single move, missing priorities and constraints (Q5 answered: implement ALL movements — not yet done)
+- ~~**I12 Scout**: No piece count calculation, no Control preservation check; never triggers Skirmish~~ — **FIXED** (Session 5: moves exactly 1 WP + most Regulars+Tories without losing Control; includes Skirmish trigger)
+- ~~**I11 Trade**: Executes in up to 3 spaces; reference says Max 1~~ — **FIXED** (Session 5: now Max 1, picks space with most Underground WP)
 
 ### MEDIUM SEVERITY (documented, not fixed)
 
 #### British Bot
-- B1 Garrison precondition missing FNI level 3 check
+- ~~B1 Garrison precondition missing FNI level 3 check~~ — RESOLVED: flowchart B4 doesn't mention FNI; code matches flowchart
 - ~~B5 Garrison "leave 2 more Royalist" omits Forts from count~~ — FIXED (Session 5)
-- B6 Muster precondition consumes die roll on every call
-- B8 Tory placement skips Active Opposition and adjacency checks; only places 1 Tory per space
+- B6 Muster precondition consumes die roll on every call (functionally correct but wasteful)
+- ~~B8 Tory placement skips Active Opposition and adjacency checks; only places 1 Tory per space~~ — RESOLVED: code matches flowchart B8 (flowchart doesn't require these checks for Tory placement)
 - ~~B12 Battle misses Fort-only spaces~~ — FIXED (Session 5); force level ignores modifiers
 - ~~B7 Naval Pressure missing Gage/Clinton leader check~~ — FIXED (Session 5)
-- B2 Event conditions overly broad text matching
-- B8 Fort target space not passed to muster.execute
-- B10 March always passes bring_escorts=False
+- B2 Event conditions overly broad text matching (would need per-card lookup table)
+- ~~B8 Fort target space not passed to muster.execute~~ — RESOLVED: Fort space implicit in `build_fort` parameter
+- B10 March always passes bring_escorts=False (reference silent on bot escorts)
 - B39 Gage leader capability (free RL) not implemented
 - OPS reference (Supply/Redeploy/Desertion priorities) not in bot
 
 #### Patriot Bot
 - ~~P8 Partisans WP vs British priority flattened into sum~~ **FIXED**
-- P2 Event conditions check shaded text only; text matching unreliable
+- P2 Event conditions: text matching unreliable (heuristic but functional; checking shaded text is correct per flowchart)
 - Rally/Rabble mutual fallback — potential infinite loop masked by always-True return
 - Rally Persuasion interrupt happens after Rally, not during
 - March destination doesn't verify Rebel Control would actually be gained
@@ -361,7 +364,8 @@ Full node-by-node comparison of all four bot implementations against their respe
 - **I8 War Path option**: Now selects correct option (3 for Fort removal, 2 for double removal, 1 default) instead of always option 1
 - **I12 Scout**: Moves exactly 1 WP (not up to 3) + most Regulars+Tories possible without changing Control; includes Tories
 - **Event instructions**: Cards 4/72/90 (Village condition), 18/44 (eligible enemy), 38 (WP placeable), 83 (shaded/unshaded conditional) — all now have proper conditional fallback logic
-- Uses `random.random()` instead of `state["rng"]` in multiple places
+- ~~Uses `random.random()` instead of `state["rng"]` in multiple places~~ **FIXED** (listed in Medium Severity above)
+
 ---
 
 ## Session 5: British Bot Node-by-Node Review
@@ -785,3 +789,68 @@ All 109 card handlers match the card reference text. All previously identified a
 ### Tests
 
 303 tests passing. No new tests needed since no code changes were made.
+
+---
+
+## Consolidated Outstanding Issues (as of Session 6 review)
+
+This section consolidates all truly remaining issues from across sessions. Items previously listed as "remaining" that have since been fixed are annotated inline in their original sections above.
+
+### Card Handlers — COMPLETE
+All 109 card handlers match `card reference full.txt`. No outstanding card issues.
+- Minor: Card 24 shaded and Card 28 still use alphabetical fallback for space selection (low impact).
+
+### British Bot (british_bot.py)
+
+#### High Severity
+- **B5 Garrison**: Only targets one city; reference calls for multi-phase (add Control to multiple cities, then reinforce existing British Control cities). Requires Garrison command interface refactoring.
+- **B38 Howe capability**: FNI not lowered by 1 before SAs during Howe's leadership period.
+- **B39 Gage capability**: Free Reward Loyalty in Gage's space not implemented.
+
+#### Medium Severity
+- B2 Event conditions: text matching is heuristic; would need per-card lookup table for reliability.
+- B6 Muster precondition: consumes a die roll on every `_can_muster` call (functionally correct but wasteful).
+- B10 March: `bring_escorts=False` hard-coded (reference silent on bot escorts).
+- OPS reference items (Supply/Redeploy/Desertion priorities, Indian Trade, BS trigger conditions) not in turn flowchart.
+
+### Patriot Bot (patriot.py)
+
+#### High Severity
+- **P4 Win-the-Day**: Free Rally and Blockade move after Rebellion wins not wired into bot. Infrastructure exists in `battle.py` (Q9 resolved) but `_execute_battle()` never passes `win_rally_space`/`win_blockade_dest` parameters.
+- **P5 March**: Missing "lose no Rebel Control" constraint, leave-behind logic per piece type, and phases 2-3.
+- **P7 Rally**: Missing Continental replacement, Fort Available placement, Control-changing Militia priority, adjacent Militia gathering. Always returns True (masks failure-to-Rabble fallback).
+- **Card 51**: "March to set up Battle" conditional not implemented; uses unconditional `"force"` directive.
+
+#### Medium Severity
+- P2 Event conditions: text matching is heuristic (functional but fragile).
+- P7/P11 Persuasion: interrupt happens after command completion, not mid-execution when resources reach 0.
+- P7/P11 Rally/Rabble mutual fallback: potential infinite loop mitigated by Rally always returning True (fragile).
+- P5 March destination: doesn't verify Rebel Control would actually be gained.
+- P11 Rabble-Rousing: arbitrarily capped at 4 spaces (reference doesn't state a max).
+- OPS Summary items (Supply, Redeploy, Desertion, BS, Leader Movement) not in bot.
+
+### French Bot (french.py)
+
+#### High Severity
+- **F14 March**: Missing "Lose no Rebel Control" constraint, Continentals in march group, march-toward-nearest-British logic, and March 1 French Regular to shared space fallback.
+
+#### Medium Severity
+- F2 Event conditions: text matching is heuristic (functional but fragile).
+- F6 Hortalez: "Spend 1D3" (pre-Treaty, exact) vs "Spend up to 1D3" (post-Treaty) — code uses `min(resources, roll)` for both (minor impact).
+- OPS summary items (French Supply/WI priorities, Redeploy leader logic, Loyalist Desertion priority, ToA trigger formula, BS trigger conditions, Leader Movement during Campaigns) not in bot.
+
+### Indian Bot (indians.py)
+
+#### High Severity
+- **I10 March**: Severely simplified — single move instead of up to 3. Missing "without moving last WP from any Village" constraint, "without adding Rebel Control" check, and second pass "to remove most Rebel Control" (Q5 answered: implement ALL movements — not yet done).
+
+#### Medium Severity
+- Mid-Raid Plunder/Trade interruption: no resource-zero check during Raid execution (reference I4 says "If Resources fall to zero during Raid, Plunder then Trade before completing").
+- Circular fallback between Gather and March: potential infinite recursion not guarded (mitigated by `_can_gather` always returning True, but fragile).
+- Defending in Battle activation rule: "If Village in Battle space, Activate all but 1 Underground WP; otherwise Activate none" not implemented.
+- Supply, Patriot Desertion, Redeployment priorities not in bot.
+- Brilliant Stroke trigger conditions (Indian Leader in space with 3+ WP) not implemented in bot.
+
+### Engine (engine.py)
+
+- **Q7 (OPEN)**: `_execute_bot_brilliant_stroke()` hardcodes command priorities instead of consulting each faction's flowchart per §8.3.7. Awaiting user decision on approach.
