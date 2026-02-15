@@ -68,7 +68,7 @@ def test_p6_battle_uses_cubes_not_militia():
 
 
 def test_p2_event_checks_shaded_text():
-    """P2: Patriots play shaded events, so conditions should check shaded text."""
+    """P2: Patriots play shaded events, conditions via CARD_EFFECTS lookup."""
     bot = PatriotBot()
     state = {
         "spaces": {},
@@ -76,22 +76,14 @@ def test_p2_event_checks_shaded_text():
         "support": {},
         "available": {},
     }
-    # Card with Support/Opposition in shaded text only
-    card_shaded = {
-        "id": 9999,
-        "unshaded_event": "British gain 3 Resources.",
-        "shaded_event": "Shift 2 spaces toward Opposition.",
-    }
-    # Support > Opposition triggers the first bullet
-    state["support"] = {"Boston": 1}
+    # Card 41 shaded: shifts 2 Colonies toward Passive Opposition
+    # (shifts_support_rebel=True).  With Support > Opposition, bullet 1 fires.
+    card_shaded = {"id": 41}
+    state["support"] = {"Boston": 1}  # Support=1 > Opposition=0
     assert bot._faction_event_conditions(state, card_shaded) is True
 
-    # Same card but no relevant text in shaded
-    card_no_match = {
-        "id": 9998,
-        "unshaded_event": "Shift toward Opposition.",
-        "shaded_event": "Draw a card.",
-    }
+    # Card 18 shaded: (none) — all flags False, no triggers possible
+    card_no_match = {"id": 18}
     state["support"] = {"Boston": 1}
     assert bot._faction_event_conditions(state, card_no_match) is False
 
@@ -111,12 +103,9 @@ def test_p2_event_25_pieces_die_roll():
         "available": {},
         "rng": __import__("random").Random(42),
     }
-    # 26 pieces on map (>= 25), card text is generic
-    card = {
-        "id": 9999,
-        "unshaded_event": "Draw a card.",
-        "shaded_event": "Draw a card.",
-    }
+    # Card 22 shaded: "Tory Desertion" — is_effective=True but no other
+    # shaded flags that would trigger bullets 1-4
+    card = {"id": 22}
     # The die roll at seed 42 may or may not be >= 5; test both cases
     # by checking the condition is at least reachable
     result = bot._faction_event_conditions(state, card)

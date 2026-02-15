@@ -25,6 +25,7 @@ from pathlib import Path
 import json
 
 from lod_ai.bots.base_bot import BaseBot
+from lod_ai.bots.event_eval import CARD_EFFECTS
 from lod_ai import rules_consts as C
 from lod_ai.commands import raid, gather, march, scout
 from lod_ai.special_activities import plunder, war_path, trade
@@ -889,31 +890,35 @@ class IndianBot(BaseBot):
         return super()._choose_event_vs_flowchart(state, card)
 
     def _faction_event_conditions(self, state: Dict, card: Dict) -> bool:
-        """Apply the unshaded‑event bullets from node I2."""
-        text = card.get("unshaded_event", "")
+        """I2: Check unshaded Event conditions for Indian bot via CARD_EFFECTS."""
+        effects = CARD_EFFECTS.get(card.get("id"))
+        if effects is None:
+            return False  # unknown card → fall through to Command
+        eff = effects["unshaded"]
+
         support_map = state.get("support", {})
         support = sum(max(0, lvl) for lvl in support_map.values())
         opposition = sum(max(0, -lvl) for lvl in support_map.values())
 
-        # I2 bullets (from indian bot flowchart and reference.txt):
-        # • Opposition > Support and Event shifts Support/Opposition in Royalist favor
-        if opposition > support and any(k in text for k in ("Support", "Opposition")):
+        # 1. Opposition > Support and Event shifts in Royalist favor
+        if opposition > support and eff["shifts_support_royalist"]:
             return True
-        # • Event places at least one Indian Village or grants free Gather
-        if "Village" in text or "Gather" in text:
+        # 2. Event places Village or grants free Gather
+        if eff["places_village"] or eff["grants_free_gather"]:
             return True
-        # • Event removes a Patriot Fort
-        if "Fort" in text and "Patriot" in text and "remove" in text.lower():
+        # 3. Event removes a Patriot Fort
+        if eff["removes_patriot_fort"]:
             return True
-        # • Event is effective, 4+ Villages on the map, and a D6 rolls 5+
-        villages_on_map = sum(
-            sp.get(C.VILLAGE, 0) for sp in state["spaces"].values()
-        )
-        if villages_on_map >= 4:
-            roll = state["rng"].randint(1, 6)
-            state.setdefault("rng_log", []).append(("Event D6", roll))
-            if roll >= 5:
-                return True
+        # 4. Event is effective, 4+ Villages on map, D6 >= 5
+        if eff["is_effective"]:
+            villages_on_map = sum(
+                sp.get(C.VILLAGE, 0) for sp in state["spaces"].values()
+            )
+            if villages_on_map >= 4:
+                roll = state["rng"].randint(1, 6)
+                state.setdefault("rng_log", []).append(("Event D6", roll))
+                if roll >= 5:
+                    return True
         return False
 
 

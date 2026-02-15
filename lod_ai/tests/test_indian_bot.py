@@ -91,7 +91,7 @@ def test_march_neutral_or_passive_destination():
 
 
 def test_i2_event_conditions_per_reference():
-    """I2 conditions per indian bot flowchart reference:
+    """I2 conditions per indian bot flowchart reference (CARD_EFFECTS lookup):
     1. Opp > Sup and event shifts S/O in Royalist favor
     2. Event places Village or grants free Gather
     3. Event removes a Patriot Fort
@@ -107,27 +107,28 @@ def test_i2_event_conditions_per_reference():
         "rng": __import__("random").Random(42),
     }
 
-    # Bullet 2: Event places a Village → True
+    # Bullet 2: Card 79 unshaded places Village → True
     state = base_state()
-    card_village = {"id": 9999, "unshaded_event": "Place 1 Village.", "shaded_event": "Nothing."}
+    card_village = {"id": 79}
     assert bot._faction_event_conditions(state, card_village) is True
 
-    # Bullet 2: Event grants free Gather → True
+    # Bullet 2: Card 75 unshaded grants free Gather → True
     state = base_state()
-    card_gather = {"id": 9998, "unshaded_event": "Free Gather in 2 Colonies.", "shaded_event": "Nothing."}
+    card_gather = {"id": 75}
     assert bot._faction_event_conditions(state, card_gather) is True
 
-    # Bullet 3: Event removes a Patriot Fort → True
+    # Bullet 3: Card 17 unshaded removes a Patriot Fort → True
     state = base_state()
-    card_fort = {"id": 9997, "unshaded_event": "Remove a Patriot Fort.", "shaded_event": "Nothing."}
+    card_fort = {"id": 17}
     assert bot._faction_event_conditions(state, card_fort) is True
 
-    # Non-matching card with < 4 Villages → should NOT match bullet 4
+    # Card 5 unshaded: "Patriots Ineligible" — is_effective but no
+    # Village/Gather/Fort.  With < 4 Villages, bullet 4 won't fire.
     state = base_state()
-    card_noop = {"id": 9996, "unshaded_event": "Draw a card.", "shaded_event": "Draw a card."}
+    card_noop = {"id": 5}
     assert bot._faction_event_conditions(state, card_noop) is False
 
-    # Non-matching card with 4+ Villages → exercises D6 check (bullet 4)
+    # Same card with 4+ Villages → exercises D6 check (bullet 4)
     state = base_state()
     state["spaces"]["B"] = {C.VILLAGE: 2}
     state["spaces"]["C"] = {C.VILLAGE: 1}
