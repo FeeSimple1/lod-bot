@@ -26,6 +26,7 @@ from pathlib import Path
 
 from lod_ai.bots.base_bot import BaseBot
 from lod_ai.bots import event_instructions as EI
+from lod_ai.bots.event_eval import CARD_EFFECTS
 from lod_ai import rules_consts as C
 from lod_ai.commands import rally, march, battle, rabble_rousing
 from lod_ai.special_activities import partisans, skirmish, persuasion
@@ -506,33 +507,39 @@ class PatriotBot(BaseBot):
     #  EVENT‑VS‑COMMAND BULLETS  (P2)
     # ===================================================================
     def _faction_event_conditions(self, state: Dict, card: Dict) -> bool:
-        # Patriots play SHADED events per flowchart P2
-        text = card.get("shaded_event", "") or ""
+        """P2: Check shaded Event conditions for Patriot bot via CARD_EFFECTS."""
+        effects = CARD_EFFECTS.get(card.get("id"))
+        if effects is None:
+            return False  # unknown card → fall through to Command
+        eff = effects["shaded"]
+
         support_map = state.get("support", {})
         sup = sum(max(0, lvl) for lvl in support_map.values())
         opp = sum(max(0, -lvl) for lvl in support_map.values())
 
-        # • Support > Opposition & event shifts Support/Opposition in Rebel favor
-        if sup > opp and any(k in text for k in ("Support", "Opposition")):
+        # 1. Support > Opposition and Event shifts in Rebel favor
+        if sup > opp and eff["shifts_support_rebel"]:
             return True
-        # • Places Underground Militia in Active Opposition or Village space with none
-        if "Militia" in text:
+        # 2. Places Patriot Militia (and game state has Active Opp or Village
+        #    space with no Militia — but the table records CAN-do, so just check flag)
+        if eff["places_patriot_militia_u"]:
             return True
-        # • Places a Patriot Fort or removes an Indian Village
-        if "Fort" in text or "Village" in text:
+        # 3. Places a Patriot Fort or removes an Indian Village
+        if eff["places_patriot_fort"] or eff["removes_village"]:
             return True
-        # • Adds 3+ Patriot Resources
-        if "Resources" in text and "Patriot" in text:
+        # 4. Adds 3+ Patriot Resources
+        if eff["adds_patriot_resources_3plus"]:
             return True
-        # • Event is effective, Patriots have 25+ pieces on the map, and D6 rolls 5+
-        pieces_on_map = sum(
-            sp.get(C.REGULAR_PAT, 0) + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
-            + sp.get(C.FORT_PAT, 0)
-            for sp in state["spaces"].values()
-        )
-        if pieces_on_map >= 25:
-            roll = state["rng"].randint(1, 6)
-            state.setdefault("rng_log", []).append(("Event D6", roll))
-            if roll >= 5:
-                return True
+        # 5. Event is effective, 25+ Patriot pieces on map, D6 >= 5
+        if eff["is_effective"]:
+            pieces_on_map = sum(
+                sp.get(C.REGULAR_PAT, 0) + sp.get(C.MILITIA_A, 0)
+                + sp.get(C.MILITIA_U, 0) + sp.get(C.FORT_PAT, 0)
+                for sp in state["spaces"].values()
+            )
+            if pieces_on_map >= 25:
+                roll = state["rng"].randint(1, 6)
+                state.setdefault("rng_log", []).append(("Event D6", roll))
+                if roll >= 5:
+                    return True
         return False

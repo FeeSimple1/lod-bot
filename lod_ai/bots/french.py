@@ -19,6 +19,7 @@ from typing import Dict, List, Tuple
 import json
 
 from lod_ai.bots.base_bot import BaseBot
+from lod_ai.bots.event_eval import CARD_EFFECTS
 from lod_ai import rules_consts as C
 from lod_ai.commands import (
     french_agent_mobilization as fam,
@@ -606,30 +607,35 @@ class FrenchBot(BaseBot):
     #  EVENT‑VS‑COMMAND BULLETS  (F2)
     # ===================================================================
     def _faction_event_conditions(self, state: Dict, card: Dict) -> bool:
-        # French play the SHADED event per F2 in the flowchart
-        text = card.get("shaded_event", "")
+        """F2: Check shaded Event conditions for French bot via CARD_EFFECTS."""
+        effects = CARD_EFFECTS.get(card.get("id"))
+        if effects is None:
+            return False  # unknown card → fall through to Command
+        eff = effects["shaded"]
+
         support_map = state.get("support", {})
         sup = sum(max(0, lvl) for lvl in support_map.values())
         opp = sum(max(0, -lvl) for lvl in support_map.values())
 
-        # • Support > Opposition and Event shifts toward Rebels
-        if sup > opp and any(k in text for k in ("Support", "Opposition")):
+        # 1. Support > Opposition and Event shifts in Rebel favor
+        if sup > opp and eff["shifts_support_rebel"]:
             return True
-        # • Moves Regulars/Squadrons from Unavailable OR places French pieces
-        if any(k in text for k in ("Squadron", "Regular", "French Leader")):
+        # 2. Places French pieces from Unavailable
+        if eff["places_french_from_unavailable"]:
             return True
-        # • Inflicts British casualties
-        if "British" in text and "casualt" in text.lower():
+        # 3. Places French pieces on map
+        if eff["places_french_on_map"]:
             return True
-        # • Adds French Resources
-        if "Resources" in text and "French" in text:
+        # 4. Inflicts British casualties
+        if eff["inflicts_british_casualties"]:
             return True
-        # • Treaty of Alliance played, Event is effective, and D6 rolls 5+
-        if state.get("toa_played") and self._event_die_roll(state):
+        # 5. Adds French Resources
+        if eff["adds_french_resources"]:
             return True
+        # 6. (After ToA only) Event is effective, D6 >= 5
+        if state.get("toa_played") and eff["is_effective"]:
+            roll = state["rng"].randint(1, 6)
+            state.setdefault("rng_log", []).append(("Event D6", roll))
+            if roll >= 5:
+                return True
         return False
-
-    def _event_die_roll(self, state: Dict) -> bool:
-        roll = state["rng"].randint(1, 6)
-        state.setdefault("rng_log", []).append(("Event D6", roll))
-        return roll >= 5

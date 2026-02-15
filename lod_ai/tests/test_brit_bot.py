@@ -165,7 +165,7 @@ def test_battle_force_level_selection():
 
 
 def test_b2_faction_event_conditions_exists():
-    """B2: British bot must evaluate Event conditions (was missing entirely)."""
+    """B2: British bot must evaluate Event conditions via CARD_EFFECTS lookup."""
     bot = BritishBot()
     state = {
         "spaces": {},
@@ -175,21 +175,15 @@ def test_b2_faction_event_conditions_exists():
         "control": {},
         "rng": __import__("random").Random(42),
     }
-    # Card with Support/Opposition in unshaded text and Opposition > Support
-    card = {
-        "id": 9999,
-        "unshaded_event": "Shift 2 spaces toward Support.",
-        "shaded_event": "Nothing relevant.",
-    }
+    # Card 10 unshaded: shifts toward Active Support (shifts_support_royalist)
+    # With Opposition > Support, bullet 1 fires
+    card = {"id": 10}
     state["support"] = {"Boston": -1}  # Opposition=1 > Support=0
     assert bot._faction_event_conditions(state, card) is True
 
-    # No relevant text → no event
-    card_noop = {
-        "id": 9998,
-        "unshaded_event": "Draw a card.",
-        "shaded_event": "Draw a card.",
-    }
+    # Card 5 unshaded: "Patriots Ineligible" — is_effective but no placement
+    # or shift flags.  With 0 British Regulars on map, bullet 5 won't fire.
+    card_noop = {"id": 5}
     state["support"] = {"Boston": -1}
     assert bot._faction_event_conditions(state, card_noop) is False
 

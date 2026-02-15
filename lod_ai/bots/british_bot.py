@@ -18,6 +18,7 @@ from pathlib import Path
 import json
 
 from lod_ai.bots.base_bot import BaseBot
+from lod_ai.bots.event_eval import CARD_EFFECTS
 from lod_ai import rules_consts as C
 from lod_ai.board.control import refresh_control
 from lod_ai.commands import garrison, muster, march, battle
@@ -108,38 +109,38 @@ class BritishBot(BaseBot):
     #  EVENT‑VS‑COMMAND BULLETS (B2)
     # =======================================================================
     def _faction_event_conditions(self, state: Dict, card: Dict) -> bool:
-        """B2: Check unshaded Event conditions for British bot."""
-        text = card.get("unshaded_event", "") or ""
+        """B2: Check unshaded Event conditions for British bot via CARD_EFFECTS."""
+        effects = CARD_EFFECTS.get(card.get("id"))
+        if effects is None:
+            return False  # unknown card → fall through to Command
+        eff = effects["unshaded"]
+
         support_map = state.get("support", {})
         sup = sum(max(0, lvl) for lvl in support_map.values())
         opp = sum(max(0, -lvl) for lvl in support_map.values())
 
-        # • Opposition > Support, and Event shifts Support/Opposition in
-        #   Royalist favor (including by removing a Blockade)?
-        if opp > sup and any(k in text for k in ("Support", "Opposition", "Blockade")):
+        # 1. Opposition > Support and Event shifts support in Royalist favor
+        if opp > sup and eff["shifts_support_royalist"]:
             return True
-        # • Event places British pieces from Unavailable?
-        if any(k in text for k in ("Unavailable",)):
-            if any(k in text for k in ("Regular", "Tory", "British")):
-                return True
-        # • Event places Tories in Active Opposition with none, a British Fort
-        #   in a Colony with none, or British Regulars in a City or Colony?
-        if "Tory" in text or "Tories" in text or "Fort" in text or "Regular" in text:
+        # 2. Event places British pieces
+        if eff["places_british_pieces"]:
             return True
-        # • Event inflicts Rebel Casualties (including free Skirmish or Battle)?
-        if any(k in text.lower() for k in ("casualt", "skirmish", "battle")):
-            if any(k in text for k in ("Rebel", "Patriot", "French", "Indian", "Militia", "Continental")):
-                return True
-        # • British Control 5+ Cities, the Event is effective, and a D6 rolls 5+?
-        controlled_cities = sum(
-            1 for name in CITIES
-            if self._control(state, name) == C.BRITISH
-        )
-        if controlled_cities >= 5:
-            roll = state["rng"].randint(1, 6)
-            state.setdefault("rng_log", []).append(("Event D6", roll))
-            if roll >= 5:
-                return True
+        # 3. Event removes a Patriot Fort or removes an Indian Village
+        if eff["removes_patriot_fort"] or eff["removes_village"]:
+            return True
+        # 4. Event adds 3+ British Resources
+        if eff["adds_british_resources_3plus"]:
+            return True
+        # 5. Event is effective, 10+ British Regulars on map, D6 >= 5
+        if eff["is_effective"]:
+            regs_on_map = sum(
+                sp.get(C.REGULAR_BRI, 0) for sp in state["spaces"].values()
+            )
+            if regs_on_map >= 10:
+                roll = state["rng"].randint(1, 6)
+                state.setdefault("rng_log", []).append(("Event D6", roll))
+                if roll >= 5:
+                    return True
         return False
 
     # =======================================================================
