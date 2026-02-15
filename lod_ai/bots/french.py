@@ -37,7 +37,13 @@ except ImportError:  # pragma: no cover
 
 from lod_ai.util.history import push_history
 from lod_ai.board.control import refresh_control
-from lod_ai.util.naval import move_blockades_to_west_indies, unavailable_blockades
+from lod_ai.util.naval import (
+    move_blockades_to_west_indies, unavailable_blockades,
+    west_indies_blockades,
+)
+from lod_ai.leaders import leader_location
+from lod_ai.map import adjacency as map_adj
+from collections import defaultdict
 
 # ---------------------------------------------------------------------------
 #  Static data
@@ -386,9 +392,17 @@ class FrenchBot(BaseBot):
 
     # ----- Hortalez (F6 / F11) ---------------------------------
     def _hortelez(self, state: Dict, *, before_treaty: bool) -> None:
+        """F6 (before Treaty): Spend exactly 1D3 French Resources.
+        F11 (after Treaty): Spend up to 1D3 French Resources.
+        Both capped at available resources. Bot always spends max possible.
+        """
         roll = state["rng"].randint(1, 3)
         state.setdefault("rng_log", []).append(("Hortalez 1D3", roll))
+        # F6 pre-Treaty: spend exactly 1D3 (capped at available)
+        # F11 post-Treaty: spend up to 1D3 (bot maximizes)
         pay = min(state["resources"][C.FRENCH], roll)
+        if pay < 1:
+            return  # Can't pay anything
         hortelez.execute(state, C.FRENCH, {}, pay=pay)
         phase = "pre‑Treaty" if before_treaty else "post‑Treaty"
         push_history(state, f"Roderigue Hortalez et Cie ({phase}): Pay {pay}")
@@ -435,31 +449,185 @@ class FrenchBot(BaseBot):
         return True
 
     # ----- March (F14) -----------------------------------------
+
+    @staticmethod
+    def _rebel_pieces_in(sp: Dict) -> int:
+        """Count all Rebellion pieces in a space."""
+        return (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+                + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                + sp.get(C.FORT_PAT, 0))
+
+    @staticmethod
+    def _royalist_pieces_in(sp: Dict) -> int:
+        """Count all Royalist pieces in a space."""
+        return (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                + sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
+                + sp.get(C.FORT_BRI, 0) + sp.get(C.VILLAGE, 0))
+
+    def _would_lose_rebel_control(self, state: Dict, src: str,
+                                  pieces_removed: Dict[str, int]) -> bool:
+        """Return True if removing *pieces_removed* from *src* loses Rebel Control."""
+        ctrl = state.get("control", {})
+        if ctrl.get(src) != "REBELLION":
+            return False
+        sp = state["spaces"][src]
+        rebel = self._rebel_pieces_in(sp) - sum(pieces_removed.values())
+        royalist = self._royalist_pieces_in(sp)
+        return rebel <= royalist
+
     def _march(self, state: Dict) -> bool:
-        """F14: March with French Regulars + Continentals to add Rebel Control,
-        first in Cities, within that first where most British.
+        """F14: Full March implementation per flowchart reference.
+
+        Steps (in order):
+        1. Lose no Rebel Control.
+        2. March as many French Regulars and Continentals as possible to add
+           Rebel Control, first in Cities, within that first where most British.
+        3. March French not in/adjacent to space with British toward nearest
+           British pieces.
+        4. If none of the above, March 1 French Regular to a space with
+           Patriots and British.
         """
         refresh_control(state)
         ctrl = state.get("control", {})
-        candidates: List[Tuple[tuple, str, str]] = []
-        for src, sp in state["spaces"].items():
-            if sp.get(C.REGULAR_FRE, 0) == 0:
-                continue
-            for adj in _MAP_DATA.get(src, {}).get("adj", []):
-                for dst in adj.split("|"):
-                    if dst not in state.get("spaces", {}):
-                        continue
-                    if ctrl.get(dst) == "REBELLION":
-                        continue
-                    dsp = state["spaces"][dst]
-                    is_city = 1 if _MAP_DATA.get(dst, {}).get("type") == "City" else 0
-                    british = dsp.get(C.REGULAR_BRI, 0) + dsp.get(C.TORY, 0)
-                    candidates.append(((is_city, british, state["rng"].random()), src, dst))
-        if not candidates:
+
+        # ---- Step 2: March to add Rebel Control ----
+        # Collect sources: spaces with French Regulars
+        sources: Dict[str, int] = {}
+        for sid, sp in state["spaces"].items():
+            fre = sp.get(C.REGULAR_FRE, 0)
+            if fre > 0:
+                sources[sid] = fre
+
+        if not sources:
             return False
-        _, src, dst = max(candidates)
-        march.execute(state, C.FRENCH, {}, [src], [dst], bring_escorts=False, limited=False)
-        return True
+
+        # Identify destinations not already REBELLION, adjacent to a source
+        dest_candidates = []
+        for dst in state["spaces"]:
+            if ctrl.get(dst) == "REBELLION":
+                continue
+            adj = map_adj.adjacent_spaces(dst)
+            adj_sources = [s for s in adj if s in sources]
+            if not adj_sources:
+                continue
+            is_city = 1 if _MAP_DATA.get(dst, {}).get("type") == "City" else 0
+            dsp = state["spaces"][dst]
+            british = dsp.get(C.REGULAR_BRI, 0) + dsp.get(C.TORY, 0)
+            dest_candidates.append((-is_city, -british, state["rng"].random(), dst, adj_sources))
+        dest_candidates.sort()
+
+        move_plans = []
+        used_from: Dict[str, int] = defaultdict(int)  # track committed pieces per source
+
+        for _, _, _, dst, adj_sources in dest_candidates:
+            dsp = state["spaces"][dst]
+            royalist = self._royalist_pieces_in(dsp)
+            rebel = self._rebel_pieces_in(dsp)
+            need = royalist - rebel + 1
+            if need <= 0:
+                continue
+
+            gathered = 0
+            plan_entries = []
+
+            for src in adj_sources:
+                if gathered >= need:
+                    break
+                sp = state["spaces"][src]
+                available_fre = sp.get(C.REGULAR_FRE, 0) - used_from[src]
+                if available_fre <= 0:
+                    continue
+                # Check lose-no-rebel-control constraint
+                max_can_move = available_fre
+                if ctrl.get(src) == "REBELLION":
+                    total_rebel = self._rebel_pieces_in(sp) - used_from[src]
+                    total_royalist = self._royalist_pieces_in(sp)
+                    max_can_move = min(max_can_move, max(0, total_rebel - total_royalist - 1))
+                take = min(max_can_move, need - gathered)
+                if take > 0:
+                    entry_pieces = {C.REGULAR_FRE: take}
+                    # Also bring Continentals as escorts (up to French count)
+                    pat_avail = sp.get(C.REGULAR_PAT, 0)
+                    escort = min(take, pat_avail, need - gathered - take)
+                    if escort > 0:
+                        entry_pieces[C.REGULAR_PAT] = escort
+                    plan_entries.append({"src": src, "dst": dst, "pieces": entry_pieces})
+                    gathered += take + (escort if escort > 0 else 0)
+
+            if gathered >= need:
+                for entry in plan_entries:
+                    move_plans.append(entry)
+                    for tag, cnt in entry["pieces"].items():
+                        if tag == C.REGULAR_FRE:
+                            used_from[entry["src"]] += cnt
+
+        if move_plans:
+            all_srcs = list(dict.fromkeys(p["src"] for p in move_plans))
+            all_dsts = list(dict.fromkeys(p["dst"] for p in move_plans))
+            march.execute(state, C.FRENCH, {}, all_srcs, all_dsts,
+                          bring_escorts=True, move_plan=move_plans)
+            return True
+
+        # ---- Step 3: March isolated French toward nearest British ----
+        british_spaces = set()
+        for sid, sp in state["spaces"].items():
+            if sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0) > 0:
+                british_spaces.add(sid)
+
+        if british_spaces:
+            for src in sorted(sources.keys()):
+                sp = state["spaces"][src]
+                fre = sp.get(C.REGULAR_FRE, 0) - used_from.get(src, 0)
+                if fre <= 0:
+                    continue
+                adj = map_adj.adjacent_spaces(src)
+                # Is this French "not in/adjacent to space with British"?
+                near_british = src in british_spaces or any(a in british_spaces for a in adj)
+                if near_british:
+                    continue
+                # Find adjacent space closest to nearest British via BFS
+                best_next, best_dist = None, float("inf")
+                for neighbor in adj:
+                    if neighbor not in state["spaces"]:
+                        continue
+                    for brit_space in british_spaces:
+                        path = map_adj.shortest_path(neighbor, brit_space)
+                        if path and len(path) < best_dist:
+                            best_dist = len(path)
+                            best_next = neighbor
+                if not best_next:
+                    continue
+                # Check lose-no-rebel-control
+                if self._would_lose_rebel_control(state, src, {C.REGULAR_FRE: 1}):
+                    continue
+                march.execute(state, C.FRENCH, {}, [src], [best_next],
+                              bring_escorts=False, move_plan=[
+                                  {"src": src, "dst": best_next,
+                                   "pieces": {C.REGULAR_FRE: 1}}])
+                return True
+
+        # ---- Step 4: Fallback — March 1 French Regular to space with both ----
+        for src in sorted(sources.keys()):
+            sp = state["spaces"][src]
+            if sp.get(C.REGULAR_FRE, 0) <= 0:
+                continue
+            for neighbor in sorted(map_adj.adjacent_spaces(src)):
+                if neighbor not in state["spaces"]:
+                    continue
+                nsp = state["spaces"][neighbor]
+                has_pats = (nsp.get(C.REGULAR_PAT, 0) + nsp.get(C.MILITIA_A, 0)
+                            + nsp.get(C.MILITIA_U, 0)) > 0
+                has_brits = (nsp.get(C.REGULAR_BRI, 0) + nsp.get(C.TORY, 0)) > 0
+                if has_pats and has_brits:
+                    if self._would_lose_rebel_control(state, src, {C.REGULAR_FRE: 1}):
+                        continue
+                    march.execute(state, C.FRENCH, {}, [src], [neighbor],
+                                  bring_escorts=False, move_plan=[
+                                      {"src": src, "dst": neighbor,
+                                       "pieces": {C.REGULAR_FRE: 1}}])
+                    return True
+
+        return False
 
     # ----- Battle (F16) ----------------------------------------
     def _battle(self, state: Dict) -> bool:
@@ -637,5 +805,125 @@ class FrenchBot(BaseBot):
             roll = state["rng"].randint(1, 6)
             state.setdefault("rng_log", []).append(("Event D6", roll))
             if roll >= 5:
+                return True
+        return False
+
+    # ===================================================================
+    #  OPS SUMMARY METHODS
+    # ===================================================================
+
+    def ops_supply_priority(self, state: Dict) -> List[str]:
+        """French Supply / West Indies: Pay for each space where removing
+        French Regulars would change Control, *within that* first where
+        British could Reward Loyalty, then higher Pop.
+        Pay to keep French Regulars in West Indies if possible.
+        """
+        refresh_control(state)
+        ctrl = state.get("control", {})
+        priorities = []
+        for sid, sp in state["spaces"].items():
+            if sp.get(C.REGULAR_FRE, 0) == 0:
+                continue
+            # Would removing French Regulars change control?
+            rebel_without = (self._rebel_pieces_in(sp)
+                             - sp.get(C.REGULAR_FRE, 0))
+            royalist = self._royalist_pieces_in(sp)
+            changes_ctrl = (ctrl.get(sid) == "REBELLION"
+                            and rebel_without <= royalist)
+            # Could British Reward Loyalty here?
+            brit_can_rl = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)) > 0
+            pop = _MAP_DATA.get(sid, {}).get("population", 0)
+            # Priority: changes control first, then Reward Loyalty, then Pop
+            priorities.append((-int(changes_ctrl), -int(brit_can_rl), -pop, sid))
+        priorities.sort()
+        result = [sid for _, _, _, sid in priorities]
+        # Always include West Indies if French there
+        wi_sp = state["spaces"].get(WEST_INDIES, {})
+        if wi_sp.get(C.REGULAR_FRE, 0) > 0 and WEST_INDIES not in result:
+            result.append(WEST_INDIES)
+        return result
+
+    def ops_redeploy_leader(self, state: Dict) -> str | None:
+        """Redeploy the French Leader to a space with French Regulars and
+        Continentals if possible, within that where most French Regulars.
+        """
+        best, best_score = None, -1
+        for sid, sp in state["spaces"].items():
+            fre = sp.get(C.REGULAR_FRE, 0)
+            pat = sp.get(C.REGULAR_PAT, 0)
+            if fre > 0 and pat > 0:
+                if fre > best_score:
+                    best, best_score = sid, fre
+        if best:
+            return best
+        # Fallback: space with most French Regulars (no Continentals needed)
+        for sid, sp in state["spaces"].items():
+            fre = sp.get(C.REGULAR_FRE, 0)
+            if fre > best_score:
+                best, best_score = sid, fre
+        return best
+
+    def ops_loyalist_desertion_priority(self, state: Dict) -> List[Tuple[str, str]]:
+        """Loyalist Desertion: Remove a Tory so as to change the most
+        Control possible, then the last Tory in a space with most Pop
+        not already at Active Support, then random.
+        Returns list of (space_id, piece_tag) in priority order.
+        """
+        refresh_control(state)
+        ctrl = state.get("control", {})
+        result = []
+        for sid, sp in state["spaces"].items():
+            tories = sp.get(C.TORY, 0)
+            if tories == 0:
+                continue
+            # Would removing 1 Tory change control?
+            royalist = self._royalist_pieces_in(sp)
+            rebel = self._rebel_pieces_in(sp)
+            # If removing 1 Tory makes royalist < rebel → changes to REBELLION
+            changes_ctrl = (ctrl.get(sid) != "REBELLION"
+                            and rebel > (royalist - 1))
+            # Is this the last Tory?
+            is_last = tories == 1
+            # Not already at Active Support → higher priority
+            sup = state.get("support", {}).get(sid, 0)
+            not_active_sup = 1 if sup != C.ACTIVE_SUPPORT else 0
+            pop = _MAP_DATA.get(sid, {}).get("population", 0)
+            # Priority: changes control, then last Tory in high Pop non-AS,
+            # then random
+            result.append((-int(changes_ctrl), -int(is_last) * not_active_sup,
+                           -pop, state["rng"].random(), sid, C.TORY))
+        result.sort()
+        return [(sid, tag) for _, _, _, _, sid, tag in result]
+
+    def ops_toa_trigger(self, state: Dict) -> bool:
+        """Treaty of Alliance: Play if
+        (Squadrons in West Indies + Available French Regulars
+         + 1/2 x Cumulative British Casualties) > 15.
+        """
+        if state.get("toa_played"):
+            return False  # Already played
+        wi_squadrons = west_indies_blockades(state)
+        avail_fre = state.get("available", {}).get(C.REGULAR_FRE, 0)
+        # Cumulative British Casualties: sum of all pieces in casualties box
+        casualties = state.get("casualties", {})
+        brit_casualties = casualties.get(C.REGULAR_BRI, 0) + casualties.get(C.TORY, 0)
+        total = wi_squadrons + avail_fre + (brit_casualties // 2)
+        return total > 15
+
+    def ops_bs_trigger(self, state: Dict) -> bool:
+        """Brilliant Stroke: Use after ToA when the French Leader is in a
+        space with 4+ French Regulars, and any player Faction is 1st
+        Eligible or the British play their Brilliant Stroke.
+        """
+        if not state.get("toa_played"):
+            return False
+        # Find French leader
+        french_leaders = ["LEADER_ROCHAMBEAU", "LEADER_LAUZUN"]
+        for ldr in french_leaders:
+            loc = leader_location(state, ldr)
+            if not loc:
+                continue
+            sp = state["spaces"].get(loc, {})
+            if sp.get(C.REGULAR_FRE, 0) >= 4:
                 return True
         return False
