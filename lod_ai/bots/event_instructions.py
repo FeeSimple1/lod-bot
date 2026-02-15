@@ -26,7 +26,7 @@ PATRIOTS = {
     18: "force_if_eligible_enemy",    # "If it hadn't been so stormy…" — target eligible enemy, else C&SA
     29: "force",                      # Edward Bancroft, British Spy — target Indians
     44: "force_if_eligible_enemy",    # Earl of Mansfield Recalled from Paris — target eligible enemy, else C&SA
-    51: "force",                      # Bermuda Gunpowder Plot
+    51: "force_if_51",                 # Bermuda Gunpowder Plot — March to set up Battle; if not possible, C&SA
     52: "force",                      # French Fleet Arrives in the Wrong Spot
     70: "force",                      # British Gain From French in India
     71: "force_unshaded",             # Treaty of Amity and Commerce — use unshaded text

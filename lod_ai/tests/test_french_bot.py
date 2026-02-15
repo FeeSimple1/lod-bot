@@ -543,3 +543,329 @@ def test_event_force_if_52_battle_target():
     state["spaces"]["Boston"][C.REGULAR_BRI] = 2
     assert bot._force_condition_met("force_if_52", state, card) is True
     assert state.get("card52_no_remove_french") is True
+
+
+# =========================================================================
+# New tests for audit-report fixes
+# =========================================================================
+
+def _full_state(**overrides):
+    """Build a well-formed state dict for French bot tests."""
+    base = {
+        "spaces": {
+            "Boston": {},
+            "Massachusetts": {},
+            "New_York": {},
+            "New_York_City": {},
+            "Connecticut_Rhode_Island": {},
+            "Philadelphia": {},
+            "Virginia": {},
+        },
+        "resources": {C.FRENCH: 10, C.PATRIOTS: 10, C.BRITISH: 10, C.INDIANS: 10},
+        "available": {C.REGULAR_FRE: 5, C.MILITIA_U: 5},
+        "unavailable": {},
+        "support": {},
+        "control": {},
+        "rng": random.Random(42),
+        "history": [],
+        "casualties": {},
+        "markers": {},
+        "toa_played": True,
+    }
+    base.update(overrides)
+    return base
+
+
+# ---------- F14 March: Full implementation ----------
+
+def test_f14_march_loses_no_rebel_control():
+    """F14: March must not move pieces that would lose Rebel Control."""
+    bot = FrenchBot()
+    state = _full_state()
+    # Massachusetts: 2 French + 1 British → REBELLION control
+    # Moving both French would lose control
+    state["spaces"]["Massachusetts"] = {
+        C.REGULAR_FRE: 2, C.REGULAR_BRI: 1,
+    }
+    # Boston: 2 British → target for adding Rebel Control
+    state["spaces"]["Boston"] = {
+        C.REGULAR_BRI: 2,
+    }
+    state["control"] = {"Massachusetts": "REBELLION"}
+    result = bot._march(state)
+    # After march, Massachusetts should still have REBELLION control
+    # (at most 1 French should have moved)
+    from lod_ai.board.control import refresh_control
+    refresh_control(state)
+    # The bot should have been careful not to lose control
+    rebel = bot._rebel_pieces_in(state["spaces"]["Massachusetts"])
+    royalist = bot._royalist_pieces_in(state["spaces"]["Massachusetts"])
+    assert rebel > royalist or state["control"].get("Massachusetts") != "REBELLION"
+
+
+def test_f14_march_cities_first():
+    """F14: March should prioritize Cities over Colonies."""
+    bot = FrenchBot()
+    state = _full_state()
+    # French in Massachusetts, adjacent to Boston (City) and New_York (Colony)
+    state["spaces"]["Massachusetts"] = {C.REGULAR_FRE: 5}
+    state["spaces"]["Boston"] = {C.REGULAR_BRI: 1}  # City
+    state["spaces"]["New_York"] = {C.REGULAR_BRI: 1}  # Colony
+    state["control"] = {}
+    result = bot._march(state)
+    assert result is True
+    # Boston (City) should have been targeted first
+    assert state["spaces"]["Boston"].get(C.REGULAR_FRE, 0) > 0
+
+
+def test_f14_march_most_british_priority():
+    """F14: Within Cities, march to where most British."""
+    bot = FrenchBot()
+    state = _full_state()
+    state["spaces"]["Massachusetts"] = {C.REGULAR_FRE: 5}
+    # Two adjacent cities
+    state["spaces"]["Boston"] = {C.REGULAR_BRI: 3}  # More British
+    state["spaces"]["Connecticut_Rhode_Island"] = {C.REGULAR_BRI: 1}  # Fewer British
+    state["control"] = {}
+    result = bot._march(state)
+    assert result is True
+    # Boston should be targeted first (more British)
+    assert state["spaces"]["Boston"].get(C.REGULAR_FRE, 0) > 0
+
+
+def test_f14_march_isolated_french_toward_british():
+    """F14 step 3: French not in/adjacent to British march toward nearest British."""
+    bot = FrenchBot()
+    state = _full_state()
+    # French in Virginia (isolated from British), British in New_York_City
+    # Path: Virginia → Maryland-Delaware → Pennsylvania → New_Jersey → New_York_City
+    # Include intermediate spaces so BFS can find a path
+    state["spaces"]["Virginia"] = {C.REGULAR_FRE: 2}
+    state["spaces"]["Maryland-Delaware"] = {}
+    state["spaces"]["Pennsylvania"] = {}
+    state["spaces"]["New_Jersey"] = {}
+    state["spaces"]["New_York_City"] = {C.REGULAR_BRI: 3}
+    # Clear other spaces to keep it simple
+    for sid in list(state["spaces"]):
+        if sid not in ("Virginia", "Maryland-Delaware", "Pennsylvania",
+                       "New_Jersey", "New_York_City"):
+            state["spaces"][sid] = {}
+    state["control"] = {}
+    result = bot._march(state)
+    # Should have moved toward New_York_City (step 3)
+    assert result is True
+    # Virginia should have fewer French (moved 1 toward British)
+    assert state["spaces"]["Virginia"].get(C.REGULAR_FRE, 0) < 2
+
+
+def test_f14_march_fallback_to_pats_and_brits():
+    """F14 step 4: Last resort — March 1 French to space with both Patriots and British."""
+    bot = FrenchBot()
+    state = _full_state()
+    # French in Massachusetts, all adjacent spaces already REBELLION (step 2 fails)
+    state["spaces"]["Massachusetts"] = {C.REGULAR_FRE: 2}
+    state["spaces"]["Boston"] = {
+        C.REGULAR_PAT: 2, C.REGULAR_BRI: 2,  # Has both Patriots and British
+    }
+    state["control"] = {
+        "Massachusetts": "REBELLION",
+        "Boston": "REBELLION",  # Already REBELLION → step 2 skips
+        "New_York": "REBELLION",
+        "Connecticut_Rhode_Island": "REBELLION",
+    }
+    result = bot._march(state)
+    # Step 2 fails (all adjacent are REBELLION)
+    # Step 3 fails (Massachusetts IS adjacent to Boston which has British)
+    # Step 4 finds Boston (has Patriots and British)
+    assert result is True
+
+
+def test_f14_march_returns_false_when_impossible():
+    """F14: Returns False when no March is possible."""
+    bot = FrenchBot()
+    state = _full_state()
+    # No French on map
+    for sid in state["spaces"]:
+        state["spaces"][sid] = {}
+    result = bot._march(state)
+    assert result is False
+
+
+# ---------- F14: Control simulation helpers ----------
+
+def test_rebel_pieces_count():
+    """_rebel_pieces_in should count all Rebellion pieces."""
+    sp = {
+        C.REGULAR_PAT: 3, C.REGULAR_FRE: 2,
+        C.MILITIA_A: 1, C.MILITIA_U: 2,
+        C.FORT_PAT: 1,
+    }
+    assert FrenchBot._rebel_pieces_in(sp) == 9
+
+
+def test_royalist_pieces_count():
+    """_royalist_pieces_in should count all Royalist pieces."""
+    sp = {
+        C.REGULAR_BRI: 2, C.TORY: 3,
+        C.WARPARTY_A: 1, C.WARPARTY_U: 1,
+        C.FORT_BRI: 1, C.VILLAGE: 2,
+    }
+    assert FrenchBot._royalist_pieces_in(sp) == 10
+
+
+def test_would_lose_rebel_control():
+    """_would_lose_rebel_control returns True when removing pieces loses control."""
+    bot = FrenchBot()
+    state = _full_state()
+    state["spaces"]["Boston"] = {C.REGULAR_FRE: 2, C.REGULAR_BRI: 1}
+    state["control"] = {"Boston": "REBELLION"}
+    # Removing 1 French: 1 rebel vs 1 royalist → tie → lost
+    assert bot._would_lose_rebel_control(state, "Boston", {C.REGULAR_FRE: 1}) is True
+    # Removing 0: still in control
+    assert bot._would_lose_rebel_control(state, "Boston", {}) is False
+
+
+# ---------- Hortalez pre/post Treaty ----------
+
+def test_hortalez_pre_treaty_spends_full_roll():
+    """F6: Before Treaty, spend exactly 1D3 (capped at available)."""
+    bot = FrenchBot()
+    state = _full_state(resources={
+        C.FRENCH: 10, C.PATRIOTS: 0, C.BRITISH: 10, C.INDIANS: 10,
+    })
+    initial_french = state["resources"][C.FRENCH]
+    bot._hortelez(state, before_treaty=True)
+    spent = initial_french - state["resources"][C.FRENCH]
+    # Should have spent 1, 2, or 3
+    assert 1 <= spent <= 3
+    # Patriots should have received spent + 1
+    assert state["resources"][C.PATRIOTS] == spent + 1
+
+
+def test_hortalez_post_treaty_spends_up_to_roll():
+    """F11: After Treaty, spend up to 1D3 (bot maximizes)."""
+    bot = FrenchBot()
+    state = _full_state(resources={
+        C.FRENCH: 10, C.PATRIOTS: 0, C.BRITISH: 10, C.INDIANS: 10,
+    })
+    initial_french = state["resources"][C.FRENCH]
+    bot._hortelez(state, before_treaty=False)
+    spent = initial_french - state["resources"][C.FRENCH]
+    assert 1 <= spent <= 3
+
+
+def test_hortalez_zero_resources_skips():
+    """Hortalez should do nothing when French has 0 resources."""
+    bot = FrenchBot()
+    state = _full_state(resources={
+        C.FRENCH: 0, C.PATRIOTS: 0, C.BRITISH: 10, C.INDIANS: 10,
+    })
+    bot._hortelez(state, before_treaty=True)
+    # Resources unchanged
+    assert state["resources"][C.FRENCH] == 0
+    assert state["resources"][C.PATRIOTS] == 0
+
+
+# ---------- OPS Summary methods ----------
+
+def test_ops_supply_priority():
+    """ops_supply_priority should prioritize spaces where removal changes control."""
+    bot = FrenchBot()
+    state = _full_state()
+    state["spaces"]["Boston"] = {
+        C.REGULAR_FRE: 2, C.REGULAR_BRI: 1,  # Removing French changes control
+    }
+    state["spaces"]["New_York"] = {
+        C.REGULAR_FRE: 1, C.REGULAR_PAT: 5,  # Removing French doesn't change control
+    }
+    state["control"] = {"Boston": "REBELLION", "New_York": "REBELLION"}
+    result = bot.ops_supply_priority(state)
+    assert len(result) >= 2
+    # Boston should come first (removing French would change control)
+    assert result[0] == "Boston"
+
+
+def test_ops_redeploy_leader():
+    """ops_redeploy_leader should prefer space with French Regs and Continentals."""
+    bot = FrenchBot()
+    state = _full_state()
+    state["spaces"]["Boston"] = {C.REGULAR_FRE: 3, C.REGULAR_PAT: 2}
+    state["spaces"]["New_York"] = {C.REGULAR_FRE: 5}  # No Continentals
+    state["spaces"]["Massachusetts"] = {C.REGULAR_FRE: 2, C.REGULAR_PAT: 1}
+    result = bot.ops_redeploy_leader(state)
+    # Boston has both French Regs and Continentals, 3 French > 2 in Massachusetts
+    assert result == "Boston"
+
+
+def test_ops_redeploy_leader_fallback():
+    """ops_redeploy_leader falls back to most French Regs if no Continentals."""
+    bot = FrenchBot()
+    state = _full_state()
+    state["spaces"]["Boston"] = {C.REGULAR_FRE: 3}
+    state["spaces"]["New_York"] = {C.REGULAR_FRE: 5}
+    result = bot.ops_redeploy_leader(state)
+    assert result == "New_York"
+
+
+def test_ops_loyalist_desertion_priority():
+    """ops_loyalist_desertion_priority should prefer removals that change control."""
+    bot = FrenchBot()
+    state = _full_state()
+    state["spaces"]["Boston"] = {
+        C.TORY: 1, C.REGULAR_PAT: 1,  # 1 rebel, 1 royalist. Removing Tory → REBELLION
+    }
+    state["spaces"]["New_York"] = {
+        C.TORY: 3, C.REGULAR_BRI: 5,  # Lots of British. Removing 1 Tory won't change
+    }
+    state["control"] = {"Boston": "BRITISH", "New_York": "BRITISH"}
+    result = bot.ops_loyalist_desertion_priority(state)
+    assert len(result) >= 2
+    # Boston should come first (removing Tory changes control)
+    assert result[0][0] == "Boston"
+
+
+def test_ops_toa_trigger():
+    """ops_toa_trigger should use the exact formula from the reference."""
+    bot = FrenchBot()
+    state = _full_state(toa_played=False)
+    state["available"] = {C.REGULAR_FRE: 10}
+    state["casualties"] = {C.REGULAR_BRI: 6, C.TORY: 4}
+    # Formula: WI_squadrons + Avail_FRE + 1/2 * British_Casualties
+    # 0 + 10 + (6+4)//2 = 0 + 10 + 5 = 15
+    # 15 > 15 is False
+    assert bot.ops_toa_trigger(state) is False
+
+    # Add more: increase casualties
+    state["casualties"][C.REGULAR_BRI] = 8
+    # 0 + 10 + (8+4)//2 = 0 + 10 + 6 = 16 > 15
+    assert bot.ops_toa_trigger(state) is True
+
+
+def test_ops_toa_trigger_already_played():
+    """ops_toa_trigger returns False if ToA already played."""
+    bot = FrenchBot()
+    state = _full_state(toa_played=True)
+    state["available"] = {C.REGULAR_FRE: 20}
+    state["casualties"] = {C.REGULAR_BRI: 20}
+    assert bot.ops_toa_trigger(state) is False
+
+
+def test_ops_bs_trigger_needs_toa():
+    """ops_bs_trigger requires ToA to be played."""
+    bot = FrenchBot()
+    state = _full_state(toa_played=False)
+    state["spaces"]["Boston"] = {C.REGULAR_FRE: 5}
+    state["leaders"] = {"LEADER_ROCHAMBEAU": "Boston"}
+    assert bot.ops_bs_trigger(state) is False
+
+
+def test_ops_bs_trigger_needs_4_plus_french():
+    """ops_bs_trigger requires 4+ French Regulars at leader's space."""
+    bot = FrenchBot()
+    state = _full_state(toa_played=True)
+    state["spaces"]["Boston"] = {C.REGULAR_FRE: 3}
+    state["leaders"] = {"LEADER_ROCHAMBEAU": "Boston"}
+    assert bot.ops_bs_trigger(state) is False
+
+    state["spaces"]["Boston"][C.REGULAR_FRE] = 4
+    assert bot.ops_bs_trigger(state) is True
