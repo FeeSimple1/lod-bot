@@ -1069,3 +1069,88 @@ Session 5 noted "correct mode parameter passed; WP constraints delegated to comm
 **Previously documented issue now resolved:** B5 Garrison multi-city operation (working correctly).
 
 790 tests passing. No code changes made in this session (review only).
+
+---
+
+## Session 6: British Bot Compliance Fixes
+
+All issues identified in the Session 6 review above have been fixed. 6 groups of changes, 26 new tests added.
+
+### Group 1: New B2 flags in event_eval.py
+
+Added 6 new boolean fields to `_F` template in `event_eval.py`:
+- `inflicts_rebel_casualties` — 7 cards True (1, 6, 9, 14, 48, 51, 52)
+- `places_british_from_unavailable` — 6 cards True (27, 30, 32, 38, 43, 46)
+- `places_tories` — 19 cards True (2, 15, 16, 26, 27, 28, 31, 32, 38, 42, 43, 46, 47, 62, 66, 76, 85, 89, 94)
+- `places_british_fort` — 2 cards True (26, 31)
+- `places_british_regulars` — 7 cards True (2, 7, 30, 32, 38, 66, 85)
+- `removes_blockade` — 1 card True (54)
+
+All 96 cards audited against `card reference full.txt` unshaded text. Shaded entries all False (no dual-effect cards for these British-specific flags).
+
+Updated `test_event_eval.py`: 6 new fields in `_EXPECTED_FIELDS`, 14 new spot-check tests (2+ per flag, one True and one False).
+
+### Group 2: Rewritten B2 bullets in `_faction_event_conditions()`
+
+Rewrote all 5 bullets to match `british bot flowchart and reference.txt` lines 14-20:
+
+| Bullet | Before | After |
+|--------|--------|-------|
+| 1 | `shifts_support_royalist` only | `shifts_support_royalist OR removes_blockade` |
+| 2 | `places_british_pieces` (any source) | `places_british_from_unavailable` (strict subset) |
+| 3 | `removes_patriot_fort OR removes_village` (wrong) | Dynamic: `places_tories` + Active Opp w/o Tories, `places_british_fort` + Colony w/o Fort, `places_british_regulars` + City/Colony |
+| 4 | `adds_british_resources_3plus` (wrong) | `inflicts_rebel_casualties` |
+| 5 | `regs_on_map >= 10` (wrong metric) | `controlled_cities >= 5` using CITIES list |
+
+3 new tests in `test_brit_bot.py` covering bullets 3 (board state check), 4 (flag check), and 5 (city count not regulars).
+
+### Group 3: British event_instructions.py conditional directives
+
+**3a.** Changed 7 BRITISH dict entries from `"force"` to conditional directives:
+- Cards 18, 44 → `"force_if_eligible_enemy"` (already handled by base_bot)
+- Card 51 → `"force_if_51"`, Card 52 → `"force_if_52"` (March to set up Battle)
+- Card 62 → `"force_if_62"` (NY Active Opp w/o Tories)
+- Card 70 → `"force_if_70"` (French Regs in WI or with British)
+- Card 80 → `"force_if_80"` (Rebel pieces in Cities)
+
+**3b.** Added `_force_condition_met()` override to BritishBot with game-state checks for each directive, following the pattern in `french.py` and `patriot.py`.
+
+4 new tests covering force_if_62, force_if_70, force_if_80, and force_if_51.
+
+### Group 4: Skirmish fixes
+
+**4a.** Fixed `_best_skirmish_option` threshold: `own_regs >= 2` → `own_regs >= 1`. Option 2 sacrifices 1 Regular, so only 1 needs to be present.
+
+**4b.** Fixed Clinton double-count in `skirmish.py`: Removed direct Clinton check at lines 150-153. The `apply_leader_modifiers` → `_clinton` modifier already sets `ctx["skirmish_extra_militia"] = 1`. The direct check was adding a second +1, causing Clinton to remove 2 extra Militia instead of 1.
+
+**4c.** Removed Clinton dead code in `british_bot.py` after `skirmish.execute()`. The `state.get("leaders", {}).get(sid, "")` lookup used space ID as key in a faction→leaders dict, always returning `""`. Dead code removed; `skirmish.execute()` handles Clinton via the modifier system.
+
+1 new test verifying Clinton removes exactly 1 extra Militia (not 0 and not 2).
+
+### Group 5: Dead code cleanup
+
+Removed dead RL exclusion filter (second `rl_candidates` comprehension). The first filter already excludes `ACTIVE_SUPPORT` spaces with `< ACTIVE_SUPPORT`; the second checks `== ACTIVE_SUPPORT` which can never match.
+
+### Group 6: Common Cause WP preservation
+
+**6a.** Added `preserve_wp` parameter to `common_cause.execute()`:
+- MARCH mode: keeps at least 1 WP per space (can't use the last one)
+- BATTLE mode: keeps at least 1 Underground WP per space (Active may be used freely)
+
+British bot's `_try_common_cause()` now passes `preserve_wp=True`.
+
+**6b.** Documented architectural limitation in audit: `_try_common_cause()` called AFTER `march.execute()`, not during March planning. CC should integrate into March group size calculation but this requires refactoring the March/CC interface.
+
+3 new tests: MARCH preservation with multiple WP, MARCH skip with single WP, BATTLE Underground preservation.
+
+### Tests
+
+816 tests passing (790 baseline + 26 new).
+
+### Remaining issues (unchanged from review)
+
+- **B38 Howe capability**: FNI not lowered before SAs during Howe's leadership period.
+- **B39 Gage capability**: Free RL not implemented.
+- **B10 March + CC timing**: CC invoked post-March, not during March planning (architectural).
+- **B5 Garrison**: Multi-city operation verified correct.
+- **OPS reference items**: Supply/Redeploy/Desertion priorities not in turn flowchart.

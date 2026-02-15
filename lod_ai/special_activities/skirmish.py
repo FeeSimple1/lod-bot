@@ -147,10 +147,9 @@ def execute(
         remove_piece(state, enemy_fort_side_tag, space_id, 1, to="casualties")
         remove_piece(state, own_tag,           space_id, 1, to="casualties")
 
-    clinton_here = (faction == BRITISH) and (leader_location(state, "LEADER_CLINTON") == space_id)
+    # Clinton bonus is already applied via apply_leader_modifiers → _clinton
+    # which sets ctx["skirmish_extra_militia"] = 1.  Do NOT add a second +1 here.
     extra_militia = (ctx.get("skirmish_extra_militia", 0) if faction == BRITISH else 0)
-    if clinton_here:
-        extra_militia += 1
 
     removed_bonus = 0
     while extra_militia and (sp.get(MILITIA_A, 0) or sp.get(MILITIA_U, 0)):
@@ -161,8 +160,8 @@ def execute(
         extra_militia -= 1
         removed_bonus += 1
 
-    if clinton_here and removed_bonus:
-        push_history(state, "Clinton present - removed one additional Patriot Militia in Skirmish")
+    if removed_bonus:
+        push_history(state, f"Clinton bonus: removed {removed_bonus} additional Patriot Militia in Skirmish")
 
     refresh_control(state)
     enforce_global_caps(state)
