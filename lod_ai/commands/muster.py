@@ -104,12 +104,16 @@ def _make_fort(state: Dict, space_id: str) -> None:
         raise ValueError("Need at least 3 British cubes here to build a Fort.")
     add_piece(state, FORT_BRI, space_id, 1)
 
-def _reward_loyalty(state: Dict, sp: Dict, space_id: str, levels: int) -> None:
+def _reward_loyalty(state: Dict, sp: Dict, space_id: str, levels: int,
+                    *, free_first: bool = False) -> None:
     """Shift *levels* toward Active Support in *sp* paying Resources.
 
     Preconditions checked per §3.2.1:
       * ≥1 British Regular and ≥1 Tory present
       * British Control in the space
+
+    If *free_first* is True (B39 Gage capability), the first support shift
+    costs 0 Resources (marker removal still costs).
     """
     if levels <= 0:
         return
@@ -136,7 +140,9 @@ def _reward_loyalty(state: Dict, sp: Dict, space_id: str, levels: int) -> None:
         # Skip Reward Loyalty if it would only clear markers
         return
 
-    cost = len(markers_here) + shift_levels
+    # B39 Gage: first shift is free (marker cost still applies)
+    discount = 1 if free_first and shift_levels > 0 else 0
+    cost = len(markers_here) + shift_levels - discount
     if state["resources"][BRITISH] < cost:
         raise ValueError("Not enough Resources to Reward Loyalty.")
 
@@ -194,7 +200,9 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
             tory_plan: Optional[Dict[str, int]] = None,
             build_fort: bool = False,
             reward_levels: int = 0,
-            french_fort: bool = False) -> Dict:
+            french_fort: bool = False,
+            fort_space: Optional[str] = None,
+            rl_free_first: bool = False) -> Dict:
     """Perform the Muster Command for *faction* in *selected* spaces."""
     # Treaty gate
     if faction == FRENCH and not state.get("toa_played"):
@@ -245,11 +253,13 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
 
         # 3) Fort or Reward Loyalty in ONE selected space
         if build_fort or reward_levels:
-            target = dest  # default to Regular destination if caller didn't say
+            # Use fort_space if specified, otherwise fall back to Regular destination
+            target = fort_space if fort_space and fort_space in selected else dest
             if build_fort:
                 _make_fort(state, target)
             else:
-                _reward_loyalty(state, state["spaces"][target], target, reward_levels)
+                _reward_loyalty(state, state["spaces"][target], target, reward_levels,
+                                free_first=rl_free_first)
 
     # -------------------------------------------------------------------
     # FRENCH flow
