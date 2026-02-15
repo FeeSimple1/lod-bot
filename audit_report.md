@@ -854,3 +854,218 @@ All 109 card handlers match `card reference full.txt`. No outstanding card issue
 ### Engine (engine.py)
 
 - **Q7 (OPEN)**: `_execute_bot_brilliant_stroke()` hardcodes command priorities instead of consulting each faction's flowchart per §8.3.7. Awaiting user decision on approach.
+
+---
+
+## Session 6: British Bot Full Compliance Review
+
+### Scope
+
+Node-by-node comparison of the entire British bot flowchart implementation in `lod_ai/bots/british_bot.py` against `Reference Documents/british bot flowchart and reference.txt` and Manual Ch 8 (§8.4). Also reviewed `base_bot.py`, `event_instructions.py`, `event_eval.py`, `skirmish.py`, `common_cause.py`, `leaders/__init__.py`, and `rules_consts.py`.
+
+### Nodes verified CORRECT
+
+The following flowchart nodes are correctly implemented and match the reference:
+
+| Node | Description | Status |
+|------|-------------|--------|
+| B1 | Sword icon skip | CORRECT |
+| B3 | Resources > 0 gate | CORRECT |
+| B4 | 10+ Regulars on map AND Rebels control City w/o Rebel Fort | CORRECT |
+| B5 | Garrison retention (leave 2 more Royalist, last Regular rules) | CORRECT |
+| B5 | Garrison Phase 2a (most Rebels w/o Pat Fort, then NYC, then random) | CORRECT |
+| B5 | Garrison Phase 2b (1+ Regular w/o Active Support, then 3+ cubes w/ Underground Militia) | CORRECT |
+| B5 | Garrison displacement (most Opposition, then least Support, then lowest Pop) | CORRECT |
+| B5 | Garrison SA-first ordering (Skirmish then Naval) | CORRECT |
+| B5 | Garrison multi-city operation | CORRECT (previously documented as single-city; now fixed) |
+| B5 | Garrison fallback to Muster if no moves | CORRECT |
+| B6 | Available Regulars > 1D6 | CORRECT |
+| B8 | Muster Regular placement (Neutral/Passive first, then add Control, then Tories-only, highest Pop) | CORRECT |
+| B8 | Muster Tory placement (Regulars-only first, then change Control, then < 5 cubes w/o Fort) | CORRECT |
+| B8 | Muster RL/Fort condition (Opposition > Support + 1D3 OR no Forts Available) | CORRECT |
+| B8 | Muster Fort placement (Colony w/ 5+ cubes, no Fort) | CORRECT |
+| B8 | Muster SA after (Skirmish then Naval) | CORRECT |
+| B9 | Active Rebel definition (Continentals + Active Militia + French Regulars) | CORRECT |
+| B9 | Leader bonus (+1 to British Regulars) | CORRECT |
+| B10 | March leave-behind rules (last Tory, last WP, last Regular if Control w/o Active Support) | CORRECT |
+| B10 | March Phase 1 (largest groups first, Cities then Colonies, Rebel cubes then highest Pop) | CORRECT |
+| B10 | March Phase 2 (Pop 1+ not Active Support, Tories-where-Regs-only, Regs-where-Tories-only) | CORRECT |
+| B10 | March Phase 3 (March in place, Activate Militia, Support spaces first) | CORRECT |
+| B11 | Skirmish space exclusion (not Battle/Muster/Garrison spaces) | CORRECT |
+| B11 | Skirmish tier priorities (WI=0, exactly-1-Regular=1, other=2) | CORRECT |
+| B11 | Skirmish tiebreaker (fewest enemy, then City) | CORRECT |
+| B12 | Battle Force Level calculation (Regs + min(Tories, Regs) + floor(Active_WP/2)) | CORRECT |
+| B12 | Battle modifiers (half Regs, Underground, Leader, -Fort) | CORRECT |
+| B12 | Battle target sort (most British first) | CORRECT |
+| B12 | Battle "exceeds" condition (strict >) | CORRECT |
+| B7 | Naval Pressure FNI > 0 path (Blockade priority: Battle space, most Rebels w/o Fort, most Support) | CORRECT |
+| B7 | Naval Pressure FNI = 0 path (+1D3 Resources) | CORRECT |
+| RL | Reward Loyalty sort (fewest Raid+Propaganda markers, then largest shift) | CORRECT |
+
+### Corrections to prior audit notes
+
+**B5 Garrison multi-city**: The prior audit (Session 5) documented "Still targets only one city instead of full multi-phase operation." This has been fixed. Phase 2a iterates over multiple target cities, Phase 2b iterates over reinforcement targets, and both accumulate into `dest_cities`. The audit_report entry at line 460 is outdated.
+
+### NEW issues found
+
+#### High Severity
+
+##### B2 Bullet 5: Wrong precondition — "10+ Regulars" vs "5+ Cities" (line 174)
+
+**Reference (B2, bullet 5):** "British Control 5+ Cities, the Event is effective, and a D6 rolls 5+?"
+
+**Implementation (line 174-178):**
+```python
+# 5. Event is effective, 10+ British Regulars on map, D6 >= 5
+if eff["is_effective"]:
+    regs_on_map = sum(sp.get(C.REGULAR_BRI, 0) for sp in state["spaces"].values())
+    if regs_on_map >= 10:
+```
+
+**Bug:** Checks "10+ British Regulars on map" instead of "British Control 5+ Cities." These are fundamentally different conditions. The reference counts Cities under British Control (a board control metric); the code counts Regular pieces on the entire map (a piece-count metric). The condition `10+ Regulars` is much easier to satisfy than `5+ Cities` and could cause the bot to play Events it shouldn't.
+
+##### B2 Bullet 3: Wrong condition entirely (line 167-169)
+
+**Reference (B2, bullet 3):** "Event places Tories in Active Opposition with none, a British Fort in a Colony with none, or British Regulars in a City or Colony?"
+
+**Implementation (line 167-169):**
+```python
+# 3. Event removes a Patriot Fort or removes an Indian Village
+if eff["removes_patriot_fort"] or eff["removes_village"]:
+    return True
+```
+
+**Bug:** The code checks for removing Patriot Forts/Villages, but the reference says *placing* Tories/Forts/Regulars under specific board conditions. The event_eval.py flag `removes_patriot_fort` has nothing to do with this bullet. This was partially documented as "B2 text matching overly broad" in Session 5 but the specific mismatch (checking removal instead of placement) was not identified. Note: correctly implementing this bullet requires state-dependent checks that the static event_eval.py lookup table cannot provide.
+
+##### B2 Bullet 4: Wrong condition entirely (line 170-172)
+
+**Reference (B2, bullet 4):** "Event inflicts Rebel Casualties (including free Skirmish or Battle)?"
+
+**Implementation (line 170-172):**
+```python
+# 4. Event adds 3+ British Resources
+if eff["adds_british_resources_3plus"]:
+    return True
+```
+
+**Bug:** The code checks for British resource gains, but the reference says Rebel Casualties. The event_eval.py table has `inflicts_british_casualties` (opposite direction) but not `inflicts_rebel_casualties`. Adding resources is not the same as inflicting casualties.
+
+##### British Event Instructions: Missing conditional directives (event_instructions.py lines 6-19)
+
+**Reference (Non-Player British Cards Special Instructions):** Cards 18, 44, 51, 52, 62, 70, and 80 all have conditional fallback clauses: "If [condition not met], choose Command & Special Activity instead."
+
+**Implementation:** All seven use plain `"force"`, which means the bot always plays the Event regardless of whether the condition is met.
+
+| Card | Reference instruction | Current | Should be |
+|------|----------------------|---------|-----------|
+| 18 | Target Eligible enemy; if none → C&SA | `"force"` | `"force_if_eligible_enemy"` |
+| 44 | Target Eligible enemy; if none → C&SA | `"force"` | `"force_if_eligible_enemy"` |
+| 51 | March to set up Battle; if not possible → C&SA | `"force"` | `"force_if_51"` (conditional) |
+| 52 | March to set up Battle; if not possible → C&SA | `"force"` | `"force_if_52"` (conditional) |
+| 62 | NY at Active Opp. w/o Tories → place; else C&SA | `"force"` | `"force_if_62"` (conditional) |
+| 70 | Remove French Regs from WI then Brit spaces; if none → C&SA | `"force"` | `"force_if_70"` (conditional) |
+| 80 | Rebel Faction w/ pieces in Cities; if none → C&SA | `"force"` | `"force_if_80"` (conditional) |
+
+Note: The Patriot bot already has `"force_if_eligible_enemy"` for cards 18 and 44, and the French bot has conditional directives for cards 52, 62, 70, etc. The British bot should follow the same pattern.
+
+##### B11 Skirmish: Option 2 requires 2+ own Regulars instead of 1 (line 275)
+
+**Reference (B11):** "Remove as many Rebel cubes as possible, first whichever type is least in the space, removing 1 British Regular if necessary."
+
+**Implementation (line 275):**
+```python
+if enemy_cubes >= 2 and own_regs >= 2:
+    return 2
+```
+
+**Bug:** The `own_regs >= 2` condition should be `own_regs >= 1`. Option 2 sacrifices 1 Regular to remove 2 enemy cubes. The bot only needs 1 Regular present to sacrifice, not 2. With exactly 1 Regular in a space that has 2+ enemy cubes, the bot should choose option 2 (maximizing removal as the reference instructs) but currently falls through to option 1 (removing only 1 piece).
+
+#### Medium Severity
+
+##### B2 Bullet 2: Over-permissive — does not verify "from Unavailable" (line 164-166)
+
+**Reference (B2, bullet 2):** "Event places British pieces from Unavailable?"
+
+**Implementation (line 164-166):**
+```python
+if eff["places_british_pieces"]:
+    return True
+```
+
+**Issue:** The flag `places_british_pieces` is true for any card that places British pieces regardless of whether they come from Unavailable or Available. The reference specifically says "from Unavailable" — pieces placed from Available would not satisfy this condition. This is a static-lookup limitation: event_eval.py doesn't distinguish piece source.
+
+##### B2 Bullet 1: Missing blockade removal consideration (line 162-163)
+
+**Reference (B2, bullet 1):** "Opposition > Support, and Event shifts Support/Opposition in Royalist favor (including by removing a Blockade)?"
+
+**Implementation (line 162-163):**
+```python
+if opp > sup and eff["shifts_support_royalist"]:
+    return True
+```
+
+**Issue:** The `shifts_support_royalist` flag in event_eval.py does not account for Events that remove Blockades (which shifts Support indirectly by removing the marker). For example, Card 40 (Battle of the Chesapeake) unshaded sets FNI to 0, which could remove Blockades, but its event_eval entry does not set `shifts_support_royalist=True`.
+
+##### B11 Clinton bonus: dead code with wrong data access (lines 326-335)
+
+**Implementation (lines 326-327):**
+```python
+leader = state.get("leaders", {}).get(sid, "")
+if leader == "LEADER_CLINTON":
+```
+
+**Issue:** `state["leaders"]` maps faction → [leader_ids] per the docstring in `leaders/__init__.py`. Looking up by space ID (`sid`) always returns `""`. This code is dead — it never fires. Meanwhile, `skirmish.execute()` already handles Clinton's bonus via both `apply_leader_modifiers` and a direct `leader_location` check. The dead code should be removed to avoid confusion.
+
+##### skirmish.py Clinton double-count (tangential — lines 150-153 of skirmish.py)
+
+**Issue (in skirmish.py, not british_bot.py):** `apply_leader_modifiers` at line 77 runs the Clinton modifier, setting `ctx["skirmish_extra_militia"] = 1`. Then at line 151, `extra_militia = ctx.get("skirmish_extra_militia", 0)` picks up that 1. Then at line 152-153, `if clinton_here: extra_militia += 1` adds another 1. Result: Clinton removes 2 extra Militia instead of 1. Either the modifier registration or the direct check should be removed, not both.
+
+##### RL exclusion filter: dead code (lines 804-808)
+
+**Implementation (lines 797-808):**
+```python
+rl_candidates = [
+    sid for sid, sp in state["spaces"].items()
+    if self._support_level(state, sid) < C.ACTIVE_SUPPORT  # excludes Active Support
+    ...
+]
+rl_candidates = [
+    sid for sid in rl_candidates
+    if not (self._support_level(state, sid) == C.ACTIVE_SUPPORT  # can never match
+            and (sid in raid_on_map or sid in prop_on_map))
+]
+```
+
+**Issue:** The first filter already excludes all spaces at Active Support (`< ACTIVE_SUPPORT`). The second filter checks for `== ACTIVE_SUPPORT`, which can never match within the already-filtered list. The intent ("Do not RL where only markers would be removed") is correctly handled by the first filter (you can't shift beyond Active Support, so Active Support spaces with markers would only have marker removal as effect), but the second filter is unreachable dead code.
+
+#### Low Severity
+
+##### B10 March + Common Cause timing (architectural)
+
+**Reference (B10):** "Use Common Cause to increase group size if destination is adjacent Province."
+
+**Implementation:** `_try_common_cause()` is called AFTER `march.execute()` completes (line 1106). The reference implies CC should be considered DURING March planning so that War Parties boost the movable group size for Phase 1 destinations. The current post-hoc invocation means March cannot benefit from CC-expanded groups.
+
+This was partially documented in Session 5 as "`bring_escorts=False` hard-coded." The root cause is broader: CC is invoked as a post-command SA rather than integrated into March planning.
+
+##### B13 Common Cause WP preservation not enforced
+
+**Reference (B13):**
+- "If Marching into an adjacent Province, do NOT use the last War Party (if possible Underground)."
+- "If Battle, do NOT use the last Underground War Party."
+
+**Implementation:** `common_cause.execute()` (line 59) defaults to using ALL War Parties in each space. No preservation logic for last WP or last Underground WP exists in either the bot or the command module.
+
+Session 5 noted "correct mode parameter passed; WP constraints delegated to common_cause.execute" but the execute function does not implement those constraints.
+
+### Summary
+
+**Correct:** 32 nodes/sub-nodes verified as correctly implementing the reference.
+
+**New issues found:** 5 high severity, 4 medium severity, 2 low severity.
+
+**Previously documented issues confirmed still present:** B2 bullets 3-4 (static lookup limitations), B38 Howe, B39 Gage, OPS reference items (Supply/Redeploy/Desertion/Trade/BS trigger).
+
+**Previously documented issue now resolved:** B5 Garrison multi-city operation (working correctly).
+
+790 tests passing. No code changes made in this session (review only).
