@@ -24,6 +24,7 @@ from lod_ai.board.control import refresh_control
 from lod_ai.commands import garrison, muster, march, battle
 from lod_ai.special_activities import naval_pressure, skirmish, common_cause
 from lod_ai.util.history import push_history
+from lod_ai.leaders import leader_location, apply_leader_modifiers
 
 # ---------------------------------------------------------------------------
 #  Shared geography helpers
@@ -50,6 +51,44 @@ class BritishBot(BaseBot):
 
     def _control(self, state: Dict, sid: str):
         return state.get("control", {}).get(sid)
+
+    # -------------------------------------------------------------------
+    #  Leader helpers
+    # -------------------------------------------------------------------
+    def _british_leader(self, state: Dict) -> str | None:
+        """Return the current British leader ID, or None."""
+        # Check explicit british_leader key
+        bl = state.get("british_leader")
+        if bl and bl.startswith("LEADER_"):
+            return bl
+        # Check leaders dict (faction -> leader or faction -> [leaders])
+        leaders = state.get("leaders", {})
+        brit_leaders = leaders.get(C.BRITISH)
+        if isinstance(brit_leaders, str) and brit_leaders.startswith("LEADER_"):
+            return brit_leaders
+        if isinstance(brit_leaders, list):
+            for lid in brit_leaders:
+                if isinstance(lid, str) and lid.startswith("LEADER_"):
+                    return lid
+        # Scan leader_locs for any British leader on the map
+        for lid in ("LEADER_GAGE", "LEADER_HOWE", "LEADER_CLINTON"):
+            if leader_location(state, lid):
+                return lid
+        return None
+
+    def _is_howe(self, state: Dict) -> bool:
+        return self._british_leader(state) == "LEADER_HOWE"
+
+    def _is_gage(self, state: Dict) -> bool:
+        return self._british_leader(state) == "LEADER_GAGE"
+
+    def _apply_howe_fni(self, state: Dict) -> None:
+        """B38: If Howe is British Leader, lower FNI by 1 before SAs."""
+        if self._is_howe(state):
+            fni = state.get("fni_level", 0)
+            if fni > 0:
+                state["fni_level"] = fni - 1
+                push_history(state, "Howe capability: FNI lowered by 1 before SA")
 
     # =======================================================================
     #  BRILLIANT STROKE LimCom  (§8.3.7)
@@ -310,7 +349,7 @@ class BritishBot(BaseBot):
             • Otherwise if FNI == 0, add +1D3 Resources.
         Falls back to Skirmish if nothing happens.
         """
-        fni = state.get("fni", 0)
+        fni = state.get("fni_level", 0)
         # Check Gage/Clinton leader requirement for blockade removal
         brit_leader = state.get("british_leader") or ""
         # Also check leaders dict for any space
@@ -357,63 +396,87 @@ class BritishBot(BaseBot):
         return False  # caller may chain
 
     # =======================================================================
-    #  NODE B5  :  GARRISON Command
+    #  NODE B5  :  GARRISON Command  (full multi-phase per flowchart)
     # =======================================================================
     def _garrison(self, state: Dict) -> bool:
-        # Flow‑chart: "First execute a Special Activity."
-        self._skirmish_then_naval(state)   # B5 edge "With: B11" → Skirmish first
-        state["_sa_done_this_turn"] = True  # prevent double SA if falling to Muster
+        """Full multi-phase Garrison per B5 reference:
+
+        Phase 1: SA first (Skirmish then Naval).
+        Phase 2a: From British-controlled origins (retention rules), move
+                  just enough Regulars to add British Control to cities.
+                  Priority: most Rebels without Patriot Fort, then NYC.
+        Phase 2b: Reinforce existing British Control cities:
+                  first 1+ Regular if without Active Support,
+                  then 3+ British cubes first where Underground Militia.
+        Phase 3: If no cubes moved, Muster fallback.
+        Phase 4: If cubes moved, Activate Underground Militia and displace
+                  Rebels (first most Opposition, then least Support, lowest Pop).
+        """
+        # Phase 1: SA first
+        self._apply_howe_fni(state)  # B38 Howe lowers FNI before SA
+        self._skirmish_then_naval(state)
+        state["_sa_done_this_turn"] = True
 
         refresh_control(state)
 
-        # ----- step 1: choose TARGET City needing British Control ----------
-        target = self._select_garrison_city(state)
-        if not target:
-            return False  # nothing to do → flow‑chart directs to MUSTER
+        # Build origin pool: how many Regulars each British-controlled space
+        # can contribute, per retention rules.
+        origin_avail = self._garrison_origin_pool(state)
 
-        # ----- step 2: build move-map respecting "leave 2 more pieces" -----
-        # Reference: "leave 2 more Royalist than Rebel pieces and remove last
-        # Regular only if Pop 0 or Active Support"
+        # Phase 2a: Move just enough to add British Control to cities
+        # Target: Rebellion-controlled Cities without Patriot Fort
+        phase2a_targets = self._garrison_phase2a_targets(state)
         move_map: Dict[str, Dict[str, int]] = {}
-        moved_cubes = 0
-        for sid, sp in state["spaces"].items():
-            if sid == target or self._control(state, sid) != C.BRITISH:
-                continue
-            royalist_units = (
-                sp.get(C.REGULAR_BRI, 0)
-                + sp.get(C.TORY, 0)
-                + sp.get(C.WARPARTY_A, 0)
-                + sp.get(C.WARPARTY_U, 0)
-                + sp.get(C.FORT_BRI, 0)
-            )
-            rebel_units = (
-                sp.get(C.REGULAR_PAT, 0)
-                + sp.get(C.REGULAR_FRE, 0)
-                + sp.get(C.MILITIA_A, 0)
-                + sp.get(C.MILITIA_U, 0)
-                + sp.get(C.FORT_PAT, 0)
-            )
-            # must leave 2 more Crown than Rebel pieces
-            must_leave_royalist = rebel_units + 2
-            spare_royalist = max(0, royalist_units - must_leave_royalist)
-            # Only move Regulars; can't move last Regular unless Pop 0 or Active Support
-            regs = sp.get(C.REGULAR_BRI, 0)
-            pop = _MAP_DATA.get(sid, {}).get("population", 0)
-            at_active_support = self._support_level(state, sid) >= C.ACTIVE_SUPPORT
-            min_regs = 0 if (pop == 0 or at_active_support) else 1
-            movable = min(spare_royalist, max(0, regs - min_regs))
-            if movable <= 0:
-                continue
-            move_map[sid] = {target: movable}
-            moved_cubes += movable
+        total_moved = 0
+        dest_cities: List[str] = []
 
-        if moved_cubes == 0:
-            # "If no cubes have moved yet, instead Muster."
-            # SA was already done above; _muster will skip SA via _sa_done_this_turn
+        for city, needed in phase2a_targets:
+            if needed <= 0:
+                continue
+            still_needed = needed
+            # Pick origins sorted by most available first
+            for origin in sorted(origin_avail, key=lambda o: -origin_avail.get(o, 0)):
+                if still_needed <= 0:
+                    break
+                avail = origin_avail.get(origin, 0)
+                if avail <= 0 or origin == city:
+                    continue
+                give = min(avail, still_needed)
+                move_map.setdefault(origin, {})[city] = \
+                    move_map.get(origin, {}).get(city, 0) + give
+                origin_avail[origin] -= give
+                still_needed -= give
+                total_moved += give
+            if still_needed < needed:
+                dest_cities.append(city)
+
+        # Phase 2b: Reinforce existing British Control cities
+        reinforce_targets = self._garrison_phase2b_targets(state)
+        for city, need in reinforce_targets:
+            if need <= 0:
+                continue
+            still_need = need
+            for origin in sorted(origin_avail, key=lambda o: -origin_avail.get(o, 0)):
+                if still_need <= 0:
+                    break
+                avail = origin_avail.get(origin, 0)
+                if avail <= 0 or origin == city:
+                    continue
+                give = min(avail, still_need)
+                move_map.setdefault(origin, {})[city] = \
+                    move_map.get(origin, {}).get(city, 0) + give
+                origin_avail[origin] -= give
+                still_need -= give
+                total_moved += give
+            if still_need < need:
+                dest_cities.append(city)
+
+        # Phase 3: If no cubes moved, Muster fallback
+        if total_moved == 0:
             return self._muster(state, tried_march=False)
 
-        # Displacement target (Province with most Opposition then least Support)
-        displace_city, displace_target = self._select_displacement(state, target)
+        # Phase 4: Displacement — pick city with most Rebels as source
+        displace_city, displace_target = self._select_displacement(state, dest_cities)
 
         garrison.execute(
             state,
@@ -426,58 +489,146 @@ class BritishBot(BaseBot):
         return True
 
     # -------------------------------------------------------------------
-    def _select_garrison_city(self, state: Dict) -> str | None:
-        """Apply priority bullets to pick the City to garrison.
-
-        Reference B5 move priorities:
-        "first just enough to add British Control, first where most Rebels
-        without Patriot Fort, then NYC, then random."
-        "Then to give each British Control City first 1+ Regular if without
-        Active Support, then 3+ British cubes first where Underground Militia."
+    def _garrison_origin_pool(self, state: Dict) -> Dict[str, int]:
+        """Compute how many Regulars each British-controlled origin can
+        contribute to Garrison, respecting retention rules:
+        - Leave 2 more Royalist than Rebel pieces (counting Forts)
+        - Remove last Regular only if Pop 0 or Active Support
         """
-        candidates: List[Tuple[tuple, str]] = []
-        for name in CITIES:
-            sp = state["spaces"].get(name, {})
-            # B4/B5: target Rebellion-controlled Cities without Rebel Fort
-            if self._control(state, name) != "REBELLION":
+        pool: Dict[str, int] = {}
+        for sid, sp in state["spaces"].items():
+            if self._control(state, sid) != C.BRITISH:
+                continue
+            royalist = (
+                sp.get(C.REGULAR_BRI, 0)
+                + sp.get(C.TORY, 0)
+                + sp.get(C.WARPARTY_A, 0)
+                + sp.get(C.WARPARTY_U, 0)
+                + sp.get(C.FORT_BRI, 0)
+            )
+            rebel = (
+                sp.get(C.REGULAR_PAT, 0)
+                + sp.get(C.REGULAR_FRE, 0)
+                + sp.get(C.MILITIA_A, 0)
+                + sp.get(C.MILITIA_U, 0)
+                + sp.get(C.FORT_PAT, 0)
+            )
+            must_leave = rebel + 2
+            spare = max(0, royalist - must_leave)
+            regs = sp.get(C.REGULAR_BRI, 0)
+            pop = _MAP_DATA.get(sid, {}).get("population", 0)
+            at_active_support = self._support_level(state, sid) >= C.ACTIVE_SUPPORT
+            min_regs = 0 if (pop == 0 or at_active_support) else 1
+            movable = min(spare, max(0, regs - min_regs))
+            if movable > 0:
+                pool[sid] = movable
+        return pool
+
+    def _garrison_phase2a_targets(self, state: Dict) -> List[Tuple[str, int]]:
+        """Phase 2a: Cities where moving Regulars would add British Control.
+        Returns list of (city, regulars_needed), sorted by priority:
+        first where most Rebels without Patriot Fort, then NYC.
+        """
+        targets: List[Tuple[tuple, str, int]] = []
+        for city in CITIES:
+            sp = state["spaces"].get(city, {})
+            if self._control(state, city) != "REBELLION":
                 continue
             if sp.get(C.FORT_PAT, 0) > 0:
                 continue
+            rebel = (
+                sp.get(C.REGULAR_PAT, 0)
+                + sp.get(C.REGULAR_FRE, 0)
+                + sp.get(C.MILITIA_A, 0)
+                + sp.get(C.MILITIA_U, 0)
+                + sp.get(C.FORT_PAT, 0)
+            )
+            brit_there = (
+                sp.get(C.REGULAR_BRI, 0)
+                + sp.get(C.TORY, 0)
+                + sp.get(C.FORT_BRI, 0)
+            )
+            # Need enough to exceed rebel pieces (brit > rebel for control)
+            needed = max(0, rebel + 1 - brit_there)
+            is_nyc = 1 if city == "New_York_City" else 0
+            # Sort: most rebels first, NYC second, random tiebreak
+            key = (-rebel, -is_nyc, state["rng"].random())
+            targets.append((key, city, needed))
+        targets.sort()
+        return [(city, needed) for _, city, needed in targets]
+
+    def _garrison_phase2b_targets(self, state: Dict) -> List[Tuple[str, int]]:
+        """Phase 2b: Reinforce existing British Control cities.
+        - First 1+ Regular if without Active Support
+        - Then 3+ British cubes first where Underground Militia
+        Returns list of (city, cubes_needed), sorted by priority.
+        """
+        targets: List[Tuple[tuple, str, int]] = []
+        for city in CITIES:
+            sp = state["spaces"].get(city, {})
+            if self._control(state, city) != C.BRITISH:
+                continue
+            regs = sp.get(C.REGULAR_BRI, 0)
+            at_active_support = self._support_level(state, city) >= C.ACTIVE_SUPPORT
+            brit_cubes = regs + sp.get(C.TORY, 0)
+            has_underground = sp.get(C.MILITIA_U, 0) > 0
+
+            # First priority: 1+ Regular if without Active Support
+            if not at_active_support and regs == 0:
+                targets.append(((0, 0, city), city, 1))
+            # Second priority: 3+ cubes first where Underground Militia
+            if brit_cubes < 3:
+                need = 3 - brit_cubes
+                underground_prio = 0 if has_underground else 1
+                targets.append(((1, underground_prio, city), city, need))
+
+        targets.sort()
+        return [(city, need) for _, city, need in targets]
+
+    def _select_displacement(self, state: Dict, dest_cities: List[str]) -> Tuple[str | None, str | None]:
+        """Phase 4: Activate Militia then displace most Rebels.
+        Pick the destination city with most Rebels as the displacement source.
+        Pick Province with most Opposition, then least Support, then lowest Pop.
+        """
+        if not dest_cities:
+            return (None, None)
+
+        # Pick city with most Rebels for displacement
+        best_city = None
+        most_rebels = -1
+        for city in dest_cities:
+            sp = state["spaces"].get(city, {})
             rebels = (
                 sp.get(C.REGULAR_PAT, 0)
                 + sp.get(C.REGULAR_FRE, 0)
                 + sp.get(C.MILITIA_A, 0)
                 + sp.get(C.MILITIA_U, 0)
             )
-            has_underground = 1 if sp.get(C.MILITIA_U, 0) > 0 else 0
-            is_nyc = 1 if name == "New_York_City" else 0
-            # Sort: most rebels first, NYC tiebreak, underground militia tiebreak
-            key = (-rebels, -is_nyc, -has_underground)
-            candidates.append((key, name))
-        if not candidates:
-            return None
-        candidates.sort()
-        return candidates[0][1]
+            if rebels > most_rebels:
+                most_rebels = rebels
+                best_city = city
 
-    def _select_displacement(self, state: Dict, target_city: str) -> Tuple[str | None, str | None]:
-        """
-        Choose where displaced Rebels will go after Garrison:
-        – Province with most Opposition, then least Support, then lowest Pop.
-        """
-        best = None
-        best_key = (-1, 99, 99)  # higher Opposition, lower Support, lower Pop
-        for sid, sp in state["spaces"].items():
-            if _MAP_DATA[sid]["type"] != "Province":
+        if not best_city or most_rebels == 0:
+            return (None, None)
+
+        # Pick Colony/Province target: most Opposition, least Support, lowest Pop
+        # (The game's "Province" spaces are "Colony" type in map data)
+        best_province = None
+        best_key = None
+        for sid in state["spaces"]:
+            stype = _MAP_DATA.get(sid, {}).get("type", "")
+            if stype not in ("Colony", "Province"):
                 continue
             support_level = self._support_level(state, sid)
             opp = max(0, -support_level)
             sup = max(0, support_level)
-            pop = _MAP_DATA[sid].get("population", 0)
-            key = (opp, -sup, -pop)
-            if key > best_key:
+            pop = _MAP_DATA.get(sid, {}).get("population", 0)
+            key = (-opp, sup, pop)  # minimize: most opp, least support, lowest pop
+            if best_key is None or key < best_key:
                 best_key = key
-                best = sid
-        return (target_city, best) if best else (None, None)
+                best_province = sid
+
+        return (best_city, best_province) if best_province else (None, None)
 
     # =======================================================================
     #  NODE B8  :  MUSTER Command
@@ -489,13 +640,17 @@ class BritishBot(BaseBot):
         1. Place Regulars: first in Neutral or Passive, within that first
            to add British Control then where Tories are the only British
            units then random; within each first in highest Pop.
-        2. Place Tories: first where Regulars are the only British cubes
-           (within that first where Regulars were just placed), then to
-           change most Control, then in Colonies with < 5 British cubes
-           and no British Fort.
+        2. Place up to 2 Tories per space (1 if Passive Opposition):
+           - First where Regulars are the only British cubes
+             (within that first where Regulars were just placed)
+           - Then to change most Control
+           - Then in Colonies with < 5 British cubes and no British Fort
+           - Skip Active Opposition; require adjacency to British power.
         3. In 1 space, first one already selected above:
            RL if Opposition > Support + 1D3 OR no Forts Available;
            else Fort in Colony with 5+ cubes and no Fort.
+           Pass fort_space to muster.execute for correct targeting.
+        B39 Gage: Free first Reward Loyalty shift.
         """
         avail_regs = state["available"].get(C.REGULAR_BRI, 0)
         avail_tories = state["available"].get(C.TORY, 0)
@@ -505,11 +660,6 @@ class BritishBot(BaseBot):
         refresh_control(state)
 
         # ----- step 1: choose spaces for Regular placement (sorted) --------
-        # Reference: "first in Neutral or Passive, within that first to add
-        # British Control then where Tories are the only British units then
-        # random; within each first in highest Pop."
-        # Neutral/Passive is a priority, not a hard filter — but Regulars
-        # can only Muster in Cities or Colonies (§3.2.1), not Provinces.
         reg_candidates: List[Tuple[tuple, str]] = []
         for sid, sp in state["spaces"].items():
             if sid == WEST_INDIES:
@@ -521,16 +671,12 @@ class BritishBot(BaseBot):
             is_neutral_or_passive = sup in (
                 C.NEUTRAL, C.PASSIVE_SUPPORT, C.PASSIVE_OPPOSITION
             )
-            # Priority: Neutral/Passive first (0), then others (1)
             neutral_priority = 0 if is_neutral_or_passive else 1
-            # Within that: add British Control (not already controlled)
             adds_control = 0 if self._control(state, sid) != C.BRITISH else 1
-            # Then: Tories are the only British units
             tories_only = 0 if (sp.get(C.TORY, 0) > 0
                                 and sp.get(C.REGULAR_BRI, 0) == 0
                                 and sp.get(C.FORT_BRI, 0) == 0) else 1
             pop = _MAP_DATA.get(sid, {}).get("population", 0)
-            # Sort: neutral/passive first, adds_control, tories_only, highest pop, random
             key = (neutral_priority, adds_control, tories_only, -pop,
                    state["rng"].random())
             reg_candidates.append((key, sid))
@@ -541,14 +687,37 @@ class BritishBot(BaseBot):
             regular_destinations.append(reg_candidates[0][1])
 
         # ----- step 2: Tory placement priorities ---------------------------
+        # Up to 2 Tories per space (1 if Passive Opposition).
+        # Skip Active Opposition spaces and spaces not adjacent to British power.
         selected_spaces = set(regular_destinations)
         tory_plan: Dict[str, int] = {}
 
+        def _tory_eligible(sid: str) -> bool:
+            """Check if a space is eligible for Tory placement."""
+            if sid == WEST_INDIES:
+                return False
+            sup = self._support_level(state, sid)
+            if sup <= C.ACTIVE_OPPOSITION:
+                return False  # Skip Active Opposition
+            # Adjacency to British power check
+            sp = state["spaces"].get(sid, {})
+            if sp.get(C.REGULAR_BRI, 0) > 0 or sp.get(C.FORT_BRI, 0) > 0:
+                return True
+            for nbr in _adjacent(sid):
+                nsp = state["spaces"].get(nbr, {})
+                if nsp and (nsp.get(C.REGULAR_BRI, 0) > 0 or nsp.get(C.FORT_BRI, 0) > 0):
+                    return True
+            return False
+
+        def _tory_max(sid: str) -> int:
+            """Max Tories placeable in a space (1 if Passive Opposition, else 2)."""
+            sup = self._support_level(state, sid)
+            return 1 if sup == C.PASSIVE_OPPOSITION else 2
+
         # Priority 1: where Regulars are the only British cubes
-        # (within that, first where Regulars were just placed)
         tory_p1: List[Tuple[tuple, str]] = []
         for sid, sp in state["spaces"].items():
-            if sid == WEST_INDIES:
+            if not _tory_eligible(sid):
                 continue
             if sp.get(C.REGULAR_BRI, 0) > 0 and sp.get(C.TORY, 0) == 0 and sp.get(C.FORT_BRI, 0) == 0:
                 just_placed = 0 if sid in selected_spaces else 1
@@ -557,21 +726,20 @@ class BritishBot(BaseBot):
         for _, sid in tory_p1:
             if avail_tories <= 0 or len(tory_plan) + len(selected_spaces) >= 4:
                 break
-            tory_plan[sid] = 1
-            avail_tories -= 1
+            n = min(_tory_max(sid), avail_tories)
+            tory_plan[sid] = n
+            avail_tories -= n
 
         # Priority 2: change most Control
         if avail_tories > 0:
             tory_p2: List[Tuple[tuple, str]] = []
             for sid, sp in state["spaces"].items():
-                if sid in tory_plan or sid == WEST_INDIES:
+                if sid in tory_plan or not _tory_eligible(sid):
                     continue
-                # "change most Control" = spaces closest to flipping control
                 brit_pieces = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0) + sp.get(C.FORT_BRI, 0)
                 rebel_pieces = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
                                 + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
                                 + sp.get(C.FORT_PAT, 0))
-                # Adding a Tory helps most where the gap is smallest
                 gap = rebel_pieces - brit_pieces
                 tory_p2.append((-gap, sid))
             tory_p2.sort()
@@ -580,27 +748,33 @@ class BritishBot(BaseBot):
                     break
                 if sid in tory_plan:
                     continue
-                tory_plan[sid] = 1
-                avail_tories -= 1
+                n = min(_tory_max(sid), avail_tories)
+                tory_plan[sid] = n
+                avail_tories -= n
 
         # Priority 3: Colonies with < 5 British cubes and no British Fort
         if avail_tories > 0:
+            tory_p3: List[Tuple[tuple, str]] = []
             for sid, sp in state["spaces"].items():
-                if avail_tories <= 0 or len(tory_plan) + len(selected_spaces) >= 4:
-                    break
-                if sid in tory_plan or sid == WEST_INDIES:
+                if sid in tory_plan or not _tory_eligible(sid):
                     continue
                 if (_MAP_DATA.get(sid, {}).get("type") == "Colony"
                         and sp.get(C.FORT_BRI, 0) == 0
                         and (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)) < 5):
-                    tory_plan[sid] = 1
-                    avail_tories -= 1
+                    pop = _MAP_DATA.get(sid, {}).get("population", 0)
+                    tory_p3.append((-pop, sid))
+            tory_p3.sort()
+            for _, sid in tory_p3:
+                if avail_tories <= 0 or len(tory_plan) + len(selected_spaces) >= 4:
+                    break
+                n = min(_tory_max(sid), avail_tories)
+                tory_plan[sid] = n
+                avail_tories -= n
 
         # ----- step 3: Reward Loyalty OR build Fort in one space -----------
-        # "in 1 space, first one already selected above"
         all_selected = list(selected_spaces | set(tory_plan.keys()))
         reward_levels = 0
-        build_fort: set[str] | None = None
+        fort_space: str | None = None
         chosen_rl_space = None
         die = state["rng"].randint(1, 3)
         state.setdefault("rng_log", []).append(("1D3", die))
@@ -614,20 +788,12 @@ class BritishBot(BaseBot):
             prop_on_map = state.get("markers", {}).get(C.PROPAGANDA, {}).get("on_map", set())
 
             def _rl_key(n):
-                # RL info box: "First where fewest Raid + Propaganda markers,
-                # within that for largest shift in (Support – Opposition)."
-                # Muster: "in 1 space, first one already selected above"
                 markers = (1 if n in raid_on_map else 0) + (1 if n in prop_on_map else 0)
                 sup = self._support_level(state, n)
-                # Largest shift = most negative support level (biggest
-                # improvement toward Active Support)
                 shift = -sup
                 already = 0 if n in all_selected else 1
-                # Sort: already selected first (0), fewest markers, largest shift
                 return (already, markers, -shift)
 
-            # RL requires British Control + 1+ Regular + 1+ Tory (§3.2.1)
-            # and room to shift (not at Active Support)
             rl_candidates = [
                 sid for sid, sp in state["spaces"].items()
                 if self._support_level(state, sid) < C.ACTIVE_SUPPORT
@@ -635,8 +801,6 @@ class BritishBot(BaseBot):
                 and sp.get(C.REGULAR_BRI, 0) >= 1
                 and sp.get(C.TORY, 0) >= 1
             ]
-            # "Do not RL in a space where only Raid/Propaganda markers would be removed"
-            # (i.e., already at Active Support with markers — removing markers is the only effect)
             rl_candidates = [
                 sid for sid in rl_candidates
                 if not (self._support_level(state, sid) == C.ACTIVE_SUPPORT
@@ -647,7 +811,6 @@ class BritishBot(BaseBot):
                 reward_levels = 1
 
         if chosen_rl_space is None and state["available"].get(C.FORT_BRI, 0):
-            # Place Fort in Colony with 5+ British cubes and no British Fort
             fort_targets = [
                 sid
                 for sid, sp in state["spaces"].items()
@@ -655,29 +818,30 @@ class BritishBot(BaseBot):
                 and sp.get(C.FORT_BRI, 0) == 0
                 and (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)) >= 5
             ]
-            # Prefer already selected spaces
             fort_targets.sort(key=lambda n: (0 if n in all_selected else 1))
             if fort_targets:
-                build_fort = {fort_targets[0]}
+                fort_space = fort_targets[0]
 
         # ----- EXECUTE MUSTER ---------------------------------------------
         all_muster_spaces = list(set(regular_destinations + list(tory_plan.keys())))
+        # Include fort_space in selected if not already there
+        if fort_space and fort_space not in all_muster_spaces:
+            all_muster_spaces.append(fort_space)
+        # Include RL space in selected if not already there
+        if chosen_rl_space and chosen_rl_space not in all_muster_spaces:
+            all_muster_spaces.append(chosen_rl_space)
+
         reg_plan = (
-            {"space": regular_destinations[0], "n": min(4, avail_regs)}
-            if avail_regs and regular_destinations
+            {"space": regular_destinations[0], "n": min(4, state["available"].get(C.REGULAR_BRI, 0))}
+            if state["available"].get(C.REGULAR_BRI, 0) > 0 and regular_destinations
             else None
         )
 
-        # Guard: muster.execute requires regular_plan for British faction
-        if not reg_plan and not tory_plan and not reward_levels and not build_fort:
-            # Nothing to muster
+        if not reg_plan and not tory_plan and not reward_levels and not fort_space:
             if not tried_march:
                 return self._march(state, tried_muster=True)
             return False
 
-        # If no regular_plan but we have tory_plan, we need at least a dummy
-        # regular_plan since muster.execute requires it for British.
-        # Use the first tory target space with n=0 as a placeholder.
         if not reg_plan and all_muster_spaces:
             reg_plan = {"space": all_muster_spaces[0], "n": 0}
 
@@ -685,6 +849,9 @@ class BritishBot(BaseBot):
             if not tried_march:
                 return self._march(state, tried_muster=True)
             return False
+
+        # B39 Gage: free first Reward Loyalty shift
+        rl_free_first = self._is_gage(state) and reward_levels > 0
 
         did_something = muster.execute(
             state,
@@ -694,18 +861,19 @@ class BritishBot(BaseBot):
             regular_plan=reg_plan,
             tory_plan=tory_plan,
             reward_levels=reward_levels,
-            build_fort=bool(build_fort),
+            build_fort=bool(fort_space),
+            fort_space=fort_space,
+            rl_free_first=rl_free_first,
         )
 
         if not did_something:
-            # "If not possible, March unless already tried, else Pass."
             if not tried_march:
                 return self._march(state, tried_muster=True)
             return False
 
-        # Execute Special-Activity: B11 arrow (Skirmish first)
-        # (skip if SA was already done during Garrison that fell through to Muster)
+        # Execute SA (skip if already done during Garrison fallback)
         if not state.get("_sa_done_this_turn"):
+            self._apply_howe_fni(state)  # B38 Howe lowers FNI before SA
             self._skirmish_then_naval(state)
         return True
 
@@ -936,6 +1104,7 @@ class BritishBot(BaseBot):
 
         # Common Cause check (B13) — mode=MARCH for March-specific constraints
         if not self._try_common_cause(state, mode="MARCH"):
+            self._apply_howe_fni(state)  # B38 Howe lowers FNI before SA
             self._skirmish_then_naval(state)
         return True
 
@@ -950,10 +1119,13 @@ class BritishBot(BaseBot):
         Force Level per §3.6.2-3.6.3:
           British Attack: Regulars + min(Tories, Regulars) + floor(Active_WP/2)
           Rebel Defense: Continentals + French_Regulars + floor(total_Militia/2) + Forts
-        Leader modifiers affect dice rolls (§3.6.5), not force level.
+
+        Modifiers included per §3.6.5-3.6.6:
+          Attacker (Defender Loss): +1 half regs, +1 underground, +1 leader
+          Defender (Attacker Loss): +1 half regs, +1 underground, +1 leader, +/- forts, blockade
         """
         refresh_control(state)
-        targets: List[str] = []
+        targets: List[Tuple[int, str]] = []
 
         for sid, sp in state["spaces"].items():
             # B12: "spaces with Rebel Forts and/or Rebel cubes"
@@ -963,17 +1135,49 @@ class BritishBot(BaseBot):
             if rebel_cubes + total_militia + rebel_forts == 0:
                 continue
 
-            # Rebel Defense Force Level (assume defender activates Underground)
+            # Rebel Defense Force Level
             rebel_force = rebel_cubes + (total_militia // 2) + rebel_forts
 
             # Royalist Attack Force Level
             regs = sp.get(C.REGULAR_BRI, 0)
-            tories = min(sp.get(C.TORY, 0), regs)  # Tories capped at Regulars
+            tories = min(sp.get(C.TORY, 0), regs)
             active_wp = sp.get(C.WARPARTY_A, 0)
             royal_force = regs + tories + (active_wp // 2)
 
-            if royal_force > rebel_force:
-                # "first where most British"
+            # --- Estimate net modifier advantage for the bot ---
+            # Attacker (British) modifiers on Defender Loss:
+            att_mod = 0
+            att_cubes = regs + sp.get(C.TORY, 0)
+            if att_cubes > 0 and regs * 2 >= att_cubes:
+                att_mod += 1  # half regs
+            if sp.get(C.WARPARTY_U, 0) > 0:
+                att_mod += 1  # underground piece
+            # British leader bonus
+            for lid in ("LEADER_GAGE", "LEADER_HOWE", "LEADER_CLINTON"):
+                if leader_location(state, lid) == sid:
+                    att_mod += 1
+                    break
+            # -1 per defending Fort
+            att_mod -= rebel_forts
+
+            # Defender (Rebel) modifiers on Attacker Loss:
+            def_mod = 0
+            def_regs = rebel_cubes
+            if def_regs > 0 and def_regs * 2 >= rebel_cubes:
+                def_mod += 1  # half regs
+            if sp.get(C.MILITIA_U, 0) > 0:
+                def_mod += 1  # underground
+            # Rebel leader bonus
+            for lid in ("LEADER_WASHINGTON", "LEADER_ROCHAMBEAU", "LEADER_LAUZUN"):
+                if leader_location(state, lid) == sid:
+                    def_mod += 1
+                    break
+            # +1 per defending fort (fort helps defender's attacker-loss roll)
+            def_mod += rebel_forts
+
+            # Net advantage: positive means British is stronger
+            net_advantage = (royal_force + att_mod) - (rebel_force + def_mod)
+            if net_advantage > 0:
                 british_count = regs + sp.get(C.TORY, 0)
                 targets.append((-british_count, sid))
 
@@ -986,8 +1190,9 @@ class BritishBot(BaseBot):
         # Common Cause before the battles
         used_cc = self._try_common_cause(state)
 
-        # If no Common Cause, execute Skirmish/Naval loop first (B11/B7)
+        # If no Common Cause, execute Skirmish/Naval loop first
         if not used_cc:
+            self._apply_howe_fni(state)  # B38 Howe lowers FNI before SA
             self._skirmish_then_naval(state)
 
         battle.execute(state, C.BRITISH, {}, chosen)
@@ -1027,6 +1232,9 @@ class BritishBot(BaseBot):
     #  PRE‑CONDITION CHECKS  (mirrors italics at start of §8.4.x)
     # =======================================================================
     def _can_garrison(self, state: Dict) -> bool:
+        # Garrison unavailable at FNI level 3
+        if state.get("fni_level", 0) >= 3:
+            return False
         refresh_control(state)
         regs_on_map = sum(sp.get(C.REGULAR_BRI, 0) for sp in state["spaces"].values())
         if regs_on_map < 10:
@@ -1040,9 +1248,12 @@ class BritishBot(BaseBot):
         return False
 
     def _can_muster(self, state: Dict) -> bool:
-        die = state["rng"].randint(1, 6)
-        state.setdefault("rng_log", []).append(("1D6", die))
-        return state["available"].get(C.REGULAR_BRI, 0) > die
+        # B6: Roll once and cache the result for this turn
+        if "_muster_die_cached" not in state:
+            die = state["rng"].randint(1, 6)
+            state["_muster_die_cached"] = die
+            state.setdefault("rng_log", []).append(("B6 1D6", die))
+        return state["available"].get(C.REGULAR_BRI, 0) > state["_muster_die_cached"]
 
     def _can_battle(self, state: Dict) -> bool:
         """B9: '2+ Active Rebels in a space outnumbered by British Regulars + Leader'
@@ -1058,13 +1269,171 @@ class BritishBot(BaseBot):
             if active_rebel < 2:
                 continue
             royal = sp.get(C.REGULAR_BRI, 0)
-            leader = state.get("leaders", {}).get(sid, "")
-            has_british_leader = leader in {
-                "LEADER_GAGE", "LEADER_HOWE", "LEADER_CLINTON"
-            }
+            has_british_leader = any(
+                leader_location(state, lid) == sid
+                for lid in ("LEADER_GAGE", "LEADER_HOWE", "LEADER_CLINTON")
+            )
             if royal + (1 if has_british_leader else 0) > active_rebel:
                 return True
         return False
 
     def _can_march(self, state: Dict) -> bool:
         return any(sp.get(C.REGULAR_BRI, 0) > 0 for sp in state["spaces"].values())
+
+    # =======================================================================
+    #  OPS Summary methods (year-end and during-turn bot decisions)
+    # =======================================================================
+
+    def bot_supply_priority(self, state: Dict) -> List[str]:
+        """British Supply: Pay only in spaces where removing British would
+        prevent Reward Loyalty or allow Committees of Correspondance,
+        first with Resources in highest Pop, then with shifts in highest Pop.
+
+        Returns ordered list of space IDs where British should pay Supply.
+        """
+        pay_spaces: List[Tuple[tuple, str]] = []
+        for sid, sp in state["spaces"].items():
+            if sid == C.WEST_INDIES_ID:
+                continue
+            brit_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+            if brit_cubes == 0:
+                continue
+            meta = _MAP_DATA.get(sid, {})
+            stype = meta.get("type", "")
+            if sp.get(C.FORT_BRI, 0) or (stype == "City" and self._control(state, sid) == C.BRITISH):
+                continue  # in supply, no payment needed
+
+            # Check: would removing British prevent RL?
+            prevents_rl = (
+                sp.get(C.REGULAR_BRI, 0) >= 1
+                and sp.get(C.TORY, 0) >= 1
+                and self._control(state, sid) == C.BRITISH
+                and self._support_level(state, sid) < C.ACTIVE_SUPPORT
+            )
+            # Check: would removing British allow Committees?
+            rebel_pieces = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+                           + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0))
+            allows_committees = rebel_pieces > (brit_cubes - brit_cubes)  # removing would flip
+
+            if prevents_rl or allows_committees:
+                pop = meta.get("population", 0)
+                # First by highest Pop
+                pay_spaces.append((-pop, sid))
+
+        pay_spaces.sort()
+        return [sid for _, sid in pay_spaces]
+
+    def bot_redeploy_leader(self, state: Dict) -> str | None:
+        """Redeploy: British Leader to the space with most British Regulars."""
+        best_sid = None
+        best_regs = -1
+        for sid, sp in state["spaces"].items():
+            regs = sp.get(C.REGULAR_BRI, 0)
+            if regs > best_regs:
+                best_regs = regs
+                best_sid = sid
+        return best_sid
+
+    def bot_loyalist_desertion(self, state: Dict, count: int) -> List[Tuple[str, int]]:
+        """Loyalist Desertion: Remove Tories to change least Control,
+        if possible without removing last Tory in any space.
+
+        Returns list of (space_id, n_to_remove) totaling *count*.
+        """
+        removals: List[Tuple[str, int]] = []
+        remaining = count
+
+        # Build list of spaces with Tories, sorted by least Control impact
+        candidates: List[Tuple[tuple, str]] = []
+        for sid, sp in state["spaces"].items():
+            tories = sp.get(C.TORY, 0)
+            if tories == 0:
+                continue
+            # Compute how much control would change if we remove 1 Tory
+            royalist = (sp.get(C.REGULAR_BRI, 0) + tories
+                       + sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
+                       + sp.get(C.FORT_BRI, 0))
+            rebel = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+                    + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                    + sp.get(C.FORT_PAT, 0))
+            margin = royalist - rebel
+            is_last = 1 if tories == 1 else 0  # avoid last Tory
+            # Sort: avoid last first, then least margin change (biggest margin first)
+            candidates.append(((is_last, -margin), sid))
+
+        candidates.sort()
+
+        for _, sid in candidates:
+            if remaining <= 0:
+                break
+            sp = state["spaces"][sid]
+            tories = sp.get(C.TORY, 0)
+            # Avoid removing last Tory if possible (only do it if we must)
+            can_take = tories - 1 if tories > 1 else 0
+            if can_take <= 0 and remaining > 0:
+                # Only take last Tory if we must
+                continue
+            take = min(can_take, remaining)
+            if take > 0:
+                removals.append((sid, take))
+                remaining -= take
+
+        # If we still need more, reluctantly take last Tories
+        if remaining > 0:
+            for _, sid in candidates:
+                if remaining <= 0:
+                    break
+                sp = state["spaces"][sid]
+                tories = sp.get(C.TORY, 0)
+                already = sum(n for s, n in removals if s == sid)
+                left = tories - already
+                if left > 0:
+                    take = min(left, remaining)
+                    removals.append((sid, take))
+                    remaining -= take
+
+        return removals
+
+    def bot_indian_trade(self, state: Dict) -> int:
+        """Indian Trade: If Indian Resources < British Resources, roll 1D6.
+        If roll < British Resources, offer half (round up) the number rolled.
+
+        Returns the amount to transfer (0 if trade not possible/favorable).
+        """
+        indian_res = state.get("resources", {}).get(C.INDIANS, 0)
+        british_res = state.get("resources", {}).get(C.BRITISH, 0)
+        if indian_res >= british_res:
+            return 0
+        die = state["rng"].randint(1, 6)
+        state.setdefault("rng_log", []).append(("Indian Trade 1D6", die))
+        if die >= british_res:
+            return 0
+        offer = (die + 1) // 2  # half rounded up
+        return offer
+
+    def bot_leader_movement(self, state: Dict, leader: str, spaces_with_moves: Dict[str, int]) -> str | None:
+        """Leader Movement: Royalist Leaders follow largest group of own units
+        that moves from (or stays in) their spaces.
+
+        *spaces_with_moves* maps space_id -> total British pieces moving from/staying.
+        Returns the space ID the leader should be in.
+        """
+        leader_loc = leader_location(state, leader)
+        if not leader_loc:
+            return None
+
+        # Find the largest group of British units moving from or staying in the leader's space
+        best_dest = leader_loc
+        best_count = 0
+        sp = state["spaces"].get(leader_loc, {})
+        staying = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+        if staying > best_count:
+            best_count = staying
+            best_dest = leader_loc
+
+        for dest, count in spaces_with_moves.items():
+            if count > best_count:
+                best_count = count
+                best_dest = dest
+
+        return best_dest

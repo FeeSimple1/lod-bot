@@ -135,6 +135,7 @@ def leader_location(state: State, leader_id: str) -> str | None:
     """
     Best-effort lookup for the current location of *leader_id*.
     Supports either state['leader_locs'] or state['leaders'] storing locations.
+    Also supports reverse mapping where state['leaders'] maps space -> leader.
     """
     valid_spaces = set(map_adj.all_space_ids())
     for key in _leader_keys(leader_id):
@@ -146,6 +147,12 @@ def leader_location(state: State, leader_id: str) -> str | None:
         loc = state.get("leaders", {}).get(key)
         if isinstance(loc, str) and loc in valid_spaces:
             return loc
+    # Check reverse mapping: state["leaders"] = {space_id: leader_id}
+    leaders_dict = state.get("leaders", {})
+    for key in _leader_keys(leader_id):
+        for space_key, val in leaders_dict.items():
+            if val == key and space_key in valid_spaces:
+                return space_key
     # fall back to scanning spaces for leader token
     for key in _leader_keys(leader_id):
         for sid, sp in state.get("spaces", {}).items():

@@ -124,7 +124,7 @@ def execute(
         raise ValueError("Only BRITISH may execute GARRISON")
 
     # FNI gate -------------------------------------------------------
-    if _nav(state).get("fni", 0) == 3:
+    if state.get("fni_level", 0) == 3:
         raise ValueError("GARRISON unavailable at FNI level 3")
 
     # Cost -----------------------------------------------------------
