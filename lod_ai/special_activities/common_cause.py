@@ -35,6 +35,7 @@ def execute(
     wp_counts: Dict[str, int] | None = None,   # omit ⇒ use *all* WP in each space
     mode: str = "MARCH",                       # "MARCH" or "BATTLE"
     destinations: List[str] | None = None,     # required for March validation
+    preserve_wp: bool = False,                 # B13: keep at least 1 WP per space
 ) -> Dict:
     if faction != BRITISH:
         raise ValueError("Only BRITISH may invoke Common Cause.")
@@ -53,19 +54,42 @@ def execute(
                            + sp.get(FORT_BRI, 0))
         if british_present == 0:
             raise ValueError(f"{s}: needs British piece for Common Cause.")
-        if (sp.get(WARPARTY_U, 0) + sp.get(WARPARTY_A, 0)) == 0:
+        total_wp = sp.get(WARPARTY_U, 0) + sp.get(WARPARTY_A, 0)
+        if total_wp == 0:
             raise ValueError(f"{s}: no War Parties present.")
 
-        use = wp_counts.get(s, sp.get(WARPARTY_U, 0) + sp.get(WARPARTY_A, 0))
+        use = wp_counts.get(s, total_wp)
         if use < 1:
             continue
 
-        if use > sp.get(WARPARTY_U, 0) + sp.get(WARPARTY_A, 0):
-            raise ValueError(f"{s}: requested {use} WP, only "
-                             f"{sp.get(WARPARTY_U,0)+sp.get(WARPARTY_A,0)} present.")
+        # B13 WP preservation constraints:
+        # - MARCH: "do NOT use the last War Party (if possible Underground)"
+        #   Keep at least 1 WP; prefer to keep Underground.
+        # - BATTLE: "do NOT use the last Underground War Party"
+        #   Active WP may be used freely; keep at least 1 Underground if any.
+        if preserve_wp:
+            if mode == "MARCH":
+                max_use = total_wp - 1
+                if max_use < 1:
+                    continue  # only 1 WP — can't use it
+                use = min(use, max_use)
+            elif mode == "BATTLE":
+                wp_u = sp.get(WARPARTY_U, 0)
+                if wp_u > 0:
+                    # Must keep at least 1 Underground — only use Active + (Underground - 1)
+                    max_use = sp.get(WARPARTY_A, 0) + (wp_u - 1)
+                    if max_use < 1:
+                        continue  # only 1 Underground WP, can't use any
+                    use = min(use, max_use)
 
-        # Flip Underground first
+        if use > total_wp:
+            raise ValueError(f"{s}: requested {use} WP, only {total_wp} present.")
+
+        # Flip Underground first (they become Active when used as Common Cause)
         take_u = min(use, sp.get(WARPARTY_U, 0))
+        # With BATTLE preservation, don't take the last Underground
+        if preserve_wp and mode == "BATTLE" and sp.get(WARPARTY_U, 0) > 0:
+            take_u = min(take_u, sp.get(WARPARTY_U, 0) - 1)
         sp[WARPARTY_U] = sp.get(WARPARTY_U, 0) - take_u
         sp[WARPARTY_A] = sp.get(WARPARTY_A, 0) + take_u
         # any remainder already Active

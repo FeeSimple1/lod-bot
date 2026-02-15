@@ -158,29 +158,127 @@ class BritishBot(BaseBot):
         sup = sum(max(0, lvl) for lvl in support_map.values())
         opp = sum(max(0, -lvl) for lvl in support_map.values())
 
-        # 1. Opposition > Support and Event shifts support in Royalist favor
-        if opp > sup and eff["shifts_support_royalist"]:
+        # 1. "Opposition > Support, and Event shifts Support/Opposition in
+        #     Royalist favor (including by removing a Blockade)?"
+        if opp > sup and (eff["shifts_support_royalist"] or eff["removes_blockade"]):
             return True
-        # 2. Event places British pieces
-        if eff["places_british_pieces"]:
+
+        # 2. "Event places British pieces from Unavailable?"
+        if eff["places_british_from_unavailable"]:
             return True
-        # 3. Event removes a Patriot Fort or removes an Indian Village
-        if eff["removes_patriot_fort"] or eff["removes_village"]:
+
+        # 3. "Event places Tories in Active Opposition with none, a British Fort
+        #     in a Colony with none, or British Regulars in a City or Colony?"
+        if eff["places_tories"]:
+            for sid, sp in state["spaces"].items():
+                if (self._support_level(state, sid) == C.ACTIVE_OPPOSITION
+                        and sp.get(C.TORY, 0) == 0):
+                    return True
+        if eff["places_british_fort"]:
+            for sid in state["spaces"]:
+                if (_MAP_DATA.get(sid, {}).get("type") == "Colony"
+                        and state["spaces"][sid].get(C.FORT_BRI, 0) == 0):
+                    return True
+        if eff["places_british_regulars"]:
+            for sid in state["spaces"]:
+                if _MAP_DATA.get(sid, {}).get("type") in ("City", "Colony"):
+                    return True
+
+        # 4. "Event inflicts Rebel Casualties (including free Skirmish or Battle)?"
+        if eff["inflicts_rebel_casualties"]:
             return True
-        # 4. Event adds 3+ British Resources
-        if eff["adds_british_resources_3plus"]:
-            return True
-        # 5. Event is effective, 10+ British Regulars on map, D6 >= 5
+
+        # 5. "British Control 5+ Cities, the Event is effective, and a D6 rolls 5+?"
         if eff["is_effective"]:
-            regs_on_map = sum(
-                sp.get(C.REGULAR_BRI, 0) for sp in state["spaces"].values()
+            controlled_cities = sum(
+                1 for sid in CITIES
+                if self._control(state, sid) == C.BRITISH
             )
-            if regs_on_map >= 10:
+            if controlled_cities >= 5:
                 roll = state["rng"].randint(1, 6)
                 state.setdefault("rng_log", []).append(("Event D6", roll))
                 if roll >= 5:
                     return True
         return False
+
+    # =======================================================================
+    #  CONDITIONAL FORCE DIRECTIVES (musket instructions)
+    # =======================================================================
+    def _force_condition_met(self, directive: str, state: Dict, card: Dict) -> bool:
+        """Evaluate force_if_X directives from the British instruction sheet.
+
+        Each card instruction specifies a condition; if not met, the bot
+        skips the event and proceeds to Command & SA instead.
+        """
+        if directive in ("force_if_51", "force_if_52"):
+            # Cards 51/52: "March to set up Battle per the Battle instructions.
+            # If not possible, choose Command & Special Activity instead."
+            # Check: any space where Royalist FL exceeds Rebel FL and British
+            # could march there from adjacent?
+            refresh_control(state)
+            for sid, sp in state["spaces"].items():
+                rebel_cubes = sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+                total_militia = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                rebel_forts = sp.get(C.FORT_PAT, 0)
+                if rebel_cubes + total_militia + rebel_forts == 0:
+                    continue
+                rebel_force = rebel_cubes + (total_militia // 2) + rebel_forts
+                regs = sp.get(C.REGULAR_BRI, 0)
+                tories = min(sp.get(C.TORY, 0), regs)
+                active_wp = sp.get(C.WARPARTY_A, 0)
+                royal_force = regs + tories + (active_wp // 2)
+                # Check if British already exceed here
+                if royal_force > rebel_force:
+                    return True
+                # Check if marching in from adjacent could tip the balance
+                for adj_sid in _adjacent(sid):
+                    adj_sp = state["spaces"].get(adj_sid, {})
+                    march_regs = adj_sp.get(C.REGULAR_BRI, 0)
+                    if march_regs > 0 and (royal_force + march_regs) > rebel_force:
+                        return True
+            return False
+
+        if directive == "force_if_62":
+            # Card 62: "If New York is at Active Opposition and has no Tories
+            # already, place Tories there. Otherwise, Command & SA."
+            ny = state["spaces"].get("New_York", {})
+            if (self._support_level(state, "New_York") == C.ACTIVE_OPPOSITION
+                    and ny.get(C.TORY, 0) == 0):
+                return True
+            return False
+
+        if directive == "force_if_70":
+            # Card 70: "Remove French Regulars from West Indies, then from
+            # spaces with British pieces. If none, Command & SA."
+            # Check: any French Regulars in WI or spaces with British pieces?
+            wi = state["spaces"].get(WEST_INDIES, {})
+            if wi.get(C.REGULAR_FRE, 0) > 0:
+                return True
+            for sid, sp in state["spaces"].items():
+                if sid == WEST_INDIES:
+                    continue
+                brit_present = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                                + sp.get(C.FORT_BRI, 0))
+                if brit_present > 0 and sp.get(C.REGULAR_FRE, 0) > 0:
+                    return True
+            return False
+
+        if directive == "force_if_80":
+            # Card 80: "Choose a Rebel Faction with pieces in Cities, and select
+            # Cities where that Faction has pieces. If none, Command & SA."
+            rebel_tags = {
+                C.PATRIOTS: [C.REGULAR_PAT, C.MILITIA_A, C.MILITIA_U, C.FORT_PAT],
+                C.FRENCH: [C.REGULAR_FRE],
+                C.INDIANS: [C.WARPARTY_A, C.WARPARTY_U, C.VILLAGE],
+            }
+            for faction, tags in rebel_tags.items():
+                for city_sid in CITIES:
+                    sp = state["spaces"].get(city_sid, {})
+                    if any(sp.get(tag, 0) > 0 for tag in tags):
+                        return True
+            return False
+
+        return True  # default: play the event
 
     # =======================================================================
     #  MAIN FLOW‑CHART DRIVER  (§8.4 nodes B4 → B13)
@@ -261,7 +359,7 @@ class BritishBot(BaseBot):
 
         def _best_skirmish_option(sid, sp):
             """B11: choose option to maximize Rebel casualties.
-            Option 2: remove 2 cubes + sacrifice 1 Regular (if 2+ enemy cubes and 2+ own Regs)
+            Option 2: remove 2 cubes + sacrifice 1 Regular (if 2+ enemy cubes and 1+ own Regs)
             Option 3: remove 1 Fort + sacrifice 1 Regular (if enemy Fort and no enemy cubes)
             Option 1: remove 1 piece (no sacrifice)
             """
@@ -271,8 +369,8 @@ class BritishBot(BaseBot):
                 + sp.get(C.MILITIA_A, 0)
             )
             own_regs = sp.get(C.REGULAR_BRI, 0)
-            # Option 2: maximize cube removal
-            if enemy_cubes >= 2 and own_regs >= 2:
+            # Option 2: maximize cube removal — sacrifice 1 Regular, so only 1 needed
+            if enemy_cubes >= 2 and own_regs >= 1:
                 return 2
             # Option 3: remove Fort when no cubes but Fort exists
             enemy_fort = sp.get(C.FORT_PAT, 0)
@@ -321,18 +419,8 @@ class BritishBot(BaseBot):
             opt = _best_skirmish_option(sid, sp)
             try:
                 skirmish.execute(state, C.BRITISH, {}, sid, option=opt)
-                # Clinton bonus: if Clinton is in this space, try to remove
-                # 1 additional Militia
-                leader = state.get("leaders", {}).get(sid, "")
-                if leader == "LEADER_CLINTON":
-                    militia_a = sp.get(C.MILITIA_A, 0)
-                    if militia_a > 0:
-                        from lod_ai.board.pieces import remove_piece
-                        try:
-                            remove_piece(state, C.MILITIA_A, sid, to="casualties")
-                            push_history(state, f"Clinton Skirmish bonus: remove 1 Militia from {sid}")
-                        except Exception:
-                            pass
+                # Clinton bonus is handled inside skirmish.execute via the
+                # leader modifier system (apply_leader_modifiers → _clinton).
                 return True
             except Exception:
                 continue
@@ -801,11 +889,6 @@ class BritishBot(BaseBot):
                 and sp.get(C.REGULAR_BRI, 0) >= 1
                 and sp.get(C.TORY, 0) >= 1
             ]
-            rl_candidates = [
-                sid for sid in rl_candidates
-                if not (self._support_level(state, sid) == C.ACTIVE_SUPPORT
-                        and (sid in raid_on_map or sid in prop_on_map))
-            ]
             if rl_candidates:
                 chosen_rl_space = min(rl_candidates, key=_rl_key)
                 reward_levels = 1
@@ -1223,7 +1306,8 @@ class BritishBot(BaseBot):
         if not spaces:
             return False
         try:
-            common_cause.execute(state, C.BRITISH, {}, spaces, mode=mode)
+            common_cause.execute(state, C.BRITISH, {}, spaces, mode=mode,
+                                 preserve_wp=True)
             return True
         except Exception:
             return False

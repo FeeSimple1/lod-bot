@@ -4,18 +4,18 @@
 # ------------------------------------------------------------
 
 BRITISH = {
-    18: "force",                # "If it hadn't been so stormy…" — target eligible enemy
-    23: "force",                # Lt Col Francis Marion
-    29: "ignore_if_4_militia",  # Edward Bancroft, British Spy
-    30: "force",                # Hessians
-    44: "force",                # Earl of Mansfield Recalled — target eligible enemy
-    51: "force",                # Bermuda Gunpowder Plot — March to set up Battle
-    52: "force",                # French Fleet Arrives in the Wrong Spot
-    62: "force",                # Charles Michel de Langlade
-    70: "force",                # British Gain From French in India
-    80: "force",                # Confusion Allows Slaves to Escape
-    88: "force",                # "If it hadn't been so foggy…"
-    95: "force",                # Ohio Country Frontier Erupts
+    18: "force_if_eligible_enemy",  # "If it hadn't been so stormy…" — target eligible enemy, else C&SA
+    23: "force",                    # Lt Col Francis Marion
+    29: "ignore_if_4_militia",      # Edward Bancroft, British Spy
+    30: "force",                    # Hessians
+    44: "force_if_eligible_enemy",  # Earl of Mansfield Recalled — target eligible enemy, else C&SA
+    51: "force_if_51",              # Bermuda Gunpowder Plot — March to set up Battle, else C&SA
+    52: "force_if_52",              # French Fleet Wrong Spot — March to set up Battle, else C&SA
+    62: "force_if_62",              # Charles Michel de Langlade — NY Active Opp w/o Tories, else C&SA
+    70: "force_if_70",              # British Gain From French in India — French Regs to remove, else C&SA
+    80: "force_if_80",              # Confusion Allows Slaves to Escape — Rebel pieces in Cities, else C&SA
+    88: "force",                    # "If it hadn't been so foggy…"
+    95: "force",                    # Ohio Country Frontier Erupts
 }
 
 # Additional musket instructions for the other factions.  These are a
