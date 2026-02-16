@@ -439,13 +439,7 @@ class BritishBot(BaseBot):
         """
         fni = state.get("fni_level", 0)
         # Check Gage/Clinton leader requirement for blockade removal
-        brit_leader = state.get("british_leader") or ""
-        # Also check leaders dict for any space
-        if not brit_leader:
-            for ldr in state.get("leaders", {}).values():
-                if ldr in ("LEADER_GAGE", "LEADER_CLINTON"):
-                    brit_leader = ldr
-                    break
+        brit_leader = self._british_leader(state)
         is_gage_clinton = brit_leader in ("LEADER_GAGE", "LEADER_CLINTON")
 
         if fni > 0 and is_gage_clinton:
@@ -1397,7 +1391,7 @@ class BritishBot(BaseBot):
             # Check: would removing British allow Committees?
             rebel_pieces = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
                            + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0))
-            allows_committees = rebel_pieces > (brit_cubes - brit_cubes)  # removing would flip
+            allows_committees = rebel_pieces > 0  # removing British would let Rebels gain control
 
             if prevents_rl or allows_committees:
                 pop = meta.get("population", 0)
