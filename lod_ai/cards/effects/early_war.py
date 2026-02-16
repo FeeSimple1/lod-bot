@@ -21,6 +21,7 @@ from lod_ai.rules_consts import (
 )
 from lod_ai.util.naval import move_blockades_to_unavailable, move_blockades_to_west_indies
 from lod_ai.board.control import refresh_control
+from lod_ai.map.adjacency import space_meta
 
 def _pick_spaces_with_militia(state, max_spaces=4):
     """Return up to *max_spaces* IDs that contain Patriot Militia."""
@@ -231,7 +232,15 @@ def evt_024_declaration(state, shaded=False):
     if shaded:
         # "Place up to three Militia anywhere, one Propaganda with each.
         #  Place one Fort anywhere."
-        targets = list(state["spaces"])[:3]
+        # Pick up to 3 spaces: prefer Cities, then highest population
+        candidates = sorted(
+            state["spaces"].keys(),
+            key=lambda sid: (
+                -(1 if (space_meta(sid) or {}).get("type") == "City" else 0),
+                -((space_meta(sid) or {}).get("population", 0)),
+            ),
+        )
+        targets = candidates[:3]
         for sid in targets:
             place_piece(state, MILITIA_U, sid, 1)
             place_marker(state, PROPAGANDA, sid, 1)
@@ -261,7 +270,18 @@ def evt_028_moores_creek(state, shaded=False):
         sid for sid, sp in targets.items()
         if (sp.get(TORY) and shaded) or ((sp.get(MILITIA_U) or sp.get(MILITIA_A)) and not shaded)
     ]
-    target_list = sorted(preferred or targets)
+    if shaded:
+        # Pick space with most Tories for maximum replacement
+        target_list = sorted(
+            preferred or list(targets.keys()),
+            key=lambda sid: -targets[sid].get(TORY, 0),
+        )
+    else:
+        # Pick space with most Militia for maximum replacement
+        target_list = sorted(
+            preferred or list(targets.keys()),
+            key=lambda sid: -(targets[sid].get(MILITIA_U, 0) + targets[sid].get(MILITIA_A, 0)),
+        )
     target = target_list[0]
     sp = state["spaces"].get(target, {})
 

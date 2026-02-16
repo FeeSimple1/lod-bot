@@ -313,40 +313,7 @@ class TestCircularFallbackGuard:
 # =====================================================================
 
 class TestDefendingInBattle:
-    """§8.7.9: Indian bot defending WP activation rule."""
-
-    def test_activate_all_but_1_with_village(self):
-        """If Village present, Activate all but 1 Underground WP."""
-        bot = IndianBot()
-        state = _base_state(spaces={
-            "Quebec": _empty_space(**{C.WARPARTY_U: 4, C.VILLAGE: 1}),
-        })
-        bot._indian_defending_activation(state, "Quebec")
-        sp = state["spaces"]["Quebec"]
-        assert sp[C.WARPARTY_U] == 1   # keep 1 Underground
-        assert sp[C.WARPARTY_A] == 3   # 4 - 1 = 3 activated
-
-    def test_no_activation_without_village(self):
-        """If no Village, Activate no Underground WP."""
-        bot = IndianBot()
-        state = _base_state(spaces={
-            "Quebec": _empty_space(**{C.WARPARTY_U: 4}),
-        })
-        bot._indian_defending_activation(state, "Quebec")
-        sp = state["spaces"]["Quebec"]
-        assert sp[C.WARPARTY_U] == 4   # all stay Underground
-        assert sp[C.WARPARTY_A] == 0
-
-    def test_single_wp_with_village_stays(self):
-        """With Village but only 1 UG WP, keep it Underground (all but 1 = 0)."""
-        bot = IndianBot()
-        state = _base_state(spaces={
-            "Quebec": _empty_space(**{C.WARPARTY_U: 1, C.VILLAGE: 1}),
-        })
-        bot._indian_defending_activation(state, "Quebec")
-        sp = state["spaces"]["Quebec"]
-        assert sp[C.WARPARTY_U] == 1
-        assert sp[C.WARPARTY_A] == 0
+    """§8.7.9: Indian bot defending WP activation rule (implemented in battle.py)."""
 
     def test_battle_applies_activation_rule(self):
         """In actual battle, bot Indian defending activation should apply."""

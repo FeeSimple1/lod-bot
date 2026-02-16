@@ -1270,3 +1270,75 @@ def test_p7_rally_bullet7_selects_unselected_fort():
     assert "Fort_B" in fort_spaces_for_gather
     # Fort_A should NOT be a candidate (already in spaces_used)
     assert "Fort_A" not in fort_spaces_for_gather
+
+
+# ===================================================================
+# Q11: P2 Bullet 2 — Active Support board-state check
+# ===================================================================
+
+def test_p2_bullet2_active_support_no_militia_returns_true():
+    """P2 bullet 2: Card places militia AND an Active Support space has no militia → True."""
+    bot = PatriotBot()
+    state = {
+        "spaces": {
+            "Boston": {C.MILITIA_U: 0, C.MILITIA_A: 0},
+        },
+        "resources": {C.PATRIOTS: 5},
+        "support": {"Boston": C.ACTIVE_SUPPORT},
+        "available": {},
+    }
+    # Card 3 shaded has places_patriot_militia_u=True
+    card = {"id": 3}
+    assert bot._faction_event_conditions(state, card) is True
+
+
+def test_p2_bullet2_active_support_with_militia_returns_false():
+    """P2 bullet 2: Active Support space already has militia → bullet doesn't fire.
+    Other bullets also structured not to trigger."""
+    bot = PatriotBot()
+    state = {
+        "spaces": {
+            "Boston": {C.MILITIA_U: 1, C.MILITIA_A: 0},
+        },
+        "resources": {C.PATRIOTS: 5},
+        "support": {"Boston": C.ACTIVE_SUPPORT},
+        "available": {},
+    }
+    # Card 3 shaded: places_patriot_militia_u=True but only bullet;
+    # Support > Opposition so bullet 1 would fire if shifts_support_rebel
+    # Card 3 shaded does NOT shift support, so bullet 1 won't fire.
+    # No forts/villages/resources flags → only bullet 2 could fire, and it shouldn't.
+    card = {"id": 3}
+    assert bot._faction_event_conditions(state, card) is False
+
+
+def test_p2_bullet2_village_no_militia_returns_true():
+    """P2 bullet 2: Village space with no militia → True."""
+    bot = PatriotBot()
+    state = {
+        "spaces": {
+            "Quebec": {C.VILLAGE: 1, C.MILITIA_U: 0, C.MILITIA_A: 0},
+        },
+        "resources": {C.PATRIOTS: 5},
+        "support": {"Quebec": C.NEUTRAL},
+        "available": {},
+    }
+    card = {"id": 3}
+    assert bot._faction_event_conditions(state, card) is True
+
+
+def test_p2_bullet2_no_qualifying_spaces_returns_false():
+    """P2 bullet 2: All Active Support spaces have militia, no Villages without militia.
+    Only bullet 2 could trigger → returns False."""
+    bot = PatriotBot()
+    state = {
+        "spaces": {
+            "Boston": {C.MILITIA_U: 2, C.MILITIA_A: 0},
+            "Quebec": {C.VILLAGE: 1, C.MILITIA_U: 1, C.MILITIA_A: 0},
+        },
+        "resources": {C.PATRIOTS: 5},
+        "support": {"Boston": C.ACTIVE_SUPPORT, "Quebec": C.NEUTRAL},
+        "available": {},
+    }
+    card = {"id": 3}
+    assert bot._faction_event_conditions(state, card) is False
