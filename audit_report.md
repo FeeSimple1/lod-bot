@@ -792,73 +792,65 @@ All 109 card handlers match the card reference text. All previously identified a
 
 ---
 
-## Consolidated Outstanding Issues (as of latest codebase review)
+## Consolidated Outstanding Issues (updated Session 7)
 
-This section consolidates all truly remaining issues, verified against the current codebase. All previously high-severity items have been resolved. Items previously listed as "remaining" that have since been fixed are annotated inline in their original session sections above.
+All high-severity issues identified in Sessions 1-6 have been resolved. The remaining items are medium-to-low severity, mostly architectural limitations or operational-phase mechanics.
 
-**Summary:** All high-severity issues are resolved. 10 medium-severity and 3 low-severity items remain, most relating to year-end OPS wiring, mid-command interrupt timing, and minor semantic distinctions.
+### Resolved Since Last Consolidation
+
+**British Bot:**
+- B38 Howe FNI lowered before SAs (`_apply_howe_fni()` called at all 4 SA paths)
+- B39 Gage free RL (`rl_free_first` passed to `muster.execute()`)
+- B5 Garrison multi-city (Phase 2a + Phase 2b iterate multiple cities)
+- B2 Event conditions rewritten with `CARD_EFFECTS` flags (all 5 bullets)
+- B6 Muster die roll cached (`_muster_die_cached`)
+- B2/event_instructions: 7 cards with `force_if_X` conditional directives + `_force_condition_met()`
+- B11 Skirmish option 2 threshold fixed (`own_regs >= 1`)
+- Clinton Skirmish double-count fixed (removed duplicate check)
+- RL dead code removed
+
+**Patriot Bot:**
+- P4 Win-the-Day wired (`win_rally_space`/`win_blockade_dest` passed to `battle.execute()`)
+- P5 March constraints (`_would_lose_rebel_control()`, `_movable_from_pat()`, Phase 1 + Phase 2)
+- P5 March destination verification (`need = royalist - rebels + 1`, `pieces_gathered >= need`)
+- P7 Rally all 7 bullets implemented
+- P7/P11 Rally/Rabble resource cap (capped at available resources, not hardcoded)
+- P7/P11 infinite loop guard (`_from_rabble`/`_from_rally` flags)
+- P11 Rabble no 4-space cap (`max_spaces = state["resources"][self.faction]`)
+- Card 51 conditional (`force_if_51` in both BRITISH and PATRIOTS dicts)
+
+**French Bot:**
+- F6 Hortalez pre-Treaty exact cost (FIXED THIS SESSION: pre-Treaty must pay exact roll or skip)
+- F14 March all 4 constraints (lose-no-control, Continentals, nearest British, shared space)
+- F2 Event conditions use `CARD_EFFECTS` lookup
+
+**Indian Bot:**
+- I10 March multi-destination (`max_dests = min(3, resources)`, Phase 1 + Phase 2)
+- Mid-Raid Plunder/Trade (checks `resources == 0` during Raid)
+- Gather/March circular guard (`_visited` set)
+- I2 Event conditions use `CARD_EFFECTS` lookup
+- Indian defending-in-battle (battle.py lines 299-309: activate WP based on Village presence)
+
+**Engine:**
+- Q7 BS command priorities (`get_bs_limited_command()` on all 4 bot subclasses; engine calls it)
+- All 4 bots use `CARD_EFFECTS` for event evaluation (P2/F2/I2/B2)
 
 ### Card Handlers — COMPLETE
 All 109 card handlers match `card reference full.txt`. No outstanding card issues.
 - Minor: Card 24 shaded uses dict iteration order for space selection (arbitrary). Card 28 still uses alphabetical fallback via `sorted()` for space selection. Both are low impact.
 
-### Cross-cutting (Medium)
-
-- **OPS methods not wired into engine/year_end.** All 4 bots define OPS summary methods (`bot_supply_priority`, `ops_redeploy`, `ops_desertion`, `ops_bs_trigger`, etc.) but `engine.py` and `util/year_end.py` do not call them. The year-end procedure uses its own hardcoded logic (e.g., leader redeploy uses generic "most pieces" rule, desertion logic is hardcoded). These bot methods are ready to be integrated but the wiring is missing.
-
-### British Bot (british_bot.py)
-
-#### Previously High — NOW RESOLVED
-- ~~**B5 Garrison**: Only targets one city~~ → Multi-city multi-phase operation confirmed working (Phase 2a iterates multiple target cities, Phase 2b iterates reinforcement targets).
-- ~~**B38 Howe capability**: FNI not lowered before SAs~~ → `_apply_howe_fni()` exists and is called at all 4 SA paths (Garrison, Muster, March, Battle). Lowers FNI by 1 when Howe is leader.
-- ~~**B39 Gage capability**: Free RL not implemented~~ → `rl_free_first` computed and passed through `muster.execute()` → `_reward_loyalty(free_first=True)`. First shift is free.
-- ~~**B2 Event conditions**: text matching~~ → All 5 bullets rewritten with `CARD_EFFECTS` lookup + hybrid static/dynamic checks. No more text matching.
-- ~~**B6 Muster**: consumes die roll on every call~~ → Die roll now cached in `_muster_die_cached`; subsequent calls in same turn reuse cached value.
+### Remaining Issues
 
 #### Medium Severity
-- **B10 March + CC timing**: `_try_common_cause()` called after `march.execute()`, not during March planning. CC should integrate into group size calculation per the reference ("Use Common Cause to increase group size if destination is adjacent Province"). Architectural limitation — requires refactoring the March/CC interface.
+
+- **OPS methods not wired into year_end**: All 4 bots define `ops_supply_priority()`, `ops_redeploy()`, `ops_desertion()`, `ops_bs_trigger()` methods. `year_end.py` uses its own ad-hoc logic and ignores these. Supply payment order, desertion target selection, and redeployment destination all use bot-independent heuristics instead of the faction-specific priorities from the reference flowcharts. This is a larger refactor — `year_end` needs to detect bot-controlled factions, import their bot instances, and call OPS methods for prioritization.
+- **P7/P11 Persuasion mid-command expansion**: Reference says Persuasion fires during Rally/Rabble and restored resources could fund additional spaces. Current code fires Persuasion after all spaces are processed (resources are capped at selection time). Low gameplay impact — bot already gets highest-priority spaces. Would require Rally/Rabble to execute space-by-space with interrupt callbacks.
+- **`_indian_defending_activation()` redundant**: The method in `indians.py` is defined and tested but never called from the bot’s own battle flow. However, `battle.py` (lines 299-309) implements the same logic inline for bot-controlled Indians. The `indians.py` method is dead code and should be removed to avoid confusion.
 
 #### Low Severity
-- B10 March: `bring_escorts=False` hard-coded (reference silent on bot escorts).
 
-### Patriot Bot (patriot.py)
-
-#### Previously High — NOW RESOLVED
-- ~~**P4 Win-the-Day**: Free Rally/Blockade not wired~~ → `_execute_battle()` now passes `win_rally_space`, `win_rally_kwargs`, `win_blockade_dest` to `battle.execute()`.
-- ~~**P5 March**: Missing constraints and phases~~ → Has "lose no Rebel Control" via `_would_lose_rebel_control()`, leave-behind logic via `_movable_from_pat()`, Phase 1 (add Rebel Control to 2 spaces) and Phase 2 (get Militia into empty spaces).
-- ~~**P7 Rally**: Missing 4 of 6 bullets~~ → All 7 bullets implemented (Fort placement, Militia at Forts, Continental placement, Continental replacement, Fort Available placement, Control-changing Militia, adjacent Militia gathering).
-- ~~**Card 51**: unconditional `"force"`~~ → Now uses `"force_if_51"` conditional directive in both BRITISH and PATRIOTS dicts, with game-state evaluation.
-- ~~**Rally/Rabble infinite loop**~~ → Recursion guard implemented via `_from_rabble` / `_from_rally` flags.
-- ~~**Rabble-Rousing 4-space cap**~~ → Removed. Now limited only by resources.
-
-#### Medium Severity
-- **P7/P11 Persuasion interrupt**: Happens after command completion, not mid-execution when resources reach 0. The flowchart says interrupt during Rally/Rabble when resources hit 0, but current code checks afterward.
-- **P5 March destination**: Doesn't verify Rebel Control would actually be gained (sends enough pieces heuristically but doesn't compute the outcome).
-
-### French Bot (french.py)
-
-#### Previously High — NOW RESOLVED
-- ~~**F14 March**: Missing 4 constraints~~ → Has all 4 constraints: `_would_lose_rebel_control()`, brings Continentals, Step 3 marches toward nearest British via BFS, Step 4 fallback to shared space.
-- ~~**F2 Event conditions**: text matching~~ → Uses `CARD_EFFECTS` lookup.
-
-#### Low Severity
-- **F6 Hortalez**: "Spend 1D3" (pre-Treaty, exact) vs "Spend up to 1D3" (post-Treaty) — code uses `min(resources, roll)` for both. Minor semantic difference; bot behavior is identical either way (always spend as much as possible).
-
-### Indian Bot (indians.py)
-
-#### Previously High — NOW RESOLVED
-- ~~**I10 March**: Severely simplified, single move~~ → Full multi-destination implementation with `max_dests = min(3, resources)`, Phase 1 (Village placement), Phase 2 (remove Rebel Control). Has "last WP from Village" constraint and "adding Rebel Control" check.
-- ~~**Mid-Raid Plunder/Trade interruption**~~ → Implemented (checks `resources == 0` during Raid).
-- ~~**Gather/March circular fallback**~~ → Recursion guard implemented via `_visited` set.
-- ~~**I2 Event conditions**~~ → Uses `CARD_EFFECTS` lookup.
-
-#### Medium Severity
-- **`_indian_defending_activation()`**: Defined and tested but not called from battle flow. The method exists in `indians.py` but isn't wired into `battle.execute()` or the Indian bot's battle execution. Rule: "If Village in Battle space, Activate all but 1 Underground WP; otherwise Activate none."
-
-### Engine (engine.py)
-
-#### Previously Open — NOW RESOLVED
-- ~~**Q7**: BS command priorities hardcoded~~ → `get_bs_limited_command()` implemented on all 4 bot subclasses; engine calls it instead of hardcoded priorities.
+- **B10 March + Common Cause timing**: CC invoked post-March instead of during March planning. CC should integrate into group size calculation for adjacent Province destinations. Architectural refactor.
+- **Cards 24/28 alphabetical fallback**: Space selection uses alphabetical tiebreaker instead of population or other game-meaningful criteria.
 
 ---
 
@@ -1152,13 +1144,6 @@ British bot's `_try_common_cause()` now passes `preserve_wp=True`.
 
 816 tests passing (790 baseline + 26 new).
 
-### Remaining issues (updated to reflect current codebase)
+### Remaining issues
 
-**Resolved since this session's review:**
-- ~~**B38 Howe capability**~~ → FIXED: `_apply_howe_fni()` exists and is called at all 4 SA paths.
-- ~~**B39 Gage capability**~~ → FIXED: `rl_free_first` computed and passed through `muster.execute()` → `_reward_loyalty(free_first=True)`.
-- ~~**B5 Garrison**~~ → FIXED: Multi-city multi-phase operation confirmed working.
-
-**Still remaining:**
-- **B10 March + CC timing**: CC invoked post-March, not during March planning (architectural).
-- **OPS reference items**: Supply/Redeploy/Desertion priorities defined as bot methods but not wired into `engine.py` or `util/year_end.py`.
+All issues from this session's review have been fixed. See the **Consolidated Outstanding Issues (updated Session 7)** section above for the current list of remaining medium-to-low severity items.

@@ -393,16 +393,23 @@ class FrenchBot(BaseBot):
     # ----- Hortalez (F6 / F11) ---------------------------------
     def _hortelez(self, state: Dict, *, before_treaty: bool) -> None:
         """F6 (before Treaty): Spend exactly 1D3 French Resources.
+           If French Resources < roll, Hortalez cannot execute — abort.
         F11 (after Treaty): Spend up to 1D3 French Resources.
-        Both capped at available resources. Bot always spends max possible.
+           Bot always spends max possible (min of resources and roll).
         """
         roll = state["rng"].randint(1, 3)
         state.setdefault("rng_log", []).append(("Hortalez 1D3", roll))
-        # F6 pre-Treaty: spend exactly 1D3 (capped at available)
-        # F11 post-Treaty: spend up to 1D3 (bot maximizes)
-        pay = min(state["resources"][C.FRENCH], roll)
+        if before_treaty:
+            # F6: must pay exactly 1D3 — abort if can’t afford
+            if state["resources"][C.FRENCH] < roll:
+                push_history(state, f"Roderigue Hortalez et Cie (pre‑Treaty): Cannot afford {roll}, skipped")
+                return
+            pay = roll
+        else:
+            # F11: spend up to 1D3
+            pay = min(state["resources"][C.FRENCH], roll)
         if pay < 1:
-            return  # Can't pay anything
+            return
         hortelez.execute(state, C.FRENCH, {}, pay=pay)
         phase = "pre‑Treaty" if before_treaty else "post‑Treaty"
         push_history(state, f"Roderigue Hortalez et Cie ({phase}): Pay {pay}")
