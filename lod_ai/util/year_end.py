@@ -71,7 +71,7 @@ def _piece_total(sp: Dict, faction: str) -> int:
 #  §6.2  Supply Phase
 # ────────────────────────────────────────────────────────────────
 
-def _supply_phase(state):
+def _supply_phase(state, *, bots=None, human_factions=None):
     def _pay(faction, sid, tag):
         if resources.can_afford(state, faction, 1):
             resources.spend(state, faction, 1)
@@ -79,7 +79,9 @@ def _supply_phase(state):
             return True
         return False
 
-    # British
+    # British — collect unsupplied spaces, then sort by bot priority
+    human = human_factions or set()
+    brit_unsupplied = []
     for sid, sp in state["spaces"].items():
         if sid == WEST_INDIES_ID:
             continue
@@ -89,6 +91,16 @@ def _supply_phase(state):
         space_type = meta.get("type") or sp.get("type")
         if sp.get(FORT_BRI) or (space_type == "City" and state.get("control", {}).get(sid) == BRITISH):
             continue
+        brit_unsupplied.append(sid)
+
+    if bots and BRITISH in bots and BRITISH not in human:
+        bot = bots[BRITISH]
+        priority = bot.bot_supply_priority(state)
+        priority_index = {s: i for i, s in enumerate(priority)}
+        brit_unsupplied.sort(key=lambda s: priority_index.get(s, 999))
+
+    for sid in brit_unsupplied:
+        sp = state["spaces"][sid]
         if _pay(BRITISH, sid, "British Supply"):
             continue
         cur_support = state.get("support", {}).get(sid, 0)
@@ -101,7 +113,8 @@ def _supply_phase(state):
             remove_piece(state, TORY, sid, sp[TORY], to="available")
         push_history(state, f"British Supply – cubes removed from {sid}")
 
-    # Patriots
+    # Patriots — collect unsupplied spaces, then sort by bot priority
+    pat_unsupplied = []
     for sid, sp in state["spaces"].items():
         total = sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0) + sp.get(REGULAR_PAT, 0)
         if not total:
@@ -110,8 +123,19 @@ def _supply_phase(state):
         space_type = meta.get("type") or sp.get("type")
         if sp.get(FORT_PAT) or ((space_type in ("Colony", "City")) and state.get("control", {}).get(sid) == "REBELLION"):
             continue
+        pat_unsupplied.append(sid)
+
+    if bots and PATRIOTS in bots and PATRIOTS not in human:
+        bot = bots[PATRIOTS]
+        priority = bot.ops_supply_priority(state)
+        priority_index = {s: i for i, s in enumerate(priority)}
+        pat_unsupplied.sort(key=lambda s: priority_index.get(s, 999))
+
+    for sid in pat_unsupplied:
+        sp = state["spaces"][sid]
         if _pay(PATRIOTS, sid, "Patriot Supply"):
             continue
+        total = sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0) + sp.get(REGULAR_PAT, 0)
         remove_target = total // 2
         for pid in (MILITIA_U, MILITIA_A, REGULAR_PAT):
             if remove_target == 0:
@@ -122,7 +146,8 @@ def _supply_phase(state):
                 remove_target -= qty
         push_history(state, f"Patriot Supply – units removed from {sid}")
 
-    # French
+    # French — collect unsupplied spaces, then sort by bot priority
+    fre_unsupplied = []
     for sid, sp in state["spaces"].items():
         fr = sp.get(REGULAR_FRE, 0)
         if fr == 0 or sid == WEST_INDIES_ID:
@@ -131,14 +156,24 @@ def _supply_phase(state):
         in_supply = sp.get(FORT_PAT) or state.get("control", {}).get(sid) == "REBELLION"
         if in_supply:
             continue
+        fre_unsupplied.append(sid)
 
-        # NEW – try to move to the nearest space with a Patriot Fort
+    if bots and FRENCH in bots and FRENCH not in human:
+        bot = bots[FRENCH]
+        priority = bot.ops_supply_priority(state)
+        priority_index = {s: i for i, s in enumerate(priority)}
+        fre_unsupplied.sort(key=lambda s: priority_index.get(s, 999))
+
+    for sid in fre_unsupplied:
+        sp = state["spaces"][sid]
+        fr = sp.get(REGULAR_FRE, 0)
+
+        # Try to move to the nearest space with a Patriot Fort
         forts = [
             s for s, sp2 in state["spaces"].items()
             if sp2.get(FORT_PAT)
         ]
         if forts:
-            # choose the fort with the shortest path (adj is map.adjacency alias)
             dest = min(
                 forts,
                 key=lambda x: len(map_adj.shortest_path(sid, x))
@@ -149,13 +184,11 @@ def _supply_phase(state):
                     state,
                     f"French Supply – moved {fr} regs {sid}→{dest}"
                 )
-                continue        # Supply satisfied by moving
+                continue
 
-        # if no fort found or move impossible, pay if you can…
         if _pay(FRENCH, sid, "French Supply"):
             continue
 
-        # …otherwise remove them to Available
         bp.remove_piece(state, REGULAR_FRE, sid, fr)
         push_history(
             state,
@@ -169,12 +202,21 @@ def _supply_phase(state):
             place_with_caps(state, VILLAGE, reserve, 1)
             push_history(state, f"Indian Supply – auto‑Village in {reserve}")
 
+    indian_unsupplied = []
     for sid, sp in state["spaces"].items():
         wp_total = sp.get(WARPARTY_A, 0) + sp.get(WARPARTY_U, 0)
         if not wp_total:
             continue
         if sp.get(VILLAGE) or sp.get("Indian_Reserve"):
             continue
+        indian_unsupplied.append(sid)
+
+    if bots and INDIANS in bots and INDIANS not in human:
+        bot = bots[INDIANS]
+        indian_unsupplied = bot.ops_supply_priority(state, indian_unsupplied)
+
+    for sid in indian_unsupplied:
+        sp = state["spaces"][sid]
         if _pay(INDIANS, sid, "Indian Supply"):
             continue
         dests = [d for d, sp2 in state["spaces"].items() if sp2.get(VILLAGE)]
@@ -474,25 +516,48 @@ def _leader_change(state):
 #  Leader Redeploy  (§6.5.2)
 # ────────────────────────────────────────────────────────────────
 
-def _leader_redeploy(state):
+def _leader_redeploy(state, *, bots=None, human_factions=None):
+    human = human_factions or set()
     order = [INDIANS, FRENCH, BRITISH, PATRIOTS]
     for fac in order:
         leader = state.get("leaders", {}).get(fac)
         if not leader:
             continue
-        # Determine destination: space with most pieces of that faction
-        dest = None
-        best = 0
-        for sid, sp in state["spaces"].items():
-            cnt = _piece_total(sp, fac)
-            if cnt > best:
-                best, dest = cnt, sid
-        if dest:
-            state.setdefault("leader_locs", {})[leader] = dest
-            push_history(state, f"Leader Redeploy – {fac} leader to {dest} (6.5.2)")
+
+        if bots and fac in bots and fac not in human:
+            bot = bots[fac]
+            if fac == INDIANS:
+                deploy_map = bot.ops_redeploy(state)
+                dest = deploy_map.get(leader)
+            elif fac == BRITISH:
+                dest = bot.bot_redeploy_leader(state)
+            elif fac == PATRIOTS:
+                dest = bot.ops_redeploy_washington(state)
+            elif fac == FRENCH:
+                dest = bot.ops_redeploy_leader(state)
+            else:
+                dest = None
+
+            if dest:
+                state.setdefault("leader_locs", {})[leader] = dest
+                push_history(state, f"Leader Redeploy – {fac} leader to {dest} (6.5.2, bot)")
+            else:
+                state.setdefault("leader_locs", {})[leader] = "Available"
+                push_history(state, f"Leader Redeploy – {fac} leader to Available (6.5.2)")
         else:
-            state.setdefault("leader_locs", {})[leader] = "Available"
-            push_history(state, f"Leader Redeploy – {fac} leader to Available (6.5.2)")
+            # Human or no bot — existing generic logic
+            dest = None
+            best = 0
+            for sid, sp in state["spaces"].items():
+                cnt = _piece_total(sp, fac)
+                if cnt > best:
+                    best, dest = cnt, sid
+            if dest:
+                state.setdefault("leader_locs", {})[leader] = dest
+                push_history(state, f"Leader Redeploy – {fac} leader to {dest} (6.5.2)")
+            else:
+                state.setdefault("leader_locs", {})[leader] = "Available"
+                push_history(state, f"Leader Redeploy – {fac} leader to Available (6.5.2)")
 
 # ────────────────────────────────────────────────────────────────
 #  British Release Date  (§6.5.3)
@@ -560,12 +625,14 @@ def _fni_drift(state):
 #  §6.6  Desertion helpers  (full Rule 6.6 logic)
 # ────────────────────────────────────────────────────────────────
 
-def _patriot_desertion(state):
+def _patriot_desertion(state, *, bots=None, human_factions=None):
     """Remove 1‑in‑5 Militia and 1‑in‑5 Continentals (round down).
 
     • **Indians** choose the *first* Militia **and** the *first* Continental to desert.
     • **Patriots** choose the remainder (engine removes least‑harmful pieces).
     """
+    human = human_factions or set()
+
     # candidate lists restricted to Colonies
     mil_spaces = [(sid, sp.get(MILITIA_U, 0) + sp.get(MILITIA_A, 0))
                   for sid, sp in state["spaces"].items() if sp.get("type") == "Colony" and (sp.get(MILITIA_U,0)+sp.get(MILITIA_A,0))]
@@ -579,54 +646,97 @@ def _patriot_desertion(state):
 
     removed = 0
 
-    # Indians choose first Militia & Continental – pick colony with **highest** Patriot Support
+    # Indians choose first Militia & Continental
     if drop_mil and mil_spaces:
-        sid = max(mil_spaces, key=lambda t: state["support"].get(t[0], 0))[0]
-        if state["spaces"][sid].get(MILITIA_U, 0):
-            remove_piece(state, MILITIA_U, sid, 1, to="available")
+        if bots and INDIANS in bots and INDIANS not in human:
+            # Build candidate list for Indian bot
+            mil_candidates = [(s, MILITIA_U) for s, _ in mil_spaces
+                              if state["spaces"][s].get(MILITIA_U, 0)]
+            mil_candidates += [(s, MILITIA_A) for s, _ in mil_spaces
+                               if state["spaces"][s].get(MILITIA_A, 0)]
+            if mil_candidates:
+                sorted_mil = bots[INDIANS].ops_patriot_desertion_priority(state, mil_candidates)
+                sid, tag = sorted_mil[0]
+            else:
+                sid = mil_spaces[0][0]
+                tag = MILITIA_U if state["spaces"][sid].get(MILITIA_U, 0) else MILITIA_A
         else:
-            remove_piece(state, MILITIA_A, sid, 1, to="available")
-        push_history(state, f"Patriot Desertion – Indians chose Militia in {sid}")
+            # Default: pick colony with highest Patriot Support
+            sid = max(mil_spaces, key=lambda t: state["support"].get(t[0], 0))[0]
+            tag = MILITIA_U if state["spaces"][sid].get(MILITIA_U, 0) else MILITIA_A
+        remove_piece(state, tag, sid, 1, to="available")
+        push_history(state, f"Patriot Desertion – Indians chose {tag} in {sid}")
         drop_mil -= 1
         removed += 1
 
     if drop_con and con_spaces:
-        sid = max(con_spaces, key=lambda t: state["support"].get(t[0], 0))[0]
+        if bots and INDIANS in bots and INDIANS not in human:
+            con_candidates = [(s, REGULAR_PAT) for s, _ in con_spaces]
+            sorted_con = bots[INDIANS].ops_patriot_desertion_priority(state, con_candidates)
+            sid, _ = sorted_con[0]
+        else:
+            sid = max(con_spaces, key=lambda t: state["support"].get(t[0], 0))[0]
         remove_piece(state, REGULAR_PAT, sid, 1, to="available")
         push_history(state, f"Patriot Desertion – Indians chose Continental in {sid}")
         drop_con -= 1
         removed += 1
 
-    # Patriots remove the rest: Underground Militia → Active Militia → Continentals
-    for sid, sp in state["spaces"].items():
-        if sp.get("type") != "Colony":
-            continue
-        if drop_mil:
-            q = min(sp.get(MILITIA_U, 0), drop_mil)
-            if q:
-                remove_piece(state, MILITIA_U, sid, q, to="available")
-                drop_mil -= q; removed += q
-            q = min(sp.get(MILITIA_A, 0), drop_mil)
-            if q:
-                remove_piece(state, MILITIA_A, sid, q, to="available")
-                drop_mil -= q; removed += q
-        if drop_con:
-            q = min(sp.get(REGULAR_PAT, 0), drop_con)
-            if q:
-                remove_piece(state, REGULAR_PAT, sid, q, to="available")
-                drop_con -= q; removed += q
-        if drop_mil == 0 and drop_con == 0:
-            break
+    # Patriots remove the rest
+    if bots and PATRIOTS in bots and PATRIOTS not in human and (drop_mil or drop_con):
+        pat_removals = bots[PATRIOTS].ops_patriot_desertion_priority(state)
+        for sid, tag in pat_removals:
+            if drop_mil == 0 and drop_con == 0:
+                break
+            sp = state["spaces"].get(sid, {})
+            if sp.get("type") != "Colony":
+                continue
+            if tag in (MILITIA_U, MILITIA_A) and drop_mil > 0:
+                qty = sp.get(tag, 0)
+                if qty > 0:
+                    take = min(qty, drop_mil)
+                    remove_piece(state, tag, sid, take, to="available")
+                    drop_mil -= take
+                    removed += take
+            elif tag == REGULAR_PAT and drop_con > 0:
+                qty = sp.get(tag, 0)
+                if qty > 0:
+                    take = min(qty, drop_con)
+                    remove_piece(state, tag, sid, take, to="available")
+                    drop_con -= take
+                    removed += take
+    else:
+        # Default: iterate spaces arbitrarily
+        for sid, sp in state["spaces"].items():
+            if sp.get("type") != "Colony":
+                continue
+            if drop_mil:
+                q = min(sp.get(MILITIA_U, 0), drop_mil)
+                if q:
+                    remove_piece(state, MILITIA_U, sid, q, to="available")
+                    drop_mil -= q; removed += q
+                q = min(sp.get(MILITIA_A, 0), drop_mil)
+                if q:
+                    remove_piece(state, MILITIA_A, sid, q, to="available")
+                    drop_mil -= q; removed += q
+            if drop_con:
+                q = min(sp.get(REGULAR_PAT, 0), drop_con)
+                if q:
+                    remove_piece(state, REGULAR_PAT, sid, q, to="available")
+                    drop_con -= q; removed += q
+            if drop_mil == 0 and drop_con == 0:
+                break
 
     if removed:
         push_history(state, f"Patriot Desertion – {removed} pieces removed (6.6.1)")
 
-def _tory_desertion(state):
+def _tory_desertion(state, *, bots=None, human_factions=None):
     """Remove 1‑in‑5 Tories (round down).
 
     • **French** choose the *first* Tory to desert.
     • **British** choose the remainder (engine removes arbitrarily).
     """
+    human = human_factions or set()
+
     tory_spaces = [(sid, sp.get(TORY, 0)) for sid, sp in state["spaces"].items() if sp.get(TORY,0)]
     total = sum(c for _, c in tory_spaces)
     drop = total // 5
@@ -634,20 +744,37 @@ def _tory_desertion(state):
         return
 
     removed = 0
-    # French choose first Tory – colony with highest Patriot Support
-    sid_choice = max(tory_spaces, key=lambda t: state["support"].get(t[0], 0))[0]
+
+    # French choose first Tory
+    if bots and FRENCH in bots and FRENCH not in human:
+        french_picks = bots[FRENCH].ops_loyalist_desertion_priority(state)
+        if french_picks:
+            sid_choice, _ = french_picks[0]
+        else:
+            sid_choice = tory_spaces[0][0]
+    else:
+        # Default: colony with highest Patriot Support
+        sid_choice = max(tory_spaces, key=lambda t: state["support"].get(t[0], 0))[0]
+
     remove_piece(state, TORY, sid_choice, 1, to="available")
     push_history(state, f"Tory Desertion – French chose Tory in {sid_choice}")
     drop -= 1; removed += 1
 
-    # British remove the rest – iterate
-    for sid, sp in state["spaces"].items():
-        if drop == 0:
-            break
-        q = min(sp.get(TORY, 0), drop)
-        if q:
-            remove_piece(state, TORY, sid, q, to="available")
-            drop -= q; removed += q
+    # British remove the rest
+    if bots and BRITISH in bots and BRITISH not in human and drop > 0:
+        removals = bots[BRITISH].bot_loyalist_desertion(state, drop)
+        for sid, n in removals:
+            remove_piece(state, TORY, sid, n, to="available")
+            removed += n
+        drop = 0
+    else:
+        for sid, sp in state["spaces"].items():
+            if drop == 0:
+                break
+            q = min(sp.get(TORY, 0), drop)
+            if q:
+                remove_piece(state, TORY, sid, q, to="available")
+                drop -= q; removed += q
 
     if removed:
         push_history(state, f"Tory Desertion – {removed} cubes removed (6.6.2)")
@@ -722,8 +849,19 @@ def _reset_phase(state):
 #  Public entry‑point
 # ────────────────────────────────────────────────────────────────
 
-def resolve(state):
-    """Run the full Winter‑Quarters routine on *state* in rule‑order."""
+def resolve(state, *, bots=None, human_factions=None):
+    """Run the full Winter‑Quarters routine on *state* in rule‑order.
+
+    Parameters
+    ----------
+    bots : dict | None
+        Mapping of faction string → bot instance (e.g. {"BRITISH": BritishBot()}).
+        When provided, bot-controlled factions use their OPS methods for
+        Supply priority, Leader Redeploy, and Desertion choices.
+    human_factions : set | None
+        Set of faction strings controlled by humans.  These factions use the
+        existing ad-hoc logic even when *bots* is provided.
+    """
 
     # 6.1  Victory Check Phase
     if victory_check(state):
@@ -734,7 +872,7 @@ def resolve(state):
     return_leaders(state)
 
     # 6.2
-    _supply_phase(state)
+    _supply_phase(state, bots=bots, human_factions=human_factions)
 
     # 6.3
     _resource_income(state)
@@ -752,13 +890,13 @@ def resolve(state):
 
     # 6.5  Redeployment Phase
     _leader_change(state)
-    _leader_redeploy(state)
+    _leader_redeploy(state, bots=bots, human_factions=human_factions)
     _british_release(state)
     _fni_drift(state)
 
     # 6.6  Desertion Phase — unconditional per §6.6
-    _patriot_desertion(state)
-    _tory_desertion(state)
+    _patriot_desertion(state, bots=bots, human_factions=human_factions)
+    _tory_desertion(state, bots=bots, human_factions=human_factions)
 
     # 6.7  Reset Phase
     _reset_phase(state)
