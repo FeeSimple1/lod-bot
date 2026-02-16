@@ -736,7 +736,8 @@ class PatriotBot(BaseBot):
                         promote_n = None
 
         # --- Bullet 5: Militia at non-Fort space with most Patriot units ---
-        if state["available"].get(C.FORT_PAT, 0) > 0 or avail_forts > 0:
+        # Reference: "If Patriot Fort Available" — check post-Bullet-1 count
+        if avail_forts > 0:
             no_fort_spaces = []
             for sid, sp in state["spaces"].items():
                 if sp.get(C.FORT_PAT, 0) > 0 or sid in build_fort_set:
@@ -758,8 +759,6 @@ class PatriotBot(BaseBot):
             for sid, sp in state["spaces"].items():
                 if sid in spaces_used:
                     continue
-                if self._support_level(state, sid) == C.ACTIVE_SUPPORT:
-                    continue  # Cannot Rally in Active Support
                 changes_ctrl = 1 if ctrl.get(sid) != "REBELLION" else 0
                 no_active_opp = 1 if self._support_level(state, sid) > C.ACTIVE_OPPOSITION else 0
                 is_city = 1 if _MAP_DATA.get(sid, {}).get("type") == "City" else 0
@@ -967,6 +966,7 @@ class PatriotBot(BaseBot):
         spaces = [
             sid for sid, sp in state["spaces"].items()
             if ctrl.get(sid) == "REBELLION" and sp.get(C.MILITIA_U, 0)
+            and _MAP_DATA.get(sid, {}).get("type") in ("Colony", "City")
         ]
         if not spaces:
             return False

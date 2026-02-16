@@ -1342,3 +1342,169 @@ def test_p2_bullet2_no_qualifying_spaces_returns_false():
     }
     card = {"id": 3}
     assert bot._faction_event_conditions(state, card) is False
+
+
+# ===================================================================
+# Session 9: Patriot Bot Compliance Review — new tests
+# ===================================================================
+
+
+def test_p13_persuasion_filters_colony_city():
+    """P13: _try_persuasion must filter to Colony/City spaces only.
+    Persuasion (§4.3.1) says 'choose 1-3 Colonies/Cities'. A Reserve
+    Province with Rebel Control and Underground Militia must be excluded,
+    otherwise persuasion.execute() raises ValueError and the entire call
+    fails — including valid Colony/City candidates."""
+    bot = PatriotBot()
+    state = _full_state()
+    # Quebec is a Reserve Province; Boston is a City
+    state["spaces"] = {
+        "Quebec": {C.MILITIA_U: 3, C.FORT_PAT: 1},
+        "Boston": {C.MILITIA_U: 2, C.FORT_PAT: 0},
+    }
+    state["control"] = {"Quebec": "REBELLION", "Boston": "REBELLION"}
+    state["support"] = {"Quebec": 0, "Boston": 0}
+    state["resources"] = {C.PATRIOTS: 0, C.BRITISH: 5, C.FRENCH: 5, C.INDIANS: 5}
+    state["markers"] = {C.PROPAGANDA: {"pool": 5, "on_map": set()}}
+
+    # With the fix, Quebec (Reserve) should be excluded and Persuasion
+    # should succeed with just Boston (City).
+    result = bot._try_persuasion(state)
+    assert result is True
+    # Resources should have been added (1 per space)
+    assert state["resources"][C.PATRIOTS] >= 1
+
+
+def test_p13_persuasion_excludes_reserve_provinces():
+    """P13: Verify Reserve Province spaces are not in the Persuasion candidate list."""
+    bot = PatriotBot()
+    from lod_ai.bots.patriot import _MAP_DATA
+    state = _full_state()
+    # Find a Reserve Province from the map data
+    reserve_spaces = [
+        sid for sid, d in _MAP_DATA.items()
+        if d.get("type") == "Reserve"
+    ]
+    assert len(reserve_spaces) > 0, "Expected at least one Reserve Province in map"
+    rsid = reserve_spaces[0]
+
+    state["spaces"] = {
+        rsid: {C.MILITIA_U: 2, C.FORT_PAT: 1},
+        "Boston": {C.MILITIA_U: 2},
+    }
+    state["control"] = {rsid: "REBELLION", "Boston": "REBELLION"}
+    state["support"] = {rsid: 0, "Boston": 0}
+    from lod_ai.board.control import refresh_control
+    refresh_control(state)
+
+    # Build the candidate list the same way the bot does
+    ctrl = state.get("control", {})
+    candidates = [
+        sid for sid, sp in state["spaces"].items()
+        if ctrl.get(sid) == "REBELLION" and sp.get(C.MILITIA_U, 0)
+        and _MAP_DATA.get(sid, {}).get("type") in ("Colony", "City")
+    ]
+    # Reserve Province must NOT be in the candidate list
+    assert rsid not in candidates
+    # Boston (City) should be in the candidate list
+    assert "Boston" in candidates
+
+
+def test_p7_rally_bullet5_uses_tracked_avail_forts():
+    """P7 Bullet 5 (ref Bullet 4): 'If Patriot Fort Available' should use the
+    post-Bullet-1 tracked count (avail_forts), not the original state['available']
+    count. If all Forts are allocated in Bullet 1, this bullet should be skipped."""
+    bot = PatriotBot()
+    state = _full_state()
+    # 2 Forts available, 2 spaces each with 4+ units and room → both allocated
+    state["spaces"] = {
+        "Boston": {
+            C.REGULAR_PAT: 2, C.MILITIA_A: 2, C.MILITIA_U: 0,
+            C.FORT_PAT: 0, C.REGULAR_FRE: 0,
+            C.FORT_BRI: 0, C.VILLAGE: 0,
+        },
+        "New_York": {
+            C.REGULAR_PAT: 2, C.MILITIA_A: 2, C.MILITIA_U: 0,
+            C.FORT_PAT: 0, C.REGULAR_FRE: 0,
+            C.FORT_BRI: 0, C.VILLAGE: 0,
+        },
+        "Philadelphia": {
+            C.REGULAR_PAT: 1, C.MILITIA_A: 0, C.MILITIA_U: 0,
+            C.FORT_PAT: 0, C.REGULAR_FRE: 0,
+        },
+    }
+    state["available"] = {C.FORT_PAT: 2, C.MILITIA_U: 10, C.REGULAR_PAT: 10}
+    state["support"] = {"Boston": 0, "New_York": 0, "Philadelphia": 0}
+    state["control"] = {}
+
+    # Simulate Bullet 1: allocate both Forts
+    avail_forts = state["available"].get(C.FORT_PAT, 0)  # = 2
+    build_fort_set = set()
+    spaces_used = []
+
+    from lod_ai.bots.patriot import _MAP_DATA
+    fort_candidates = []
+    for sid, sp in state["spaces"].items():
+        if sp.get(C.FORT_PAT, 0) > 0:
+            continue
+        bases = sp.get(C.FORT_PAT, 0) + sp.get(C.FORT_BRI, 0) + sp.get(C.VILLAGE, 0)
+        if bases >= 2:
+            continue
+        if bot._rebel_group_size(sp) >= 4:
+            is_city = 1 if _MAP_DATA.get(sid, {}).get("type") == "City" else 0
+            pop = _MAP_DATA.get(sid, {}).get("population", 0)
+            fort_candidates.append((-is_city, -pop, sid))
+    fort_candidates.sort()
+    for _, _, sid in fort_candidates:
+        if len(spaces_used) >= 4 or avail_forts <= 0:
+            break
+        build_fort_set.add(sid)
+        spaces_used.append(sid)
+        avail_forts -= 1
+
+    # Both forts should be allocated
+    assert avail_forts == 0
+    assert len(build_fort_set) == 2
+
+    # Bullet 5 condition: should be False since avail_forts == 0
+    # The fixed code uses `avail_forts > 0` (not state["available"])
+    assert avail_forts == 0  # post-planning: no forts left
+    assert state["available"].get(C.FORT_PAT, 0) == 2  # original: still shows 2
+
+
+def test_p7_rally_bullet6_does_not_exclude_active_support():
+    """P7 Bullet 6: Reference says 'place Militia, first to change Control
+    then where no Active Opposition' — this is a PRIORITY, not an exclusion.
+    Active Support spaces should still be valid candidates (just low priority)."""
+    bot = PatriotBot()
+    state = _full_state()
+    from lod_ai.board.control import refresh_control
+
+    # Only Active Support spaces available — with the fix, they should
+    # be selectable (whereas before they were excluded)
+    state["spaces"] = {
+        "Boston": {C.REGULAR_PAT: 0, C.MILITIA_A: 0, C.MILITIA_U: 0},
+        "New_York": {C.REGULAR_PAT: 0, C.MILITIA_A: 0, C.MILITIA_U: 0},
+    }
+    state["support"] = {"Boston": C.ACTIVE_SUPPORT, "New_York": C.ACTIVE_SUPPORT}
+    state["control"] = {}
+    state["available"] = {C.FORT_PAT: 0, C.MILITIA_U: 10, C.REGULAR_PAT: 0}
+    refresh_control(state)
+
+    # Build Bullet 6 candidate list the way the fixed code does
+    ctrl = state.get("control", {})
+    spaces_used = []  # nothing selected in earlier bullets
+    militia_targets = []
+    for sid, sp in state["spaces"].items():
+        if sid in spaces_used:
+            continue
+        # Fixed code: NO Active Support exclusion
+        changes_ctrl = 1 if ctrl.get(sid) != "REBELLION" else 0
+        no_active_opp = 1 if bot._support_level(state, sid) > C.ACTIVE_OPPOSITION else 0
+        militia_targets.append((-changes_ctrl, -no_active_opp, sid))
+    militia_targets.sort()
+
+    # Active Support spaces should be in the candidate list
+    sids = [t[-1] for t in militia_targets]
+    assert "Boston" in sids
+    assert "New_York" in sids

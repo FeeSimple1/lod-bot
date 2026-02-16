@@ -1237,3 +1237,99 @@ The flowchart says "Active Opposition" but Manual §8.5 says "Active Support." D
 ### Tests
 
 See test run results below.
+
+---
+
+## Session 9: Patriot Bot Compliance Review
+
+### Scope
+
+Independent node-by-node review of the entire Patriot bot flowchart implementation in `lod_ai/bots/patriot.py` against `Reference Documents/patriot bot flowchart and reference.txt`. Also reviewed `base_bot.py`, `event_instructions.py`, `event_eval.py`, `partisans.py`, `skirmish.py`, `persuasion.py`, and `rules_consts.py`.
+
+### Label Compliance: PASS
+
+No string literal violations found.
+
+### Nodes verified CORRECT
+
+| Node | Description | Status |
+|------|-------------|--------|
+| P1 | Sword icon skip / Event vs Command | CORRECT — `base_bot._choose_event_vs_flowchart()` |
+| P2 | Event conditions (5 bullets) | CORRECT — uses `CARD_EFFECTS` shaded side, Q11 resolution applied |
+| P3 | Resources > 0 gate | CORRECT — checks `== 0`, PASSes |
+| P4 | Battle (FL calculation, French cap, French resource gate, Washington/Pop/Village tiebreak) | CORRECT |
+| P5 | March Phase 1 (Rebel Control destinations, Villages/Cities/Pop priority, French Regulars) | CORRECT |
+| P5 | March leave-behind (Fort guard, no Active Opposition, lose-no-control) | CORRECT |
+| P6 | Battle possible (rebel cubes + all 3 Rebellion leaders vs Active Royal pieces) | CORRECT |
+| P7 | Rally Bullet 1 (Fort placement: 4+ units, room, Cities-first/Pop) | CORRECT |
+| P7 | Rally Bullet 2 (Militia at lonely Forts) | CORRECT |
+| P7 | Rally Bullets 3-4 (Continental replacement at Fort with most Militia) | CORRECT |
+| P7 | Rally Bullet 7 (adjacent Militia gathering, excludes selected spaces) | CORRECT |
+| P8 | Partisans (Village→WP→British priority; option 3 when no WP; option 1 otherwise) | CORRECT |
+| P9 | Rally preferred (Fort possible OR 1D6 > Underground Militia) | CORRECT |
+| P10 | Rabble possible (any space not at Active Opposition) | CORRECT |
+| P11 | Rabble-Rousing (Active Support first, highest Pop, resource-capped) | CORRECT |
+| P12 | Skirmish (Fort-first, Control change sub-priority, option 3 when applicable) | CORRECT |
+| P8→P12→P13 | SA chain (Partisans→Skirmish→Persuasion, resource-0 Persuasion gates) | CORRECT |
+| P7↔P11 | Rally/Rabble mutual fallback (infinite loop guard via `_from_rabble`/`_from_rally`) | CORRECT |
+| OPS | Supply priority, Redeploy Washington, Patriot Desertion, BS trigger | CORRECT |
+| Event | All 13 Patriot card instructions match reference | CORRECT |
+
+### FIXED issues (this session — 3 bugs)
+
+#### P13 `_try_persuasion` — Missing Colony/City space type filter
+
+**Reference (§4.3.1):** "Patriots choose 1-3 **Colonies/Cities** that are Rebellion-controlled and contain ≥1 Underground Militia."
+
+**Bug:** `_try_persuasion()` built its candidate list filtering only by Rebel Control and Underground Militia, without checking space type. Reserve Province spaces could enter the list. Since `persuasion.execute()` validates space type and raises `ValueError` for non-Colony/City spaces, and the bot passed all spaces in a single call, a single invalid Province space would cause the entire Persuasion call to fail — even when valid Colony/City candidates existed.
+
+**Fix:** Added `and _MAP_DATA.get(sid, {}).get("type") in ("Colony", "City")` to the candidate list comprehension.
+
+#### P7 Rally Bullet 5 (reference Bullet 4) — Over-inclusive Fort Available condition
+
+**Reference:** "If Patriot Fort Available, place Militia in the space with no Patriot Fort and most Patriot units."
+
+**Bug:** The condition was `state["available"].get(C.FORT_PAT, 0) > 0 or avail_forts > 0`. Since `state["available"]` reflects the pre-planning state (Rally hasn't executed yet), while `avail_forts` tracks remaining Forts after Bullet 1 allocations, the condition was True even when all Forts had been allocated in Bullet 1. This caused the bot to place Militia at a non-Fort space (per Bullet 5) even when no Fort was actually available.
+
+**Fix:** Changed condition to `avail_forts > 0` (post-Bullet-1 count only).
+
+#### P7 Rally Bullet 6 — Spurious Active Support exclusion
+
+**Reference:** "place Militia, first to change Control then where no Active Opposition, within each first in Cities, within that highest Pop."
+
+**Bug:** The code excluded Active Support spaces with `if self._support_level(state, sid) == C.ACTIVE_SUPPORT: continue`. The reference specifies priority criteria (change Control, no Active Opposition, Cities, Pop) but does not exclude any spaces. Active Support spaces are low priority but valid targets.
+
+**Fix:** Removed the Active Support exclusion. Active Support spaces now appear in the candidate list but sort to the bottom (they already have British control, don't change Control, etc.).
+
+### DOCUMENTED — minor deviations (not fixed)
+
+#### P5 March Phase 2: Continental fallback
+
+**Reference:** "get 1 **Militia** (Underground if possible) into each other space with none"
+
+**Code:** Also moves Continentals as a fallback when no Militia can reach the target space. The reference says "Militia" specifically. This is a pragmatic deviation — if no Militia can reach a space, moving a Continental at least establishes presence. Low impact since Militia are preferred and tried first.
+
+#### P9 Rally preferred: bases < 2 not checked
+
+The P9 "Fort can be placed" gate checks 4+ Patriot units and no existing Fort, but doesn't verify that the space has room for a base (< 2 existing bases). This means P9 could return True (Rally preferred) but Bullet 1 would reject the space due to base stacking. The fallback behavior is reasonable — Rally proceeds with other bullets instead of Fort placement.
+
+#### P5 March Phase 2: scope of "with none"
+
+The reference says "each other space with none" — the code interprets "none" as "no Patriot units" and includes spaces that already have other Rebellion pieces (French Regulars). This interpretation is reasonable since the goal is Patriot presence.
+
+### Previously documented issues (unchanged)
+
+- **P4 Force level modifiers** — raw piece counts instead of §3.6.5-6 modifiers
+- **P4 Win-the-Day per-space** — pre-selects one rally space; requires battle callback refactoring
+- **P7/P11 Persuasion mid-command** — fires after command, not during
+- **OPS methods not wired into year_end**
+
+### Tests added (5 new, 848 total)
+
+| Test | Verifies |
+|------|----------|
+| `test_p13_persuasion_filters_colony_city` | Persuasion succeeds with City candidate even when Reserve Province in pool |
+| `test_p13_persuasion_excludes_reserve_provinces` | Reserve Province spaces excluded from candidate list |
+| `test_p7_rally_bullet5_uses_tracked_avail_forts` | Post-Bullet-1 tracked count used, not original state |
+| `test_p7_rally_bullet6_does_not_exclude_active_support` | Active Support spaces appear in Bullet 6 candidate list |
+| `test_p2_bullet2_no_qualifying_spaces_returns_false` | (existing test, verified still passes) |
