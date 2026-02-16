@@ -12,7 +12,7 @@ def _pass_decider(faction, card, allowed, engine):
 
 def test_year_end_runs_only_for_winter_cards(monkeypatch):
     calls = []
-    monkeypatch.setattr("lod_ai.engine.resolve_year_end", lambda state: calls.append(True))
+    monkeypatch.setattr("lod_ai.engine.resolve_year_end", lambda state, **kw: calls.append(True))
     engine = Engine()
     engine.set_human_factions({C.BRITISH, C.PATRIOTS, C.FRENCH, C.INDIANS})
 
@@ -27,7 +27,7 @@ def test_year_end_runs_only_for_winter_cards(monkeypatch):
 
 def test_winter_quarters_card_skips_actions(monkeypatch):
     calls = []
-    monkeypatch.setattr("lod_ai.engine.resolve_year_end", lambda state: calls.append(True))
+    monkeypatch.setattr("lod_ai.engine.resolve_year_end", lambda state, **kw: calls.append(True))
     engine = Engine()
     engine.set_human_factions({C.BRITISH})
 

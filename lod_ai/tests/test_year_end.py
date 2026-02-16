@@ -161,11 +161,11 @@ def test_desertion_runs_unconditionally(monkeypatch):
     # Do NOT set winter_flag — desertion should still run
     monkeypatch.setattr(year_end, "victory_check", lambda s: False)
     monkeypatch.setattr(year_end, "return_leaders", lambda s: None)
-    monkeypatch.setattr(year_end, "_supply_phase", lambda s: None)
+    monkeypatch.setattr(year_end, "_supply_phase", lambda s, **kw: None)
     monkeypatch.setattr(year_end, "_resource_income", lambda s: None)
     monkeypatch.setattr(year_end, "_support_phase", lambda s: None)
     monkeypatch.setattr(year_end, "_leader_change", lambda s: None)
-    monkeypatch.setattr(year_end, "_leader_redeploy", lambda s: None)
+    monkeypatch.setattr(year_end, "_leader_redeploy", lambda s, **kw: None)
     monkeypatch.setattr(year_end, "_british_release", lambda s: None)
     monkeypatch.setattr(year_end, "_fni_drift", lambda s: None)
     monkeypatch.setattr(year_end, "_reset_phase", lambda s: None)

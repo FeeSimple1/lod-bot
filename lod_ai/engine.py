@@ -868,7 +868,7 @@ class Engine:
         """Execute all eligible turns for *card* (bot- and human-aware)."""
         queue = self._prepare_card(card)
         if card.get("winter_quarters"):
-            resolve_year_end(self.state)
+            resolve_year_end(self.state, bots=self.bots, human_factions=self.human_factions)
             if card.get("id"):
                 self._record_played_card(card["id"])
             return []
@@ -896,7 +896,7 @@ class Engine:
                 first_action = result
 
         if card.get("winter_quarters"):
-            resolve_year_end(self.state)
+            resolve_year_end(self.state, bots=self.bots, human_factions=self.human_factions)
 
         if card.get("id"):
             self._record_played_card(card["id"])

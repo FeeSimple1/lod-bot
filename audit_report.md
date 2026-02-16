@@ -119,13 +119,13 @@ Source: `Reference Documents/card reference full.txt`
 - **dispatcher.py**: Simple router — no issues found.
 - **victory.py**: All four faction victory conditions correctly calculated per Manual Ch 7. Final scoring (§7.3) correctly sums both conditions.
 
-### Year-End/Winter Quarters — 98% PASS
+### Year-End/Winter Quarters — 99% PASS
 
-- Supply phase (§6.2): Correctly implements all faction supply rules.
+- Supply phase (§6.2): Correctly implements all faction supply rules. Bot-controlled factions now use faction-specific OPS priority methods for supply payment order.
 - Resource income (§6.3): British/Patriot/Indian/French income formulas correct.
-- Support phase (§6.4): Max 2 shifts, marker removal costs, correct shift directions.
-- Redeployment (§6.5): Leader change, redeploy, British release, FNI drift all correct.
-- Desertion (§6.6): 1-in-5 removal with correct rounding.
+- Support phase (§6.4): Max 2 shifts, marker removal costs, correct shift directions. **Known gap:** Support Phase space iteration order not bot-controlled (no bot OPS methods exist for this).
+- Redeployment (§6.5): Leader change, redeploy, British release, FNI drift all correct. Bot-controlled factions now use faction-specific OPS redeploy methods.
+- Desertion (§6.6): 1-in-5 removal with correct rounding. Indian/French first-choice and Patriot/British remainder now use bot OPS priority methods.
 - Reset phase (§6.7): Marker removal, eligibility reset, flip to Underground all correct.
 
 ### REMAINING bot issues
@@ -325,7 +325,7 @@ Full node-by-node comparison of all four bot implementations against their respe
 - ~~B8 Fort target space not passed to muster.execute~~ — RESOLVED: Fort space implicit in `build_fort` parameter
 - B10 March always passes bring_escorts=False (reference silent on bot escorts)
 - B39 Gage leader capability (free RL) not implemented
-- OPS reference (Supply/Redeploy/Desertion priorities) not in bot
+- ~~OPS reference (Supply/Redeploy/Desertion priorities) not in bot~~ **RESOLVED**: Bot OPS methods wired into year_end.py Supply, Redeploy, and Desertion phases
 
 #### Patriot Bot
 - ~~P8 Partisans WP vs British priority flattened into sum~~ **FIXED**
@@ -343,7 +343,7 @@ Full node-by-node comparison of all four bot implementations against their respe
 - ~~F16 Battle doesn't enter F12 Skirmish loop afterward~~ → FIXED: full SA chain
 - ~~F10 Muster not filtering by Colony/City type~~ → FIXED
 - ~~Battle counts Underground Militia in force~~ → FIXED: Active only
-- OPS summary items not implemented (Supply, Redeploy, Desertion, ToA trigger, BS trigger)
+- ~~OPS summary items not implemented (Supply, Redeploy, Desertion, ToA trigger, BS trigger)~~ **PARTIALLY RESOLVED**: Supply, Redeploy, and Desertion priorities wired into year_end.py; ToA trigger and BS trigger remain separate
 
 #### Indian Bot — FIXED (Session 5)
 - ~~I6 checks Available village count instead of whether Gather would place 2+~~ **FIXED**: Now checks both Available count AND eligible spaces with enough WP
@@ -354,7 +354,7 @@ Full node-by-node comparison of all four bot implementations against their respe
 - Circular fallback between Gather and March — potential infinite loop (unchanged; would need recursion guard)
 - ~~Raid movement doesn't check "WP don't exceed Rebels" condition~~ **FIXED**: Now moves WP when target has none OR WP ≤ Rebels
 - Defending in Battle activation rule not implemented
-- Supply, Patriot Desertion, Redeployment priorities not in bot
+- ~~Supply, Patriot Desertion, Redeployment priorities not in bot~~ **RESOLVED**: Bot OPS methods wired into year_end.py
 - Brilliant Stroke trigger conditions not implemented
 - ~~Uses `random.random()` instead of `state["rng"]` in multiple places~~ **FIXED**: All uses now via `state["rng"]`
 
