@@ -294,15 +294,22 @@ class PatriotBot(BaseBot):
         return False
 
     def _execute_battle(self, state: Dict) -> bool:
-        """P4: Select all spaces where Rebel Force Level exceeds British FL.
-        Priority: Washington, highest Pop, most Villages, random.
+        """P4: Select all spaces where Rebel Force Level exceeds Royalist FL.
+        §8.5.1: Include French only if French Resources > 0.
+        If resources too low for all, prioritize: Washington, highest Pop,
+        most Villages, random.
         Win-the-Day: free Rally (P7 priorities) + French Blockade move.
         """
         refresh_control(state)
+        french_res = state["resources"].get(C.FRENCH, 0)
         targets = []
         for sid, sp in state["spaces"].items():
             pat_cubes = sp.get(C.REGULAR_PAT, 0)
-            fre_cubes = min(sp.get(C.REGULAR_FRE, 0), pat_cubes)
+            # §8.5.1: include French only if French Resources > 0
+            if french_res > 0:
+                fre_cubes = min(sp.get(C.REGULAR_FRE, 0), pat_cubes)
+            else:
+                fre_cubes = 0
             active_mil = sp.get(C.MILITIA_A, 0)
             rebel_force = pat_cubes + fre_cubes + (active_mil // 2)
 
@@ -320,6 +327,11 @@ class PatriotBot(BaseBot):
             return False
         targets.sort()
         chosen = [sid for *_, sid in targets]
+
+        # §8.5.1: If Patriot Resources too low for all spaces, trim list
+        pat_res = state["resources"].get(self.faction, 0)
+        if pat_res < len(chosen):
+            chosen = chosen[:max(pat_res, 1)]
 
         # Win-the-Day: select free Rally space and Blockade destination
         win_rally_space = self._best_rally_space(state)
@@ -394,11 +406,13 @@ class PatriotBot(BaseBot):
         return best
 
     def _rebel_cube_count(self, state: Dict, sid: str) -> int:
-        """P6: 'Rebel cubes + Leader' = Continentals + French Regulars + leader."""
+        """P6: 'Rebel cubes + Leaders' = Continentals + French Regulars
+        + all Rebellion leaders present (§8.5.1 says 'Leaders' plural)."""
         sp = state["spaces"].get(sid, {})
         cubes = sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
-        if leader_location(state, "LEADER_WASHINGTON") == sid:
-            cubes += 1
+        for ldr in ("LEADER_WASHINGTON", "LEADER_ROCHAMBEAU", "LEADER_LAUZUN"):
+            if leader_location(state, ldr) == sid:
+                cubes += 1
         return cubes
 
     def _active_royal_count(self, sp: Dict) -> int:
@@ -758,10 +772,12 @@ class PatriotBot(BaseBot):
                 spaces_used.append(sid)
 
         # --- Bullet 7: Move adjacent Militia to 1 Fort, flip Underground ---
+        # §8.5.2: "in one Fort space NOT already selected above"
         fort_spaces_for_gather = [
-            sid for sid in spaces_used
-            if state["spaces"].get(sid, {}).get(C.FORT_PAT, 0) > 0
-            or sid in build_fort_set
+            sid for sid, sp in state["spaces"].items()
+            if sid not in spaces_used
+            and (sp.get(C.FORT_PAT, 0) > 0 or sid in build_fort_set)
+            and len(spaces_used) < 4  # must have room for one more space
         ]
         if fort_spaces_for_gather:
             # Pick the Fort that can gather the most adjacent Active Militia

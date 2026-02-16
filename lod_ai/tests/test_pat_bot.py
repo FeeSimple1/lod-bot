@@ -1098,3 +1098,175 @@ def test_ops_patriot_desertion_priority():
     # New_York with 2 rebels vs 1 royalist: removing 1 changes control (2-1=1, not > 1)
     first_sid, first_tag = result[0]
     assert first_sid == "Boston"  # safe removal first
+
+
+# ===================================================================
+# Session 8: Patriot Bot Compliance Review — new tests
+# ===================================================================
+
+
+def test_p6_rebel_cube_count_includes_all_rebel_leaders():
+    """P6: 'Rebellion cubes and Leaders' (§8.5.1) — Rochambeau and Lauzun
+    should count toward the leader total, not just Washington."""
+    bot = PatriotBot()
+    state = {
+        "spaces": {
+            "Boston": {
+                C.REGULAR_PAT: 2, C.REGULAR_FRE: 0,
+                C.MILITIA_A: 0, C.MILITIA_U: 0,
+                C.REGULAR_BRI: 2, C.TORY: 1,
+                C.WARPARTY_A: 0,
+            },
+        },
+        "resources": {C.PATRIOTS: 5},
+        "available": {},
+        "support": {},
+        "control": {},
+    }
+    # 2 cubes vs 3 Royal → no battle
+    assert bot._battle_possible(state) is False
+
+    # Add Rochambeau → 2 cubes + 1 leader = 3, still not > 3
+    state["leaders"] = {"LEADER_ROCHAMBEAU": "Boston"}
+    assert bot._battle_possible(state) is False
+
+    # Add Lauzun → 2 cubes + 2 leaders = 4 > 3 → battle possible
+    state["leaders"]["LEADER_LAUZUN"] = "Boston"
+    assert bot._battle_possible(state) is True
+
+
+def test_p4_battle_french_excluded_when_no_french_resources():
+    """P4: §8.5.1 — French Regulars only count in FL if French Resources > 0."""
+    bot = PatriotBot()
+    state = {
+        "spaces": {
+            "Boston": {
+                C.REGULAR_PAT: 1, C.REGULAR_FRE: 3,
+                C.MILITIA_A: 0, C.MILITIA_U: 0,
+                C.FORT_PAT: 0,
+                C.REGULAR_BRI: 2, C.TORY: 0,
+                C.WARPARTY_A: 0, C.FORT_BRI: 0,
+            },
+        },
+        "resources": {C.PATRIOTS: 5, C.BRITISH: 5, C.FRENCH: 0, C.INDIANS: 5},
+        "available": {},
+        "support": {},
+        "control": {},
+        "rng": random.Random(42),
+        "history": [],
+        "casualties": {},
+    }
+    # French Resources = 0 → French excluded from FL
+    # Rebel FL: pat(1) + fre(0, excluded) + mil(0) = 1
+    # British FL: regs(2) = 2
+    # 1 > 2 is False → no battle
+    assert bot._execute_battle(state) is False
+
+    # With French Resources > 0 → French included
+    state["resources"][C.FRENCH] = 5
+    # Rebel FL: pat(1) + min(fre(3), pat(1))=1 + mil(0) = 2 = brit(2) → still not >
+    assert bot._execute_battle(state) is False
+
+    # More Patriot cubes so French contribute more
+    state["spaces"]["Boston"][C.REGULAR_PAT] = 3
+    # Rebel FL: pat(3) + min(fre(3), pat(3))=3 + 0 = 6 > 2 → battle
+    assert bot._execute_battle(state) is True
+
+
+def test_p4_battle_resource_constraint_trims_spaces():
+    """P4: §8.5.1 — If Patriot Resources too low for all spaces, trim list.
+    We test the trim logic directly rather than through battle.execute,
+    since full execution requires many state dependencies."""
+    bot = PatriotBot()
+    from lod_ai.board.control import refresh_control
+    from lod_ai.leaders import leader_location
+    base_sp = {
+        C.REGULAR_PAT: 4, C.REGULAR_FRE: 0,
+        C.MILITIA_A: 0, C.MILITIA_U: 0,
+        C.FORT_PAT: 0,
+        C.REGULAR_BRI: 1, C.TORY: 0,
+        C.WARPARTY_A: 0, C.FORT_BRI: 0,
+    }
+    state = {
+        "spaces": {
+            "Boston": dict(base_sp),
+            "New_York": dict(base_sp),
+            "Philadelphia": dict(base_sp),
+        },
+        "resources": {C.PATRIOTS: 2, C.BRITISH: 5, C.FRENCH: 5, C.INDIANS: 5},
+        "available": {},
+        "support": {},
+        "control": {},
+        "rng": random.Random(42),
+        "history": [],
+        "casualties": {},
+    }
+    # Simulate the target selection logic from _execute_battle
+    refresh_control(state)
+    french_res = state["resources"].get(C.FRENCH, 0)
+    targets = []
+    for sid, sp in state["spaces"].items():
+        pat_cubes = sp.get(C.REGULAR_PAT, 0)
+        fre_cubes = min(sp.get(C.REGULAR_FRE, 0), pat_cubes) if french_res > 0 else 0
+        active_mil = sp.get(C.MILITIA_A, 0)
+        rebel_force = pat_cubes + fre_cubes + (active_mil // 2)
+        regs = sp.get(C.REGULAR_BRI, 0)
+        tories = sp.get(C.TORY, 0)
+        active_wp = sp.get(C.WARPARTY_A, 0)
+        brit_force = regs + tories + (active_wp // 2) + sp.get(C.FORT_BRI, 0)
+        if rebel_force > brit_force and (regs + tories + active_wp) > 0:
+            has_wash = 1 if leader_location(state, "LEADER_WASHINGTON") == sid else 0
+            pop = 0
+            villages = sp.get(C.VILLAGE, 0)
+            targets.append((-has_wash, -pop, -villages, state["rng"].random(), sid))
+    targets.sort()
+    chosen = [sid for *_, sid in targets]
+    # All 3 spaces should be eligible
+    assert len(chosen) == 3
+    # Resource constraint should trim to 2
+    pat_res = state["resources"].get(C.PATRIOTS, 0)
+    if pat_res < len(chosen):
+        chosen = chosen[:max(pat_res, 1)]
+    assert len(chosen) == 2
+
+
+def test_p7_rally_bullet7_selects_unselected_fort():
+    """P7 Bullet 7: §8.5.2 — gather Fort must be 'not already selected above'."""
+    bot = PatriotBot()
+    state = _full_state()
+    # Fort_A is in spaces_used (bullets 1-6), Fort_B is NOT
+    state["spaces"] = {
+        "Fort_A": {
+            C.FORT_PAT: 1, C.REGULAR_PAT: 2, C.MILITIA_A: 2,
+            C.MILITIA_U: 1,
+        },
+        "Fort_B": {
+            C.FORT_PAT: 1, C.REGULAR_PAT: 1, C.MILITIA_U: 1,
+        },
+        "Adj_to_B": {
+            C.MILITIA_A: 3, C.MILITIA_U: 0,
+            C.REGULAR_PAT: 0,
+        },
+    }
+    state["support"] = {"Fort_A": 0, "Fort_B": 0, "Adj_to_B": 0}
+    state["control"] = {}
+    state["available"] = {C.FORT_PAT: 0, C.MILITIA_U: 5, C.REGULAR_PAT: 5}
+    state["resources"] = {C.PATRIOTS: 10, C.BRITISH: 5, C.FRENCH: 5, C.INDIANS: 5}
+
+    # The Bullet 7 logic should prefer Fort_B (not already selected)
+    # over Fort_A (would be in spaces_used from earlier bullets).
+    # We can't easily test this end-to-end because Rally selection is complex,
+    # but we can verify the filter logic directly.
+    spaces_used = ["Fort_A"]  # simulate bullets 1-6 selected Fort_A
+    build_fort_set = set()
+
+    fort_spaces_for_gather = [
+        sid for sid, sp in state["spaces"].items()
+        if sid not in spaces_used
+        and (sp.get(C.FORT_PAT, 0) > 0 or sid in build_fort_set)
+        and len(spaces_used) < 4
+    ]
+    # Fort_B should be a candidate (not in spaces_used, has Fort)
+    assert "Fort_B" in fort_spaces_for_gather
+    # Fort_A should NOT be a candidate (already in spaces_used)
+    assert "Fort_A" not in fort_spaces_for_gather

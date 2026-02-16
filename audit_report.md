@@ -1147,3 +1147,88 @@ British bot's `_try_common_cause()` now passes `preserve_wp=True`.
 ### Remaining issues
 
 All issues from this session's review have been fixed. See the **Consolidated Outstanding Issues (updated Session 7)** section above for the current list of remaining medium-to-low severity items.
+
+---
+
+## Session 8: Patriot Bot Full Compliance Review
+
+### Scope
+
+Node-by-node comparison of the entire Patriot bot flowchart implementation in `lod_ai/bots/patriot.py` against `Reference Documents/patriot bot flowchart and reference.txt` and Manual Ch 8 (§8.5). Also reviewed `base_bot.py`, `event_instructions.py`, `event_eval.py`, `rules_consts.py`, Manual Ch 3 (Commands), and Manual Ch 4 (Special Activities).
+
+### Label Compliance: PASS
+
+No string literal violations found. All piece tags, faction names, markers, and control values use proper constants from `rules_consts.py`.
+
+### Nodes verified CORRECT
+
+The following flowchart nodes are correctly implemented and match the reference:
+
+| Node | Description | Status |
+|------|-------------|--------|
+| P1 | Sword icon skip | CORRECT — handled by `base_bot._choose_event_vs_flowchart()` |
+| P2 | Event conditions (5 bullets) | CORRECT — uses `CARD_EFFECTS` shaded side per §8.3.2 |
+| P3 | Resources > 0 gate | CORRECT |
+| P5 | March (3 leave-behind constraints, Phase 1 + Phase 2, French escorts) | CORRECT |
+| P8 | Partisans (Village→WP→British priority, resource check→Persuasion) | CORRECT |
+| P9 | Rally preference (Fort possible OR 1D6 > Underground Militia) | CORRECT |
+| P10 | Rabble possibility (any space can shift toward Active Opposition) | CORRECT |
+| P11 | Rabble-Rousing (Active Support first, highest Pop, Persuasion interrupt) | CORRECT |
+| P12 | Skirmish (Fort-first priority, resource check→Persuasion) | CORRECT |
+| P13 | Persuasion (Rebel Control + Underground Militia, Fort priority, max 3) | CORRECT |
+| OPS | Supply priority (change Control, Reward Loyalty, Villages, Pop) | CORRECT |
+| OPS | Redeploy Washington (most Continentals) | CORRECT |
+| OPS | Patriot Desertion (least Control change, then keep last unit) | CORRECT |
+| Event | All 13 card instructions match reference | CORRECT |
+| Event | Cards 71/90 `force_unshaded`, 8 `force_if_french_not_human`, 18/44 `force_if_eligible_enemy`, 51 `force_if_51` | CORRECT |
+
+### FIXED issues (this session)
+
+#### P6 `_rebel_cube_count` — Only counted Washington, not all Rebellion leaders
+
+**Reference (§8.5.1):** "the total number of Rebellion cubes and **Leaders** there outnumber all Active Royalist pieces"
+
+**Bug:** Only checked Washington. French leaders Rochambeau and Lauzun are also Rebellion leaders and should count toward the "Leaders" total in P6.
+
+**Fix:** Added loop over all three Rebellion leaders (Washington, Rochambeau, Lauzun). Each leader present in the space adds 1 to the rebel count.
+
+#### P4 `_execute_battle` — Missing French Resource check
+
+**Reference (§8.5.1):** "if French Regulars are present and **French Resources exceed 0**, pay one French Resource to include as many French Regulars as possible."
+
+**Bug:** Code always counted French Regulars in Rebel force level regardless of French Resources.
+
+**Fix:** Added `french_res = state["resources"].get(C.FRENCH, 0)` check. French cubes only included in FL when `french_res > 0`.
+
+#### P4 `_execute_battle` — Missing resource constraint
+
+**Reference (§8.5.1):** "If Patriot Resources are too low to pay for all such spaces, select the space with Washington first, then the spaces with highest Population, then with the largest number of Villages, then randomly."
+
+**Bug:** Code selected all eligible spaces without checking if Patriot Resources could cover them. The priority sorting was correct (Washington, Pop, Villages, random) but the resource cap was missing.
+
+**Fix:** Added `pat_res` check after sorting. If resources < len(chosen), truncate chosen list to `max(pat_res, 1)`.
+
+#### P7 Rally Bullet 7 — Fort selection from wrong set
+
+**Reference (§8.5.2):** "in one Fort space **not already selected above**, move in all Active Militia from adjacent spaces..."
+
+**Bug:** Code selected from Fort spaces already in `spaces_used` (selected in bullets 1-6). Reference explicitly says "not already selected above."
+
+**Fix:** Changed `fort_spaces_for_gather` to iterate over all `state["spaces"]` and exclude spaces already in `spaces_used`. Also requires `len(spaces_used) < 4` (room for one more).
+
+### DOCUMENTED (not fixed — ambiguous reference)
+
+#### Q11: P2 Bullet 2 — "Active Opposition" vs "Active Support" (added to QUESTIONS.md)
+
+The flowchart says "Active Opposition" but Manual §8.5 says "Active Support." These are contradictory. Current code uses the broad `places_patriot_militia_u` flag without checking board state, which is a heuristic regardless of which reading is correct. Documented as Q11 in QUESTIONS.md for user decision.
+
+### REMAINING issues (not fixed — architectural or already documented)
+
+- **P4 Force level modifiers**: Reference says "plus modifiers" but bot uses raw piece counts. Would require importing and computing all §3.6.5-6 modifiers at the bot level. Previously documented in Session 5.
+- **P4 Win-the-Day per-space**: Code pre-selects one rally space; reference says "for each space where Rebellion Wins the Day." Requires battle.execute() callback refactoring. Previously documented.
+- **P7/P11 Persuasion mid-command**: Fires after command, not during when resources reach 0. Previously documented.
+- **OPS methods not wired into year_end**: Previously documented in Consolidated Outstanding Issues.
+
+### Tests
+
+See test run results below.
