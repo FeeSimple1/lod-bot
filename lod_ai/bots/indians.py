@@ -1106,20 +1106,6 @@ class IndianBot(BaseBot):
                 best_dst = nbr
         return best_dst
 
-    def _indian_defending_activation(self, state: Dict, space_id: str) -> None:
-        """§8.7.9: Defending in Battle activation.
-        If Village in Battle space, Activate all but 1 Underground WP.
-        Otherwise, Activate no Underground WP.
-        """
-        sp = state["spaces"].get(space_id, {})
-        if sp.get(C.WARPARTY_U, 0) == 0:
-            return
-        if sp.get(C.VILLAGE, 0) > 0:
-            activate = sp.get(C.WARPARTY_U, 0) - 1
-            if activate > 0:
-                sp[C.WARPARTY_U] -= activate
-                sp[C.WARPARTY_A] = sp.get(C.WARPARTY_A, 0) + activate
-
     # ==================================================================
     #  EVENT‑VS‑COMMAND  (I1 / I2)
     # ==================================================================

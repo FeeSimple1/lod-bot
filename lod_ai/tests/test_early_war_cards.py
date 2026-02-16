@@ -220,10 +220,11 @@ def test_card28_moores_creek_any_space():
     assert MILITIA_U not in state["spaces"]["South_Carolina"]
     assert MILITIA_A not in state["spaces"]["South_Carolina"]
 
-    # shaded should target the Tory space even if not North Carolina
+    # shaded picks space with most Tories — after unshaded, South_Carolina
+    # has 4 Tories (from replacement) vs North_Carolina's 1
     early_war.evt_028_moores_creek(state, shaded=True)
-    assert state["spaces"]["North_Carolina"].get(MILITIA_U) == 2
-    assert TORY not in state["spaces"]["North_Carolina"]
+    assert state["spaces"]["South_Carolina"].get(MILITIA_U) == 8  # 4 Tories × 2
+    assert TORY not in state["spaces"]["South_Carolina"] or state["spaces"]["South_Carolina"].get(TORY, 0) == 0
 
 
 def test_card29_bancroft_allows_indian_choice():
@@ -594,3 +595,66 @@ def test_card84_unshaded_player_override_colonies():
     assert len(ops) == 2
     assert ops[0] == ("INDIANS", "gather", "Georgia")
     assert ops[1] == ("INDIANS", "gather", "South_Carolina")
+
+
+# ===================================================================
+# Card 24/28 space selection tiebreaker tests
+# ===================================================================
+
+def test_card24_shaded_picks_highest_population():
+    """Card 24 shaded: Space selection should prefer Cities, then highest population."""
+    state = _base_state()
+    # Boston is a City (pop 2 in map data), Virginia is Colony (pop 2),
+    # Georgia is Colony (pop 1). Cities should come first.
+    state["spaces"] = {
+        "Georgia": {},
+        "Virginia": {},
+        "Boston": {},
+        "New_Hampshire": {},
+    }
+    state["available"] = {MILITIA_U: 5, FORT_PAT: 1}
+
+    early_war.evt_024_declaration(state, shaded=True)
+
+    # Boston (City, pop 2) should be selected first and get the Fort
+    assert state["spaces"]["Boston"].get(FORT_PAT) == 1
+    # All 3 selected spaces should have militia + propaganda
+    spaces_with_militia = [
+        sid for sid, sp in state["spaces"].items()
+        if sp.get(MILITIA_U, 0) > 0
+    ]
+    assert len(spaces_with_militia) == 3
+    assert "Boston" in spaces_with_militia
+
+
+def test_card28_shaded_picks_most_tories():
+    """Card 28 shaded: Should pick the space with the most Tories."""
+    state = _base_state()
+    state["spaces"] = {
+        "Space_A": {TORY: 1},
+        "Space_B": {TORY: 3},
+    }
+    state["available"] = {MILITIA_U: 10}
+
+    early_war.evt_028_moores_creek(state, shaded=True)
+
+    # Space_B has 3 Tories → should be picked → 6 militia placed
+    assert state["spaces"]["Space_B"].get(MILITIA_U) == 6
+    assert TORY not in state["spaces"]["Space_B"] or state["spaces"]["Space_B"].get(TORY, 0) == 0
+
+
+def test_card28_unshaded_picks_most_militia():
+    """Card 28 unshaded: Should pick the space with the most Militia."""
+    state = _base_state()
+    state["spaces"] = {
+        "Space_A": {MILITIA_U: 1, MILITIA_A: 0},
+        "Space_B": {MILITIA_U: 2, MILITIA_A: 1},
+    }
+    state["available"] = {TORY: 10}
+
+    early_war.evt_028_moores_creek(state, shaded=False)
+
+    # Space_B has 3 militia total → should be picked → 6 Tories placed
+    assert state["spaces"]["Space_B"].get(TORY) == 6
+    assert state["spaces"]["Space_B"].get(MILITIA_U, 0) == 0
+    assert state["spaces"]["Space_B"].get(MILITIA_A, 0) == 0

@@ -85,23 +85,10 @@ Implemented:
 
 ---
 
-## Q11: Patriot P2 Bullet 2 — "Active Opposition" vs "Active Support"
+## Q11: Patriot P2 Bullet 2 — "Active Opposition" vs "Active Support" — RESOLVED
 
-**What I was trying to implement:**
-Patriot bot event condition P2 bullet 2 — whether to play an event that places Underground Militia.
+**Decision:** Use "Active Support" (Manual §8.5 is correct).
 
-**What the reference says:**
-- **Flowchart** (patriot bot flowchart and reference.txt, line 16): "Event places Underground Militia in at least one **Active Opposition** or Village space with none?"
-- **Manual §8.5** (line 468-469): "The Event places Underground Militia in at least one **Active Support** or Village space that has none already."
+**Evidence:** Analysis of all 18 shaded cards that place Underground Militia shows the largest cluster (cards 28, 47, 58, 78, 89) targets Active Support spaces (Tory-occupied, British-controlled territory). "Active Opposition with no militia" is a near-impossible board state. "Active Support or Village" forms a coherent strategic grouping: enemy-aligned territory lacking Patriot military presence.
 
-**What's ambiguous or contradictory:**
-The flowchart says "Active Opposition" but the Manual §8.5 says "Active Support." These are opposite values. The flowchart is the primary bot reference, but §8.5 is the expanded rulebook description of the same condition.
-
-**Options:**
-1. Use "Active Support" (per Manual §8.5) — thematically makes more sense: Patriots want to place militia in friendly spaces.
-2. Use "Active Opposition" (per flowchart) — the flowchart is the direct bot reference.
-3. Check both — treat it as "Active Support OR Active Opposition OR Village space with none."
-
-**Current code:** `_faction_event_conditions` returns True if the event places Underground Militia *anywhere* (flag-based, no space check). This is over-broad regardless of which reading is correct.
-
-**Status:** Awaiting user decision. Code not modified — using flag-based heuristic for now.
+**Implementation:** `_faction_event_conditions()` now checks the board for Active Support or Village spaces with no existing militia, instead of the previous over-broad flag check.

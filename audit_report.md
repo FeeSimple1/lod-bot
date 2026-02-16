@@ -830,6 +830,13 @@ All high-severity issues identified in Sessions 1-6 have been resolved. The rema
 - Gather/March circular guard (`_visited` set)
 - I2 Event conditions use `CARD_EFFECTS` lookup
 - Indian defending-in-battle (battle.py lines 299-309: activate WP based on Village presence)
+- `_indian_defending_activation()` dead code removed (was duplicated in battle.py)
+
+**Patriot Bot:**
+- P2 bullet 2 now checks board state for Active Support / Village spaces (Q11 resolved)
+
+**Engine/Cards:**
+- Cards 24/28 space selection uses population tiebreaker instead of alphabetical
 
 **Engine:**
 - Q7 BS command priorities (`get_bs_limited_command()` on all 4 bot subclasses; engine calls it)
@@ -837,7 +844,7 @@ All high-severity issues identified in Sessions 1-6 have been resolved. The rema
 
 ### Card Handlers — COMPLETE
 All 109 card handlers match `card reference full.txt`. No outstanding card issues.
-- Minor: Card 24 shaded uses dict iteration order for space selection (arbitrary). Card 28 still uses alphabetical fallback via `sorted()` for space selection. Both are low impact.
+- Card 24 shaded now selects spaces by Cities-first then highest population. Card 28 now selects by most Tories (shaded) / most Militia (unshaded).
 
 ### Remaining Issues
 
@@ -845,12 +852,10 @@ All 109 card handlers match `card reference full.txt`. No outstanding card issue
 
 - **OPS methods not wired into year_end**: All 4 bots define `ops_supply_priority()`, `ops_redeploy()`, `ops_desertion()`, `ops_bs_trigger()` methods. `year_end.py` uses its own ad-hoc logic and ignores these. Supply payment order, desertion target selection, and redeployment destination all use bot-independent heuristics instead of the faction-specific priorities from the reference flowcharts. This is a larger refactor — `year_end` needs to detect bot-controlled factions, import their bot instances, and call OPS methods for prioritization.
 - **P7/P11 Persuasion mid-command expansion**: Reference says Persuasion fires during Rally/Rabble and restored resources could fund additional spaces. Current code fires Persuasion after all spaces are processed (resources are capped at selection time). Low gameplay impact — bot already gets highest-priority spaces. Would require Rally/Rabble to execute space-by-space with interrupt callbacks.
-- **`_indian_defending_activation()` redundant**: The method in `indians.py` is defined and tested but never called from the bot’s own battle flow. However, `battle.py` (lines 299-309) implements the same logic inline for bot-controlled Indians. The `indians.py` method is dead code and should be removed to avoid confusion.
 
 #### Low Severity
 
 - **B10 March + Common Cause timing**: CC invoked post-March instead of during March planning. CC should integrate into group size calculation for adjacent Province destinations. Architectural refactor.
-- **Cards 24/28 alphabetical fallback**: Space selection uses alphabetical tiebreaker instead of population or other game-meaningful criteria.
 
 ---
 
@@ -1218,9 +1223,9 @@ The following flowchart nodes are correctly implemented and match the reference:
 
 ### DOCUMENTED (not fixed — ambiguous reference)
 
-#### Q11: P2 Bullet 2 — "Active Opposition" vs "Active Support" (added to QUESTIONS.md)
+#### Q11: P2 Bullet 2 — RESOLVED (Session 9): "Active Support" per Manual §8.5
 
-The flowchart says "Active Opposition" but Manual §8.5 says "Active Support." These are contradictory. Current code uses the broad `places_patriot_militia_u` flag without checking board state, which is a heuristic regardless of which reading is correct. Documented as Q11 in QUESTIONS.md for user decision.
+The flowchart says "Active Opposition" but Manual §8.5 says "Active Support." Decision: Use "Active Support." `_faction_event_conditions()` now checks the board for Active Support or Village spaces with no existing militia, instead of the previous over-broad flag check.
 
 ### REMAINING issues (not fixed — architectural or already documented)
 
