@@ -766,6 +766,70 @@ def test_hortalez_zero_resources_skips():
     assert state["resources"][C.PATRIOTS] == 0
 
 
+# ---------- F6 pre-Treaty exact cost (must pay exact roll or skip) ----------
+
+def test_hortalez_pre_treaty_cannot_afford_skips():
+    """F6: Pre-Treaty with resources < roll must skip (resources unchanged)."""
+    bot = FrenchBot()
+    # Use a seed where randint(1,3) returns 3
+    # We'll try seeds until we get roll=3, then set resources=2
+    for seed in range(100):
+        rng = random.Random(seed)
+        roll = rng.randint(1, 3)
+        if roll == 3:
+            break
+    state = _full_state(resources={
+        C.FRENCH: 2, C.PATRIOTS: 0, C.BRITISH: 10, C.INDIANS: 10,
+    })
+    state["rng"] = random.Random(seed)
+    bot._hortelez(state, before_treaty=True)
+    # Resources < roll (2 < 3): must skip entirely
+    assert state["resources"][C.FRENCH] == 2
+    assert state["resources"][C.PATRIOTS] == 0
+    # History should mention "skipped"
+    history = " ".join(str(h) for h in state.get("history", []))
+    assert "skipped" in history.lower()
+
+
+def test_hortalez_pre_treaty_pays_exact_roll():
+    """F6: Pre-Treaty with resources >= roll must pay exactly the roll amount."""
+    bot = FrenchBot()
+    # Use a seed where randint(1,3) returns 2
+    for seed in range(100):
+        rng = random.Random(seed)
+        roll = rng.randint(1, 3)
+        if roll == 2:
+            break
+    state = _full_state(resources={
+        C.FRENCH: 10, C.PATRIOTS: 0, C.BRITISH: 10, C.INDIANS: 10,
+    })
+    state["rng"] = random.Random(seed)
+    bot._hortelez(state, before_treaty=True)
+    # Must pay exactly 2 (not min(10, 2)=2 which happens to be the same,
+    # but the key point is it's exactly the roll, not capped)
+    assert state["resources"][C.FRENCH] == 8  # 10 - 2
+    assert state["resources"][C.PATRIOTS] == 3  # 2 + 1
+
+
+def test_hortalez_post_treaty_pays_min_resources_roll():
+    """F11: Post-Treaty with resources < roll pays min(resources, roll)."""
+    bot = FrenchBot()
+    # Use a seed where randint(1,3) returns 3
+    for seed in range(100):
+        rng = random.Random(seed)
+        roll = rng.randint(1, 3)
+        if roll == 3:
+            break
+    state = _full_state(resources={
+        C.FRENCH: 2, C.PATRIOTS: 0, C.BRITISH: 10, C.INDIANS: 10,
+    })
+    state["rng"] = random.Random(seed)
+    bot._hortelez(state, before_treaty=False)
+    # Post-Treaty: pay min(2, 3) = 2
+    assert state["resources"][C.FRENCH] == 0  # 2 - 2
+    assert state["resources"][C.PATRIOTS] == 3  # 2 + 1
+
+
 # ---------- OPS Summary methods ----------
 
 def test_ops_supply_priority():
