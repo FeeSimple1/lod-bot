@@ -82,3 +82,26 @@ Implemented:
 **Decision:** FNI cap = pool + on_map markers (interpretation 2). This is the only reading consistent with Option B existing in the rules — interpretation (1) would make Option B unreachable.
 
 **Status:** Implemented in `naval_pressure.py` `_exec_french()` — `max_fni = wi_blks + on_map_count`.
+
+---
+
+## Q11: Patriot P2 Bullet 2 — "Active Opposition" vs "Active Support"
+
+**What I was trying to implement:**
+Patriot bot event condition P2 bullet 2 — whether to play an event that places Underground Militia.
+
+**What the reference says:**
+- **Flowchart** (patriot bot flowchart and reference.txt, line 16): "Event places Underground Militia in at least one **Active Opposition** or Village space with none?"
+- **Manual §8.5** (line 468-469): "The Event places Underground Militia in at least one **Active Support** or Village space that has none already."
+
+**What's ambiguous or contradictory:**
+The flowchart says "Active Opposition" but the Manual §8.5 says "Active Support." These are opposite values. The flowchart is the primary bot reference, but §8.5 is the expanded rulebook description of the same condition.
+
+**Options:**
+1. Use "Active Support" (per Manual §8.5) — thematically makes more sense: Patriots want to place militia in friendly spaces.
+2. Use "Active Opposition" (per flowchart) — the flowchart is the direct bot reference.
+3. Check both — treat it as "Active Support OR Active Opposition OR Village space with none."
+
+**Current code:** `_faction_event_conditions` returns True if the event places Underground Militia *anywhere* (flag-based, no space check). This is over-broad regardless of which reading is correct.
+
+**Status:** Awaiting user decision. Code not modified — using flag-based heuristic for now.
