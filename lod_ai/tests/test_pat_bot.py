@@ -917,7 +917,9 @@ def test_rally_returns_false_when_nothing_possible():
 # ---------- Rabble-Rousing has no 4-space cap ----------
 
 def test_rabble_no_4space_cap():
-    """P11: Rabble-Rousing should select all eligible spaces (limited by resources only)."""
+    """P11: Rabble-Rousing should select all eligible spaces (limited by resources only).
+    With space-by-space execution for mid-command Persuasion, each space gets its
+    own execute() call, so 6 spaces → 6 log entries."""
     bot = PatriotBot()
     state = _full_state(
         resources={C.PATRIOTS: 6, C.BRITISH: 10, C.FRENCH: 10, C.INDIANS: 10},
@@ -928,12 +930,10 @@ def test_rabble_no_4space_cap():
         state["spaces"][sid][C.MILITIA_U] = 1  # needs Underground Militia for eligibility
     result = bot._execute_rabble(state)
     assert result is True
-    # All 6 spaces should appear in the Rabble-Rousing log entry (not capped at 4)
+    # All 6 spaces should appear in Rabble-Rousing log entries (one per space)
     rabble_log = [h for h in state.get("history", [])
                   if isinstance(h, dict) and "RABBLE_ROUSING" in h.get("msg", "")]
-    assert len(rabble_log) == 1
-    for sid in state["spaces"]:
-        assert sid in rabble_log[0]["msg"]
+    assert len(rabble_log) == 6
 
 
 # ---------- Control simulation helpers ----------
@@ -1855,3 +1855,59 @@ def test_p4_battle_modifiers_leader_bonus():
     # def_mod: +1 half regs = +1
     # net = (2+2) - (2+1) = 1 > 0 → battle
     assert bot._execute_battle(state) is True
+
+
+# ──────────────────────────────────────────────────────────────
+#  P7/P11 Persuasion mid-command (§8.5.2 / §8.5.3)
+# ──────────────────────────────────────────────────────────────
+
+def test_rabble_persuasion_mid_command():
+    """P11+P13: When Rabble resources hit 0 after first space, Persuasion
+    should fire mid-command to restore resources, allowing further spaces."""
+    bot = PatriotBot()
+    state = _full_state(
+        resources={C.PATRIOTS: 1, C.BRITISH: 10, C.FRENCH: 10, C.INDIANS: 10},
+    )
+    # Two Rabble-eligible spaces
+    state["spaces"]["Boston"] = {C.MILITIA_U: 2, C.MILITIA_A: 0, C.REGULAR_PAT: 1}
+    state["spaces"]["New_York"] = {C.MILITIA_U: 2, C.MILITIA_A: 0, C.REGULAR_PAT: 1}
+    state["support"] = {"Boston": 0, "New_York": 0}
+    state["control"] = {"Boston": "REBELLION", "New_York": "REBELLION"}
+
+    # After spending 1 on first Rabble space, resources = 0.
+    # Persuasion should activate in a Rebellion-controlled Colony/City
+    # with Underground Militia, restoring 1+ Resource.
+    # The bot should then continue to the second space.
+
+    result = bot._execute_rabble(state)
+    assert result is True
+    # Verify that at least one Rabble happened and Persuasion fired
+    history_msgs = [h.get("msg", "") if isinstance(h, dict) else str(h)
+                    for h in state.get("history", [])]
+    assert any("RABBLE" in m for m in history_msgs)
+    assert any("PERSUASION" in m for m in history_msgs)
+
+
+def test_rally_persuasion_mid_command():
+    """P7+P13: When Rally resources hit 0 mid-command, Persuasion fires."""
+    bot = PatriotBot()
+    state = _full_state(
+        resources={C.PATRIOTS: 1, C.BRITISH: 10, C.FRENCH: 10, C.INDIANS: 10},
+    )
+    # Multiple Rally-eligible spaces
+    state["spaces"]["Boston"] = {
+        C.MILITIA_U: 2, C.MILITIA_A: 1, C.REGULAR_PAT: 2, C.FORT_PAT: 0,
+    }
+    state["spaces"]["New_York"] = {
+        C.MILITIA_U: 2, C.MILITIA_A: 1, C.REGULAR_PAT: 2, C.FORT_PAT: 0,
+    }
+    state["support"] = {"Boston": 0, "New_York": 0}
+    state["control"] = {"Boston": "REBELLION", "New_York": "REBELLION"}
+
+    result = bot._execute_rally(state)
+    assert result is True
+    history_msgs = [h.get("msg", "") if isinstance(h, dict) else str(h)
+                    for h in state.get("history", [])]
+    assert any("RALLY" in m for m in history_msgs)
+    # Persuasion should have fired mid-command
+    assert any("PERSUASION" in m for m in history_msgs)

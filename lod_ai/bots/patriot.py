@@ -875,34 +875,42 @@ class PatriotBot(BaseBot):
             return False
 
         # Check we have resources to pay
-        if state["resources"][self.faction] < len(spaces_used):
-            # Reduce spaces to what we can afford
-            spaces_used = spaces_used[:state["resources"][self.faction]]
-            if not spaces_used:
-                return False
-            # Remove Fort targets not in spaces_used
-            build_fort_set &= set(spaces_used)
-            if promote_space and promote_space not in spaces_used:
-                promote_space = None
-                promote_n = None
-            move_plan_list = [(s, d, n) for s, d, n in move_plan_list
-                              if d in spaces_used]
-
-        try:
-            rally.execute(
-                state, self.faction, {},
-                spaces_used,
-                build_fort=build_fort_set,
-                promote_space=promote_space,
-                promote_n=promote_n,
-                move_plan=move_plan_list,
-            )
-            # Check for mid-Rally Persuasion interrupt
-            if state["resources"][self.faction] == 0:
-                self._try_persuasion(state)
-            return True
-        except (ValueError, KeyError):
+        if state["resources"][self.faction] < 1:
             return False
+
+        # §8.5.2/P7+P13: Execute space-by-space, checking after each space
+        # whether resources hit 0 and triggering Persuasion mid-command.
+        executed_any = False
+        for sid in spaces_used:
+            if state["resources"][self.faction] < 1:
+                # Try mid-command Persuasion to restore resources
+                self._try_persuasion(state)
+                if state["resources"][self.faction] < 1:
+                    break  # still no resources — stop
+
+            kw = {}
+            if sid in build_fort_set:
+                kw["build_fort"] = {sid}
+            if promote_space == sid:
+                kw["promote_space"] = promote_space
+                kw["promote_n"] = promote_n
+            move_for_space = [(s, d, n) for s, d, n in move_plan_list
+                              if d == sid]
+            if move_for_space:
+                kw["move_plan"] = move_for_space
+            try:
+                rally.execute(
+                    state, self.faction, {},
+                    [sid],
+                    **kw,
+                )
+                executed_any = True
+                # Check for mid-Rally Persuasion interrupt
+                if state["resources"][self.faction] == 0:
+                    self._try_persuasion(state)
+            except (ValueError, KeyError):
+                continue
+        return executed_any
 
     # ---------- Rabble-Rousing (P11) ----------------------------------
     @staticmethod
@@ -937,16 +945,27 @@ class PatriotBot(BaseBot):
             -self._support_level(state, n),
             -_MAP_DATA[n].get("population", 0),
         ))
-        # No artificial cap - use all eligible spaces (limited by resources)
-        max_spaces = state["resources"][self.faction]
-        selected = spaces[:max_spaces] if max_spaces > 0 else []
-        if not selected:
+        if state["resources"][self.faction] < 1:
             return False
-        rabble_rousing.execute(state, self.faction, {}, selected)
-        # Persuasion interrupt when resources reach 0
-        if state["resources"][self.faction] == 0:
-            self._try_persuasion(state)
-        return True
+
+        # §8.5.3/P11+P13: Execute space-by-space, checking after each space
+        # whether resources hit 0 and triggering Persuasion mid-command.
+        executed_any = False
+        for sid in spaces:
+            if state["resources"][self.faction] < 1:
+                # Try mid-command Persuasion to restore resources
+                self._try_persuasion(state)
+                if state["resources"][self.faction] < 1:
+                    break  # still no resources — stop
+            try:
+                rabble_rousing.execute(state, self.faction, {}, [sid])
+                executed_any = True
+                # Check for mid-Rabble Persuasion interrupt
+                if state["resources"][self.faction] == 0:
+                    self._try_persuasion(state)
+            except (ValueError, KeyError):
+                continue
+        return executed_any
 
     # ===================================================================
     #  SPECIAL-ACTIVITY HELPERS
