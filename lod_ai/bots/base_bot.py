@@ -53,12 +53,16 @@ class BaseBot:
         }
         return tables[self.faction].get(card_id, "normal")
 
-    def _execute_event(self, card: Dict, state: Dict, *, force_unshaded: bool = False) -> None:
+    def _execute_event(self, card: Dict, state: Dict, *,
+                       force_unshaded: bool = False,
+                       force_shaded: bool = False) -> None:
         """Dispatch the effect function for *card* using proper shading."""
         handler = CARD_HANDLERS.get(card["id"])
         if not handler:
             return
-        if force_unshaded:
+        if force_shaded:
+            shaded = True
+        elif force_unshaded:
             shaded = False
         else:
             shaded = card.get("dual") and self.faction in {C.PATRIOTS, C.FRENCH}
@@ -121,6 +125,9 @@ class BaseBot:
                 return True
             if directive == "force_unshaded":
                 self._execute_event(card, state, force_unshaded=True)
+                return True
+            if directive == "force_shaded":
+                self._execute_event(card, state, force_shaded=True)
                 return True
             if directive == "force_if_french_not_human":
                 if not state.get("human_factions", set()) & {C.FRENCH}:

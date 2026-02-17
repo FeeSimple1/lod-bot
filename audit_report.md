@@ -1551,3 +1551,152 @@ If Rally and Rabble both fail from the P9=Yes path, the code falls through to `_
 | `test_rally_bullet4_continental_replacement_from_selected_only` | Bullet 4 searches only Rally-selected spaces |
 | `test_force_if_52_patriot_requires_battle_space` | Card 52 returns False when no French+British co-location |
 | `test_force_if_52_patriot_true_when_shared_space` | Card 52 returns True when French+British share a space |
+
+---
+
+## Session 12: Indian Bot Full Compliance Review
+
+### Scope
+
+Full node-by-node comparison of the entire Indian bot flowchart implementation in `lod_ai/bots/indians.py` against `Reference Documents/indian bot flowchart and reference.txt` and Manual Ch 8 (§8.7). Also reviewed `base_bot.py`, `event_instructions.py`, `event_eval.py`, `commands/raid.py`, `commands/gather.py`, `commands/scout.py`, `commands/march.py`, `commands/battle.py`, `special_activities/war_path.py`, `special_activities/trade.py`, `special_activities/plunder.py`, `leaders/__init__.py`, and `rules_consts.py`.
+
+### Label Compliance: PASS
+
+No string literal violations found. All piece tags, faction names, markers, and control values use proper constants from `rules_consts.py`. The only string literals are `"REBELLION"` for control checks and map data type strings (`"Colony"`, `"City"`, `"Province"`), which are consistent with the rest of the codebase and have no corresponding constants.
+
+### Known Issue Verification
+
+1. **I10 March (Q5)**: **RESOLVED — properly implemented.** `_march()` uses `max_dests = min(3, resources)`, Phase 1 (Village placement: get 3+ WP in Neutral/Passive space with room) + Phase 2 (remove most Rebel Control, first no Active Support). All movement constraints correct: Underground-first (`_take`), no last-WP-from-Village (`_can_remove`), no Rebel Control addition (`_can_remove`). Q5 status updated to "Implemented."
+
+2. **Mid-Raid Plunder/Trade interruption**: **RESOLVED.** Lines 157-161 of `_raid_sequence()` check `resources == 0` after `_raid()` and trigger Plunder then Trade. Architecturally, this fires after `raid.execute()` completes (atomic payment+activation), which is the best approximation without mid-command interrupts.
+
+3. **Circular Gather/March fallback**: **RESOLVED.** `_gather_sequence()` and `_march_sequence()` both accept a `_visited` set parameter. Each adds its command name on entry and checks before recursing, preventing infinite loops.
+
+4. **`_can_plunder` scope**: **RESOLVED.** Lines 337-338 restrict candidates to `state.get("_turn_affected_spaces", set())` (Raid spaces only).
+
+5. **BS trigger conditions**: **WAS BROKEN — FIXED this session.** See bug #2 below. Method was named `ops_bs_should_trigger` (not callable by shared infrastructure expecting `ops_bs_trigger`), was missing Winter Quarters check, and was missing the "player 1st Eligible or Rebel BS played" condition.
+
+6. **ops_loyalist_desertion_priority**: **N/A for Indians.** The Indian bot has `ops_patriot_desertion_priority` (removes Patriots, not Tories). However, the same class of scoping bug existed — the sort used `-reb` (total rebel count) instead of checking whether removal actually changes control. **FIXED this session** (see bug #4 below).
+
+### Nodes verified CORRECT
+
+| Node | Description | Status |
+|------|-------------|--------|
+| I1 | Sword icon skip / Event vs Command | CORRECT — handled by `base_bot._choose_event_vs_flowchart()` |
+| I2 | Event conditions (4 bullets) | CORRECT — uses `CARD_EFFECTS` unshaded side per §8.3.2; all 4 conditions verified: Opp>Sup+shifts_royalist, places_village/grants_free_gather, removes_patriot_fort, effective+4_villages+D6>=5 |
+| I3 | Support+1D6 > Opposition test | CORRECT — `randint(1,6)`, `(support + roll) <= opposition` routes to Raid branch |
+| I4 | Raid (Max 3) — space selection | CORRECT — Opposition Colonies with/adj Underground WP (or within 2 of Dragging Canoe), priority plunder-possible then pop |
+| I4 | Raid — WP movement and village leave-behind | CORRECT — `_reserve_source` prefers adjacent, checks village last-WP |
+| I4 | Raid — mid-Raid Plunder/Trade when resources=0 | CORRECT — fires after `raid.execute()`, triggers `_plunder` then `_trade` |
+| I5 | Plunder target selection | CORRECT — restricted to Raid spaces, WP > rebels, highest Pop (after FORT_PAT fix) |
+| I6 | Gather worthwhile (2+ Villages OR D6 < Available WP) | CORRECT — eligible space count ≥2 with Cornplanter threshold |
+| I7 | Gather Bullet 1 (Village placement) | CORRECT — room check, 3+ WP (2+ if Cornplanter), leader priority |
+| I7 | Gather Bullet 2 (WP at Villages) | CORRECT — enemies first, then no UG WP, then leader, then random |
+| I7 | Gather Bullet 3 (WP in spaces with Village room) | CORRECT — exactly 2 WP first, then 1, then random; max 2 spaces |
+| I7 | Gather Bullet 4 (move adjacent Active WP) | CORRECT — no WP available gate, 1 Village space, control preservation |
+| I8 | War Path — target selection | CORRECT — Fort first, most Rebels, Province with Village tiebreak |
+| I8 | War Path — option selection | CORRECT — option 3 (Fort, no cubes, 2+ WP_U), option 2 (2+ cubes, 2+ WP_U), else option 1 |
+| I8 | War Path / Trade fallback | CORRECT — resources=0 → Trade; else War Path → Trade |
+| I9 | Space with WP + British Regulars? | CORRECT — checks all spaces |
+| I10 | March — Phase 1 (Village dest) | CORRECT — 1+ Villages Available, Neutral/Passive, room, 3+ WP target |
+| I10 | March — Phase 2 (Rebel Control) | CORRECT — Rebellion spaces, first no Active Support, adjacent supply |
+| I10 | March — movement constraints | CORRECT — Underground first, no last-WP-from-Village, no Rebel Control |
+| I10 | March → Gather fallback | CORRECT — `_visited` set prevents infinite recursion |
+| I11 | Trade — space selection | CORRECT — Village space with most Underground WP |
+| I11 | Trade — British resource request | CORRECT — D6 < British Resources → transfer ceil(roll/2) |
+| I12 | Scout — origin selection | CORRECT — space with WP + British Regulars, most Regs+Tories |
+| I12 | Scout — destination priority | CORRECT — Patriot Fort first, Village+enemy, Rebel Control |
+| I12 | Scout — control preservation | CORRECT — caps pieces moved to maintain royalist > rebel in origin |
+| I12 | Scout + Skirmish | CORRECT — Fort-first priority, option 3/2/1 selection |
+| Event | Cards 4/72/90 Village condition | CORRECT — `_VILLAGE_REQUIRED_CARDS` check before event |
+| Event | Cards 18/44 eligible enemy condition | CORRECT — `_ELIGIBLE_ENEMY_CARDS` check; `_has_eligible_enemy` correctly checks Patriots and French |
+| Event | Card 38 WP condition | CORRECT — `_WP_REQUIRED_CARDS` check before event |
+| Event | Card 83 shaded/unshaded selection | CORRECT — `_can_place_village(state)` determines side |
+| OPS | Supply priority | CORRECT — prevent Rebel Control first, then Village room |
+| OPS | Redeploy leaders | CORRECT — Brant/DC to most WP; Cornplanter to Neutral/Passive Province with 2+ WP and Village room, else most WP |
+| OPS | Leader Movement | CORRECT — accompanies largest group from origin |
+| OPS | Defending in Battle | CORRECT — `battle.py` lines 299-309: Village → activate all but 1 UG WP; no Village → activate none |
+| BS | get_bs_limited_command | CORRECT — walks I3→I4/I6→I9→I10 with leader's space |
+
+### FIXED issues (this session)
+
+#### 1. Cards 4, 32, 38 — Playing UNSHADED instead of SHADED (HIGH)
+
+**Reference (indian bot flowchart):**
+- Card 4: "Use the shaded text. If no Village can be placed, choose Command & Special Activity instead."
+- Card 32: "Use the shaded text."
+- Card 38: "Use the shaded text. Place War Parties; if not possible, choose Command & Special Activity instead."
+
+**Bug:** All three cards had `"force"` directive in `event_instructions.py`, which plays the unshaded event (Indian default). The Indian bot flowchart explicitly says "Use the shaded text" for all three.
+
+**Fix:**
+- Added `"force_shaded"` directive support to `base_bot._choose_event_vs_flowchart()` and `base_bot._execute_event()`.
+- Changed cards 4, 32, 38 from `"force"` to `"force_shaded"` in `event_instructions.py`.
+- Cards 4 and 38 have their conditional checks (Village/WP) in the IndianBot `_choose_event_vs_flowchart` override, which runs BEFORE `super()` sees the `force_shaded` directive.
+
+#### 2. `ops_bs_trigger` — Wrong method name + missing conditions (MEDIUM)
+
+**Reference (OPS):** "Brilliant Stroke: Use after Treaty of Alliance when the Indian Leader is in a space with 3+ War Parties, and a player is 1st Eligible or a Rebel Faction plays a Brilliant Stroke card other than the Treaty of Alliance."
+
+**Bug 1:** Method was named `ops_bs_should_trigger` instead of `ops_bs_trigger`. Shared infrastructure calling `ops_bs_trigger()` would get `AttributeError` or use the default (always False).
+
+**Bug 2:** Missing "a player is 1st Eligible or a Rebel Faction plays a BS" check. The method only checked ToA + Leader + 3 WP.
+
+**Bug 3:** Missing Winter Quarters check (same bug found in French bot Session 10).
+
+**Fix:** Renamed to `ops_bs_trigger`. Added WQ check (`current_card in C.WINTER_QUARTERS_CARDS`). Added player-eligible check (`first_eligible in human_factions`) and Rebel BS check (`bs_played.get(C.PATRIOTS) or bs_played.get(C.FRENCH)`).
+
+#### 3. `_can_plunder`, `_plunder`, `_raid` score — Missing FORT_PAT in rebel count (MEDIUM)
+
+**Reference (I5):** "Plunder in a Raid space with more War Parties than Rebel pieces."
+
+**Bug:** The rebel piece count in `_can_plunder` (line 342), `_plunder` (line 360), and the `_raid` `score()` function (line 275) counted only `MILITIA_A + MILITIA_U + REGULAR_PAT + REGULAR_FRE`, missing `FORT_PAT`. Patriot Forts are Rebel pieces per §1.4. This could cause the bot to select Plunder in a space where WP don't actually exceed all Rebel pieces (because a Fort was uncounted).
+
+**Fix:** Added `+ sp.get(C.FORT_PAT, 0)` to all three rebel count calculations.
+
+#### 4. `ops_patriot_desertion_priority` — Wrong sort for "remove most Rebel Control" (MEDIUM)
+
+**Reference (OPS):** "Remove Patriots first from Village spaces, then to remove most Rebel Control, then to remove last Patriot of that type in a space, then random."
+
+**Bug:** The sort used `(-is_rebel, -reb)` which prioritized Rebellion-controlled spaces with MORE rebel pieces. But "remove most Rebel Control" means preferring spaces where removing 1 Patriot piece would actually CHANGE control from Rebellion — i.e., spaces where the rebel excess is smallest (royalist pieces ≥ rebels - 1). A space with 10 rebels won't change control; a space with 2 rebels and 1 royalist will.
+
+Same class of bug as the French `ops_loyalist_desertion_priority` fixed in Session 10.
+
+**Fix:** Changed sort key to check `changes_ctrl = (ctrl == "REBELLION" and royalist >= (reb - 1))`. Population tiebreaks scoped within the control-change tier only.
+
+### DOCUMENTED — minor deviations (not fixed)
+
+#### Gather Bullet 1: Excludes spaces with existing Villages
+`_gather_worthwhile` (line 388) and `_gather` (line 442) skip spaces that already have a Village (`sp.get(C.VILLAGE, 0) > 0`). The reference says "Place Villages where room" — a space with 1 Village and no Fort has room (bases < 2). Building a second Village in the same space is valid per stacking rules but is rarely strategically optimal. Minor deviation.
+
+#### Mid-Raid Plunder/Trade is atomic
+The reference says "before completing the Raid" but `raid.execute()` bundles payment and activation in one call. The interrupt fires after the full Raid completes, not mid-execution. Architectural limitation — no mid-command interrupt support.
+
+#### Partisans/Skirmish never use option 2
+Same as documented in Session 11 for Patriot bot. The flowchart provides no algorithm for when to choose option 2 over option 1.
+
+#### get_bs_limited_command skips I3 D6 gate
+The BS Limited Command walk always tries both Raid and Gather branches without rolling the I3 D6. Per §8.3.7, BS should follow the faction flowchart including the D6 check. Minor — affects only which LimCom is selected during BS.
+
+### Previously documented issues (unchanged)
+
+- **OPS methods not wired into year_end** — all 4 bots define OPS methods but `year_end.py` uses ad-hoc logic
+- **P7/P11 Persuasion mid-command** — fires after command, not during
+- **B10 March + Common Cause timing** — CC invoked post-March
+- **I2 Event conditions: CARD_EFFECTS static lookup** — correct but cannot verify dynamic game-state conditions
+
+### Tests added (11 new, 866 total)
+
+| Test | Verifies |
+|------|----------|
+| `test_card_32_uses_force_shaded_directive` | Card 32 directive is `force_shaded` |
+| `test_card_4_uses_force_shaded_directive` | Card 4 directive is `force_shaded` |
+| `test_card_38_uses_force_shaded_directive` | Card 38 directive is `force_shaded` |
+| `test_force_shaded_handler_sets_shaded_true` | `force_shaded` passes `shaded=True` to handler |
+| `test_bs_trigger_blocked_during_winter_quarters` | BS trigger returns False during WQ |
+| `test_bs_trigger_requires_player_eligible_or_rebel_bs` | BS trigger needs player 1st eligible or Rebel BS |
+| `test_bs_trigger_fires_on_rebel_bs_played` | BS trigger fires when Patriot BS played |
+| `test_can_plunder_false_when_fort_makes_rebels_ge_wp` | FORT_PAT counted in rebel pieces for Plunder |
+| `test_can_plunder_true_when_wp_exceeds_rebels_with_fort` | Plunder still works when WP > rebels including Fort |
+| `test_changes_control_before_excess_rebels` | Desertion prioritizes control-changing removal |
+| `test_village_still_first_priority` | Village spaces remain top priority for desertion |
