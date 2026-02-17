@@ -294,7 +294,8 @@ class PatriotBot(BaseBot):
         return False
 
     def _execute_battle(self, state: Dict) -> bool:
-        """P4: Select all spaces where Rebel Force Level exceeds Royalist FL.
+        """P4: Select all spaces where Rebel Force Level + modifiers exceeds
+        Royalist FL + modifiers (§3.6.5-6).
         §8.5.1: Include French only if French Resources > 0.
         If resources too low for all, prioritize: Washington, highest Pop,
         most Villages, random.
@@ -318,7 +319,42 @@ class PatriotBot(BaseBot):
             active_wp = sp.get(C.WARPARTY_A, 0)
             brit_force = regs + tories + (active_wp // 2) + sp.get(C.FORT_BRI, 0)
 
-            if rebel_force > brit_force and (regs + tories + active_wp) > 0:
+            # §3.6.5: Attacker (Rebellion) modifiers on Defender Loss
+            att_mod = 0
+            att_regs = pat_cubes + fre_cubes
+            att_cubes = att_regs  # all Rebellion cubes are Regulars
+            if att_cubes > 0 and att_regs * 2 >= att_cubes:
+                att_mod += 1  # half regs
+            if sp.get(C.MILITIA_U, 0) > 0:
+                att_mod += 1  # underground piece
+            for ldr in ("LEADER_WASHINGTON", "LEADER_ROCHAMBEAU", "LEADER_LAUZUN"):
+                if leader_location(state, ldr) == sid:
+                    att_mod += 1
+                    break
+            # +1 if Attacking includes French with Lauzun
+            if fre_cubes > 0 and leader_location(state, "LEADER_LAUZUN") == sid:
+                att_mod += 1
+            # -1 per defending Fort
+            att_mod -= sp.get(C.FORT_BRI, 0)
+
+            # §3.6.6: Defender (Royalist) modifiers on Attacker Loss
+            def_mod = 0
+            def_cubes = regs + tories
+            if def_cubes > 0 and regs * 2 >= def_cubes:
+                def_mod += 1  # half regs
+            if sp.get(C.WARPARTY_U, 0) > 0:
+                def_mod += 1  # underground piece
+            for ldr in ("LEADER_GAGE", "LEADER_HOWE", "LEADER_CLINTON",
+                         "LEADER_BRANT", "LEADER_CORNPLANTER", "LEADER_DRAGGING_CANOE"):
+                if leader_location(state, ldr) == sid:
+                    def_mod += 1
+                    break
+            # +1 per defending Fort (helps defender on attacker-loss roll)
+            def_mod += sp.get(C.FORT_BRI, 0)
+
+            # Net advantage: positive means Rebellion is stronger
+            net = (rebel_force + att_mod) - (brit_force + def_mod)
+            if net > 0 and (regs + tories + active_wp) > 0:
                 has_wash = 1 if leader_location(state, "LEADER_WASHINGTON") == sid else 0
                 pop = _MAP_DATA.get(sid, {}).get("population", 0)
                 villages = sp.get(C.VILLAGE, 0)

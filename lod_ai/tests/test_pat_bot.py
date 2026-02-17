@@ -266,17 +266,21 @@ def test_p6_washington_lookup_uses_leader_location():
 
 def test_p4_force_level_excludes_underground_militia():
     """P4: Force Level should only count Active Militia, not Underground.
-    Per §3.6.3: 'half Active Militia' — Underground excluded."""
+    Per §3.6.3: 'half Active Militia' — Underground excluded from raw FL.
+    Note: §3.6.5 gives +1 modifier for underground pieces on attacking side,
+    so underground militia indirectly help through modifiers."""
     bot = PatriotBot()
     state = {
         "spaces": {
             "Boston": {
                 C.REGULAR_PAT: 2, C.REGULAR_FRE: 0,
                 # 0 Active Militia, 10 Underground → FL contribution = 0
+                # but +1 att_mod for underground piece present
                 C.MILITIA_A: 0, C.MILITIA_U: 10,
                 C.FORT_PAT: 0,
-                C.REGULAR_BRI: 2, C.TORY: 0,
-                C.WARPARTY_A: 0, C.FORT_BRI: 0,
+                # Need enough British to overcome the underground modifier
+                C.REGULAR_BRI: 3, C.TORY: 0,
+                C.WARPARTY_A: 0, C.WARPARTY_U: 0, C.FORT_BRI: 0,
             },
         },
         "resources": {C.PATRIOTS: 5, C.BRITISH: 5, C.FRENCH: 5, C.INDIANS: 5},
@@ -286,15 +290,18 @@ def test_p4_force_level_excludes_underground_militia():
         "rng": random.Random(42),
         "history": [],
         "casualties": {},
+        "leader_locs": {},
     }
-    # Rebel FL: pat(2) + fre(0) + active_mil//2(0) = 2
-    # British FL: regs(2) + tories(0) + wp//2(0) + forts(0) = 2
-    # 2 > 2 is False → no battle
+    # Rebel FL: 2 + 0 + 0 = 2; att_mod: +1 half regs + 1 underground = +2
+    # British FL: 3 + 0 + 0 + 0 = 3; def_mod: +1 half regs = +1
+    # net = (2+2) - (3+1) = 0 → no battle
     assert bot._execute_battle(state) is False
 
     # Now add Active Militia: FL goes up
     state["spaces"]["Boston"][C.MILITIA_A] = 4
-    # Rebel FL: 2 + 0 + 4//2 = 4 > 2 → battle
+    # Rebel FL: 2 + 0 + 2 = 4; att_mod: +1 half regs + 1 underground = +2
+    # British FL: 3 + 0 + 0 + 0 = 3; def_mod: +1 half regs = +1
+    # net = (4+2) - (3+1) = 2 → battle
     assert bot._execute_battle(state) is True
 
 
@@ -1750,3 +1757,101 @@ def test_p12_skirmish_uses_option1_when_no_own_regs():
     else:
         opt = 1
     assert opt == 1
+
+
+# ──────────────────────────────────────────────────────────────
+#  P4 Battle force level modifiers (§3.6.5-6)
+# ──────────────────────────────────────────────────────────────
+
+def test_p4_battle_modifiers_fort_penalty_prevents_battle():
+    """§3.6.5: -1 per defending Fort shifts net advantage against Rebellion.
+
+    Without modifiers: rebel_force(3) > brit_force(2) → would battle.
+    With modifiers: British Fort gives def_mod +1 and att_mod -1 → net flips.
+    """
+    bot = PatriotBot()
+    state = {
+        "spaces": {
+            "Boston": {
+                C.REGULAR_PAT: 3, C.REGULAR_FRE: 0,
+                C.MILITIA_A: 0, C.MILITIA_U: 0,
+                C.FORT_PAT: 0,
+                C.REGULAR_BRI: 1, C.TORY: 1,
+                C.WARPARTY_A: 0, C.WARPARTY_U: 0,
+                C.FORT_BRI: 1,
+            },
+        },
+        "resources": {C.PATRIOTS: 5, C.BRITISH: 5, C.FRENCH: 5, C.INDIANS: 5},
+        "available": {},
+        "support": {},
+        "control": {},
+        "rng": random.Random(42),
+        "history": [],
+        "casualties": {},
+        "leader_locs": {},
+    }
+    # Raw FL: rebel=3, brit=1+1+0+1(fort)=3. 3>3 is False → no battle
+    # With modifiers the Fort penalty makes it even worse.
+    assert bot._execute_battle(state) is False
+
+
+def test_p4_battle_modifiers_underground_militia_helps():
+    """§3.6.5: +1 for underground piece on attacking side."""
+    bot = PatriotBot()
+    state = {
+        "spaces": {
+            "Boston": {
+                C.REGULAR_PAT: 2, C.REGULAR_FRE: 0,
+                C.MILITIA_A: 2, C.MILITIA_U: 1,
+                C.FORT_PAT: 0,
+                C.REGULAR_BRI: 2, C.TORY: 1,
+                C.WARPARTY_A: 0, C.WARPARTY_U: 0,
+                C.FORT_BRI: 0,
+            },
+        },
+        "resources": {C.PATRIOTS: 5, C.BRITISH: 5, C.FRENCH: 5, C.INDIANS: 5},
+        "available": {},
+        "support": {},
+        "control": {},
+        "rng": random.Random(42),
+        "history": [],
+        "casualties": {},
+        "leader_locs": {},
+    }
+    # Raw FL: rebel=2+0+1=3, brit=2+1+0+0=3. 3>3 = False
+    # With modifiers:
+    # att_mod: +1 (all cubes regs) + 1 (underground militia) = +2
+    # def_mod: +1 (2 regs / 3 cubes, 2*2=4>=3) = +1
+    # net = (3+2) - (3+1) = 1 > 0 → battle
+    assert bot._execute_battle(state) is True
+
+
+def test_p4_battle_modifiers_leader_bonus():
+    """§3.6.5: +1 for leader on attacking side."""
+    bot = PatriotBot()
+    state = {
+        "spaces": {
+            "Boston": {
+                C.REGULAR_PAT: 2, C.REGULAR_FRE: 0,
+                C.MILITIA_A: 0, C.MILITIA_U: 0,
+                C.FORT_PAT: 0,
+                C.REGULAR_BRI: 2, C.TORY: 0,
+                C.WARPARTY_A: 0, C.WARPARTY_U: 0,
+                C.FORT_BRI: 0,
+            },
+        },
+        "resources": {C.PATRIOTS: 5, C.BRITISH: 5, C.FRENCH: 5, C.INDIANS: 5},
+        "available": {},
+        "support": {},
+        "control": {},
+        "rng": random.Random(42),
+        "history": [],
+        "casualties": {},
+        "leader_locs": {"LEADER_WASHINGTON": "Boston"},
+    }
+    # Raw FL: rebel=2, brit=2. Tie → no battle without modifiers
+    # With modifiers:
+    # att_mod: +1 half regs + 1 leader = +2
+    # def_mod: +1 half regs = +1
+    # net = (2+2) - (2+1) = 1 > 0 → battle
+    assert bot._execute_battle(state) is True
