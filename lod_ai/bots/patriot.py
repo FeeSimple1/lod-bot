@@ -710,30 +710,46 @@ class PatriotBot(BaseBot):
             if other == 0 and sid not in spaces_used:
                 spaces_used.append(sid)
 
-        # --- Bullets 3-4: Continental placement and replacement ---
+        # --- Bullet 3: Continental placement at Fort with most Militia ---
+        # §8.5.2: "then if any Continentals are Available at the Fort with
+        # the largest number of Militia already."
+        # This adds a new Rally space (the Fort with most Militia globally).
+        if avail_cont > 0 and len(spaces_used) < 4:
+            best_cont_fort = None
+            best_cont_mil = -1
+            for sid, sp in state["spaces"].items():
+                if sid in spaces_used:
+                    continue  # already selected
+                if sp.get(C.FORT_PAT, 0) == 0 and sid not in build_fort_set:
+                    continue
+                mil = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                if mil > best_cont_mil:
+                    best_cont_mil = mil
+                    best_cont_fort = sid
+            if best_cont_fort and best_cont_mil > 0:
+                spaces_used.append(best_cont_fort)
+
+        # --- Bullet 4: Continental replacement ---
+        # §8.5.2: "In the Patriot Fort space with most Militia OF THOSE
+        # ALREADY SELECTED FOR RALLY, replace all Militia except 1
+        # Underground with Continentals."
         if avail_cont > 0:
-            # Find Fort with most Militia
             best_fort = None
             best_mil = -1
-            for sid, sp in state["spaces"].items():
+            for sid in spaces_used:
+                sp = state["spaces"].get(sid, {})
                 if sp.get(C.FORT_PAT, 0) == 0 and sid not in build_fort_set:
                     continue
                 mil = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
                 if mil > best_mil:
                     best_mil = mil
                     best_fort = sid
-            if best_fort:
-                if best_fort not in spaces_used:
-                    if len(spaces_used) < 4:
-                        spaces_used.append(best_fort)
-                # Bullet 4: Replace all Militia except 1 Underground
-                if best_fort in spaces_used and best_mil > 0:
-                    promote_space = best_fort
-                    # Keep 1 Underground, replace the rest
-                    promote_n = max(0, best_mil - 1)
-                    if promote_n == 0:
-                        promote_space = None
-                        promote_n = None
+            if best_fort and best_mil > 0:
+                promote_space = best_fort
+                promote_n = max(0, best_mil - 1)
+                if promote_n == 0:
+                    promote_space = None
+                    promote_n = None
 
         # --- Bullet 5: Militia at non-Fort space with most Patriot units ---
         # Reference: "If Patriot Fort Available" — check post-Bullet-1 count
@@ -854,15 +870,31 @@ class PatriotBot(BaseBot):
             return False
 
     # ---------- Rabble-Rousing (P11) ----------------------------------
+    @staticmethod
+    def _rabble_eligible(state: Dict, sid: str, sp: Dict) -> bool:
+        """Check §3.3.4 eligibility: (Rebellion Control AND Patriot pieces) OR
+        Underground Militia.  Also must not be at Active Opposition."""
+        from lod_ai.rules_consts import ACTIVE_OPPOSITION
+        if state.get("support", {}).get(sid, 0) <= ACTIVE_OPPOSITION:
+            return False
+        rebellion_ctrl = state.get("control", {}).get(sid) == "REBELLION"
+        has_pat = any(sp.get(t, 0) > 0 for t in
+                      (C.REGULAR_PAT, C.MILITIA_A, C.MILITIA_U, C.FORT_PAT))
+        has_underground = sp.get(C.MILITIA_U, 0) > 0
+        return (rebellion_ctrl and has_pat) or has_underground
+
     def _execute_rabble(self, state: Dict) -> bool:
         """P11: Rabble-Rousing. Shift spaces toward Active Opposition.
         First in Active Support, within that highest Pop.
         No artificial cap (reference doesn't state a max).
         Persuasion interrupt when resources reach 0.
+        Only eligible spaces per §3.3.4: (Rebellion Control + Patriot pieces)
+        or Underground Militia.
         """
+        refresh_control(state)
         spaces = [
             sid for sid, sp in state["spaces"].items()
-            if self._support_level(state, sid) > C.ACTIVE_OPPOSITION
+            if self._rabble_eligible(state, sid, sp)
         ]
         if not spaces:
             return False
@@ -997,9 +1029,12 @@ class PatriotBot(BaseBot):
         return roll > hidden
 
     def _rabble_possible(self, state: Dict) -> bool:
+        """P10: 'Rabble-Rousing can shift 1+ spaces toward Active Opposition?'
+        Must also check §3.3.4 eligibility for each space."""
+        refresh_control(state)
         return any(
-            self._support_level(state, sid) > C.ACTIVE_OPPOSITION
-            for sid in state["spaces"]
+            self._rabble_eligible(state, sid, sp)
+            for sid, sp in state["spaces"].items()
         )
 
     # ===================================================================
@@ -1007,6 +1042,19 @@ class PatriotBot(BaseBot):
     # ===================================================================
     def _force_condition_met(self, directive: str, state: Dict, card: Dict) -> bool:
         """Evaluate force_if_X directives from the Patriot instruction sheet."""
+        if directive == "force_if_52":
+            # Card 52: "Remove no French Regulars; select space per Battle
+            # instructions, else ignore."
+            # Check: any space where both French and British pieces exist
+            # that would satisfy Battle selection?
+            refresh_control(state)
+            for sid, sp in state["spaces"].items():
+                french = sp.get(C.REGULAR_FRE, 0)
+                brit = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                        + sp.get(C.WARPARTY_A, 0))
+                if french > 0 and brit > 0:
+                    return True
+            return False
         if directive == "force_if_51":
             # Card 51: "March to set up Battle per the Battle instructions.
             # If not possible, choose Command & Special Activity instead."

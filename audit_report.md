@@ -1456,3 +1456,98 @@ Reference §8.6.9 says: "Remove a Blockade from the City with least Support; rem
 | `test_ops_bs_trigger_requires_player_eligible_or_brit_bs` | BS trigger requires player 1st eligible or British BS played |
 | `test_ops_desertion_population_scoped_to_tier` | Desertion priority: control-changing spaces before non-changing |
 | `test_f7_agent_mobilization_skips_active_support` | Agent Mobilization skips Active Support provinces (no crash) |
+
+---
+
+## Session 11: Patriot Bot Compliance Review (Independent)
+
+### Scope
+
+Independent node-by-node comparison of the Patriot bot flowchart implementation in `lod_ai/bots/patriot.py` against `Reference Documents/patriot bot flowchart and reference.txt`, Manual Ch 3 (§3.3, §3.6), Manual Ch 4 (§4.3), and Manual Ch 8 (§8.5). Also reviewed `base_bot.py`, `event_instructions.py`, `event_eval.py`, `partisans.py`, `skirmish.py`, `persuasion.py`, `rabble_rousing.py`, `rally.py`, `battle.py`, and `rules_consts.py`.
+
+### Label Compliance: PASS
+
+No string literal violations found. All piece tags, faction names, markers, and control values use proper constants from `rules_consts.py`.
+
+### Nodes verified CORRECT
+
+| Node | Description | Status |
+|------|-------------|--------|
+| P1 | Sword icon skip / Event vs Command | CORRECT — `base_bot._choose_event_vs_flowchart()` |
+| P2 | Event conditions (5 bullets) | CORRECT — uses `CARD_EFFECTS` shaded side per §8.3.2 |
+| P3 | Resources > 0 gate | CORRECT — checks `== 0`, PASSes |
+| P4 | Battle (FL calculation, French cap, French resource gate, Washington/Pop/Village tiebreak, resource trim) | CORRECT (modifiers omission previously documented) |
+| P5 | March Phase 1 (Rebel Control destinations, Villages/Cities/Pop priority, French escort) | CORRECT |
+| P5 | March Phase 2 (get 1 Militia Underground preferred into spaces with none) | CORRECT |
+| P5 | March leave-behind (Fort guard, no Active Opposition, lose-no-control) | CORRECT |
+| P6 | Battle possible (rebel cubes + all 3 Rebellion leaders vs Active Royal pieces, no Forts per glossary) | CORRECT |
+| P7 | Rally Bullet 1 (Fort placement: 4+ units, room, Cities-first/Pop) | CORRECT |
+| P7 | Rally Bullet 2 (Militia at lonely Forts) | CORRECT |
+| P7 | Rally Bullet 5 (Militia at non-Fort space with most Patriot units, post-Bullet-1 Fort count) | CORRECT |
+| P7 | Rally Bullet 6 (change Control, no Active Opp, Cities, Pop; no Active Support exclusion) | CORRECT |
+| P7 | Rally Bullet 7 (adjacent Militia gathering, excludes selected spaces) | CORRECT |
+| P8 | Partisans (Village→WP→British priority; option 3 when no WP; option 1 otherwise) | CORRECT |
+| P9 | Rally preferred (Fort possible OR 1D6 > Underground Militia) | CORRECT |
+| P12 | Skirmish (Fort-first, Control change sub-priority, option 3 when applicable) | CORRECT |
+| P13 | Persuasion (Rebel Control + Underground Militia + Colony/City filter, Fort priority, max 3) | CORRECT |
+| P8→P12→P13 | SA chain (Partisans→Skirmish→Persuasion, resource-0 Persuasion gates) | CORRECT |
+| P7↔P11 | Rally/Rabble mutual fallback (infinite loop guard via `_from_rabble`/`_from_rally`) | CORRECT |
+| OPS | Supply priority, Redeploy Washington, Patriot Desertion, BS trigger | CORRECT |
+| Event | All 13 Patriot card instructions match reference (with card 52 fix below) | CORRECT |
+
+### FIXED issues (this session — 3 bugs)
+
+#### 1. P10/P11 `_rabble_possible` and `_execute_rabble` — Missing §3.3.4 eligibility filter
+
+**Reference (§3.3.4):** "Select any spaces with Rebellion Control and Patriot pieces or at least one Underground Militia."
+
+**Bug:** Both `_rabble_possible()` and `_execute_rabble()` only checked `support_level > ACTIVE_OPPOSITION` (i.e., space not at Active Opposition). They did not verify §3.3.4 eligibility: the space must have **(Rebellion Control AND Patriot pieces) OR Underground Militia**. This could cause:
+1. `_rabble_possible()` (P10) to return True for spaces with no Patriot presence
+2. `rabble_rousing.execute()` to raise `ValueError` when the bot passed ineligible spaces
+
+**Fix:** Added `_rabble_eligible()` static method that checks both the support level and §3.3.4 eligibility. Both `_rabble_possible()` and `_execute_rabble()` now use this method, and `_execute_rabble()` calls `refresh_control()` before filtering.
+
+#### 2. P7 Rally Bullet 4 — Continental replacement selected from all Fort spaces, not Rally-selected spaces
+
+**Reference (§8.5.2):** "In the Patriot Fort space with most Militia **of those already selected for Rally**, replace all Militia except 1 Underground with Continentals."
+
+**Bug:** Lines 718-724 searched all Fort spaces on the entire map for the Continental replacement target. The flowchart explicitly says "of those already selected for Rally" — the search should be restricted to `spaces_used`.
+
+**Fix:** Split the combined block into two separate steps:
+- Bullet 3: Continental PLACEMENT selects the Fort with most Militia globally (can add a new Rally space)
+- Bullet 4: Continental REPLACEMENT searches only `spaces_used` for the Fort with most Militia
+
+#### 3. Card 52 event instruction — "force" instead of conditional
+
+**Reference (Patriot bot card instruction #52):** "Remove no French Regulars; select space per Battle instructions, **else ignore**."
+
+**Bug:** `event_instructions.py` had `52: "force"` for the Patriot entry. The "else ignore" clause means if no valid Battle space exists (French + British pieces co-located), the bot should fall through to Command & SA, not force the event. Both the British and French bots already used `force_if_52` for the same card.
+
+**Fix:** Changed to `52: "force_if_52"` and added `_force_condition_met()` handler for `force_if_52` in `PatriotBot`. The condition checks whether any space contains both French Regulars and British pieces.
+
+### DOCUMENTED — minor deviations (not fixed)
+
+#### Partisans/Skirmish never use option 2
+
+The flowchart describes space selection priorities for Partisans (P8) and Skirmish (P12) but is silent on when to choose option 2 (remove 2 enemies at cost of 1 own piece) vs option 1 (remove 1 enemy, no cost). The bot currently uses only options 1 and 3, never option 2. This is a rules gap, not a bug — the flowchart provides no algorithm for option selection. Option 2 could be more efficient with 2+ enemy units.
+
+#### P9=Yes fallback to March
+
+If Rally and Rabble both fail from the P9=Yes path, the code falls through to `_march_chain()`. The flowchart shows P7→P11→P7 (loop), with no path to March from this entry point. March is only reachable from P10=No. This deviation is beneficial — it gives the bot one more chance to act before PASSing.
+
+### Previously documented issues (unchanged)
+
+- **P4 Force level modifiers** — raw piece counts instead of §3.6.5-6 modifiers
+- **P4 Win-the-Day per-space** — pre-selects one rally space; requires battle callback refactoring
+- **P7/P11 Persuasion mid-command** — fires after command, not during
+- **OPS methods not wired into year_end**
+
+### Tests added (5 new, 855 total)
+
+| Test | Verifies |
+|------|----------|
+| `test_rabble_eligible_requires_pieces_or_militia` | Rabble eligibility enforces §3.3.4 |
+| `test_rabble_execute_skips_ineligible_spaces` | _execute_rabble excludes spaces without Patriot presence |
+| `test_rally_bullet4_continental_replacement_from_selected_only` | Bullet 4 searches only Rally-selected spaces |
+| `test_force_if_52_patriot_requires_battle_space` | Card 52 returns False when no French+British co-location |
+| `test_force_if_52_patriot_true_when_shared_space` | Card 52 returns True when French+British share a space |
