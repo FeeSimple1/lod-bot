@@ -503,6 +503,75 @@ def test_common_cause_wp_preservation_battle_keeps_underground():
         "Must preserve at least 1 Underground WP during Battle"
 
 
+def test_b10_march_cc_integration_colony(monkeypatch):
+    """B10+B13: Common Cause fires during March planning when destination is
+    a Colony (Province) and Regulars > Tories in origin."""
+    from lod_ai.special_activities import common_cause
+    from lod_ai.commands import march
+
+    cc_calls = []
+    orig_cc = common_cause.execute
+
+    def spy_cc(state, faction, ctx, spaces, **kw):
+        cc_calls.append((spaces, kw))
+        return orig_cc(state, faction, ctx, spaces, **kw)
+
+    monkeypatch.setattr(common_cause, "execute", spy_cc)
+
+    # Prevent march.execute from needing full state:
+    march_calls = []
+
+    def fake_march(state, faction, ctx, srcs, dsts, **kw):
+        march_calls.append((srcs, dsts, kw))
+    monkeypatch.setattr(march, "execute", fake_march)
+
+    bot = BritishBot()
+    # Boston (City) → Massachusetts (Colony, pop 2).
+    # British in Boston: 4 Regs, 1 Tory, 3 WP.
+    # Regs (4) > Tories (1), so CC should activate up to 3 WP.
+    # preserve_wp keeps 1 WP → use min(2, 4-1) = 2.
+    state = {
+        "spaces": {
+            "Boston": {
+                C.REGULAR_BRI: 4, C.TORY: 1,
+                C.WARPARTY_A: 2, C.WARPARTY_U: 1,
+                C.REGULAR_PAT: 0, C.REGULAR_FRE: 0,
+                C.MILITIA_A: 0, C.MILITIA_U: 0,
+                C.FORT_PAT: 0, C.FORT_BRI: 0,
+            },
+            "Massachusetts": {
+                C.REGULAR_BRI: 0, C.TORY: 0,
+                C.REGULAR_PAT: 1, C.REGULAR_FRE: 0,
+                C.MILITIA_A: 0, C.MILITIA_U: 0,
+                C.FORT_PAT: 0, C.FORT_BRI: 0,
+                C.WARPARTY_A: 0, C.WARPARTY_U: 0,
+            },
+            "Connecticut_Rhode_Island": {
+                C.REGULAR_BRI: 0, C.TORY: 0,
+            },
+        },
+        "resources": {C.BRITISH: 5},
+        "available": {C.REGULAR_BRI: 0, C.TORY: 0},
+        "rng": __import__("random").Random(42),
+        "history": [],
+        "support": {"Boston": C.ACTIVE_SUPPORT, "Massachusetts": 0,
+                     "Connecticut_Rhode_Island": 0},
+        "control": {"Boston": C.BRITISH, "Massachusetts": None,
+                     "Connecticut_Rhode_Island": None},
+        "casualties": {},
+    }
+    result = bot._march(state, tried_muster=True)
+    assert result is True
+    # CC should have been called for Boston (origin with WP)
+    assert len(cc_calls) >= 1
+    # Verify preserve_wp was True and mode was MARCH
+    _, kw = cc_calls[0]
+    assert kw.get("preserve_wp") is True
+    assert kw.get("mode") == "MARCH"
+    # March should have been called
+    assert len(march_calls) >= 1
+
+
 def test_force_if_51_march_to_battle():
     """Card 51: play event only if March to set up Battle is possible."""
     bot = BritishBot()

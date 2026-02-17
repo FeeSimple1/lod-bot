@@ -1071,12 +1071,33 @@ class BritishBot(BaseBot):
         # Deduplicate destinations, keep first 2
         seen_dst: set = set()
         move_plan: List[Dict] = []
+        cc_spaces: Dict[str, int] = {}  # B13: CC War Parties per space
         spaces_used = 0
         for _, dst, origin in control_targets:
             if dst in seen_dst or spaces_used >= 2:
                 continue
             movable = _movable_from(origin)
             total = movable.get(C.REGULAR_BRI, 0) + movable.get(C.TORY, 0)
+
+            # B10+B13: When destination is an adjacent Province, include
+            # War Parties via Common Cause to increase group size.
+            # CC restriction: War Parties may never move into Cities.
+            # "Province" in rules = Colony or Reserve (anything not a City).
+            dst_type = _MAP_DATA.get(dst, {}).get("type", "")
+            cc_wp_count = 0
+            osp = state["spaces"][origin]
+            if dst_type not in ("City", "Special"):
+                # B13: WP as Tories when Regulars > Tories
+                regs_here = osp.get(C.REGULAR_BRI, 0)
+                tories_here = osp.get(C.TORY, 0) + movable.get(C.TORY, 0)
+                if regs_here > tories_here:
+                    wp_a = osp.get(C.WARPARTY_A, 0)
+                    wp_u = osp.get(C.WARPARTY_U, 0)
+                    # Preserve last WP per B13 March constraint
+                    avail_wp = max(0, wp_a + wp_u - 1)
+                    cc_wp_count = min(avail_wp, regs_here - tories_here)
+                    total += cc_wp_count
+
             if total <= 0:
                 continue
             pieces: Dict[str, int] = {}
@@ -1084,6 +1105,8 @@ class BritishBot(BaseBot):
                 pieces[C.REGULAR_BRI] = movable[C.REGULAR_BRI]
             if movable.get(C.TORY, 0) > 0:
                 pieces[C.TORY] = movable[C.TORY]
+            if cc_wp_count > 0:
+                cc_spaces[origin] = cc_wp_count
             move_plan.append({"src": origin, "dst": dst, "pieces": pieces})
             seen_dst.add(dst)
             spaces_used += 1
@@ -1154,6 +1177,21 @@ class BritishBot(BaseBot):
                 return self._muster(state, tried_march=True)
             return False
 
+        # B10+B13: Execute Common Cause BEFORE the March so that WP from CC
+        # contribute to group sizes for adjacent Province destinations.
+        used_cc = False
+        march_ctx = {}
+        if cc_spaces:
+            try:
+                cc_ctx = common_cause.execute(
+                    state, C.BRITISH, {}, list(cc_spaces.keys()),
+                    mode="MARCH", wp_counts=cc_spaces, preserve_wp=True,
+                )
+                march_ctx = cc_ctx
+                used_cc = True
+            except (ValueError, KeyError):
+                pass  # CC failed — proceed without it
+
         # Execute the March (Max 4 spaces) for actual moves
         if move_plan:
             all_srcs = list({p["src"] for p in move_plan})[:4]
@@ -1161,7 +1199,7 @@ class BritishBot(BaseBot):
             march.execute(
                 state,
                 C.BRITISH,
-                {},
+                march_ctx,
                 all_srcs,
                 all_dsts,
                 plan=move_plan[:4],
@@ -1179,10 +1217,12 @@ class BritishBot(BaseBot):
                     flip_pieces(state, C.MILITIA_U, C.MILITIA_A, sid, mu)
                     push_history(state, f"BRITISH March in place: Activate {mu} Militia in {sid}")
 
-        # Common Cause check (B13) — mode=MARCH for March-specific constraints
-        if not self._try_common_cause(state, mode="MARCH"):
-            self._apply_howe_fni(state)  # B38 Howe lowers FNI before SA
-            self._skirmish_then_naval(state)
+        # If CC was not used during planning, try it post-March (fallback),
+        # otherwise skip to SA chain
+        if not used_cc:
+            if not self._try_common_cause(state, mode="MARCH"):
+                self._apply_howe_fni(state)
+                self._skirmish_then_naval(state)
         return True
 
     # =======================================================================

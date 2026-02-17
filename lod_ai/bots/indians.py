@@ -61,7 +61,7 @@ class IndianBot(BaseBot):
         """Walk Indian flowchart for the first valid Limited Command
         that can involve the Indian Leader in the Leader's current space.
 
-        Flowchart order: I3 → I4 (Raid) / I6 (Gather) → I9 (Scout) → I10 (March).
+        Flowchart order: I3 (D6 gate) → I4 (Raid) / I6 (Gather) → I9 (Scout) → I10 (March).
         Returns a command name or None.
         """
         leader_space = self._find_bs_leader_space(state)
@@ -71,23 +71,27 @@ class IndianBot(BaseBot):
         sp = state["spaces"].get(leader_space, {})
         wp_total = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
 
-        # I3: (Support + 1D6) > Opposition?  Determines Raid vs Gather branch.
+        # I3: (Support + 1D6) > Opposition?
         support_map = state.get("support", {})
         support = sum(max(0, lvl) for lvl in support_map.values())
         opposition = sum(max(0, -lvl) for lvl in support_map.values())
-        # Don't consume a die roll; check both branches
+        roll = state["rng"].randint(1, 6)
+        state.setdefault("rng_log", []).append(("I3 BS D6", roll))
+        i3_yes = (support + roll) > opposition
 
-        # --- Raid branch (I3 No) ---
-        # I4: Raid — leader's space must be an Opposition Colony with or
-        # adjacent to Underground War Parties
-        stype = _MAP_DATA.get(leader_space, {}).get("type", "")
-        sup_level = self._support_level(state, leader_space)
-        if (stype == "Colony"
-                and sup_level <= C.PASSIVE_OPPOSITION
-                and sp.get(C.WARPARTY_U, 0) > 0):
-            return "raid"
+        if not i3_yes:
+            # --- Raid branch (I3 No → I4) ---
+            # I4: Raid — leader's space must be an Opposition Colony with or
+            # adjacent to Underground War Parties
+            stype = _MAP_DATA.get(leader_space, {}).get("type", "")
+            sup_level = self._support_level(state, leader_space)
+            if (stype == "Colony"
+                    and sup_level <= C.PASSIVE_OPPOSITION
+                    and sp.get(C.WARPARTY_U, 0) > 0):
+                return "raid"
+            # If Raid not possible, fall through to Gather (I6)
 
-        # --- Gather branch (I3 Yes) ---
+        # --- Gather branch (I3 Yes, or Raid not possible) ---
         # I6/I7: Gather — leader's space has room for Village or WP can be
         # placed there
         avail_wp = (state["available"].get(C.WARPARTY_U, 0)

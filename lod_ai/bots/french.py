@@ -122,7 +122,7 @@ class FrenchBot(BaseBot):
         that can involve the French Leader in the Leader's current space.
 
         BS requires ToA played, so only post-Treaty branch applies.
-        Flowchart order: F3 → F9 (Muster) → F13 (Battle) → F14 (March).
+        Flowchart order: F3 → F9 (D6 gate) → F10 (Muster) / F13 (Battle) → F14 (March).
         Returns a command name or None.
         """
         leader_space = self._find_bs_leader_space(state)
@@ -136,9 +136,13 @@ class FrenchBot(BaseBot):
         sp = state["spaces"].get(leader_space, {})
         refresh_control(state)
 
-        # F9/F10: Muster — Available French Regulars > 0?
-        # Muster can target the leader's space.
-        if state["available"].get(C.REGULAR_FRE, 0) > 0:
+        # F9: 1D6 < Available French Regulars?
+        avail_fre = state.get("available", {}).get(C.REGULAR_FRE, 0)
+        roll = state["rng"].randint(1, 6)
+        state.setdefault("rng_log", []).append(("F9 BS D6", roll))
+
+        if roll < avail_fre:
+            # F10: Muster — in leader's space
             return "muster"
 
         # F13: Battle — Rebel cubes + Leader exceed British pieces

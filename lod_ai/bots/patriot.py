@@ -294,7 +294,8 @@ class PatriotBot(BaseBot):
         return False
 
     def _execute_battle(self, state: Dict) -> bool:
-        """P4: Select all spaces where Rebel Force Level exceeds Royalist FL.
+        """P4: Select all spaces where Rebel Force Level + modifiers exceeds
+        Royalist FL + modifiers (§3.6.5-6).
         §8.5.1: Include French only if French Resources > 0.
         If resources too low for all, prioritize: Washington, highest Pop,
         most Villages, random.
@@ -318,7 +319,42 @@ class PatriotBot(BaseBot):
             active_wp = sp.get(C.WARPARTY_A, 0)
             brit_force = regs + tories + (active_wp // 2) + sp.get(C.FORT_BRI, 0)
 
-            if rebel_force > brit_force and (regs + tories + active_wp) > 0:
+            # §3.6.5: Attacker (Rebellion) modifiers on Defender Loss
+            att_mod = 0
+            att_regs = pat_cubes + fre_cubes
+            att_cubes = att_regs  # all Rebellion cubes are Regulars
+            if att_cubes > 0 and att_regs * 2 >= att_cubes:
+                att_mod += 1  # half regs
+            if sp.get(C.MILITIA_U, 0) > 0:
+                att_mod += 1  # underground piece
+            for ldr in ("LEADER_WASHINGTON", "LEADER_ROCHAMBEAU", "LEADER_LAUZUN"):
+                if leader_location(state, ldr) == sid:
+                    att_mod += 1
+                    break
+            # +1 if Attacking includes French with Lauzun
+            if fre_cubes > 0 and leader_location(state, "LEADER_LAUZUN") == sid:
+                att_mod += 1
+            # -1 per defending Fort
+            att_mod -= sp.get(C.FORT_BRI, 0)
+
+            # §3.6.6: Defender (Royalist) modifiers on Attacker Loss
+            def_mod = 0
+            def_cubes = regs + tories
+            if def_cubes > 0 and regs * 2 >= def_cubes:
+                def_mod += 1  # half regs
+            if sp.get(C.WARPARTY_U, 0) > 0:
+                def_mod += 1  # underground piece
+            for ldr in ("LEADER_GAGE", "LEADER_HOWE", "LEADER_CLINTON",
+                         "LEADER_BRANT", "LEADER_CORNPLANTER", "LEADER_DRAGGING_CANOE"):
+                if leader_location(state, ldr) == sid:
+                    def_mod += 1
+                    break
+            # +1 per defending Fort (helps defender on attacker-loss roll)
+            def_mod += sp.get(C.FORT_BRI, 0)
+
+            # Net advantage: positive means Rebellion is stronger
+            net = (rebel_force + att_mod) - (brit_force + def_mod)
+            if net > 0 and (regs + tories + active_wp) > 0:
                 has_wash = 1 if leader_location(state, "LEADER_WASHINGTON") == sid else 0
                 pop = _MAP_DATA.get(sid, {}).get("population", 0)
                 villages = sp.get(C.VILLAGE, 0)
@@ -333,24 +369,23 @@ class PatriotBot(BaseBot):
         if pat_res < len(chosen):
             chosen = chosen[:max(pat_res, 1)]
 
-        # Win-the-Day: select free Rally space and Blockade destination
-        win_rally_space = self._best_rally_space(state)
-        win_rally_kwargs = {}
-        if win_rally_space:
-            # Build minimal Rally kwargs for the free Rally
-            sp_r = state["spaces"].get(win_rally_space, {})
-            if (sp_r.get(C.FORT_PAT, 0) == 0
-                    and self._rebel_group_size(sp_r) >= 4
-                    and state["available"].get(C.FORT_PAT, 0) > 0):
-                win_rally_kwargs["build_fort"] = {win_rally_space}
-
-        win_blockade_dest = self._best_blockade_city(state)
+        # Win-the-Day: per-space callback for free Rally + Blockade move
+        def _win_callback(st, battle_sid):
+            """Per-space Win-the-Day callback per §3.6.8."""
+            rally_space = self._best_rally_space(st)
+            rally_kwargs = {}
+            if rally_space:
+                sp_r = st["spaces"].get(rally_space, {})
+                if (sp_r.get(C.FORT_PAT, 0) == 0
+                        and self._rebel_group_size(sp_r) >= 4
+                        and st["available"].get(C.FORT_PAT, 0) > 0):
+                    rally_kwargs["build_fort"] = {rally_space}
+            blockade_dest = self._best_blockade_city(st)
+            return rally_space, rally_kwargs, blockade_dest
 
         battle.execute(
             state, self.faction, {}, chosen,
-            win_rally_space=win_rally_space,
-            win_rally_kwargs=win_rally_kwargs if win_rally_space else None,
-            win_blockade_dest=win_blockade_dest,
+            win_callback=_win_callback,
         )
         return True
 
@@ -840,34 +875,42 @@ class PatriotBot(BaseBot):
             return False
 
         # Check we have resources to pay
-        if state["resources"][self.faction] < len(spaces_used):
-            # Reduce spaces to what we can afford
-            spaces_used = spaces_used[:state["resources"][self.faction]]
-            if not spaces_used:
-                return False
-            # Remove Fort targets not in spaces_used
-            build_fort_set &= set(spaces_used)
-            if promote_space and promote_space not in spaces_used:
-                promote_space = None
-                promote_n = None
-            move_plan_list = [(s, d, n) for s, d, n in move_plan_list
-                              if d in spaces_used]
-
-        try:
-            rally.execute(
-                state, self.faction, {},
-                spaces_used,
-                build_fort=build_fort_set,
-                promote_space=promote_space,
-                promote_n=promote_n,
-                move_plan=move_plan_list,
-            )
-            # Check for mid-Rally Persuasion interrupt
-            if state["resources"][self.faction] == 0:
-                self._try_persuasion(state)
-            return True
-        except (ValueError, KeyError):
+        if state["resources"][self.faction] < 1:
             return False
+
+        # §8.5.2/P7+P13: Execute space-by-space, checking after each space
+        # whether resources hit 0 and triggering Persuasion mid-command.
+        executed_any = False
+        for sid in spaces_used:
+            if state["resources"][self.faction] < 1:
+                # Try mid-command Persuasion to restore resources
+                self._try_persuasion(state)
+                if state["resources"][self.faction] < 1:
+                    break  # still no resources — stop
+
+            kw = {}
+            if sid in build_fort_set:
+                kw["build_fort"] = {sid}
+            if promote_space == sid:
+                kw["promote_space"] = promote_space
+                kw["promote_n"] = promote_n
+            move_for_space = [(s, d, n) for s, d, n in move_plan_list
+                              if d == sid]
+            if move_for_space:
+                kw["move_plan"] = move_for_space
+            try:
+                rally.execute(
+                    state, self.faction, {},
+                    [sid],
+                    **kw,
+                )
+                executed_any = True
+                # Check for mid-Rally Persuasion interrupt
+                if state["resources"][self.faction] == 0:
+                    self._try_persuasion(state)
+            except (ValueError, KeyError):
+                continue
+        return executed_any
 
     # ---------- Rabble-Rousing (P11) ----------------------------------
     @staticmethod
@@ -902,16 +945,27 @@ class PatriotBot(BaseBot):
             -self._support_level(state, n),
             -_MAP_DATA[n].get("population", 0),
         ))
-        # No artificial cap - use all eligible spaces (limited by resources)
-        max_spaces = state["resources"][self.faction]
-        selected = spaces[:max_spaces] if max_spaces > 0 else []
-        if not selected:
+        if state["resources"][self.faction] < 1:
             return False
-        rabble_rousing.execute(state, self.faction, {}, selected)
-        # Persuasion interrupt when resources reach 0
-        if state["resources"][self.faction] == 0:
-            self._try_persuasion(state)
-        return True
+
+        # §8.5.3/P11+P13: Execute space-by-space, checking after each space
+        # whether resources hit 0 and triggering Persuasion mid-command.
+        executed_any = False
+        for sid in spaces:
+            if state["resources"][self.faction] < 1:
+                # Try mid-command Persuasion to restore resources
+                self._try_persuasion(state)
+                if state["resources"][self.faction] < 1:
+                    break  # still no resources — stop
+            try:
+                rabble_rousing.execute(state, self.faction, {}, [sid])
+                executed_any = True
+                # Check for mid-Rabble Persuasion interrupt
+                if state["resources"][self.faction] == 0:
+                    self._try_persuasion(state)
+            except (ValueError, KeyError):
+                continue
+        return executed_any
 
     # ===================================================================
     #  SPECIAL-ACTIVITY HELPERS
@@ -944,8 +998,15 @@ class PatriotBot(BaseBot):
             sp = state["spaces"][sid]
             has_village = sp.get(C.VILLAGE, 0)
             wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
-            if has_village and not wp:
+            enemy_cubes = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                           + sp.get(C.WARPARTY_A, 0))
+            own_militia = sp.get(C.MILITIA_U, 0) + sp.get(C.MILITIA_A, 0)
+            # §8.1 "maximum extent": option 2 nets +1 removal over option 1
+            # (sacrifice 1 own piece → remove 2 enemy) when 2+ enemy cubes
+            if has_village and enemy_cubes == 0 and not wp:
                 opt = 3
+            elif enemy_cubes >= 2 and own_militia >= 1:
+                opt = 2
             else:
                 opt = 1
             try:
@@ -981,8 +1042,13 @@ class PatriotBot(BaseBot):
             sp = state["spaces"][sid]
             has_fort = sp.get(C.FORT_BRI, 0)
             enemy_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+            own_regs = sp.get(C.REGULAR_PAT, 0)
+            # §8.1 "maximum extent": option 2 nets +1 removal over option 1
+            # (sacrifice 1 own piece → remove 2 enemy) when 2+ enemy cubes
             if has_fort and not enemy_cubes:
                 opt = 3
+            elif enemy_cubes >= 2 and own_regs >= 1:
+                opt = 2
             else:
                 opt = 1
             try:
