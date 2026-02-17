@@ -601,25 +601,71 @@ def _british_release(state):
 #  FNI drift & Blockade shuffle (§6.5.4)
 # ────────────────────────────────────────────────────────────────
 
-def _fni_drift(state):
+def _fni_drift(state, *, bots=None, human_factions=None):
     if not state.get("treaty_of_alliance", False):
         return  # only after ToA
+    human = human_factions or set()
+
     # Lower FNI one box if > 0
     if state.get("fni_level", 0) > 0:
         adjust_fni(state, -1)
         push_history(state, "FNI drift – box shifts 1 toward War (6.5.4)")
+
     # Remove one Blockade from a City to the West Indies pool (§6.5.4)
+    # §8.6.9: Bot French removes Blockade from City with LEAST Support.
     bloc = state.setdefault("markers", {}).setdefault(BLOCKADE, {"pool": 0, "on_map": set()})
     on_map = bloc.get("on_map", set())
     if on_map:
-        removed_city = next(iter(on_map))
+        if bots and FRENCH in bots and FRENCH not in human:
+            # §8.6.9: Remove Blockade from City with least Support
+            support_map = state.get("support", {})
+            removed_city = min(on_map, key=lambda s: support_map.get(s, 0))
+        else:
+            removed_city = next(iter(on_map))
         on_map.discard(removed_city)
         bloc["pool"] = bloc.get("pool", 0) + 1
         push_history(state, f"Blockade removed from {removed_city} to West Indies (6.5.4)")
 
-        # Per Manual Ch 6.5.4: "French may rearrange the remaining Blockade markers"
-        # For bot play, the French bot decides; for now, log the opportunity.
-        push_history(state, "French may rearrange remaining Blockade markers (6.5.4)")
+        # §8.6.9: Rearrange remaining Blockades to Cities with most Support
+        if bots and FRENCH in bots and FRENCH not in human and on_map:
+            _rearrange_blockades(state, on_map)
+        elif on_map:
+            push_history(state, "French may rearrange remaining Blockade markers (6.5.4)")
+
+
+def _rearrange_blockades(state, on_map):
+    """§8.6.9: Move remaining Blockades to Cities with most Support.
+
+    Collect all remaining Blockades, then redistribute them to Cities
+    sorted by descending Support level.  The on_map set stores one entry
+    per blockaded city; each entry represents one blockade marker.
+    """
+    support_map = state.get("support", {})
+    remaining = list(on_map)
+    on_map.clear()
+
+    if not remaining:
+        return
+
+    # Find all Cities (from map data)
+    cities = [
+        sid for sid in state.get("spaces", {})
+        if (map_adj.space_meta(sid) or {}).get("type") == "City"
+    ]
+    if not cities:
+        on_map.update(remaining)
+        return
+
+    # Sort cities by most Support (descending), break ties randomly
+    cities.sort(key=lambda s: -support_map.get(s, 0))
+
+    # Place each blockade in the highest-Support cities available.
+    # Since on_map is a set (one blockade per city), distribute across
+    # the top N cities where N = number of remaining blockades.
+    n_blockades = len(remaining)
+    for i in range(min(n_blockades, len(cities))):
+        on_map.add(cities[i])
+    push_history(state, f"French rearranged Blockades to {sorted(on_map)} (§8.6.9)")
 
 # ────────────────────────────────────────────────────────────────
 #  §6.6  Desertion helpers  (full Rule 6.6 logic)
@@ -892,7 +938,7 @@ def resolve(state, *, bots=None, human_factions=None):
     _leader_change(state)
     _leader_redeploy(state, bots=bots, human_factions=human_factions)
     _british_release(state)
-    _fni_drift(state)
+    _fni_drift(state, bots=bots, human_factions=human_factions)
 
     # 6.6  Desertion Phase — unconditional per §6.6
     _patriot_desertion(state, bots=bots, human_factions=human_factions)
@@ -901,3 +947,29 @@ def resolve(state, *, bots=None, human_factions=None):
     # 6.7  Reset Phase
     _reset_phase(state)
     push_history(state, "Winter-Quarters routine complete")
+
+
+# ────────────────────────────────────────────────────────────────
+#  Brilliant Stroke trigger check (§8.3.7)
+# ────────────────────────────────────────────────────────────────
+
+def check_bs_triggers(state, *, bots=None, human_factions=None):
+    """Check whether any bot-controlled faction should trigger its
+    Brilliant Stroke card per §8.4.11 / §8.5.8 / §8.6.11 / §8.7.8.
+
+    Returns a dict mapping faction → True for each bot faction whose
+    ``ops_bs_trigger(state)`` returns True.  Human factions are excluded.
+
+    Callers (e.g. engine.py) should invoke this when a Brilliant Stroke
+    card is drawn to determine which bots want to play it.
+    """
+    human = human_factions or set()
+    triggers = {}
+    if not bots:
+        return triggers
+    for faction, bot in bots.items():
+        if faction in human:
+            continue
+        if hasattr(bot, "ops_bs_trigger") and bot.ops_bs_trigger(state):
+            triggers[faction] = True
+    return triggers

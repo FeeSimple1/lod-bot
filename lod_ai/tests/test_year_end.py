@@ -167,7 +167,7 @@ def test_desertion_runs_unconditionally(monkeypatch):
     monkeypatch.setattr(year_end, "_leader_change", lambda s: None)
     monkeypatch.setattr(year_end, "_leader_redeploy", lambda s, **kw: None)
     monkeypatch.setattr(year_end, "_british_release", lambda s: None)
-    monkeypatch.setattr(year_end, "_fni_drift", lambda s: None)
+    monkeypatch.setattr(year_end, "_fni_drift", lambda s, **kw: None)
     monkeypatch.setattr(year_end, "_reset_phase", lambda s: None)
 
     year_end.resolve(state)
@@ -268,3 +268,105 @@ def test_british_release_two_rounds():
     assert state["available"].get(C.TORY) == 12
     assert state["unavailable"].get(C.REGULAR_BRI, 0) == 0
     assert state["unavailable"].get(C.TORY, 0) == 0
+
+
+# ──────────────────────────────────────────────────────────────
+#  FNI drift with bot Blockade rearrangement (§8.6.9)
+# ──────────────────────────────────────────────────────────────
+
+class FakeFrenchBot:
+    """Stub French bot for year-end tests."""
+    faction = C.FRENCH
+
+    def ops_supply_priority(self, state):
+        return []
+
+    def ops_redeploy_leader(self, state):
+        return None
+
+    def ops_loyalist_desertion_priority(self, state):
+        return []
+
+    def ops_bs_trigger(self, state):
+        return state.get("_test_bs_trigger", False)
+
+
+def test_fni_drift_bot_removes_least_support_blockade(monkeypatch):
+    """§8.6.9: Bot French removes Blockade from City with least Support."""
+    state = basic_state()
+    state["treaty_of_alliance"] = True
+    state["fni_level"] = 1
+    state["spaces"] = {
+        "Boston": {"type": "City"},
+        "New_York_City": {"type": "City"},
+        "Charleston": {"type": "City"},
+    }
+    state["support"] = {"Boston": 2, "New_York_City": -1, "Charleston": 0}
+    state["markers"][C.BLOCKADE] = {"pool": 0, "on_map": {"Boston", "New_York_City", "Charleston"}}
+
+    monkeypatch.setattr(year_end.map_adj, "space_meta",
+                        lambda sid: {"type": "City"}, raising=False)
+
+    bots = {C.FRENCH: FakeFrenchBot()}
+    year_end._fni_drift(state, bots=bots, human_factions=set())
+
+    on_map = state["markers"][C.BLOCKADE]["on_map"]
+    # Least support is New_York_City (-1) — it should be removed
+    assert "New_York_City" not in on_map
+    # Remaining 2 blockades rearranged to cities with most support
+    # Boston (2) and Charleston (0) — since 2 blockades remain,
+    # they go to the top 2 cities by support
+    assert "Boston" in on_map
+
+
+def test_fni_drift_no_bot_uses_arbitrary_removal():
+    """Without bots, blockade removal is arbitrary (no rearrangement)."""
+    state = basic_state()
+    state["treaty_of_alliance"] = True
+    state["fni_level"] = 1
+    state["spaces"] = {
+        "Boston": {"type": "City"},
+        "Charleston": {"type": "City"},
+    }
+    state["support"] = {"Boston": 2, "Charleston": -1}
+    state["markers"][C.BLOCKADE] = {"pool": 0, "on_map": {"Boston", "Charleston"}}
+
+    year_end._fni_drift(state)
+
+    on_map = state["markers"][C.BLOCKADE]["on_map"]
+    pool = state["markers"][C.BLOCKADE]["pool"]
+    # One removed, one remains
+    assert len(on_map) == 1
+    assert pool == 1
+
+
+def test_check_bs_triggers_calls_bot_method():
+    """check_bs_triggers should call ops_bs_trigger on each bot faction."""
+    state = basic_state()
+    state["_test_bs_trigger"] = True
+
+    bots = {C.FRENCH: FakeFrenchBot()}
+    result = year_end.check_bs_triggers(state, bots=bots, human_factions=set())
+    assert result.get(C.FRENCH) is True
+
+
+def test_check_bs_triggers_excludes_humans():
+    """Human-controlled factions should not be checked for BS triggers."""
+    state = basic_state()
+    state["_test_bs_trigger"] = True
+
+    bots = {C.FRENCH: FakeFrenchBot()}
+    result = year_end.check_bs_triggers(
+        state, bots=bots, human_factions={C.FRENCH}
+    )
+    assert C.FRENCH not in result
+
+
+def test_check_bs_triggers_returns_empty_when_no_trigger():
+    """If ops_bs_trigger returns False, faction should not appear."""
+    state = basic_state()
+    state["_test_bs_trigger"] = False
+
+    bots = {C.FRENCH: FakeFrenchBot()}
+    result = year_end.check_bs_triggers(state, bots=bots, human_factions=set())
+    assert C.FRENCH not in result
