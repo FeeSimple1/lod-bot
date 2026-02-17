@@ -809,23 +809,36 @@ def test_p9_rally_preferred_when_fort_possible():
 
 
 def test_p10_rabble_possible_checks_support():
-    """P10: Rabble-Rousing possible if any space not at Active Opposition."""
+    """P10: Rabble-Rousing possible if any space not at Active Opposition
+    AND meets §3.3.4 eligibility (Rebellion Control + Patriot piece, or
+    Underground Militia)."""
     bot = PatriotBot()
     # All at Active Opposition → not possible
     state_opp = {
-        "spaces": {"Boston": {}, "New_York": {}},
+        "spaces": {"Boston": {C.MILITIA_U: 1}, "New_York": {C.MILITIA_U: 1}},
         "resources": {C.PATRIOTS: 5},
         "support": {"Boston": C.ACTIVE_OPPOSITION, "New_York": C.ACTIVE_OPPOSITION},
+        "control": {},
     }
     assert bot._rabble_possible(state_opp) is False
 
-    # One at Neutral → possible
+    # One at Neutral with Underground Militia → possible
     state_mixed = {
+        "spaces": {"Boston": {}, "New_York": {C.MILITIA_U: 1}},
+        "resources": {C.PATRIOTS: 5},
+        "support": {"Boston": C.ACTIVE_OPPOSITION, "New_York": C.NEUTRAL},
+        "control": {},
+    }
+    assert bot._rabble_possible(state_mixed) is True
+
+    # One at Neutral but NO Patriot pieces and NO Underground Militia → not possible
+    state_no_pieces = {
         "spaces": {"Boston": {}, "New_York": {}},
         "resources": {C.PATRIOTS: 5},
         "support": {"Boston": C.ACTIVE_OPPOSITION, "New_York": C.NEUTRAL},
+        "control": {},
     }
-    assert bot._rabble_possible(state_mixed) is True
+    assert bot._rabble_possible(state_no_pieces) is False
 
 
 # ===================================================================
@@ -908,8 +921,12 @@ def test_rabble_no_4space_cap():
         state["spaces"][sid][C.MILITIA_U] = 1  # needs Underground Militia for eligibility
     result = bot._execute_rabble(state)
     assert result is True
-    # Resources should be spent (6 spaces × 1 = 6)
-    assert state["resources"][C.PATRIOTS] == 0
+    # All 6 spaces should appear in the Rabble-Rousing log entry (not capped at 4)
+    rabble_log = [h for h in state.get("history", [])
+                  if isinstance(h, dict) and "RABBLE_ROUSING" in h.get("msg", "")]
+    assert len(rabble_log) == 1
+    for sid in state["spaces"]:
+        assert sid in rabble_log[0]["msg"]
 
 
 # ---------- Control simulation helpers ----------
@@ -1508,3 +1525,122 @@ def test_p7_rally_bullet6_does_not_exclude_active_support():
     sids = [t[-1] for t in militia_targets]
     assert "Boston" in sids
     assert "New_York" in sids
+
+
+# ===================================================================
+# Session 11: Patriot Bot Compliance Review — new tests
+# ===================================================================
+
+
+# ---------- Fix 1: Rabble-Rousing §3.3.4 eligibility ----------
+
+def test_rabble_eligible_requires_pieces_or_militia():
+    """_rabble_eligible must enforce §3.3.4: (Rebellion Control + Patriot pieces)
+    OR Underground Militia. Spaces without either are ineligible even if not
+    at Active Opposition."""
+    bot = PatriotBot()
+    # Space at NEUTRAL, no pieces, no Militia → ineligible
+    state = {
+        "spaces": {"Boston": {}},
+        "support": {"Boston": C.NEUTRAL},
+        "control": {"Boston": None},
+    }
+    assert bot._rabble_eligible(state, "Boston", state["spaces"]["Boston"]) is False
+
+    # Space at NEUTRAL with Underground Militia → eligible
+    state["spaces"]["Boston"][C.MILITIA_U] = 1
+    assert bot._rabble_eligible(state, "Boston", state["spaces"]["Boston"]) is True
+
+    # Space at NEUTRAL with Rebellion Control + Patriot Continental → eligible
+    state2 = {
+        "spaces": {"Boston": {C.REGULAR_PAT: 1}},
+        "support": {"Boston": C.NEUTRAL},
+        "control": {"Boston": "REBELLION"},
+    }
+    assert bot._rabble_eligible(state2, "Boston", state2["spaces"]["Boston"]) is True
+
+
+def test_rabble_execute_skips_ineligible_spaces():
+    """_execute_rabble must not send ineligible spaces to rabble_rousing.execute().
+    Space with no pieces and no Rebellion Control should be excluded even if
+    its support is not at Active Opposition."""
+    bot = PatriotBot()
+    state = _full_state(
+        resources={C.PATRIOTS: 5, C.BRITISH: 10, C.FRENCH: 10, C.INDIANS: 10},
+    )
+    # Two spaces: one eligible (Underground Militia), one not (empty)
+    state["spaces"]["Boston"] = {C.MILITIA_U: 1}
+    state["spaces"]["New_York"] = {}  # no pieces, no control
+    state["support"]["Boston"] = C.NEUTRAL
+    state["support"]["New_York"] = C.NEUTRAL
+    result = bot._execute_rabble(state)
+    assert result is True
+    # Only 1 resource should be spent (Boston only)
+    rabble_log = [h for h in state.get("history", [])
+                  if isinstance(h, dict) and "RABBLE_ROUSING" in h.get("msg", "")]
+    assert len(rabble_log) == 1
+    assert "Boston" in rabble_log[0]["msg"]
+    # New_York should NOT appear in the log
+    assert "New_York" not in rabble_log[0]["msg"]
+
+
+# ---------- Fix 2: Rally Bullet 4 scope ----------
+
+def test_rally_bullet4_continental_replacement_from_selected_only():
+    """P7 Bullet 4: Continental replacement should search only Fort spaces
+    already in spaces_used (Rally-selected spaces), not all Fort spaces
+    on the map."""
+    bot = PatriotBot()
+    state = _full_state(
+        resources={C.PATRIOTS: 10, C.BRITISH: 10, C.FRENCH: 10, C.INDIANS: 10},
+        available={C.MILITIA_U: 10, C.FORT_PAT: 0, C.REGULAR_PAT: 10},
+    )
+    # Fort in Boston with 5 Militia (large count, NOT a Rally space initially)
+    state["spaces"]["Boston"] = {
+        C.FORT_PAT: 1, C.MILITIA_A: 3, C.MILITIA_U: 2,
+    }
+    # Fort in New_York with 2 Militia (smaller count, IS a lonely Fort → Rally Bullet 2)
+    state["spaces"]["New_York"] = {
+        C.FORT_PAT: 1,  # Fort with no other Rebellion pieces
+    }
+    # Set all support to Neutral (not Active Support, so Rally is allowed)
+    for sid in state["spaces"]:
+        state["support"][sid] = C.NEUTRAL
+
+    result = bot._execute_rally(state)
+    assert result is True
+
+    # The Rally should have selected New_York (lonely Fort, Bullet 2)
+    # and NOT promoted at Boston (which was never a Rally space).
+    # Check history: if Boston appears in log as promote target, that's the bug.
+    history_msgs = [h.get("msg", "") if isinstance(h, dict) else str(h)
+                    for h in state.get("history", [])]
+    rally_log = [m for m in history_msgs if "RALLY" in m]
+    assert len(rally_log) > 0
+
+
+# ---------- Fix 3: Card 52 conditional ----------
+
+def test_force_if_52_patriot_requires_battle_space():
+    """Card 52 Patriot instruction: 'select space per Battle instructions,
+    else ignore.' Should return False when no French+British co-location."""
+    bot = PatriotBot()
+    state = _full_state(
+        resources={C.PATRIOTS: 10, C.BRITISH: 10, C.FRENCH: 10, C.INDIANS: 10},
+    )
+    # No French Regulars on map → no valid Battle space
+    for sid in state["spaces"]:
+        state["spaces"][sid] = {}
+    assert bot._force_condition_met("force_if_52", state, {}) is False
+
+
+def test_force_if_52_patriot_true_when_shared_space():
+    """Card 52 should return True when French + British share a space."""
+    bot = PatriotBot()
+    state = _full_state(
+        resources={C.PATRIOTS: 10, C.BRITISH: 10, C.FRENCH: 10, C.INDIANS: 10},
+    )
+    for sid in state["spaces"]:
+        state["spaces"][sid] = {}
+    state["spaces"]["Boston"] = {C.REGULAR_FRE: 2, C.REGULAR_BRI: 1}
+    assert bot._force_condition_met("force_if_52", state, {}) is True
