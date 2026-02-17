@@ -369,24 +369,23 @@ class PatriotBot(BaseBot):
         if pat_res < len(chosen):
             chosen = chosen[:max(pat_res, 1)]
 
-        # Win-the-Day: select free Rally space and Blockade destination
-        win_rally_space = self._best_rally_space(state)
-        win_rally_kwargs = {}
-        if win_rally_space:
-            # Build minimal Rally kwargs for the free Rally
-            sp_r = state["spaces"].get(win_rally_space, {})
-            if (sp_r.get(C.FORT_PAT, 0) == 0
-                    and self._rebel_group_size(sp_r) >= 4
-                    and state["available"].get(C.FORT_PAT, 0) > 0):
-                win_rally_kwargs["build_fort"] = {win_rally_space}
-
-        win_blockade_dest = self._best_blockade_city(state)
+        # Win-the-Day: per-space callback for free Rally + Blockade move
+        def _win_callback(st, battle_sid):
+            """Per-space Win-the-Day callback per §3.6.8."""
+            rally_space = self._best_rally_space(st)
+            rally_kwargs = {}
+            if rally_space:
+                sp_r = st["spaces"].get(rally_space, {})
+                if (sp_r.get(C.FORT_PAT, 0) == 0
+                        and self._rebel_group_size(sp_r) >= 4
+                        and st["available"].get(C.FORT_PAT, 0) > 0):
+                    rally_kwargs["build_fort"] = {rally_space}
+            blockade_dest = self._best_blockade_city(st)
+            return rally_space, rally_kwargs, blockade_dest
 
         battle.execute(
             state, self.faction, {}, chosen,
-            win_rally_space=win_rally_space,
-            win_rally_kwargs=win_rally_kwargs if win_rally_space else None,
-            win_blockade_dest=win_blockade_dest,
+            win_callback=_win_callback,
         )
         return True
 

@@ -78,6 +78,7 @@ def execute(
     win_rally_space: str | None = None,
     win_rally_kwargs: Dict | None = None,
     win_blockade_dest: str | None = None,
+    win_callback=None,
 ) -> Dict:
     faction = faction.upper()
     if faction not in (BRITISH, PATRIOTS, FRENCH):
@@ -117,23 +118,41 @@ def execute(
 
     # §3.6.8: Post-win actions for Rebellion winner
     if rebellion_won_in:
-        # Free Rally in any one eligible space
-        if win_rally_space:
+        if win_callback:
+            # Per-space callback: let the caller decide rally/blockade for
+            # EACH winning space (§3.6.8 Win-the-Day per-space)
             from lod_ai.commands import rally
-            pre_res = state["resources"].get(PATRIOTS, 0)
-            rally.execute(
-                state, PATRIOTS, {},
-                [win_rally_space],
-                **(win_rally_kwargs or {}),
-            )
-            # Restore resources — this Rally is free (§3.6.8)
-            state["resources"][PATRIOTS] = pre_res
-
-        # Move Blockades from any Battle City to another City
-        if win_blockade_dest:
             for battle_sid in rebellion_won_in:
-                if map_adj.is_city(battle_sid):
-                    move_blockade_city_to_city(state, battle_sid, win_blockade_dest)
+                cb_result = win_callback(state, battle_sid)
+                if cb_result is None:
+                    continue
+                cb_rally, cb_rally_kw, cb_blockade = cb_result
+                if cb_rally:
+                    pre_res = state["resources"].get(PATRIOTS, 0)
+                    rally.execute(
+                        state, PATRIOTS, {},
+                        [cb_rally],
+                        **(cb_rally_kw or {}),
+                    )
+                    state["resources"][PATRIOTS] = pre_res
+                if cb_blockade and map_adj.is_city(battle_sid):
+                    move_blockade_city_to_city(state, battle_sid, cb_blockade)
+        else:
+            # Legacy single-space parameters
+            if win_rally_space:
+                from lod_ai.commands import rally
+                pre_res = state["resources"].get(PATRIOTS, 0)
+                rally.execute(
+                    state, PATRIOTS, {},
+                    [win_rally_space],
+                    **(win_rally_kwargs or {}),
+                )
+                state["resources"][PATRIOTS] = pre_res
+
+            if win_blockade_dest:
+                for battle_sid in rebellion_won_in:
+                    if map_adj.is_city(battle_sid):
+                        move_blockade_city_to_city(state, battle_sid, win_blockade_dest)
 
     refresh_control(state)
     enforce_global_caps(state)
