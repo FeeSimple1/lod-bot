@@ -45,7 +45,7 @@ Implemented:
 
 **Decision:** Implement ALL flowchart movements (not single move). The Indian bot March should attempt up to 3 movements per the flowchart bullets.
 
-**Status:** Not yet implemented — documented for future work.
+**Status:** Implemented. Session 12 verified: `_march()` uses `max_dests = min(3, resources)`, Phase 1 (Village placement) + Phase 2 (Rebel Control removal), all movement constraints correct (Underground-first, no last-WP-from-Village, no Rebel Control addition).
 
 ---
 

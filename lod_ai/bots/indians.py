@@ -277,6 +277,7 @@ class IndianBot(BaseBot):
                 + sp.get(C.MILITIA_U, 0)
                 + sp.get(C.REGULAR_PAT, 0)
                 + sp.get(C.REGULAR_FRE, 0)
+                + sp.get(C.FORT_PAT, 0)
             )
             wp_total = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
             pop = _MAP_DATA.get(space, {}).get("population", 0)
@@ -344,6 +345,7 @@ class IndianBot(BaseBot):
                 + sp.get(C.MILITIA_U, 0)
                 + sp.get(C.REGULAR_PAT, 0)
                 + sp.get(C.REGULAR_FRE, 0)
+                + sp.get(C.FORT_PAT, 0)
             )
             if wp > rebels and wp > 0:
                 return True
@@ -362,6 +364,7 @@ class IndianBot(BaseBot):
                 + sp.get(C.MILITIA_U, 0)
                 + sp.get(C.REGULAR_PAT, 0)
                 + sp.get(C.REGULAR_FRE, 0)
+                + sp.get(C.FORT_PAT, 0)
             )
             if wp > rebels and wp > 0:
                 choices.append((_MAP_DATA.get(sid, {}).get("population", 0), sid))
@@ -1010,8 +1013,9 @@ class IndianBot(BaseBot):
         self, state: Dict, candidates: List[Tuple[str, str]]
     ) -> List[Tuple[str, str]]:
         """OPS: Patriot Desertion removal priority.
-        First from Village spaces, then remove most Rebel Control,
-        then last of type in space, then random.
+        First from Village spaces, then to remove most Rebel Control
+        (i.e. where removing 1 Patriot piece changes control from
+        Rebellion), then last of type in space, then random.
         """
         refresh_control(state)
         ctrl = state.get("control", {})
@@ -1020,11 +1024,20 @@ class IndianBot(BaseBot):
             sid, tag = item
             sp = state["spaces"].get(sid, {})
             has_village = 1 if sp.get(C.VILLAGE, 0) > 0 else 0
-            is_rebel = 1 if ctrl.get(sid) == "REBELLION" else 0
+            # Would removing 1 rebel piece change control from Rebellion?
             reb = sum(sp.get(t, 0) for t in (
                 C.REGULAR_PAT, C.REGULAR_FRE, C.MILITIA_A, C.MILITIA_U, C.FORT_PAT))
+            royalist = sum(sp.get(t, 0) for t in (
+                C.REGULAR_BRI, C.TORY, C.FORT_BRI,
+                C.WARPARTY_U, C.WARPARTY_A, C.VILLAGE))
+            changes_ctrl = (ctrl.get(sid) == "REBELLION"
+                            and royalist >= (reb - 1))
             is_last = 1 if sp.get(tag, 0) == 1 else 0
-            return (-has_village, -is_rebel, -reb, -is_last, state["rng"].random())
+            pop = _MAP_DATA.get(sid, {}).get("population", 0)
+            # Population tiebreaks WITHIN control-change tier only
+            ctrl_pop = -pop if changes_ctrl else 0
+            return (-has_village, -int(changes_ctrl), ctrl_pop,
+                    -is_last, state["rng"].random())
 
         return sorted(candidates, key=sort_key)
 
@@ -1069,13 +1082,29 @@ class IndianBot(BaseBot):
 
         return result
 
-    def ops_bs_should_trigger(self, state: Dict) -> bool:
+    def ops_bs_trigger(self, state: Dict) -> bool:
         """OPS: Brilliant Stroke trigger conditions.
         Use after Treaty of Alliance when Indian Leader is in a space
-        with 3+ War Parties.
+        with 3+ War Parties, and a player is 1st Eligible or a Rebel
+        Faction plays a Brilliant Stroke card other than the Treaty of
+        Alliance.
         """
         if not state.get("toa_played"):
             return False
+        # §8.1: "no Winter Quarters card is showing"
+        current_card = state.get("current_card", {}).get("id")
+        if current_card in C.WINTER_QUARTERS_CARDS:
+            return False
+        # Must have a player 1st eligible or a Rebel Faction plays BS
+        human = state.get("human_factions", set())
+        eligible = state.get("eligible", [])
+        first_eligible = eligible[0] if eligible else None
+        player_is_first = first_eligible in human
+        bs_map = state.get("bs_played", {})
+        rebel_bs_played = bs_map.get(C.PATRIOTS, False) or bs_map.get(C.FRENCH, False)
+        if not (player_is_first or rebel_bs_played):
+            return False
+        # Indian Leader with 3+ War Parties
         for leader in ("LEADER_BRANT", "LEADER_CORNPLANTER", "LEADER_DRAGGING_CANOE"):
             loc = leader_location(state, leader)
             if not loc:

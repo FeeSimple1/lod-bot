@@ -409,14 +409,18 @@ class TestOPSRedeploy:
 
 class TestOPSBrilliantStroke:
     def test_bs_trigger_after_toa_with_leader_and_wp(self):
-        """BS trigger: after ToA, Indian Leader in space with 3+ WP."""
+        """BS trigger: after ToA, Indian Leader in space with 3+ WP,
+        player 1st eligible."""
         bot = IndianBot()
         state = _base_state(spaces={
             "Quebec": _empty_space(**{C.WARPARTY_U: 3}),
         })
         state["toa_played"] = True
         state["leader_locs"] = {"LEADER_BRANT": "Quebec"}
-        assert bot.ops_bs_should_trigger(state) is True
+        state["human_factions"] = {C.PATRIOTS}
+        state["eligible"] = [C.PATRIOTS, C.INDIANS]
+        state["current_card"] = {"id": 10}
+        assert bot.ops_bs_trigger(state) is True
 
     def test_bs_no_trigger_before_toa(self):
         """BS trigger: should not trigger before Treaty of Alliance."""
@@ -425,8 +429,11 @@ class TestOPSBrilliantStroke:
             "Quebec": _empty_space(**{C.WARPARTY_U: 5}),
         })
         state["leader_locs"] = {"LEADER_BRANT": "Quebec"}
+        state["human_factions"] = {C.PATRIOTS}
+        state["eligible"] = [C.PATRIOTS]
+        state["current_card"] = {"id": 10}
         # toa_played not set
-        assert bot.ops_bs_should_trigger(state) is False
+        assert bot.ops_bs_trigger(state) is False
 
     def test_bs_no_trigger_insufficient_wp(self):
         """BS trigger: need 3+ WP at leader location."""
@@ -436,7 +443,10 @@ class TestOPSBrilliantStroke:
         })
         state["toa_played"] = True
         state["leader_locs"] = {"LEADER_BRANT": "Quebec"}
-        assert bot.ops_bs_should_trigger(state) is False
+        state["human_factions"] = {C.PATRIOTS}
+        state["eligible"] = [C.PATRIOTS]
+        state["current_card"] = {"id": 10}
+        assert bot.ops_bs_trigger(state) is False
 
 
 class TestOPSLeaderMovement:
@@ -515,3 +525,177 @@ class TestI11TradeMax1Verify:
         assert len(trade_entries) >= 1
         # Only 1 space should have been traded in
         assert len([h for h in trade_entries if "INDIANS TRADE" in str(h)]) == 1
+
+
+# =====================================================================
+#  Session 12: Indian Bot Full Compliance Review — New Tests
+# =====================================================================
+
+class TestForceShaded:
+    """Cards 4, 32, 38: Indian bot should play the shaded text per reference."""
+
+    def test_card_32_uses_force_shaded_directive(self):
+        """Card 32 (Rule Britannia!) should have force_shaded directive."""
+        from lod_ai.bots.event_instructions import INDIANS as EI_INDIANS
+        assert EI_INDIANS[32] == "force_shaded"
+
+    def test_card_4_uses_force_shaded_directive(self):
+        """Card 4 (The Penobscot Expedition) should have force_shaded directive."""
+        from lod_ai.bots.event_instructions import INDIANS as EI_INDIANS
+        assert EI_INDIANS[4] == "force_shaded"
+
+    def test_card_38_uses_force_shaded_directive(self):
+        """Card 38 (Johnson's Royal Greens) should have force_shaded directive."""
+        from lod_ai.bots.event_instructions import INDIANS as EI_INDIANS
+        assert EI_INDIANS[38] == "force_shaded"
+
+    def test_force_shaded_handler_sets_shaded_true(self):
+        """base_bot._execute_event with force_shaded should call handler(shaded=True)."""
+        from lod_ai.bots.base_bot import BaseBot
+        captured = {}
+
+        class TestBot(BaseBot):
+            faction = C.INDIANS
+            def _follow_flowchart(self, state):
+                pass
+
+        # Monkey-patch CARD_HANDLERS temporarily
+        from lod_ai.cards import CARD_HANDLERS
+        original = CARD_HANDLERS.get(32)
+        try:
+            def fake_handler(state, shaded=False):
+                captured["shaded"] = shaded
+            CARD_HANDLERS[32] = fake_handler
+            bot = TestBot()
+            state = _base_state()
+            card = {"id": 32, "musket": True}
+            bot._execute_event(card, state, force_shaded=True)
+            assert captured["shaded"] is True
+        finally:
+            if original is not None:
+                CARD_HANDLERS[32] = original
+            else:
+                CARD_HANDLERS.pop(32, None)
+
+
+class TestBSTriggerConditions:
+    """ops_bs_trigger must check WQ cards, player-eligible, and Rebel BS played."""
+
+    def test_bs_trigger_blocked_during_winter_quarters(self):
+        """BS trigger returns False during Winter Quarters."""
+        bot = IndianBot()
+        state = _base_state(spaces={
+            "Quebec": _empty_space(**{C.WARPARTY_U: 5}),
+        })
+        state["toa_played"] = True
+        state["leader_locs"] = {"LEADER_BRANT": "Quebec"}
+        state["human_factions"] = {C.PATRIOTS}
+        state["eligible"] = [C.PATRIOTS]
+        state["current_card"] = {"id": 97}  # Winter Quarters card
+        assert bot.ops_bs_trigger(state) is False
+
+    def test_bs_trigger_requires_player_eligible_or_rebel_bs(self):
+        """BS trigger requires player 1st eligible or Rebel BS played."""
+        bot = IndianBot()
+        state = _base_state(spaces={
+            "Quebec": _empty_space(**{C.WARPARTY_U: 5}),
+        })
+        state["toa_played"] = True
+        state["leader_locs"] = {"LEADER_BRANT": "Quebec"}
+        state["human_factions"] = set()  # No human factions
+        state["eligible"] = [C.INDIANS]
+        state["current_card"] = {"id": 10}
+        state["bs_played"] = {}  # No rebel BS
+        assert bot.ops_bs_trigger(state) is False
+
+    def test_bs_trigger_fires_on_rebel_bs_played(self):
+        """BS trigger fires when Rebel Faction has played their BS."""
+        bot = IndianBot()
+        state = _base_state(spaces={
+            "Quebec": _empty_space(**{C.WARPARTY_U: 5}),
+        })
+        state["toa_played"] = True
+        state["leader_locs"] = {"LEADER_BRANT": "Quebec"}
+        state["human_factions"] = set()
+        state["eligible"] = [C.INDIANS]
+        state["current_card"] = {"id": 10}
+        state["bs_played"] = {C.PATRIOTS: True}  # Patriot BS played
+        assert bot.ops_bs_trigger(state) is True
+
+
+class TestPlunderRebelCountIncludesFort:
+    """_can_plunder and _plunder must include FORT_PAT in rebel piece count."""
+
+    def test_can_plunder_false_when_fort_makes_rebels_ge_wp(self):
+        """With 2 WP, 1 Militia, 1 Fort: rebels=2, WP=2 → not plunderable."""
+        bot = IndianBot()
+        state = _base_state(spaces={
+            "Virginia": _empty_space(**{
+                C.WARPARTY_U: 1, C.WARPARTY_A: 1,
+                C.MILITIA_A: 1, C.FORT_PAT: 1,
+            }),
+        })
+        state["_turn_affected_spaces"] = {"Virginia"}
+        assert bot._can_plunder(state) is False
+
+    def test_can_plunder_true_when_wp_exceeds_rebels_with_fort(self):
+        """With 3 WP, 1 Militia, 1 Fort: rebels=2, WP=3 → plunderable."""
+        bot = IndianBot()
+        state = _base_state(spaces={
+            "Virginia": _empty_space(**{
+                C.WARPARTY_U: 2, C.WARPARTY_A: 1,
+                C.MILITIA_A: 1, C.FORT_PAT: 1,
+            }),
+        })
+        state["_turn_affected_spaces"] = {"Virginia"}
+        assert bot._can_plunder(state) is True
+
+
+class TestDesertionPriorityControlChange:
+    """ops_patriot_desertion_priority: 'remove most Rebel Control' means
+    prefer spaces where removing a Patriot piece changes control."""
+
+    def test_changes_control_before_excess_rebels(self):
+        """Space where removal flips control should be prioritized over
+        space with many rebels but no control change."""
+        bot = IndianBot()
+        state = _base_state(spaces={
+            "Tight": _empty_space(**{
+                C.REGULAR_PAT: 2, C.WARPARTY_U: 1,
+            }),
+            "ManyRebels": _empty_space(**{
+                C.REGULAR_PAT: 5, C.MILITIA_A: 3,
+            }),
+        })
+        # Tight: 2 rebels, 1 royalist → Rebellion control
+        # Removing 1 → 1 rebel, 1 royalist → NO Rebellion control → changes ctrl
+        # ManyRebels: 8 rebels, 0 royalist → Rebellion control
+        # Removing 1 → 7 rebels → still Rebellion → does NOT change ctrl
+        refresh_control(state)
+        candidates = [
+            ("Tight", C.REGULAR_PAT),
+            ("ManyRebels", C.REGULAR_PAT),
+        ]
+        result = bot.ops_patriot_desertion_priority(state, candidates)
+        # Tight should come first (changes control)
+        assert result[0] == ("Tight", C.REGULAR_PAT)
+
+    def test_village_still_first_priority(self):
+        """Village spaces should still be highest priority, above control change."""
+        bot = IndianBot()
+        state = _base_state(spaces={
+            "VillageSpace": _empty_space(**{
+                C.REGULAR_PAT: 5, C.VILLAGE: 1,
+            }),
+            "ControlChange": _empty_space(**{
+                C.REGULAR_PAT: 2, C.WARPARTY_U: 1,
+            }),
+        })
+        refresh_control(state)
+        candidates = [
+            ("ControlChange", C.REGULAR_PAT),
+            ("VillageSpace", C.REGULAR_PAT),
+        ]
+        result = bot.ops_patriot_desertion_priority(state, candidates)
+        # Village space first regardless of control change
+        assert result[0] == ("VillageSpace", C.REGULAR_PAT)
