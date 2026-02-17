@@ -253,13 +253,34 @@ class TestIndianBsLimCom:
         assert bot.get_bs_limited_command(state) is None
 
     def test_raid_in_opposition_colony(self):
-        """I4: Leader in Opposition Colony with Underground WP -> raid."""
+        """I4: Leader in Opposition Colony with Underground WP -> raid.
+        I3 D6 gate: (Support + 1D6) must be <= Opposition to reach Raid branch.
+        """
         bot = IndianBot()
         state = _base_state(
             spaces={"South_Carolina": _sp(**{C.WARPARTY_A: 2, C.WARPARTY_U: 2})},
             leader_locs={"LEADER_BRANT": "South_Carolina"},
             support={"South_Carolina": -1},  # Passive Opposition
+            # Support=0, Opposition=1. Need (0+roll)<=1, so roll=1.
+            rng=random.Random(2),  # seed 2: first randint(1,6)=1
         )
+        assert bot.get_bs_limited_command(state) == "raid"
+
+    def test_i3_gate_raid_when_roll_low(self):
+        """I3: (Support + 1D6) <= Opposition → Raid branch."""
+        bot = IndianBot()
+        # Support=0, Opposition=5. Need (0+roll)<=5, so roll<=5.
+        state = _base_state(
+            spaces={"South_Carolina": _sp(**{C.WARPARTY_A: 2, C.WARPARTY_U: 2})},
+            leader_locs={"LEADER_BRANT": "South_Carolina"},
+            support={"South_Carolina": -2, "Boston": -3},  # Opp=5, Sup=0
+            rng=random.Random(42),  # seed 42: first roll=6; (0+6)>5 → Gather
+        )
+        # With roll=6, (0+6)>5 is True → Gather branch
+        assert bot.get_bs_limited_command(state) == "gather"
+
+        # With roll=1, (0+1)<=5 → Raid branch
+        state["rng"] = random.Random(2)  # seed 2: first roll=1
         assert bot.get_bs_limited_command(state) == "raid"
 
     def test_gather_when_available_wp(self):
@@ -349,11 +370,13 @@ class TestFrenchBsLimCom:
         assert bot.get_bs_limited_command(state) is None
 
     def test_muster_when_available_regulars(self):
-        """F9/F10: Available French Regulars > 0 -> muster."""
+        """F9: 1D6 < Available French Regulars → F10 Muster."""
         bot = FrenchBot()
         state = _base_state(
             spaces={"West_Indies": _sp(**{C.REGULAR_FRE: 5})},
             leader_locs={"LEADER_ROCHAMBEAU": "West_Indies"},
+            # Available French Regs = 5 (default). Need roll < 5.
+            rng=random.Random(1),  # seed 1: first randint(1,6)=2; 2<5 → Muster
         )
         assert bot.get_bs_limited_command(state) == "muster"
 
@@ -385,8 +408,23 @@ class TestFrenchBsLimCom:
         # French Regs in space -> march
         assert bot.get_bs_limited_command(state) == "march"
 
+    def test_f9_gate_skips_muster_when_roll_high(self):
+        """F9: 1D6 >= Available French Regulars → skip Muster, try Battle/March."""
+        bot = FrenchBot()
+        state = _base_state(
+            spaces={"Boston": _sp(**{
+                C.REGULAR_FRE: 5, C.REGULAR_BRI: 2,
+            })},
+            leader_locs={"LEADER_ROCHAMBEAU": "Boston"},
+            available={C.REGULAR_FRE: 3},
+            # Need roll >= 3 → roll ∈ {3,4,5,6}. Seed 42 gives 6.
+            rng=random.Random(42),
+        )
+        # 6 < 3 is False → skip Muster. Rebel(5)+Leader(1)=6 > 2 → Battle.
+        assert bot.get_bs_limited_command(state) == "battle"
+
     def test_muster_preferred_over_battle(self):
-        """Even when battle is possible, muster comes first per flowchart."""
+        """F9: When D6 < Available Regs, muster comes before battle."""
         bot = FrenchBot()
         state = _base_state(
             spaces={"Boston": _sp(**{
@@ -394,6 +432,7 @@ class TestFrenchBsLimCom:
             })},
             leader_locs={"LEADER_ROCHAMBEAU": "Boston"},
             available={C.REGULAR_FRE: 3},  # muster possible
+            # Available French Regs = 3. Need roll < 3 → roll ∈ {1,2}.
+            rng=random.Random(2),  # seed 2: first randint(1,6)=1; 1<3 → Muster
         )
-        # Available Regs > 0 -> muster (even though battle would also work)
         assert bot.get_bs_limited_command(state) == "muster"
