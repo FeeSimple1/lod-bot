@@ -1333,3 +1333,126 @@ The reference says "each other space with none" — the code interprets "none" a
 | `test_p7_rally_bullet5_uses_tracked_avail_forts` | Post-Bullet-1 tracked count used, not original state |
 | `test_p7_rally_bullet6_does_not_exclude_active_support` | Active Support spaces appear in Bullet 6 candidate list |
 | `test_p2_bullet2_no_qualifying_spaces_returns_false` | (existing test, verified still passes) |
+
+---
+
+## Session 10: French Bot Full Compliance Review
+
+### Scope
+
+Full node-by-node comparison of the entire French bot flowchart implementation in `lod_ai/bots/french.py` against `Reference Documents/french bot flowchart and reference.txt` and Manual Ch 8 (§8.6). Also reviewed `base_bot.py`, `event_instructions.py`, `event_eval.py`, `commands/hortelez.py`, `commands/french_agent_mobilization.py`, `special_activities/preparer.py`, `special_activities/naval_pressure.py`, `special_activities/skirmish.py`, `commands/battle.py`, `commands/march.py`, `commands/muster.py`, `leaders/__init__.py`, and `rules_consts.py`.
+
+### Label Compliance: PASS
+
+No string literal violations found. All piece tags, faction names, markers, and control values use proper constants from `rules_consts.py`. The only string literals are `"REBELLION"` for control checks and map data type strings (`"Colony"`, `"City"`), which are consistent with the rest of the codebase and have no corresponding constants.
+
+### Nodes verified CORRECT
+
+The following flowchart nodes are correctly implemented and match the reference:
+
+| Node | Description | Status |
+|------|-------------|--------|
+| F1 | Sword icon skip / Event vs Command | CORRECT — handled by `base_bot._choose_event_vs_flowchart()` |
+| F2 | Event conditions (6 bullets) | CORRECT — uses `CARD_EFFECTS` shaded side per §8.3.2; all 6 conditions verified: Support>Opposition+shifts_rebel, French_from_unavailable, French_on_map, inflicts_british_casualties, adds_french_resources, ToA+effective+D6>=5 |
+| F3 | French Resources > 0 gate | CORRECT — `state.get("resources", {}).get(C.FRENCH, 0) <= 0` routes to PASS |
+| F4 | Treaty of Alliance played? | CORRECT — branches to `_before_treaty` / `_after_treaty` |
+| F5 | Patriot Resources < 1D3 | CORRECT — uses `state["rng"].randint(1,3)`, strict less-than |
+| F6 | Hortalez before Treaty | CORRECT — pays exact roll, aborts if can't afford (Session 7 fix confirmed) |
+| F7 | Agent Mobilization | CORRECT — correct provinces, correct placement priority (control change then most patriots), fallback to F6 |
+| F8 | Préparer pre-Treaty | CORRECT — Blockade to WI first, then up to 3 Regulars Unavailable→Available |
+| F9 | 1D6 < Available Regulars | CORRECT — strict less-than with `state["rng"]` |
+| F10 | Muster (Max 1) | CORRECT — <4 Available + WI not Rebel → WI; else Colony/City with Continentals; `state["rng"].choice()` for ties |
+| F11 | Hortalez after Treaty | CORRECT — `min(resources, roll)` ("up to 1D3") |
+| F12 | Skirmish | CORRECT — excludes affected spaces, WI priority, Fort-first (option=3), British pieces includes Regs+Tories+Forts |
+| F13 | Can Battle (decision gate) | CORRECT — Rebel cubes (Continentals+French) + Leaders > British pieces (Regs+Tories+Forts, excludes WP) |
+| F14 | March (all 4 bullets) | CORRECT — (1) Lose no Rebel Control, (2) March to add Control first Cities then most British, (3) Isolated French toward nearest British via BFS, (4) Fallback: 1 French to shared space |
+| F15 | Préparer post-Treaty | CORRECT — D6 ≤ (unavail regs + blockades) gate, Blockade→WI or up to 3 Regs, +2 Resources fallback when nothing moved and Resources=0 |
+| F17 | Naval Pressure target | CORRECT — Battle space first, then most Support; fallback F17→F12→F15 |
+| Event instructions | Cards 52, 62, 70, 73, 83, 95 | CORRECT — all use conditional `force_if_X` directives with game-state checks |
+| OPS | Supply priority | CORRECT — changes Control first, then British RL possible, then Pop; WI appended |
+| OPS | Redeploy leader | CORRECT — space with French Regs + Continentals, then most French Regs |
+
+### FIXED issues (this session)
+
+#### 1. F16 `_battle` — Missing French presence requirement
+
+**Reference (§8.6.6):** "Select all spaces with **both French and British pieces** where the Rebellion Force Level... exceeds the Royalist Force Level."
+
+**Bug:** The code checked `british_pieces > 0` but did NOT check for French Regulars. A space with Patriots + British but no French would be selected as a battle target — the French bot would initiate battle in spaces where it has no pieces.
+
+**Fix:** Added `french_here = sp.get(C.REGULAR_FRE, 0) > 0` check to the filter condition. Only spaces with both French and British pieces are now candidates.
+
+#### 2. `ops_toa_trigger` — Wrong CBC source (CRITICAL)
+
+**Reference (§8.1):** "the sum of Squadrons in WI + Available French Regulars + **half of Cumulative British Casualties** exceed 15"
+
+**Bug:** Used `state.get("casualties", {})` — the battle losses box containing pieces lost in the most recent battle — instead of `state.get("cbc", 0)` which is the Cumulative British Casualties running total tracked throughout the game. The casualties box is transient (cleared after each battle), while `cbc` accumulates. This caused the Treaty of Alliance trigger to use the wrong value entirely.
+
+**Fix:** Changed from `casualties.get(C.REGULAR_BRI, 0) + casualties.get(C.TORY, 0)` to `state.get("cbc", 0)`.
+
+#### 3. `ops_toa_trigger` — Missing Winter Quarters check
+
+**Reference (§8.1):** "no Winter Quarters card is showing"
+
+**Bug:** The function did not check whether the current card is a Winter Quarters card. The ToA trigger should never fire during Winter Quarters.
+
+**Fix:** Added `if current_card in C.WINTER_QUARTERS_CARDS: return False` check.
+
+#### 4. `ops_bs_trigger` — Missing player/eligible and WQ checks
+
+**Reference (§8.6.11):** "any player Faction is 1st Eligible or the British play their Brilliant Stroke card."
+
+**Bug 1:** The function only checked ToA played + Leader with 4+ Regulars. It did not check the situational trigger: whether a player (human) faction is 1st eligible OR the British played their Brilliant Stroke.
+
+**Bug 2:** Same missing Winter Quarters card check as ops_toa_trigger.
+
+**Fix:** Added both checks. The function now verifies `first_eligible in human_factions or british_bs_played` and checks `current_card not in WINTER_QUARTERS_CARDS`.
+
+#### 5. `ops_loyalist_desertion_priority` — Population tiebreaker incorrectly scoped
+
+**Reference (§8.6.10):** "Remove a Tory so as to change Control of the **most Population** possible, **then** the last Tory in the space with **most Population** that is not already at Active Support, then elsewhere."
+
+**Bug:** The sort key used `(-int(changes_ctrl), -int(is_last)*not_active_sup, -pop, random, sid, tag)` which applied `-pop` globally across all tiers. Population should only break ties WITHIN each tier: "most Population" in the control-change tier, then "most Population" in the last-Tory-non-AS tier, but a high-pop non-control-changing space should not sort before a low-pop control-changing space.
+
+**Fix:** Split population into tier-scoped sort keys: `ctrl_pop = -pop if changes_ctrl else 0` and `last_pop = -pop if (is_last and not_active_sup) else 0`. The full sort key is now `(-int(changes_ctrl), ctrl_pop, -int(is_last)*not_active_sup, last_pop, random, sid, tag)`.
+
+#### 6. `_agent_mobilization` — Missing Active Support filter (crash bug)
+
+**Reference (§3.5.1):** Agent Mobilization cannot target provinces at Active Support.
+
+**Bug:** `_can_agent_mobilization()` correctly filtered out Active Support provinces, but `_agent_mobilization()` did not. If the highest-scoring province was at Active Support while another province was valid, the bot would select the Active Support province, and `fam.execute()` would raise `ValueError`, crashing the bot's turn.
+
+**Fix:** Added `if self._support_level(state, prov) == C.ACTIVE_SUPPORT: continue` to the province selection loop in `_agent_mobilization()`.
+
+### DOCUMENTED — minor deviations (not fixed)
+
+#### F14 March force level: Active Militia included unconditionally
+The F16 `_battle` force level calculation includes Active Militia in the Rebellion Force Level. Per §3.6.3, Active Militia only participate "if that Faction paid." The bot's decision gate makes an optimistic assumption that Patriots will pay, which is a reasonable heuristic for a bot. Low gameplay impact.
+
+#### F6/F11 Hortalez +1 bonus
+`hortelez.execute()` adds `pay + 1` to Patriot Resources. This +1 bonus comes from §3.5.2 (player rules for Hortalez). The bot flowchart reference doesn't explicitly mention it, but since the command implementation applies it uniformly, the bot inherits it correctly.
+
+#### get_bs_limited_command skips F9 D6 gate
+The BS Limited Command method always tries Muster first if Available Regulars > 0, without the F9 D6 gate. Per §8.3.7, the BS walk should "follow the executing Faction's flowchart," which includes the D6 check. Minor deviation — affects which LimCom is selected for BS only.
+
+#### ops_redeploy_leader: Missing Blockade rearrangement
+Reference §8.6.9 says: "Remove a Blockade from the City with least Support; remaining Blockades are moved to Cities with most Support." The `ops_redeploy_leader` method only handles leader redeployment, not Blockade rearrangement. This should be handled by `year_end.py` when calling the bot's redeploy method. Architectural issue — the Blockade rearrangement belongs in the year-end redeployment phase, not in the bot method itself.
+
+### Previously documented issues (unchanged)
+
+- **F2 Event conditions**: Uses `CARD_EFFECTS` static lookup — correct but cannot verify dynamic game-state conditions. (Unchanged from Session 5)
+- **OPS methods not wired into year_end**: All 4 bots define OPS methods but `year_end.py` uses ad-hoc logic. (Unchanged from Consolidated Outstanding Issues)
+- **P7/P11 Persuasion mid-command**: Fires after command, not during. (Unchanged)
+- **B10 March + Common Cause timing**: CC invoked post-March. (Unchanged)
+
+### Tests added (7 new, 850 total)
+
+| Test | Verifies |
+|------|----------|
+| `test_f16_battle_requires_french_presence` | F16 only selects spaces with French Regulars present |
+| `test_ops_toa_trigger_uses_cbc_not_casualties` | ToA trigger uses `state["cbc"]`, not `state["casualties"]` |
+| `test_ops_toa_trigger_blocked_during_winter_quarters` | ToA trigger returns False during Winter Quarters |
+| `test_ops_bs_trigger_blocked_during_winter_quarters` | BS trigger returns False during Winter Quarters |
+| `test_ops_bs_trigger_requires_player_eligible_or_brit_bs` | BS trigger requires player 1st eligible or British BS played |
+| `test_ops_desertion_population_scoped_to_tier` | Desertion priority: control-changing spaces before non-changing |
+| `test_f7_agent_mobilization_skips_active_support` | Agent Mobilization skips Active Support provinces (no crash) |

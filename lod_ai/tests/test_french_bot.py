@@ -889,19 +889,20 @@ def test_ops_loyalist_desertion_priority():
 
 
 def test_ops_toa_trigger():
-    """ops_toa_trigger should use the exact formula from the reference."""
+    """ops_toa_trigger should use the cbc (Cumulative British Casualties) field."""
     bot = FrenchBot()
     state = _full_state(toa_played=False)
     state["available"] = {C.REGULAR_FRE: 10}
-    state["casualties"] = {C.REGULAR_BRI: 6, C.TORY: 4}
-    # Formula: WI_squadrons + Avail_FRE + 1/2 * British_Casualties
-    # 0 + 10 + (6+4)//2 = 0 + 10 + 5 = 15
+    state["cbc"] = 10
+    state["current_card"] = {"id": 1}  # Not a WQ card
+    # Formula: WI_squadrons + Avail_FRE + 1/2 * CBC
+    # 0 + 10 + 10//2 = 0 + 10 + 5 = 15
     # 15 > 15 is False
     assert bot.ops_toa_trigger(state) is False
 
-    # Add more: increase casualties
-    state["casualties"][C.REGULAR_BRI] = 8
-    # 0 + 10 + (8+4)//2 = 0 + 10 + 6 = 16 > 15
+    # Increase CBC
+    state["cbc"] = 12
+    # 0 + 10 + 12//2 = 0 + 10 + 6 = 16 > 15
     assert bot.ops_toa_trigger(state) is True
 
 
@@ -910,7 +911,8 @@ def test_ops_toa_trigger_already_played():
     bot = FrenchBot()
     state = _full_state(toa_played=True)
     state["available"] = {C.REGULAR_FRE: 20}
-    state["casualties"] = {C.REGULAR_BRI: 20}
+    state["cbc"] = 20
+    state["current_card"] = {"id": 1}
     assert bot.ops_toa_trigger(state) is False
 
 
@@ -920,16 +922,150 @@ def test_ops_bs_trigger_needs_toa():
     state = _full_state(toa_played=False)
     state["spaces"]["Boston"] = {C.REGULAR_FRE: 5}
     state["leaders"] = {"LEADER_ROCHAMBEAU": "Boston"}
+    state["current_card"] = {"id": 1}
+    state["human_factions"] = {C.PATRIOTS}
+    state["eligible"] = [C.PATRIOTS]
     assert bot.ops_bs_trigger(state) is False
 
 
 def test_ops_bs_trigger_needs_4_plus_french():
-    """ops_bs_trigger requires 4+ French Regulars at leader's space."""
+    """ops_bs_trigger requires 4+ French Regulars at leader's space,
+    plus a player faction 1st eligible or British BS played."""
     bot = FrenchBot()
     state = _full_state(toa_played=True)
     state["spaces"]["Boston"] = {C.REGULAR_FRE: 3}
     state["leaders"] = {"LEADER_ROCHAMBEAU": "Boston"}
-    assert bot.ops_bs_trigger(state) is False
+    state["current_card"] = {"id": 1}  # Not a WQ card
+    state["human_factions"] = {C.PATRIOTS}
+    state["eligible"] = [C.PATRIOTS, C.FRENCH]  # Player faction is 1st eligible
+    assert bot.ops_bs_trigger(state) is False  # Only 3 Regulars
 
     state["spaces"]["Boston"][C.REGULAR_FRE] = 4
     assert bot.ops_bs_trigger(state) is True
+
+
+# ===================================================================
+#  Session 10: French Bot Full Compliance Review — new tests
+# ===================================================================
+
+def test_f16_battle_requires_french_presence():
+    """F16 (§8.6.6): Select spaces with BOTH French AND British pieces.
+    A space with Patriots + British but no French should NOT be selected."""
+    bot = FrenchBot()
+    state = _full_state(toa_played=True)
+    state["spaces"] = {
+        "Boston": {C.REGULAR_PAT: 5, C.MILITIA_A: 2, C.REGULAR_BRI: 2},      # No French
+        "New_York": {C.REGULAR_FRE: 3, C.REGULAR_PAT: 2, C.REGULAR_BRI: 1},  # French present
+    }
+    state["leaders"] = {}
+    state["support"] = {"Boston": 0, "New_York": 0}
+    state["control"] = {}
+    # Boston has rebel_force(5+2)=7 > crown_force(2), but NO French
+    # New_York has rebel_force(3+2)=5 > crown_force(1), and HAS French
+    # Without the fix, both would be selected. With the fix, only New_York.
+    result = bot._battle(state)
+    affected = state.get("_turn_affected_spaces", set())
+    assert "Boston" not in affected, "Boston should not be a battle target (no French)"
+    assert "New_York" in affected, "New_York should be a battle target (French present)"
+
+
+def test_ops_toa_trigger_uses_cbc_not_casualties():
+    """ops_toa_trigger must use state['cbc'] (Cumulative British Casualties counter),
+    not state['casualties'] (the battle losses box)."""
+    bot = FrenchBot()
+    state = _full_state(toa_played=False)
+    state["available"] = {C.REGULAR_FRE: 10}
+    state["current_card"] = {"id": 1}
+    # With cbc=0 but high casualties box — should NOT trigger
+    state["cbc"] = 0
+    state["casualties"] = {C.REGULAR_BRI: 20, C.TORY: 20}
+    assert bot.ops_toa_trigger(state) is False  # 10 + 0 = 10, not > 15
+    # With high cbc — SHOULD trigger
+    state["cbc"] = 14
+    assert bot.ops_toa_trigger(state) is True  # 10 + 7 = 17 > 15
+
+
+def test_ops_toa_trigger_blocked_during_winter_quarters():
+    """ops_toa_trigger returns False when a Winter Quarters card is showing."""
+    bot = FrenchBot()
+    state = _full_state(toa_played=False)
+    state["available"] = {C.REGULAR_FRE: 10}
+    state["cbc"] = 20  # Would easily trigger
+    state["current_card"] = {"id": 97}  # Winter Quarters card
+    assert bot.ops_toa_trigger(state) is False
+
+
+def test_ops_bs_trigger_blocked_during_winter_quarters():
+    """ops_bs_trigger returns False when a Winter Quarters card is showing."""
+    bot = FrenchBot()
+    state = _full_state(toa_played=True)
+    state["spaces"]["Boston"] = {C.REGULAR_FRE: 5}
+    state["leaders"] = {"LEADER_ROCHAMBEAU": "Boston"}
+    state["human_factions"] = {C.PATRIOTS}
+    state["eligible"] = [C.PATRIOTS]
+    state["current_card"] = {"id": 99}  # Winter Quarters card
+    assert bot.ops_bs_trigger(state) is False
+
+
+def test_ops_bs_trigger_requires_player_eligible_or_brit_bs():
+    """ops_bs_trigger requires a player faction 1st eligible or British BS played."""
+    bot = FrenchBot()
+    state = _full_state(toa_played=True)
+    state["spaces"]["Boston"] = {C.REGULAR_FRE: 5}
+    state["leaders"] = {"LEADER_ROCHAMBEAU": "Boston"}
+    state["current_card"] = {"id": 1}
+    state["human_factions"] = set()  # No human players
+    state["eligible"] = [C.FRENCH, C.BRITISH]  # Bot is 1st eligible
+    # No player is 1st eligible and no British BS played
+    assert bot.ops_bs_trigger(state) is False
+
+    # British BS played — should now trigger
+    state["british_bs_played"] = True
+    assert bot.ops_bs_trigger(state) is True
+
+
+def test_ops_desertion_population_scoped_to_tier():
+    """ops_loyalist_desertion_priority: control-changing spaces should come
+    before non-control-changing ones. The sort uses scoped population tiebreaks."""
+    bot = FrenchBot()
+    state = _full_state()
+    # SpaceA: tied control (royalist=2, rebel=2) → None control.
+    #   Removing 1 Tory → royalist=1 < rebel=2 → changes to REBELLION.
+    # SpaceB: British control (royalist=5, rebel=0) → BRITISH.
+    #   Removing 1 Tory → royalist=4 > rebel=0 → stays BRITISH. No change.
+    state["spaces"] = {
+        "SpaceA": {C.TORY: 2, C.REGULAR_PAT: 2},  # tied→changes ctrl on Tory removal
+        "SpaceB": {C.TORY: 1, C.REGULAR_BRI: 4},   # BRITISH stays BRITISH
+    }
+    state["support"] = {"SpaceA": 0, "SpaceB": 0}
+    result = bot.ops_loyalist_desertion_priority(state)
+    sids = [sid for sid, _ in result]
+    # SpaceA changes control (tier 1) should come before SpaceB (tier 2/3)
+    assert sids.index("SpaceA") < sids.index("SpaceB"), \
+        "Control-changing space should come before non-control-changing"
+
+
+def test_f7_agent_mobilization_skips_active_support():
+    """_agent_mobilization should skip provinces at Active Support even
+    when they have the best score, to avoid crash in fam.execute()."""
+    bot = FrenchBot()
+    state = _full_state(toa_played=False)
+    state["spaces"] = {
+        "Quebec_City": {C.REGULAR_PAT: 5},
+        "New_York": {C.REGULAR_PAT: 1},
+        "New_Hampshire": {},
+        "Massachusetts": {},
+    }
+    state["support"] = {
+        "Quebec_City": C.ACTIVE_SUPPORT,  # Best score but Active Support
+        "New_York": 0,
+        "New_Hampshire": 0,
+        "Massachusetts": 0,
+    }
+    state["control"] = {}
+    state["available"] = {C.MILITIA_U: 5}
+    # Quebec_City would have highest score (5 patriots) but is Active Support
+    # Bot should pick New_York (1 patriot) instead
+    result = bot._agent_mobilization(state)
+    assert result is True
+    # Verify no crash — the test passing means Active Support was skipped

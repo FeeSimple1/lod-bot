@@ -368,6 +368,9 @@ class FrenchBot(BaseBot):
             sp = state["spaces"].get(prov)
             if not sp:
                 continue
+            # Skip provinces at Active Support (§3.5.1 restriction)
+            if self._support_level(state, prov) == C.ACTIVE_SUPPORT:
+                continue
             # first to add most Rebel Control, then most Patriot units
             rc_shift = 1 if ctrl.get(prov) != "REBELLION" else 0
             patriots = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0) + sp.get(C.REGULAR_PAT, 0)
@@ -664,7 +667,9 @@ class FrenchBot(BaseBot):
                               + sp.get(C.FORT_BRI, 0))
             crown_force = british_pieces + sp.get(C.WARPARTY_A, 0)
 
-            if rebel_force > crown_force and british_pieces > 0:
+            # §8.6.6: "spaces with both French and British pieces"
+            french_here = sp.get(C.REGULAR_FRE, 0) > 0
+            if french_here and rebel_force > crown_force and british_pieces > 0:
                 pop = _MAP_DATA.get(sid, {}).get("population", 0)
                 targets.append((pop, sid))
         if not targets:
@@ -895,12 +900,17 @@ class FrenchBot(BaseBot):
             sup = state.get("support", {}).get(sid, 0)
             not_active_sup = 1 if sup != C.ACTIVE_SUPPORT else 0
             pop = _MAP_DATA.get(sid, {}).get("population", 0)
-            # Priority: changes control, then last Tory in high Pop non-AS,
-            # then random
-            result.append((-int(changes_ctrl), -int(is_last) * not_active_sup,
-                           -pop, state["rng"].random(), sid, C.TORY))
+            # Priority: (1) changes control + most pop,
+            #           (2) last Tory, not Active Support + most pop,
+            #           (3) elsewhere random
+            # Population should only tiebreak WITHIN each tier.
+            ctrl_pop = -pop if changes_ctrl else 0
+            last_pop = -pop if (is_last and not_active_sup) else 0
+            result.append((-int(changes_ctrl), ctrl_pop,
+                           -int(is_last) * not_active_sup, last_pop,
+                           state["rng"].random(), sid, C.TORY))
         result.sort()
-        return [(sid, tag) for _, _, _, _, sid, tag in result]
+        return [(sid, tag) for _, _, _, _, _, sid, tag in result]
 
     def ops_toa_trigger(self, state: Dict) -> bool:
         """Treaty of Alliance: Play if
@@ -909,12 +919,15 @@ class FrenchBot(BaseBot):
         """
         if state.get("toa_played"):
             return False  # Already played
+        # §8.1: "no Winter Quarters card is showing"
+        current_card = state.get("current_card", {}).get("id")
+        if current_card in C.WINTER_QUARTERS_CARDS:
+            return False
         wi_squadrons = west_indies_blockades(state)
         avail_fre = state.get("available", {}).get(C.REGULAR_FRE, 0)
-        # Cumulative British Casualties: sum of all pieces in casualties box
-        casualties = state.get("casualties", {})
-        brit_casualties = casualties.get(C.REGULAR_BRI, 0) + casualties.get(C.TORY, 0)
-        total = wi_squadrons + avail_fre + (brit_casualties // 2)
+        # Cumulative British Casualties: running total tracked by the engine
+        cbc = state.get("cbc", 0)
+        total = wi_squadrons + avail_fre + (cbc // 2)
         return total > 15
 
     def ops_bs_trigger(self, state: Dict) -> bool:
@@ -924,7 +937,20 @@ class FrenchBot(BaseBot):
         """
         if not state.get("toa_played"):
             return False
-        # Find French leader
+        # §8.1: "no Winter Quarters card is showing"
+        current_card = state.get("current_card", {}).get("id")
+        if current_card in C.WINTER_QUARTERS_CARDS:
+            return False
+        # §8.6.11: "any player Faction is 1st Eligible or the British
+        # play their Brilliant Stroke"
+        human = state.get("human_factions", set())
+        eligible = state.get("eligible", [])
+        first_eligible = eligible[0] if eligible else None
+        player_is_first = first_eligible in human
+        brit_bs_played = state.get("british_bs_played", False)
+        if not (player_is_first or brit_bs_played):
+            return False
+        # Find French leader with 4+ French Regulars
         french_leaders = ["LEADER_ROCHAMBEAU", "LEADER_LAUZUN"]
         for ldr in french_leaders:
             loc = leader_location(state, ldr)
