@@ -1527,9 +1527,9 @@ No string literal violations found. All piece tags, faction names, markers, and 
 
 ### DOCUMENTED — minor deviations (not fixed)
 
-#### Partisans/Skirmish never use option 2
+#### ~~Partisans/Skirmish never use option 2~~ **RESOLVED**
 
-The flowchart describes space selection priorities for Partisans (P8) and Skirmish (P12) but is silent on when to choose option 2 (remove 2 enemies at cost of 1 own piece) vs option 1 (remove 1 enemy, no cost). The bot currently uses only options 1 and 3, never option 2. This is a rules gap, not a bug — the flowchart provides no algorithm for option selection. Option 2 could be more efficient with 2+ enemy units.
+~~The flowchart describes space selection priorities for Partisans (P8) and Skirmish (P12) but is silent on when to choose option 2.~~ **FIXED:** Ch 8 §8.1 ("maximum extent") provides clear guidance — bots should maximize removals. P8 Partisans and P12 Skirmish now use option 2 (sacrifice 1 own piece, remove 2 enemy) when 2+ enemy cubes are present and the faction has a piece to sacrifice. Indian bot already implemented this correctly for War-Path (I8) and Scout+Skirmish (I12).
 
 #### P9=Yes fallback to March
 
@@ -1672,8 +1672,8 @@ Same class of bug as the French `ops_loyalist_desertion_priority` fixed in Sessi
 #### Mid-Raid Plunder/Trade is atomic
 The reference says "before completing the Raid" but `raid.execute()` bundles payment and activation in one call. The interrupt fires after the full Raid completes, not mid-execution. Architectural limitation — no mid-command interrupt support.
 
-#### Partisans/Skirmish never use option 2
-Same as documented in Session 11 for Patriot bot. The flowchart provides no algorithm for when to choose option 2 over option 1.
+#### ~~Partisans/Skirmish never use option 2~~ **RESOLVED**
+~~Same as documented in Session 11 for Patriot bot.~~ **FIXED:** See Session 11 note — Ch 8 §8.1 provides clear guidance. Indian bot already correct; Patriot bot now fixed.
 
 #### get_bs_limited_command skips I3 D6 gate
 The BS Limited Command walk always tries both Raid and Gather branches without rolling the I3 D6. Per §8.3.7, BS should follow the faction flowchart including the D6 check. Minor — affects only which LimCom is selected during BS.

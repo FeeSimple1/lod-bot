@@ -944,8 +944,15 @@ class PatriotBot(BaseBot):
             sp = state["spaces"][sid]
             has_village = sp.get(C.VILLAGE, 0)
             wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
-            if has_village and not wp:
+            enemy_cubes = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                           + sp.get(C.WARPARTY_A, 0))
+            own_militia = sp.get(C.MILITIA_U, 0) + sp.get(C.MILITIA_A, 0)
+            # §8.1 "maximum extent": option 2 nets +1 removal over option 1
+            # (sacrifice 1 own piece → remove 2 enemy) when 2+ enemy cubes
+            if has_village and enemy_cubes == 0 and not wp:
                 opt = 3
+            elif enemy_cubes >= 2 and own_militia >= 1:
+                opt = 2
             else:
                 opt = 1
             try:
@@ -981,8 +988,13 @@ class PatriotBot(BaseBot):
             sp = state["spaces"][sid]
             has_fort = sp.get(C.FORT_BRI, 0)
             enemy_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+            own_regs = sp.get(C.REGULAR_PAT, 0)
+            # §8.1 "maximum extent": option 2 nets +1 removal over option 1
+            # (sacrifice 1 own piece → remove 2 enemy) when 2+ enemy cubes
             if has_fort and not enemy_cubes:
                 opt = 3
+            elif enemy_cubes >= 2 and own_regs >= 1:
+                opt = 2
             else:
                 opt = 1
             try:
