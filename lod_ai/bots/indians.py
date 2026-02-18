@@ -146,6 +146,7 @@ class IndianBot(BaseBot):
                 return
 
         # If nothing executed, Pass
+        state['_pass_reason'] = 'no_valid_command'
         push_history(state, "INDIANS PASS")
 
     # ==================================================================

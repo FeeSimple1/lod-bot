@@ -172,6 +172,7 @@ class FrenchBot(BaseBot):
     def _follow_flowchart(self, state: Dict) -> None:
         # F3: French Resources > 0?
         if state.get("resources", {}).get(C.FRENCH, 0) <= 0:
+            state['_pass_reason'] = 'resource_gate'
             push_history(state, "FRENCH PASS (no Resources)")
             return
 
@@ -181,12 +182,14 @@ class FrenchBot(BaseBot):
         if not treaty:
             if self._before_treaty(state):
                 return
+            state['_pass_reason'] = 'no_valid_command'
             push_history(state, "FRENCH PASS")
             return
 
         # -------- POST-TREATY BRANCH (F9-F17) --------------------------------
         if self._after_treaty(state):
             return
+        state['_pass_reason'] = 'no_valid_command'
         push_history(state, "FRENCH PASS")
 
     # -------------------------------------------------------------------

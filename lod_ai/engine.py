@@ -823,14 +823,14 @@ class Engine:
             result, legal, sandbox_state, sandbox_ctx = human_decider(faction, card, allowed, self)
             if not legal:
                 self._award_pass(faction)
-                return {"action": "pass", "used_special": False}
+                return {"action": "pass", "used_special": False, "pass_reason": "illegal_action"}
             if sandbox_state is not None and sandbox_ctx is not None:
                 self._commit_state(sandbox_state, sandbox_ctx)
         else:
             bot = self.bots.get(faction)
             if not bot:
                 self._award_pass(faction)
-                return {"action": "pass", "used_special": False}
+                return {"action": "pass", "used_special": False, "pass_reason": "no_bot"}
             try:
                 result, legal, sandbox_state, sandbox_ctx = self._simulate_action(
                     faction,
@@ -839,12 +839,14 @@ class Engine:
                     lambda s, _c: bot.take_turn(s, card),
                 )
                 if not legal:
+                    pass_reason = sandbox_state.get('_pass_reason', 'illegal_action')
                     self._award_pass(faction)
-                    return {"action": "pass", "used_special": False, "reason": "illegal action"}
+                    return {"action": "pass", "used_special": False, "pass_reason": pass_reason}
                 self._commit_state(sandbox_state, sandbox_ctx)
             except Exception as exc:  # noqa: BLE001
                 self._award_pass(faction)
-                return {"action": "pass", "used_special": False, "reason": f"bot error: {exc}"}
+                return {"action": "pass", "used_special": False, "pass_reason": "bot_error",
+                        "reason": f"bot error: {exc}"}
 
         # Drain any free ops queued by a card event handler.
         # The engine's handle_event() drains internally, but the bot path
@@ -856,8 +858,11 @@ class Engine:
             result = {"action": "command", "used_special": bool(self.state.get("_turn_used_special"))}
 
         if result.get("action") == "pass":
+            pass_reason = self.state.pop('_pass_reason', None) or result.get("notes") or "unknown"
+            result["pass_reason"] = pass_reason
             self._award_pass(faction)
         else:
+            self.state.pop('_pass_reason', None)
             self._mark_executed(faction)
         return result
 
@@ -867,6 +872,7 @@ class Engine:
     def play_card(self, card: dict, human_decider: Callable[..., Tuple[dict, bool, dict, dict]] | None = None) -> List[Tuple[str, dict]]:
         """Execute all eligible turns for *card* (bot- and human-aware)."""
         queue = self._prepare_card(card)
+        self.state['_card_turn_log'] = []
         if card.get("winter_quarters"):
             resolve_year_end(self.state, bots=self.bots, human_factions=self.human_factions)
             if card.get("id"):
@@ -877,9 +883,11 @@ class Engine:
             return []
         actions: List[Tuple[str, dict]] = []
         first_action: dict | None = None
+        eligible_position = 0
 
         while queue and len(actions) < 2:
             faction = queue.pop(0)
+            eligible_position += 1
             allowed = self._options_for_slot(first_action)
             sig = inspect.signature(self.play_turn)
             if "allowed" in sig.parameters:
@@ -888,6 +896,15 @@ class Engine:
                 result = self.play_turn(faction, card=card)
             if not result:
                 result = {"action": "command", "used_special": bool(self.state.get("_turn_used_special"))}
+
+            # Record this faction's turn for diagnostic tracking
+            self.state.setdefault('_card_turn_log', []).append({
+                'faction': faction,
+                'eligible_position': eligible_position,
+                'action': result.get('action'),
+                'pass_reason': result.get('pass_reason'),
+            })
+
             if result.get("action") == "pass":
                 continue
 

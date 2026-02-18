@@ -286,6 +286,7 @@ class BritishBot(BaseBot):
     def _follow_flowchart(self, state: Dict) -> None:
         # --- B3  : Resources > 0? -----------------------------------------
         if state.get("resources", {}).get(C.BRITISH, 0) <= 0:
+            state['_pass_reason'] = 'resource_gate'
             push_history(state, "BRITISH PASS (no Resources)")
             return
 
@@ -324,6 +325,7 @@ class BritishBot(BaseBot):
                 return
 
         # --- Otherwise PASS ------------------------------------------------
+        state['_pass_reason'] = 'no_valid_command'
         push_history(state, "BRITISH PASS")
 
     # =======================================================================
