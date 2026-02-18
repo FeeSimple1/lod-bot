@@ -1700,3 +1700,86 @@ The BS Limited Command walk always tries both Raid and Gather branches without r
 | `test_can_plunder_true_when_wp_exceeds_rebels_with_fort` | Plunder still works when WP > rebels including Fort |
 | `test_changes_control_before_excess_rebels` | Desertion prioritizes control-changing removal |
 | `test_village_still_first_priority` | Village spaces remain top priority for desertion |
+
+---
+
+## Session 6: Patriot Bot Compliance Review
+
+Full node-by-node comparison of `patriot.py` against `Reference Documents/patriot bot flowchart and reference.txt` and `Manual Ch 8` (§8.5).
+
+### FIXED issues (this session)
+
+#### P4 Battle: Half-regs modifier — Active Militia excluded from attacker cubes
+- **Bug:** `att_cubes = att_regs` only counted Regulars (Continentals + French). Active Militia are also cubes per §3.6.5.
+- **Impact:** Half-regs modifier always triggered (+1) even when Militia outnumbered Regulars.
+- **Fix:** `att_cubes = att_regs + active_mil`.
+
+#### P4 Battle: Half-regs modifier — Active War Parties excluded from defender cubes
+- **Bug:** `def_cubes = regs + tories` omitted Active War Parties. Crown cubes include WP per §3.6.6.
+- **Impact:** Defender half-regs triggered too easily (fewer counted cubes = easier 50% threshold).
+- **Fix:** `def_cubes = regs + tories + active_wp`.
+
+#### P5 March: Fort leave-behind should be Active, not Underground
+- **Bug:** Move priority [Cont, MilA, Fre, MilU] left Underground Militia at Forts.
+- **Reference:** §8.5.4 "leave an Active Patriot unit with each Patriot Fort."
+- **Fix:** When Fort present, move order reversed: [MilU, Cont, MilA, Fre] so Active pieces stay behind. Applied to both `_movable_from` and `_movable_from_simulated`.
+
+#### P5 March Phase 2: Missing Population tiebreaker
+- **Bug:** Phase 2 sort key was `(-changes_ctrl, random)`, missing population.
+- **Reference:** §8.5.4 "first to change Control of the most Population, then elsewhere."
+- **Fix:** Added `-pop` to sort key: `(-changes_ctrl, -pop, random)`.
+
+#### P7 Rally / P11 Rabble: Mid-command Persuasion not tracked for SA chain gate
+- **Bug:** `_rally_chain` and `_rabble_chain` did not know if Persuasion was used during Rally/Rabble execution.
+- **Reference:** §8.5.2 "if no Persuasion was used during the Rally, the Patriots execute Partisans…"
+- **Impact:** SA chain could run even after mid-command Persuasion.
+- **Fix:** `_execute_rally` and `_execute_rabble` now set `state["_rally_persuasion_used"]` / `state["_rabble_persuasion_used"]` flags. Chain methods pop and check these flags to gate the SA chain.
+
+#### P9: Fort placement check missing room verification
+- **Bug:** `_rally_preferred` checked 4+ Patriot units and no existing Fort but not the 2-base limit.
+- **Impact:** Bot could choose Rally thinking Fort placement was possible when bases were full.
+- **Fix:** Added `(FORT_PAT + FORT_BRI + VILLAGE) < 2` check.
+
+#### Flowchart routing: March tried after Rally+Rabble fail on P9=Yes/P10=Yes paths
+- **Bug:** When P9=Yes or P10=Yes but Rally+Rabble both failed, code fell through to March.
+- **Reference:** Flowchart shows P9→P7→P11→(guard)→PASS, not March. March only reachable via P10=No.
+- **Fix:** `_march_chain` now only runs inside `else` (P10=No) block.
+
+#### BS trigger: Missing "player Faction is 1st Eligible" check
+- **Bug:** `ops_bs_trigger` checked ToA played and Washington location but not whether 1st Eligible is human.
+- **Reference:** §8.5.8 "a player Faction is 1st Eligible."
+- **Fix:** Added check that `state["first_eligible"]` is in `state["human_factions"]`.
+
+### NOT A BUG (investigated, confirmed correct)
+
+- **P4 Fort in brit_force:** §3.6.3 says "If Defending, include all that Side's cubes, Forts…" — Forts ARE correctly included in defending Force Level.
+- **P4 Underground modifier:** §3.6.5 says "At least one Attacking side piece Underground +1" — "+1 total" is correct (not per piece).
+- **P12 Skirmish option 3:** `skirmish.execute()` requires no enemy cubes for option 3. The original code's `if has_fort and not enemy_cubes` guard is correct. The "first to remove a Fort" in the reference is about space selection priority, not option override.
+- **P2 Event conditions:** Correctly check shaded text per §8.3.2. Q11 resolution confirmed "Active Support" (not "Active Opposition") for bullet 2.
+- **P13 Persuasion Colony/City filter:** Consistent with Persuasion activity rules.
+- **P1/P3 Resource checks:** `take_turn()` handles P1→P2→P3 ordering correctly.
+- **Special Card Instructions:** All 13 Patriot card directives in `event_instructions.py` match the reference document.
+- **OPS Summary (Supply, Redeploy, Desertion):** All sort priorities match §8.5.5–8.5.7.
+
+### Previously documented issues (status update)
+
+- ~~**P7/P11 Persuasion mid-command** — fires after command, not during~~ **FIXED** (this session: tracking flags)
+- **P4 Battle: Win-the-Day free Rally** — bot integration not yet passing Rally params to battle.execute. Infrastructure exists in battle.py (Q9 RESOLVED) but PatriotBot doesn't pass `win_rally_space`/`win_blockade_dest` yet. (REMAINING)
+- **P5 March: "lose no Rebel Control" constraint** — partially implemented via `_movable_from` retention logic but not verified during destination selection. (REMAINING)
+- **P7 Rally: 4 of 6 bullet points incomplete** — Bullets 1 (Fort), 5 (Fort Available Militia), 6 (general Militia) implemented. Bullets 2-3 (Militia at empty Forts, Continental replacement) partially implemented but may not always execute correctly. Bullet 7 (gather at Fort) implemented. (PARTIALLY REMAINING)
+- **Card 51 Bermuda Gunpowder Plot** — "March to set up Battle" conditional not fully implemented. (REMAINING)
+
+### Tests added (10 new, 895 total)
+
+| Test | Verifies |
+|------|----------|
+| `test_p4_half_regs_includes_active_militia` | Active Militia counted in attacker cubes for half-regs check |
+| `test_p4_half_regs_defender_includes_wp` | Active WP counted in defender cubes for half-regs check |
+| `test_march_fort_leave_behind_active` | Fort spaces keep Active piece, move Underground first |
+| `test_march_no_fort_leave_behind_underground` | Non-Fort spaces keep Underground, move Active first |
+| `test_march_phase2_population_tiebreaker` | Phase 2 destinations sorted by population |
+| `test_rally_persuasion_blocks_sa_chain` | Mid-Rally Persuasion tracking flag set |
+| `test_p9_fort_room_check` | P9 Fort assessment verifies 2-base limit |
+| `test_p12_skirmish_fort_priority` | Skirmish option 3 for Fort-only, option 2 with cubes |
+| `test_flowchart_p9_yes_no_march_fallback` | P9=Yes path does not fall through to March |
+| `test_bs_trigger_requires_player_1st_eligible` | BS trigger checks human 1st Eligible |

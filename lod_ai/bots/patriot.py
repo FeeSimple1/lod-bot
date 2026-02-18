@@ -150,12 +150,19 @@ class PatriotBot(BaseBot):
 
         can_move = total_movable - retain
 
-        # Build result: prefer moving Active Militia first (keep Underground for leave-behind)
+        # §8.5.4: Leave Active Patriot unit at Fort; leave Underground
+        # preferred where no Active Opposition.
+        has_fort = sp.get(C.FORT_PAT, 0) > 0
+        if has_fort:
+            # Fort present: move Underground first so Active pieces stay
+            move_order = [C.MILITIA_U, C.REGULAR_PAT, C.MILITIA_A, C.REGULAR_FRE]
+        else:
+            # No Fort: move Active first, keep Underground for leave-behind
+            move_order = [C.REGULAR_PAT, C.MILITIA_A, C.REGULAR_FRE, C.MILITIA_U]
+
         result = {}
         remaining = can_move
-        # Move Continentals first, then Active Militia, then French Regulars
-        # Keep Underground Militia for last (preferred to leave behind)
-        for tag in [C.REGULAR_PAT, C.MILITIA_A, C.REGULAR_FRE, C.MILITIA_U]:
+        for tag in move_order:
             take = min(remaining, avail.get(tag, 0))
             if take > 0:
                 result[tag] = take
@@ -217,14 +224,17 @@ class PatriotBot(BaseBot):
             if self._battle_chain(state):
                 return
         else:
-            if self._rally_preferred(state):
+            if self._rally_preferred(state):          # P9
                 if self._rally_chain(state):
                     return
-            elif self._rabble_possible(state):
+                # P9 was Yes but Rally+Rabble both failed → PASS
+            elif self._rabble_possible(state):        # P10=Yes
                 if self._rabble_chain(state):
                     return
-            if self._march_chain(state):
-                return
+                # P10 was Yes but Rabble+Rally both failed → PASS
+            else:                                     # P10=No → P5 March
+                if self._march_chain(state):
+                    return
 
         push_history(state, "PATRIOTS PASS")
 
@@ -244,26 +254,29 @@ class PatriotBot(BaseBot):
         return True
 
     def _rally_chain(self, state: Dict, *, _from_rabble: bool = False) -> bool:
-        used_persuasion = False
         if not self._execute_rally(state):
             if _from_rabble:
                 return False  # prevent infinite Rally<->Rabble loop
             return self._rabble_chain(state, _from_rally=True)
-        if state["resources"][self.faction] == 0:
-            used_persuasion = self._try_persuasion(state)
-        if not used_persuasion:
+        # §8.5.2: "if no Persuasion was used during the Rally"
+        # _execute_rally returns (True, persuasion_used) — check mid-Rally usage
+        persuasion_during = state.pop("_rally_persuasion_used", False)
+        if not persuasion_during and state["resources"][self.faction] == 0:
+            persuasion_during = self._try_persuasion(state)
+        if not persuasion_during:
             self._partisans_loop(state)
         return True
 
     def _rabble_chain(self, state: Dict, *, _from_rally: bool = False) -> bool:
-        used_persuasion = False
         if not self._execute_rabble(state):
             if _from_rally:
                 return False  # prevent infinite Rabble<->Rally loop
             return self._rally_chain(state, _from_rabble=True)
-        if state["resources"][self.faction] == 0:
-            used_persuasion = self._try_persuasion(state)
-        if not used_persuasion:
+        # §8.5.3: "if no Persuasion was used during Rabble-Rousing"
+        persuasion_during = state.pop("_rabble_persuasion_used", False)
+        if not persuasion_during and state["resources"][self.faction] == 0:
+            persuasion_during = self._try_persuasion(state)
+        if not persuasion_during:
             self._partisans_loop(state)
         return True
 
@@ -322,7 +335,7 @@ class PatriotBot(BaseBot):
             # §3.6.5: Attacker (Rebellion) modifiers on Defender Loss
             att_mod = 0
             att_regs = pat_cubes + fre_cubes
-            att_cubes = att_regs  # all Rebellion cubes are Regulars
+            att_cubes = att_regs + active_mil  # all Rebellion cubes incl Militia
             if att_cubes > 0 and att_regs * 2 >= att_cubes:
                 att_mod += 1  # half regs
             if sp.get(C.MILITIA_U, 0) > 0:
@@ -339,7 +352,7 @@ class PatriotBot(BaseBot):
 
             # §3.6.6: Defender (Royalist) modifiers on Attacker Loss
             def_mod = 0
-            def_cubes = regs + tories
+            def_cubes = regs + tories + active_wp  # all Crown cubes
             if def_cubes > 0 and regs * 2 >= def_cubes:
                 def_mod += 1  # half regs
             if sp.get(C.WARPARTY_U, 0) > 0:
@@ -575,12 +588,13 @@ class PatriotBot(BaseBot):
                          + sp.get(C.REGULAR_PAT, 0))
             if pat_units > 0:
                 continue
-            # Priority: first to change most Control, then random
+            # §8.5.4: first to change Control of the most Population, then elsewhere
             changes_ctrl = 1 if ctrl.get(sid) != "REBELLION" else 0
-            phase2_targets.append((-changes_ctrl, state["rng"].random(), sid))
+            pop = _MAP_DATA.get(sid, {}).get("population", 0)
+            phase2_targets.append((-changes_ctrl, -pop, state["rng"].random(), sid))
         phase2_targets.sort()
 
-        for _, _, dst in phase2_targets:
+        for _, _, _, dst in phase2_targets:
             adj_set = map_adj.adjacent_spaces(dst)
             found = False
             for src in sorted(adj_set):
@@ -666,9 +680,18 @@ class PatriotBot(BaseBot):
             return {}
 
         can_move = total_movable - retain
+
+        # §8.5.4: Leave Active Patriot unit at Fort; leave Underground
+        # preferred where no Active Opposition.
+        has_fort = sp.get(C.FORT_PAT, 0) and sp.get(C.FORT_PAT, 0) > 0
+        if has_fort:
+            move_order = [C.MILITIA_U, C.REGULAR_PAT, C.MILITIA_A, C.REGULAR_FRE]
+        else:
+            move_order = [C.REGULAR_PAT, C.MILITIA_A, C.REGULAR_FRE, C.MILITIA_U]
+
         result = {}
         remaining = can_move
-        for tag in [C.REGULAR_PAT, C.MILITIA_A, C.REGULAR_FRE, C.MILITIA_U]:
+        for tag in move_order:
             take = min(remaining, avail.get(tag, 0))
             if take > 0:
                 result[tag] = take
@@ -880,11 +903,14 @@ class PatriotBot(BaseBot):
 
         # §8.5.2/P7+P13: Execute space-by-space, checking after each space
         # whether resources hit 0 and triggering Persuasion mid-command.
+        # Track whether Persuasion was used during Rally for SA chain gate.
         executed_any = False
+        persuasion_used = False
         for sid in spaces_used:
             if state["resources"][self.faction] < 1:
                 # Try mid-command Persuasion to restore resources
-                self._try_persuasion(state)
+                if self._try_persuasion(state):
+                    persuasion_used = True
                 if state["resources"][self.faction] < 1:
                     break  # still no resources — stop
 
@@ -907,9 +933,12 @@ class PatriotBot(BaseBot):
                 executed_any = True
                 # Check for mid-Rally Persuasion interrupt
                 if state["resources"][self.faction] == 0:
-                    self._try_persuasion(state)
+                    if self._try_persuasion(state):
+                        persuasion_used = True
             except (ValueError, KeyError):
                 continue
+        if persuasion_used:
+            state["_rally_persuasion_used"] = True
         return executed_any
 
     # ---------- Rabble-Rousing (P11) ----------------------------------
@@ -950,11 +979,14 @@ class PatriotBot(BaseBot):
 
         # §8.5.3/P11+P13: Execute space-by-space, checking after each space
         # whether resources hit 0 and triggering Persuasion mid-command.
+        # Track whether Persuasion was used for SA chain gate.
         executed_any = False
+        persuasion_used = False
         for sid in spaces:
             if state["resources"][self.faction] < 1:
                 # Try mid-command Persuasion to restore resources
-                self._try_persuasion(state)
+                if self._try_persuasion(state):
+                    persuasion_used = True
                 if state["resources"][self.faction] < 1:
                     break  # still no resources — stop
             try:
@@ -962,9 +994,12 @@ class PatriotBot(BaseBot):
                 executed_any = True
                 # Check for mid-Rabble Persuasion interrupt
                 if state["resources"][self.faction] == 0:
-                    self._try_persuasion(state)
+                    if self._try_persuasion(state):
+                        persuasion_used = True
             except (ValueError, KeyError):
                 continue
+        if persuasion_used:
+            state["_rabble_persuasion_used"] = True
         return executed_any
 
     # ===================================================================
@@ -1043,12 +1078,13 @@ class PatriotBot(BaseBot):
             has_fort = sp.get(C.FORT_BRI, 0)
             enemy_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
             own_regs = sp.get(C.REGULAR_PAT, 0)
-            # §8.1 "maximum extent": option 2 nets +1 removal over option 1
-            # (sacrifice 1 own piece → remove 2 enemy) when 2+ enemy cubes
+            # §8.5.1: "first to remove a British Fort" — space selection
+            # prefers Fort spaces.  Option 3 (Fort removal) is only valid
+            # when no enemy cubes remain in the space (skirmish.execute rule).
             if has_fort and not enemy_cubes:
                 opt = 3
             elif enemy_cubes >= 2 and own_regs >= 1:
-                opt = 2
+                opt = 2  # §8.1 "maximum extent": sacrifice 1, remove 2
             else:
                 opt = 1
             try:
@@ -1085,7 +1121,10 @@ class PatriotBot(BaseBot):
         """P9: Rally if would place Fort OR 1D6 > Underground Militia."""
         avail_forts = state["available"].get(C.FORT_PAT, 0)
         if avail_forts and any(
-            self._rebel_group_size(sp) >= 4 and sp.get(C.FORT_PAT, 0) == 0
+            self._rebel_group_size(sp) >= 4
+            and sp.get(C.FORT_PAT, 0) == 0
+            and (sp.get(C.FORT_PAT, 0) + sp.get(C.FORT_BRI, 0)
+                 + sp.get(C.VILLAGE, 0)) < 2       # room (max 2 bases)
             for sp in state["spaces"].values()
         ):
             return True
@@ -1260,6 +1299,12 @@ class PatriotBot(BaseBot):
         in a space with 4+ Continentals, and a player Faction is 1st Eligible."""
         if not state.get("toa_played"):
             return False
+        # §8.5.8: "a player Faction is 1st Eligible"
+        human_factions = state.get("human_factions", set())
+        eligible = state.get("eligible", {})
+        first_eligible = state.get("first_eligible")
+        if first_eligible and first_eligible not in human_factions:
+            return False  # 1st Eligible is not a player Faction
         wash_loc = leader_location(state, "LEADER_WASHINGTON")
         if not wash_loc:
             return False
