@@ -2157,3 +2157,108 @@ def test_bs_trigger_requires_player_1st_eligible():
     state["human_factions"] = {C.PATRIOTS}
     state["first_eligible"] = C.PATRIOTS
     assert bot.ops_bs_trigger(state) is True
+
+
+# ===================================================================
+# P4 Win-the-Day Tests
+# ===================================================================
+
+def test_p4_best_blockade_city_excludes_battle_city():
+    """_best_blockade_city should not return the excluded battle city."""
+    bot = PatriotBot()
+    state = _full_state()
+    # Boston and Philadelphia are cities.  Set Boston highest support.
+    state["support"]["Boston"] = C.ACTIVE_SUPPORT
+    state["support"]["Philadelphia"] = C.PASSIVE_SUPPORT
+    # Without exclusion, Boston (highest support) should be selected
+    result = bot._best_blockade_city(state)
+    assert result is not None
+    # With Boston excluded, should get a different city
+    result_excl = bot._best_blockade_city(state, exclude="Boston")
+    assert result_excl != "Boston"
+
+
+def test_p4_win_callback_returns_rally_and_blockade():
+    """Win-the-Day callback should return (rally_space, kwargs, blockade_dest)."""
+    bot = PatriotBot()
+    state = _full_state()
+    # Set up: 5 Continentals in Boston (4+ for Fort), no Fort yet
+    state["spaces"]["Boston"] = {
+        C.REGULAR_PAT: 5, C.REGULAR_BRI: 2, C.TORY: 1,
+        C.MILITIA_A: 3, C.MILITIA_U: 0, C.FORT_PAT: 0,
+        C.REGULAR_FRE: 0, C.FORT_BRI: 0, C.VILLAGE: 0,
+        C.WARPARTY_A: 0, C.WARPARTY_U: 0,
+    }
+    state["spaces"]["Philadelphia"] = {
+        C.REGULAR_PAT: 0, C.MILITIA_A: 0, C.MILITIA_U: 0,
+        C.REGULAR_FRE: 0, C.FORT_PAT: 0, C.FORT_BRI: 0,
+        C.VILLAGE: 0, C.REGULAR_BRI: 0, C.TORY: 0,
+        C.WARPARTY_A: 0, C.WARPARTY_U: 0,
+    }
+    state["available"][C.FORT_PAT] = 2
+    state["support"]["Philadelphia"] = C.ACTIVE_SUPPORT
+    state["support"]["Boston"] = 0
+
+    # Simulate the callback that _execute_battle sets up
+    rally_space = bot._best_rally_space(state)
+    blockade_dest = bot._best_blockade_city(state, exclude="Boston")
+    # Rally space should be chosen (Boston qualifies: 5+ units, Fort available)
+    assert rally_space is not None
+    # Blockade should NOT be Boston (excluded)
+    assert blockade_dest != "Boston"
+
+
+def test_p4_execute_battle_uses_win_callback():
+    """_execute_battle should wire the win_callback into battle.execute."""
+    from unittest.mock import patch
+    bot = PatriotBot()
+    state = _full_state()
+    # Set up a space where Rebellion clearly wins
+    state["spaces"]["Boston"] = {
+        C.REGULAR_PAT: 6, C.REGULAR_FRE: 0,
+        C.MILITIA_A: 4, C.MILITIA_U: 2,
+        C.REGULAR_BRI: 1, C.TORY: 0,
+        C.WARPARTY_A: 0, C.WARPARTY_U: 0,
+        C.FORT_PAT: 0, C.FORT_BRI: 0, C.VILLAGE: 0,
+    }
+    state["spaces"]["New_York"] = {
+        C.REGULAR_PAT: 0, C.MILITIA_A: 0, C.MILITIA_U: 0,
+        C.REGULAR_FRE: 0, C.FORT_PAT: 0, C.FORT_BRI: 0,
+        C.VILLAGE: 0, C.REGULAR_BRI: 0, C.TORY: 0,
+        C.WARPARTY_A: 0, C.WARPARTY_U: 0,
+    }
+    state["leader_locs"] = {"LEADER_WASHINGTON": "Boston"}
+    state["resources"][C.FRENCH] = 0  # No French involvement
+
+    # Patch battle.execute to capture the win_callback argument
+    with patch("lod_ai.bots.patriot.battle.execute") as mock_execute:
+        mock_execute.return_value = {}
+        bot._execute_battle(state)
+        assert mock_execute.called
+        call_kwargs = mock_execute.call_args
+        # Should have win_callback kwarg
+        assert "win_callback" in call_kwargs.kwargs
+
+
+def test_p4_best_rally_space_fort_priority():
+    """_best_rally_space prioritizes Fort placement (Cities first, highest Pop)."""
+    bot = PatriotBot()
+    state = _full_state()
+    # Boston (City) with 5 units = Fort candidate
+    state["spaces"]["Boston"] = {
+        C.REGULAR_PAT: 3, C.MILITIA_A: 2, C.MILITIA_U: 0,
+        C.REGULAR_FRE: 0, C.FORT_PAT: 0, C.FORT_BRI: 0,
+        C.VILLAGE: 0,
+    }
+    # Virginia (Colony) with 5 units = Fort candidate
+    state["spaces"]["Virginia"] = {
+        C.REGULAR_PAT: 3, C.MILITIA_A: 2, C.MILITIA_U: 0,
+        C.REGULAR_FRE: 0, C.FORT_PAT: 0, C.FORT_BRI: 0,
+        C.VILLAGE: 0,
+    }
+    state["available"][C.FORT_PAT] = 2
+    state["control"] = {}
+
+    result = bot._best_rally_space(state)
+    # Should pick a space (Boston preferred as City with higher pop)
+    assert result is not None

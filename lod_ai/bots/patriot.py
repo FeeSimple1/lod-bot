@@ -384,7 +384,13 @@ class PatriotBot(BaseBot):
 
         # Win-the-Day: per-space callback for free Rally + Blockade move
         def _win_callback(st, battle_sid):
-            """Per-space Win-the-Day callback per §3.6.8."""
+            """Per-space Win-the-Day callback per §3.6.8.
+
+            Returns (rally_space, rally_kwargs, blockade_dest) for this
+            battle space.  Rally uses P7 priorities; Blockade moves to
+            the City with most Support (excluding the battle city itself).
+            """
+            # Free Rally: pick best space per P7 priorities
             rally_space = self._best_rally_space(st)
             rally_kwargs = {}
             if rally_space:
@@ -393,7 +399,8 @@ class PatriotBot(BaseBot):
                         and self._rebel_group_size(sp_r) >= 4
                         and st["available"].get(C.FORT_PAT, 0) > 0):
                     rally_kwargs["build_fort"] = {rally_space}
-            blockade_dest = self._best_blockade_city(st)
+            # Blockade: move FROM battle city TO city with most Support
+            blockade_dest = self._best_blockade_city(st, exclude=battle_sid)
             return rally_space, rally_kwargs, blockade_dest
 
         battle.execute(
@@ -442,11 +449,20 @@ class PatriotBot(BaseBot):
             return candidates[0][4]
         return None
 
-    def _best_blockade_city(self, state: Dict) -> str | None:
-        """Select City with most Support for French Blockade move (P4)."""
+    def _best_blockade_city(self, state: Dict,
+                            exclude: str | None = None) -> str | None:
+        """Select City with most Support for French Blockade move (P4).
+
+        Parameters
+        ----------
+        exclude : str | None
+            A city to exclude (the battle city the blockade moves FROM).
+        """
         best = None
         best_support = -999
         for sid in CITIES:
+            if sid == exclude:
+                continue
             sup = self._support_level(state, sid)
             if sup > best_support:
                 best_support = sup
