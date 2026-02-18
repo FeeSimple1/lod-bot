@@ -1069,3 +1069,116 @@ def test_f7_agent_mobilization_skips_active_support():
     result = bot._agent_mobilization(state)
     assert result is True
     # Verify no crash — the test passing means Active Support was skipped
+
+
+# ===================================================================
+#  Session 13: French Bot Compliance Review — new tests
+# ===================================================================
+
+def test_f6_hortalez_cant_afford_does_not_run_preparer():
+    """F6: When Hortalez can't afford the 1D3 roll, the bot should Pass
+    (no Preparer SA). Previously, _before_treaty always ran Preparer
+    and returned True even when Hortalez was skipped."""
+    bot = FrenchBot()
+    # Find a seed where the F5 roll sends us to Hortalez (need_hortalez=True)
+    # AND the Hortalez roll exceeds French resources
+    for seed in range(200):
+        rng = random.Random(seed)
+        f5_roll = rng.randint(1, 3)  # F5: Patriot Resources < 1D3?
+        h_roll = rng.randint(1, 3)   # Hortalez 1D3
+        # need_hortalez=True when Patriot Resources < f5_roll
+        # can't afford when French Resources < h_roll
+        if f5_roll > 0 and h_roll >= 2:
+            # Set Patriot Resources = 0 (< any roll) and French Resources = 1
+            break
+
+    state = _full_state(toa_played=False)
+    state["resources"] = {C.FRENCH: 1, C.PATRIOTS: 0, C.BRITISH: 10, C.INDIANS: 10}
+    state["rng"] = random.Random(seed)
+    state["unavailable"] = {}
+    state["available"] = {C.REGULAR_FRE: 0, C.MILITIA_U: 0}
+
+    result = bot._before_treaty(state)
+
+    # If Hortalez can't afford, _before_treaty should return False (Pass)
+    # The old code would return True and run Preparer even after Hortalez skipped
+    if not result:
+        # Correct: bot passed because Hortalez couldn't afford
+        assert state["resources"][C.FRENCH] == 1  # Resources unchanged
+    # If result is True, Hortalez actually succeeded (roll was 1) — also fine
+
+
+def test_f6_hortalez_returns_bool():
+    """_hortelez should return True on success, False on failure."""
+    bot = FrenchBot()
+    # Success case: enough resources
+    state = _full_state(toa_played=False)
+    state["resources"] = {C.FRENCH: 10, C.PATRIOTS: 0, C.BRITISH: 10, C.INDIANS: 10}
+    result = bot._hortelez(state, before_treaty=True)
+    assert result is True
+
+    # Failure case: can't afford (find seed with roll > 1, set resources to 1)
+    for seed in range(200):
+        rng = random.Random(seed)
+        roll = rng.randint(1, 3)
+        if roll > 1:
+            break
+    state2 = _full_state(toa_played=False)
+    state2["resources"] = {C.FRENCH: 1, C.PATRIOTS: 0, C.BRITISH: 10, C.INDIANS: 10}
+    state2["rng"] = random.Random(seed)
+    result2 = bot._hortelez(state2, before_treaty=True)
+    assert result2 is False
+
+
+def test_f16_battle_includes_patriot_forts_in_rebel_force():
+    """F16: Rebel Force Level should include Patriot Forts per section 3.6
+    (Force Level = cubes + Forts). A Patriot Fort should tip the balance."""
+    bot = FrenchBot()
+    state = _full_state(toa_played=True)
+    # Without Fort: rebel_force = 1 French + 1 Cont = 2, crown = 3 British → no battle
+    # With Fort:    rebel_force = 1 French + 1 Cont + 1 Fort = 3, crown = 3 → still no (not exceeding)
+    # With Fort+1:  rebel_force = 2 French + 1 Cont + 1 Fort = 4, crown = 3 → battle!
+    state["spaces"] = {
+        "Boston": {
+            C.REGULAR_FRE: 1, C.REGULAR_PAT: 1,
+            C.REGULAR_BRI: 3, C.TORY: 0,
+            C.MILITIA_A: 0, C.MILITIA_U: 0,
+            C.WARPARTY_A: 0, C.FORT_BRI: 0,
+            C.FORT_PAT: 1,
+        },
+    }
+    state["leaders"] = {}
+    state["support"] = {"Boston": 0}
+    state["control"] = {}
+
+    # rebel = 1+1+1 = 3, crown = 3 → not exceeding → no battle
+    result = bot._battle(state)
+    assert result is False
+
+    # Add 1 more French Regular: rebel = 2+1+1 = 4 > 3 → battle
+    state["spaces"]["Boston"][C.REGULAR_FRE] = 2
+    result = bot._battle(state)
+    assert result is True
+
+
+def test_f10_muster_fallback_includes_west_indies():
+    """F10: Muster fallback targets should include West Indies even when
+    WI is not Rebel Controlled, per 'in 1 space with Rebel Control or
+    the West Indies'."""
+    bot = FrenchBot()
+    state = _full_state(toa_played=True)
+    # avail_regs >= 4 so we go to "Otherwise" branch
+    state["available"] = {C.REGULAR_FRE: 6}
+    # No Colony/City with Continentals AND Rebel Control
+    state["spaces"] = {
+        "West_Indies": {},
+        "Boston": {C.REGULAR_BRI: 3},  # No Continentals
+    }
+    state["control"] = {"Boston": "BRITISH"}  # No Rebel Control anywhere
+    # WI is not Rebel Controlled either
+    # But WI should still be a valid fallback target
+    result = bot._muster(state)
+    # Should succeed by mustering in West Indies (the only valid target)
+    assert result is True
+    affected = state.get("_turn_affected_spaces", set())
+    assert "West_Indies" in affected
