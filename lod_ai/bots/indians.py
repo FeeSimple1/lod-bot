@@ -273,6 +273,11 @@ class IndianBot(BaseBot):
 
         dc_loc = leader_location(state, "LEADER_DRAGGING_CANOE")
         available_wp = {sid: sp.get(C.WARPARTY_U, 0) for sid, sp in state["spaces"].items()}
+        # Track DC extended-range budget separately: mirrors raid.py's
+        # dc_pool / dc_used validation.  Only non-adjacent moves from DC's
+        # location consume extended-range budget.
+        dc_initial_pool = available_wp.get(dc_loc, 0) if dc_loc else 0
+        dc_extended_used = 0
 
         # Priority: first where Plunder possible (WP > Rebels), within each highest Pop
         def score(space: str) -> Tuple[int, int]:
@@ -292,18 +297,30 @@ class IndianBot(BaseBot):
         selected: List[str] = []
         move_plan: List[Tuple[str, str]] = []
 
+        def _is_adjacent(src: str, dst: str) -> bool:
+            return dst in _adjacent(src)
+
         def _reserve_source(dst: str) -> str | None:
-            # prefer adjacent Underground WP
+            nonlocal dc_extended_used
+            # prefer adjacent Underground WP (includes DC loc if adjacent)
             for src in _adjacent(dst):
                 if available_wp.get(src, 0) <= 0:
                     continue
                 if state["spaces"][src].get(C.VILLAGE, 0) and available_wp[src] == 1:
                     continue  # avoid stripping last WP from a Village space
                 return src
-            if dc_loc and available_wp.get(dc_loc, 0) > 0:
-                path = shortest_path(dc_loc, dst)
-                if path and (len(path) - 1) <= 2:
-                    return dc_loc
+            # DC extended-range fallback: only if DC has WP remaining AND
+            # we haven't exhausted the DC pool budget AND the destination
+            # is within 2 moves of DC (but NOT adjacent, since adjacent
+            # was already checked above).
+            if (dc_loc
+                    and available_wp.get(dc_loc, 0) > 0
+                    and dc_initial_pool > dc_extended_used):
+                if not _is_adjacent(dc_loc, dst):
+                    path = shortest_path(dc_loc, dst)
+                    if path and (len(path) - 1) <= 2:
+                        dc_extended_used += 1
+                        return dc_loc
             return None
 
         max_raid = min(3, state["resources"].get(C.INDIANS, 0))
@@ -333,7 +350,37 @@ class IndianBot(BaseBot):
         if not selected:
             return False
 
-        raid.execute(state, C.INDIANS, {}, selected, move_plan=move_plan)
+        # Final validation: ensure every (src, dst) in move_plan passes
+        # the same adjacency / DC-extended-range check that raid.execute()
+        # will perform, so we never hand it an invalid plan.
+        dc_verify_used = 0
+        validated_plan: List[Tuple[str, str]] = []
+        validated_selected: List[str] = []
+        plan_dsts = {dst for _, dst in move_plan}
+        for src, dst in move_plan:
+            path = shortest_path(src, dst)
+            dist = (len(path) - 1) if path else None
+            is_dc_ext = (dc_loc and src == dc_loc
+                         and dc_initial_pool > dc_verify_used
+                         and dist is not None and dist <= 2)
+            if is_dc_ext:
+                dc_verify_used += 1
+                validated_plan.append((src, dst))
+                validated_selected.append(dst)
+            elif dist == 1:
+                validated_plan.append((src, dst))
+                validated_selected.append(dst)
+            # else: skip this move — it would fail validation in raid.py
+
+        # Add targets that didn't need a move (already have WP)
+        for tgt in selected:
+            if tgt not in plan_dsts and tgt not in validated_selected:
+                validated_selected.append(tgt)
+
+        if not validated_selected:
+            return False
+
+        raid.execute(state, C.INDIANS, {}, validated_selected, move_plan=validated_plan)
         return True
 
     # ------------------------------------------------------------------
