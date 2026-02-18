@@ -9,6 +9,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from copy import deepcopy
 import inspect
+import traceback as _tb_module
 from typing import Any, Callable, Dict, Iterable, List, Tuple
 
 from lod_ai.dispatcher import Dispatcher
@@ -844,6 +845,16 @@ class Engine:
                     return {"action": "pass", "used_special": False, "pass_reason": pass_reason}
                 self._commit_state(sandbox_state, sandbox_ctx)
             except Exception as exc:  # noqa: BLE001
+                # Enhanced error logging: capture full traceback for diagnostics
+                card_id = card.get("id") if card else None
+                error_entry = {
+                    "faction": faction,
+                    "card_number": card_id,
+                    "exception_type": type(exc).__name__,
+                    "exception_message": str(exc),
+                    "traceback_str": _tb_module.format_exc(),
+                }
+                self.state.setdefault("_bot_error_log", []).append(error_entry)
                 self._award_pass(faction)
                 return {"action": "pass", "used_special": False, "pass_reason": "bot_error",
                         "reason": f"bot error: {exc}"}
