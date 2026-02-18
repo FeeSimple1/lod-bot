@@ -171,7 +171,11 @@ def evt_010_franklin_to_france(state, shaded=False):
         add_resource(state, FRENCH,   3)
         add_resource(state, PATRIOTS, 2)
     else:
-        c1, c2 = pick_two_cities(state)
+        cities = pick_two_cities(state)
+        if len(cities) < 2:
+            # Insufficient cities found — event is ineffective
+            return
+        c1, c2 = cities
         shift_support(state, c1, +1)
         shift_support(state, c2, +1)
 
