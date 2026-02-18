@@ -1198,6 +1198,14 @@ class BritishBot(BaseBot):
         if move_plan:
             all_srcs = list({p["src"] for p in move_plan})[:4]
             all_dsts = list({p["dst"] for p in move_plan})[:4]
+            # Set bring_escorts=True when any move includes Tories or
+            # Common-Cause War Parties, which require Regular escorts.
+            needs_escorts = any(
+                p["pieces"].get(C.TORY, 0) > 0
+                or p["pieces"].get(C.WARPARTY_U, 0) > 0
+                or p["pieces"].get(C.WARPARTY_A, 0) > 0
+                for p in move_plan
+            )
             march.execute(
                 state,
                 C.BRITISH,
@@ -1205,7 +1213,7 @@ class BritishBot(BaseBot):
                 all_srcs,
                 all_dsts,
                 plan=move_plan[:4],
-                bring_escorts=False,
+                bring_escorts=needs_escorts,
                 limited=False,
             )
 
