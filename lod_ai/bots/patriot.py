@@ -768,6 +768,7 @@ class PatriotBot(BaseBot):
         ctrl = state.get("control", {})
         spaces_used: List[str] = []  # Track Rally spaces (Max 4)
         build_fort_set: Set[str] = set()
+        place_one_set: Set[str] = set()   # Spaces that need explicit Militia placement
         promote_space: str | None = None
         promote_n: int | None = None
         move_plan_list: List[Tuple[str, str, int]] = []
@@ -798,27 +799,39 @@ class PatriotBot(BaseBot):
                 avail_forts -= 1
 
         # --- Bullet 2: Militia at lonely Fort spaces ---
-        for sid, sp in state["spaces"].items():
-            if len(spaces_used) >= 4:
-                break
-            if sp.get(C.FORT_PAT, 0) == 0:
-                continue
-            # "no other Rebellion pieces" = only the Fort itself
-            other = (sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0) +
-                     sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0))
-            if other == 0 and sid not in spaces_used:
+        # §8.5.2: "place Militia, first at each Patriot Fort with no other
+        # Rebellion pieces"
+        # Only add if Militia are actually Available to place.
+        if avail_militia > 0:
+            lonely_forts = []
+            for sid, sp in state["spaces"].items():
+                if sp.get(C.FORT_PAT, 0) == 0:
+                    continue
+                # "no other Rebellion pieces" = only the Fort itself
+                other = (sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0) +
+                         sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0))
+                if other == 0 and sid not in spaces_used:
+                    lonely_forts.append(sid)
+            # Sort for determinism (alphabetical)
+            lonely_forts.sort()
+            for sid in lonely_forts:
+                if len(spaces_used) >= 4 or avail_militia <= 0:
+                    break
                 spaces_used.append(sid)
+                place_one_set.add(sid)  # explicit placement needed at Fort spaces
+                avail_militia -= 1  # track placement against available
 
         # --- Bullet 3: Continental placement at Fort with most Militia ---
         # §8.5.2: "then if any Continentals are Available at the Fort with
         # the largest number of Militia already."
         # This adds a new Rally space (the Fort with most Militia globally).
+        # Unlike Bullet 4, this may select a Fort not yet in spaces_used.
         if avail_cont > 0 and len(spaces_used) < 4:
             best_cont_fort = None
             best_cont_mil = -1
             for sid, sp in state["spaces"].items():
                 if sid in spaces_used:
-                    continue  # already selected
+                    continue  # already selected — checked separately in Bullet 4
                 if sp.get(C.FORT_PAT, 0) == 0 and sid not in build_fort_set:
                     continue
                 mil = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
@@ -845,7 +858,8 @@ class PatriotBot(BaseBot):
                     best_fort = sid
             if best_fort and best_mil > 0:
                 promote_space = best_fort
-                promote_n = max(0, best_mil - 1)
+                # Replace all except 1 Underground, capped by available Continentals
+                promote_n = min(max(0, best_mil - 1), avail_cont)
                 if promote_n == 0:
                     promote_space = None
                     promote_n = None
@@ -958,6 +972,8 @@ class PatriotBot(BaseBot):
             kw = {}
             if sid in build_fort_set:
                 kw["build_fort"] = {sid}
+            if sid in place_one_set:
+                kw["place_one"] = {sid}
             if promote_space == sid:
                 kw["promote_space"] = promote_space
                 kw["promote_n"] = promote_n
