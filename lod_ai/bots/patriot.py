@@ -643,6 +643,31 @@ class PatriotBot(BaseBot):
         if not move_plans:
             return False
 
+        # --- Post-planning verification: Lose no Rebel Control ---
+        # Aggregate total removals per source across all moves, then verify
+        # that no Rebellion-controlled origin would flip to Crown control.
+        agg_removals: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        for plan in move_plans:
+            for tag, cnt in plan["pieces"].items():
+                agg_removals[plan["src"]][tag] += cnt
+
+        verified_plans = []
+        for plan in move_plans:
+            src = plan["src"]
+            if src in agg_removals and self._would_lose_rebel_control(
+                    state, src, dict(agg_removals[src])):
+                # Skip this plan — would lose Rebel Control at origin
+                # Also reduce aggregated removals for this source
+                for tag, cnt in plan["pieces"].items():
+                    agg_removals[src][tag] -= cnt
+                continue
+            verified_plans.append(plan)
+
+        if not verified_plans:
+            return False
+
+        move_plans = verified_plans
+
         # Collect all unique destinations
         all_dests = list(dict.fromkeys(p["dst"] for p in move_plans))
         all_srcs = list(dict.fromkeys(p["src"] for p in move_plans))

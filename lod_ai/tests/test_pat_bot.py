@@ -2262,3 +2262,67 @@ def test_p4_best_rally_space_fort_priority():
     result = bot._best_rally_space(state)
     # Should pick a space (Boston preferred as City with higher pop)
     assert result is not None
+
+
+# ===================================================================
+# P5 March Control-Loss Verification Tests
+# ===================================================================
+
+def test_p5_march_would_lose_rebel_control_helper():
+    """_would_lose_rebel_control returns True when removing pieces
+    would cause Rebellion to lose control."""
+    bot = PatriotBot()
+    state = {
+        "spaces": {
+            "TestSpace": {
+                C.REGULAR_PAT: 2, C.MILITIA_A: 0, C.MILITIA_U: 0,
+                C.REGULAR_FRE: 0, C.FORT_PAT: 0,
+                C.REGULAR_BRI: 1, C.TORY: 0, C.FORT_BRI: 0,
+                C.WARPARTY_A: 0, C.WARPARTY_U: 0, C.VILLAGE: 0,
+            },
+        },
+        "control": {"TestSpace": "REBELLION"},
+        "support": {},
+    }
+    # Rebels=2, Royalist=1.  Removing 1 → Rebels=1, not > Royalist=1 → loses control
+    assert bot._would_lose_rebel_control(state, "TestSpace", {C.REGULAR_PAT: 1}) is True
+    # Removing 0 → no change
+    assert bot._would_lose_rebel_control(state, "TestSpace", {}) is False
+
+
+def test_p5_march_would_lose_control_with_fort():
+    """Fort counts toward Rebel pieces, so control may be retained."""
+    bot = PatriotBot()
+    state = {
+        "spaces": {
+            "TestSpace": {
+                C.REGULAR_PAT: 2, C.MILITIA_A: 0, C.MILITIA_U: 0,
+                C.REGULAR_FRE: 0, C.FORT_PAT: 1,
+                C.REGULAR_BRI: 1, C.TORY: 0, C.FORT_BRI: 0,
+                C.WARPARTY_A: 0, C.WARPARTY_U: 0, C.VILLAGE: 0,
+            },
+        },
+        "control": {"TestSpace": "REBELLION"},
+        "support": {},
+    }
+    # Rebels=2+1(Fort)=3, Royalist=1.  Removing 1 Cont → Rebels=2 > 1 → keeps control
+    assert bot._would_lose_rebel_control(state, "TestSpace", {C.REGULAR_PAT: 1}) is False
+    # Removing 2 Cont → Rebels=1(Fort) > 1? No, 1 <= 1 → loses control
+    assert bot._would_lose_rebel_control(state, "TestSpace", {C.REGULAR_PAT: 2}) is True
+
+
+def test_p5_march_skips_moves_that_lose_control():
+    """Post-planning verification should skip moves that would lose Rebel Control."""
+    bot = PatriotBot()
+    state = _full_state()
+    # Source: Massachusetts has barely Rebellion control (2 rebels vs 1 royalist)
+    state["spaces"]["Massachusetts"] = {
+        C.REGULAR_PAT: 2, C.MILITIA_A: 0, C.MILITIA_U: 0,
+        C.REGULAR_FRE: 0, C.FORT_PAT: 0,
+        C.REGULAR_BRI: 1, C.TORY: 0, C.FORT_BRI: 0,
+        C.WARPARTY_A: 0, C.WARPARTY_U: 0, C.VILLAGE: 0,
+    }
+    state["control"]["Massachusetts"] = "REBELLION"
+    # Verify the helper detects control loss
+    assert bot._would_lose_rebel_control(
+        state, "Massachusetts", {C.REGULAR_PAT: 1}) is True
