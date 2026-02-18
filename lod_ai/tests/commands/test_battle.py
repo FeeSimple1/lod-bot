@@ -120,19 +120,21 @@ def test_defender_wins_ties(monkeypatch):
 def test_apply_shifts_to_returns_remaining():
     """_apply_shifts_to stops when the space hits its support limit and
     returns the number of unused shifts."""
-    state = {"support": {"Boston": C.PASSIVE_OPPOSITION}}
+    state = {"support": {"Boston": C.PASSIVE_SUPPORT}}
     remaining = battle._apply_shifts_to(state, "Boston", "ROYALIST", 3)
-    # PASSIVE_OPPOSITION(-1) → ACTIVE_OPPOSITION(-2), can't go further
-    assert state["support"]["Boston"] == C.ACTIVE_OPPOSITION
+    # §3.6.8: Royalist winner shifts toward Support.
+    # PASSIVE_SUPPORT(1) → ACTIVE_SUPPORT(2), can't go further
+    assert state["support"]["Boston"] == C.ACTIVE_SUPPORT
     assert remaining == 2
 
 
 def test_apply_shifts_to_rebellion():
-    """_apply_shifts_to shifts toward ACTIVE_SUPPORT for REBELLION winner."""
-    state = {"support": {"Boston": C.PASSIVE_SUPPORT}}
+    """_apply_shifts_to shifts toward ACTIVE_OPPOSITION for REBELLION winner."""
+    state = {"support": {"Boston": C.PASSIVE_OPPOSITION}}
     remaining = battle._apply_shifts_to(state, "Boston", "REBELLION", 3)
-    # PASSIVE_SUPPORT(1) → ACTIVE_SUPPORT(2), can't go further
-    assert state["support"]["Boston"] == C.ACTIVE_SUPPORT
+    # §3.6.8: Rebellion winner shifts toward Opposition.
+    # PASSIVE_OPPOSITION(-1) → ACTIVE_OPPOSITION(-2), can't go further
+    assert state["support"]["Boston"] == C.ACTIVE_OPPOSITION
     assert remaining == 2
 
 
@@ -163,9 +165,10 @@ def test_overflow_shifts_to_adjacent(monkeypatch):
         "resources": {C.BRITISH: 5, C.PATRIOTS: 0, C.FRENCH: 0, C.INDIANS: 0},
         "available": {},
         "casualties": {},
-        # Boston at PASSIVE_OPPOSITION: can only shift 1 more toward Opposition
+        # §3.6.8: Royalist winner shifts toward Support.
+        # Boston at PASSIVE_SUPPORT: can only shift 1 more toward Support
         "support": {
-            "Boston": C.PASSIVE_OPPOSITION,
+            "Boston": C.PASSIVE_SUPPORT,
             "Adj_A": C.NEUTRAL,
             "Adj_B": C.NEUTRAL,
         },
@@ -175,9 +178,9 @@ def test_overflow_shifts_to_adjacent(monkeypatch):
 
     # Royalist wins (1 attacker piece lost < 4 defender pieces lost).
     # loser_removed=4, shifts = min(3, 4//2) = 2.
-    # Shift 1 in Boston: -1 → -2. Shift 2 overflows to Adj_A (pop 2).
-    assert state["support"]["Boston"] == C.ACTIVE_OPPOSITION
-    assert state["support"]["Adj_A"] == C.PASSIVE_OPPOSITION
+    # Shift 1 in Boston: 1 → 2. Shift 2 overflows to Adj_A (pop 2).
+    assert state["support"]["Boston"] == C.ACTIVE_SUPPORT
+    assert state["support"]["Adj_A"] == C.PASSIVE_SUPPORT
     # Adj_B untouched (only 2 shifts total, 1 used in Boston, 1 in Adj_A)
     assert state["support"]["Adj_B"] == C.NEUTRAL
 

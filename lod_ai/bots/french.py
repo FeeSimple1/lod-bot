@@ -52,7 +52,7 @@ _MAP_DATA = json.load(
     open(Path(__file__).resolve().parents[1] / "map" / "data" / "map.json")
 )
 WEST_INDIES = C.WEST_INDIES_ID
-_VALID_PROVINCES: List[str] = ["Quebec_City", "New_York", "New_Hampshire", "Massachusetts"]
+_VALID_PROVINCES: List[str] = ["Quebec", "New_York", "New_Hampshire", "Massachusetts"]
 
 
 # ---------------------------------------------------------------------------

@@ -92,3 +92,11 @@ Implemented:
 **Evidence:** Analysis of all 18 shaded cards that place Underground Militia shows the largest cluster (cards 28, 47, 58, 78, 89) targets Active Support spaces (Tory-occupied, British-controlled territory). "Active Opposition with no militia" is a near-impossible board state. "Active Support or Village" forms a coherent strategic grouping: enemy-aligned territory lacking Patriot military presence.
 
 **Implementation:** `_faction_event_conditions()` now checks the board for Active Support or Village spaces with no existing militia, instead of the previous over-broad flag check.
+
+---
+
+## Q12: French Agent Mobilization (§3.5.1) — "Quebec" vs "Quebec City" — RESOLVED
+
+**Decision:** Use `"Quebec"` (Reserve) per Manual §3.5.1 command definition. The bot flowchart's "Quebec City" is treated as an informal reference to the same location; the command definition in the manual is authoritative for what spaces the command can target.
+
+**Implementation:** Changed `_VALID_PROVINCES` in both `french_agent_mobilization.py` and `bots/french.py` from `"Quebec_City"` to `"Quebec"`. Updated 3 tests.

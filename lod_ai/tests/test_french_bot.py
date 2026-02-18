@@ -79,11 +79,11 @@ def test_f13_can_battle_checks_force_comparison():
     assert bot._can_battle(state) is True
 
 
-def test_f7_valid_provinces_uses_quebec_city():
-    """F7: Agent Mobilization targets Quebec_City, not Quebec (Reserve)."""
+def test_f7_valid_provinces_uses_quebec():
+    """F7: Agent Mobilization targets Quebec (Reserve) per §3.5.1."""
     from lod_ai.bots.french import _VALID_PROVINCES
-    assert "Quebec_City" in _VALID_PROVINCES
-    assert "Quebec" not in _VALID_PROVINCES
+    assert "Quebec" in _VALID_PROVINCES
+    assert "Quebec_City" not in _VALID_PROVINCES
 
 
 def test_f14_march_fallback_to_muster():
@@ -1051,20 +1051,20 @@ def test_f7_agent_mobilization_skips_active_support():
     bot = FrenchBot()
     state = _full_state(toa_played=False)
     state["spaces"] = {
-        "Quebec_City": {C.REGULAR_PAT: 5},
+        "Quebec": {C.REGULAR_PAT: 5},
         "New_York": {C.REGULAR_PAT: 1},
         "New_Hampshire": {},
         "Massachusetts": {},
     }
     state["support"] = {
-        "Quebec_City": C.ACTIVE_SUPPORT,  # Best score but Active Support
+        "Quebec": C.ACTIVE_SUPPORT,  # Best score but Active Support
         "New_York": 0,
         "New_Hampshire": 0,
         "Massachusetts": 0,
     }
     state["control"] = {}
     state["available"] = {C.MILITIA_U: 5}
-    # Quebec_City would have highest score (5 patriots) but is Active Support
+    # Quebec would have highest score (5 patriots) but is Active Support
     # Bot should pick New_York (1 patriot) instead
     result = bot._agent_mobilization(state)
     assert result is True

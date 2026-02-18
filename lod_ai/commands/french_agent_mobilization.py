@@ -32,7 +32,7 @@ from lod_ai.economy.resources import spend, can_afford
 
 COMMAND_NAME = "FRENCH_AGENT_MOBILIZATION"   # auto‑registered
 
-_VALID_PROVINCES = {"Quebec_City", "New_York", "New_Hampshire", "Massachusetts"}
+_VALID_PROVINCES = {"Quebec", "New_York", "New_Hampshire", "Massachusetts"}
 
 # ---------------------------------------------------------------------------
 # Helpers

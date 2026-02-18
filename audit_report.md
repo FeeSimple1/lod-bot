@@ -2048,3 +2048,58 @@ This is the same pattern as Session 12 bug #3 (FORT_PAT missing from `score()`, 
 | `test_scout_caps_tories_to_regulars` | Tories capped at Regulars count (no crash with 5 Tories, 2 Regs) |
 | `test_scout_all_tories_when_le_regulars` | All Tories move when count ≤ Regulars |
 | `test_scout_skips_city_selects_province` | City destination filtered out, Province selected instead |
+
+---
+
+## Session 16: Commands Compliance Review (Manual Ch 3)
+
+### Scope
+
+Systematic comparison of all 11 command implementations in `lod_ai/commands/` against Manual Ch 3 (§3.1–§3.6). Files reviewed: `battle.py`, `march.py`, `muster.py`, `rally.py`, `garrison.py`, `gather.py`, `scout.py`, `raid.py`, `rabble_rousing.py`, `french_agent_mobilization.py`, `hortelez.py`.
+
+### Commands verified CORRECT
+
+| Command | Section | Status |
+|---------|---------|--------|
+| `muster.py` (British) | §3.2.1 | CORRECT — Regular placement (up to 6), Tory placement (2/1 by support), Fort/Reward Loyalty, resource costs |
+| `muster.py` (French) | §3.5.3 | CORRECT — single space, Rebellion Control or WI, up to 4 Regulars, optional Fort replacement |
+| `garrison.py` | §3.2.2 | CORRECT — 2 Resource total, Blockade exclusions, Militia activation per 3 cubes, displacement rules, FNI 3 gate, Limited Command constraints |
+| `march.py` (British) | §3.2.3 | CORRECT — escort cap 1-for-1, Militia activation per 3 cubes, resource costs |
+| `march.py` (Patriots) | §3.3.2 | CORRECT — French escort 1-for-1, WP activation per 2 Continentals, Militia activation conditions, French resource fee |
+| `march.py` (Indians) | §3.4.2 | CORRECT — Province-only destinations, first-reserve-free cost, WP activation conditions |
+| `march.py` (French) | §3.5.4 | CORRECT — Treaty gate, Continental escort 1-for-1, Patriot resource fee |
+| `rally.py` | §3.3.1 | CORRECT — no Active Support, place 1 Militia or build Fort, bulk placement up to Forts+Pop, move-and-flip, promotion, Indian Reserve/WI exclusion |
+| `gather.py` | §3.4.1 | CORRECT — support level gate (Neutral/Passive), first reserve free, place 1 WP or build Village, bulk up to Villages+1, move-and-flip |
+| `scout.py` | §3.4.3 | CORRECT — Province-only, WP arrive Active, Regulars mandatory, Tory cap, Militia activation, optional Skirmish |
+| `raid.py` | §3.4.4 | CORRECT — up to 3 Provinces, Opposition-only, move 1 adjacent WP, Activate 1 WP, Raid marker placement, shift toward Neutral |
+| `rabble_rousing.py` | §3.3.4 | CORRECT — Rebellion Control + Patriot piece OR Underground Militia, Propaganda marker, shift toward Opposition, conditional Militia activation |
+| `hortelez.py` | §3.5.2 | CORRECT — French pays N, Patriots gain N+1 |
+| `battle.py` (force levels) | §3.6.2–3 | CORRECT — cube counts, half Active guerrillas, Forts defending only, Tory cap when British attacks, allied cube limits |
+| `battle.py` (dice) | §3.6.4 | CORRECT — Force/3 D3s capped at 3, 0 dice if Force ≤ 2 |
+| `battle.py` (modifiers) | §3.6.5–6 | CORRECT — all 9 Defender modifiers and 6 Attacker modifiers match rules |
+| `battle.py` (removal) | §3.6.7 | CORRECT — alternating priority, Underground ignored, cubes to Casualties, Forts to Available, guerrillas to Available |
+| `battle.py` (winner) | §3.6.8 | CORRECT — elimination check, fewest pieces, defender wins ties, both eliminated = no winner |
+| `battle.py` (overflow) | §3.6.8 | CORRECT — adjacent spaces sorted by population |
+| `battle.py` (free Rally/Blockade) | §3.6.8 | CORRECT — infrastructure exists, callback mechanism per-space |
+
+### FIXED issues (this session — 1 critical bug)
+
+#### 1. Battle Win-the-Day shift direction INVERTED (CRITICAL)
+
+**Reference (§3.6.8):** "Shift Support/Opposition levels in the Battle space by half the number of pieces the Loser removed." Glossary: "Win the Day: A shift in Support or Opposition for the winning Side in a Battle." Royalist winner shifts toward Support; Rebellion winner shifts toward Opposition.
+
+**Bug:** `_apply_shifts_to()` in `battle.py` had the shift directions reversed:
+- Royalist winner: `cur - 1` (shifted toward Opposition instead of Support)
+- Rebellion winner: `cur + 1` (shifted toward Support instead of Opposition)
+
+Every Battle Win-the-Day outcome since the code was written shifted the population sentiment AGAINST the winner instead of toward them. Tests also had inverted expectations, masking the bug.
+
+**Fix:** Swapped the conditions and arithmetic:
+- Royalist winner: `cur + 1` when `cur < ACTIVE_SUPPORT` (toward Support)
+- Rebellion winner: `cur - 1` when `cur > ACTIVE_OPPOSITION` (toward Opposition)
+
+Updated 4 tests: `test_apply_shifts_to_returns_remaining`, `test_apply_shifts_to_rebellion`, `test_overflow_shifts_to_adjacent`, `test_washington_doubles_win_the_day`.
+
+### DOCUMENTED — ambiguity (see QUESTIONS.md Q12)
+
+- **French Agent Mobilization `_VALID_PROVINCES`**: Manual §3.5.1 says "Quebec" but bot flowchart F7 says "Quebec City". Map has both spaces ("Quebec" as Reserve, "Quebec_City" as City). Current code uses "Quebec_City" matching the bot flowchart. Documented as Q12 in QUESTIONS.md for human decision.
