@@ -258,8 +258,18 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
             if build_fort:
                 _make_fort(state, target)
             else:
-                _reward_loyalty(state, state["spaces"][target], target, reward_levels,
-                                free_first=rl_free_first)
+                # Re-validate RL preconditions AFTER placements, since
+                # Regular/Tory placements may have altered piece counts or
+                # control.  Skip RL silently if preconditions no longer hold
+                # (the bot selected the target against pre-muster state).
+                refresh_control(state)
+                sp_rl = state["spaces"][target]
+                rl_ok = (sp_rl.get(REGULAR_BRI, 0) >= 1
+                         and sp_rl.get(TORY, 0) >= 1
+                         and state.get("control", {}).get(target) == BRITISH)
+                if rl_ok:
+                    _reward_loyalty(state, sp_rl, target, reward_levels,
+                                    free_first=rl_free_first)
 
     # -------------------------------------------------------------------
     # FRENCH flow

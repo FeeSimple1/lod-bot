@@ -129,6 +129,11 @@ def execute(
                 cb_rally, cb_rally_kw, cb_blockade = cb_result
                 if cb_rally:
                     pre_res = state["resources"].get(PATRIOTS, 0)
+                    # Win-the-Day rally is free (§3.6.8): temporarily
+                    # ensure Patriots can afford the rally cost so
+                    # spend() doesn't raise, then restore original.
+                    rally_cost = 1  # rallying in 1 space
+                    state["resources"][PATRIOTS] = max(pre_res, rally_cost)
                     rally.execute(
                         state, PATRIOTS, {},
                         [cb_rally],
@@ -142,6 +147,10 @@ def execute(
             if win_rally_space:
                 from lod_ai.commands import rally
                 pre_res = state["resources"].get(PATRIOTS, 0)
+                # Win-the-Day rally is free (§3.6.8): temporarily
+                # ensure Patriots can afford the rally cost.
+                rally_cost = 1
+                state["resources"][PATRIOTS] = max(pre_res, rally_cost)
                 rally.execute(
                     state, PATRIOTS, {},
                     [win_rally_space],
