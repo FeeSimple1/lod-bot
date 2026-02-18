@@ -33,6 +33,7 @@ from lod_ai.board.control import refresh_control
 from lod_ai.leaders import leader_location
 from lod_ai.util.history import push_history
 from lod_ai.map.adjacency import shortest_path
+from lod_ai.economy.resources import can_afford
 
 # ----------------------------------------------------------------------
 #  MAP helpers
@@ -633,6 +634,17 @@ class IndianBot(BaseBot):
 
         if not selected:
             return False
+
+        # Resource affordability: gather costs 1 per selected space
+        # (first reserve province may be free, but check conservatively)
+        gather_cost = len(selected)
+        if not can_afford(state, C.INDIANS, gather_cost):
+            # Trim selection to what we can afford
+            affordable = max(1, state["resources"].get(C.INDIANS, 0))
+            if affordable < len(selected):
+                selected = selected[:affordable]
+            if not can_afford(state, C.INDIANS, len(selected)):
+                return False
 
         # Remove spaces from build_village that aren't in selected
         build_village = build_village & set(selected)

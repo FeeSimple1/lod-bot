@@ -25,6 +25,7 @@ from lod_ai.commands import garrison, muster, march, battle
 from lod_ai.special_activities import naval_pressure, skirmish, common_cause
 from lod_ai.util.history import push_history
 from lod_ai.leaders import leader_location, apply_leader_modifiers
+from lod_ai.economy.resources import can_afford
 
 # ---------------------------------------------------------------------------
 #  Shared geography helpers
@@ -1198,6 +1199,12 @@ class BritishBot(BaseBot):
         if move_plan:
             all_srcs = list({p["src"] for p in move_plan})[:4]
             all_dsts = list({p["dst"] for p in move_plan})[:4]
+            # Resource affordability: march costs 1 per destination
+            march_cost = len(set(p["dst"] for p in move_plan[:4]))
+            if not can_afford(state, C.BRITISH, march_cost):
+                if not tried_muster:
+                    return self._muster(state, tried_march=True)
+                return False
             # Set bring_escorts=True when any move includes Tories or
             # Common-Cause War Parties, which require Regular escorts.
             needs_escorts = any(
