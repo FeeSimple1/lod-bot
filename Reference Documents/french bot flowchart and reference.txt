@@ -57,7 +57,7 @@ nodes:
     title: "French Agent Mobilization"
     limitation:  Max 1
     text: |
-      Place 2 Militia, or—if not possible—1 Continental, in Quebec City, New York,
+      Place 2 Militia, or—if not possible—1 Continental, in Quebec, New York,
       New Hampshire, or Massachusetts, first to add most Rebel Control, then
       where most Patriot units.
     edges:
@@ -240,4 +240,5 @@ nodes:
 "Ohio Country Frontier Erupts":
   number: 95
   instruction: |
+
     If no British Fort is removed, choose Command & Special Activity instead.
