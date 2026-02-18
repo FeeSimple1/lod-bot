@@ -69,6 +69,8 @@ def execute(
 
     if sp.get(WARPARTY_U, 0) == 0:
         raise ValueError("War Path needs an Underground War-Party.")
+    if option in (2, 3) and sp.get(WARPARTY_U, 0) < 2:
+        raise ValueError("Options 2/3 require at least two Underground War Parties (§4.4.2).")
 
     rebel_units = sum(sp.get(t, 0) for t in REB_CUBE_TAGS)
     if option in (1, 2) and rebel_units == 0:

@@ -106,9 +106,11 @@ class TestPreparer:
 class TestTrade:
     """§4.4.1: Trade adds flat +1 when British transfer is 0."""
 
-    def test_trade_zero_transfer_adds_one_flat(self):
+    def test_trade_zero_transfer_adds_one_flat(self, monkeypatch):
         """§4.4.1: 'if 0, then Activate one Underground War Party in the
         selected Province and add one Resource.' — flat +1, not 1D3."""
+        from lod_ai.map import adjacency
+        monkeypatch.setattr(adjacency, "space_type", lambda sid: "Reserve")
         state = _base_state()
         _space(state, "Ohio", **{C.WARPARTY_U: 2, C.VILLAGE: 1})
         state["available"][C.WARPARTY_A] = 5
@@ -116,8 +118,10 @@ class TestTrade:
         trade.execute(state, C.INDIANS, {}, "Ohio", transfer=0)
         assert state["resources"][C.INDIANS] == before + 1
 
-    def test_trade_positive_transfer(self):
+    def test_trade_positive_transfer(self, monkeypatch):
         """§4.4.1: British → Indian transfer when > 0."""
+        from lod_ai.map import adjacency
+        monkeypatch.setattr(adjacency, "space_type", lambda sid: "Reserve")
         state = _base_state()
         _space(state, "Ohio", **{C.WARPARTY_U: 2, C.VILLAGE: 1})
         state["available"][C.WARPARTY_A] = 5
@@ -125,8 +129,10 @@ class TestTrade:
         assert state["resources"][C.BRITISH] == 7   # 10 - 3
         assert state["resources"][C.INDIANS] == 13  # 10 + 3
 
-    def test_trade_activates_one_wp(self):
+    def test_trade_activates_one_wp(self, monkeypatch):
         """§4.4.1: Activate one Underground War Party."""
+        from lod_ai.map import adjacency
+        monkeypatch.setattr(adjacency, "space_type", lambda sid: "Reserve")
         state = _base_state()
         _space(state, "Ohio", **{C.WARPARTY_U: 2, C.VILLAGE: 1})
         state["available"][C.WARPARTY_A] = 5
@@ -134,7 +140,9 @@ class TestTrade:
         assert state["spaces"]["Ohio"][C.WARPARTY_U] == 1
         assert state["spaces"]["Ohio"].get(C.WARPARTY_A, 0) == 1
 
-    def test_trade_requires_village(self):
+    def test_trade_requires_village(self, monkeypatch):
+        from lod_ai.map import adjacency
+        monkeypatch.setattr(adjacency, "space_type", lambda sid: "Reserve")
         state = _base_state()
         _space(state, "Ohio", **{C.WARPARTY_U: 2})
         with pytest.raises(ValueError, match="Village"):
@@ -492,3 +500,137 @@ class TestPersuasion:
         state = _base_state()
         with pytest.raises(ValueError, match="1-3"):
             persuasion.execute(state, C.PATRIOTS, {}, spaces=["A", "B", "C", "D"])
+
+    def test_persuasion_no_double_propaganda_pool_loss(self, monkeypatch):
+        """§4.3.1: If a space already has a Propaganda marker, do not decrement
+        the pool again (on_map is a set, so add() is a no-op for existing entries)."""
+        monkeypatch.setattr(persuasion, "refresh_control", lambda s: None)
+        monkeypatch.setattr(persuasion, "enforce_global_caps", lambda s: None)
+        from lod_ai.map import adjacency
+        monkeypatch.setattr(adjacency, "space_type", lambda sid: "Colony")
+
+        state = _base_state()
+        state["control"]["Virginia"] = "REBELLION"
+        _space(state, "Virginia", **{C.MILITIA_U: 3})
+        state["available"][C.MILITIA_A] = 5
+        # Pre-place a Propaganda marker on Virginia
+        state["markers"][C.PROPAGANDA]["on_map"].add("Virginia")
+        state["markers"][C.PROPAGANDA]["pool"] = 11  # 12 - 1 already placed
+        persuasion.execute(state, C.PATRIOTS, {}, spaces=["Virginia"])
+        # Pool should NOT have been decremented — Virginia already had marker
+        assert state["markers"][C.PROPAGANDA]["pool"] == 11
+        assert "Virginia" in state["markers"][C.PROPAGANDA]["on_map"]
+
+
+# ===========================================================================
+# §4.3.2 — Partisans validation (options 2/3 need 2 Underground Militia)
+# ===========================================================================
+
+class TestPartisansValidation:
+    """§4.3.2: Options 2/3 'Activate two Underground Militia' — need ≥ 2."""
+
+    def test_option2_rejects_single_underground_militia(self):
+        """Option 2 requires 2 Underground Militia; 1 is not enough."""
+        state = _base_state()
+        _space(state, "SC", **{C.MILITIA_U: 1, C.TORY: 3})
+        with pytest.raises(ValueError, match="two Underground Militia"):
+            partisans.execute(state, C.PATRIOTS, {}, "SC", option=2)
+
+    def test_option3_rejects_single_underground_militia(self):
+        """Option 3 requires 2 Underground Militia; 1 is not enough."""
+        state = _base_state()
+        _space(state, "SC", **{C.MILITIA_U: 1, C.VILLAGE: 1})
+        state["available"][C.VILLAGE] = 5
+        with pytest.raises(ValueError, match="two Underground Militia"):
+            partisans.execute(state, C.PATRIOTS, {}, "SC", option=3)
+
+    def test_option2_succeeds_with_two_militia(self):
+        """Option 2 works with exactly 2 Underground Militia."""
+        state = _base_state()
+        _space(state, "SC", **{C.MILITIA_U: 2, C.TORY: 2})
+        state["available"][C.MILITIA_A] = 5
+        partisans.execute(state, C.PATRIOTS, {}, "SC", option=2)
+        assert state["_turn_used_special"] is True
+
+    def test_option1_still_works_with_one_militia(self):
+        """Option 1 only needs 1 Underground Militia — regression check."""
+        state = _base_state()
+        _space(state, "SC", **{C.MILITIA_U: 1, C.TORY: 1})
+        state["available"][C.MILITIA_A] = 5
+        partisans.execute(state, C.PATRIOTS, {}, "SC", option=1)
+        assert state["_turn_used_special"] is True
+
+
+# ===========================================================================
+# §4.4.2 — War Path validation (options 2/3 need 2 Underground WP)
+# ===========================================================================
+
+class TestWarPathValidation:
+    """§4.4.2: Options 2/3 'Activate two Underground War Parties' — need ≥ 2."""
+
+    def test_option2_rejects_single_underground_wp(self):
+        """Option 2 requires 2 Underground WP; 1 is not enough."""
+        state = _base_state()
+        _space(state, "Ohio", **{C.WARPARTY_U: 1, C.REGULAR_PAT: 2})
+        with pytest.raises(ValueError, match="two Underground War Parties"):
+            war_path.execute(state, C.INDIANS, {}, "Ohio", option=2)
+
+    def test_option3_rejects_single_underground_wp(self):
+        """Option 3 requires 2 Underground WP; 1 is not enough."""
+        state = _base_state()
+        _space(state, "Ohio", **{C.WARPARTY_U: 1, C.FORT_PAT: 1})
+        with pytest.raises(ValueError, match="two Underground War Parties"):
+            war_path.execute(state, C.INDIANS, {}, "Ohio", option=3)
+
+    def test_option2_succeeds_with_two_wp(self):
+        """Option 2 works with exactly 2 Underground WP."""
+        state = _base_state()
+        _space(state, "Ohio", **{C.WARPARTY_U: 2, C.REGULAR_PAT: 2})
+        state["available"][C.WARPARTY_A] = 5
+        war_path.execute(state, C.INDIANS, {}, "Ohio", option=2)
+        assert state["_turn_used_special"] is True
+
+    def test_option1_still_works_with_one_wp(self):
+        """Option 1 only needs 1 Underground WP — regression check."""
+        state = _base_state()
+        _space(state, "Ohio", **{C.WARPARTY_U: 1, C.REGULAR_PAT: 1})
+        state["available"][C.WARPARTY_A] = 5
+        war_path.execute(state, C.INDIANS, {}, "Ohio", option=1)
+        assert state["_turn_used_special"] is True
+
+
+# ===========================================================================
+# §4.4.1 — Trade Province type validation
+# ===========================================================================
+
+class TestTradeProvinceValidation:
+    """§4.4.1: 'Trade may occur in any one Province' — Colony or Reserve only."""
+
+    def test_trade_in_colony_allowed(self, monkeypatch):
+        """Colonies are Provinces — Trade is valid."""
+        from lod_ai.map import adjacency
+        monkeypatch.setattr(adjacency, "space_type", lambda sid: "Colony")
+        state = _base_state()
+        _space(state, "Virginia", **{C.WARPARTY_U: 2, C.VILLAGE: 1})
+        state["available"][C.WARPARTY_A] = 5
+        trade.execute(state, C.INDIANS, {}, "Virginia", transfer=0)
+        assert state["_turn_used_special"] is True
+
+    def test_trade_in_reserve_allowed(self, monkeypatch):
+        """Indian Reserves are Provinces — Trade is valid."""
+        from lod_ai.map import adjacency
+        monkeypatch.setattr(adjacency, "space_type", lambda sid: "Reserve")
+        state = _base_state()
+        _space(state, "Northwest", **{C.WARPARTY_U: 2, C.VILLAGE: 1})
+        state["available"][C.WARPARTY_A] = 5
+        trade.execute(state, C.INDIANS, {}, "Northwest", transfer=0)
+        assert state["_turn_used_special"] is True
+
+    def test_trade_in_city_rejected(self, monkeypatch):
+        """Cities are NOT Provinces — Trade must reject."""
+        from lod_ai.map import adjacency
+        monkeypatch.setattr(adjacency, "space_type", lambda sid: "City")
+        state = _base_state()
+        _space(state, "Boston", **{C.WARPARTY_U: 2, C.VILLAGE: 1})
+        with pytest.raises(ValueError, match="Province"):
+            trade.execute(state, C.INDIANS, {}, "Boston", transfer=0)
