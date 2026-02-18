@@ -206,8 +206,7 @@ class FrenchBot(BaseBot):
                 return True
 
         # F6: Roderigue Hortalez et Cie
-        if self._can_hortelez(state):
-            self._hortelez(state, before_treaty=True)
+        if self._can_hortelez(state) and self._hortelez(state, before_treaty=True):
             _preparer_la_guerre(state, post_treaty=False)  # F8
             return True
 
@@ -398,11 +397,13 @@ class FrenchBot(BaseBot):
         )
 
     # ----- Hortalez (F6 / F11) ---------------------------------
-    def _hortelez(self, state: Dict, *, before_treaty: bool) -> None:
+    def _hortelez(self, state: Dict, *, before_treaty: bool) -> bool:
         """F6 (before Treaty): Spend exactly 1D3 French Resources.
            If French Resources < roll, Hortalez cannot execute — abort.
         F11 (after Treaty): Spend up to 1D3 French Resources.
            Bot always spends max possible (min of resources and roll).
+
+        Returns True if Hortalez executed, False if skipped.
         """
         roll = state["rng"].randint(1, 3)
         state.setdefault("rng_log", []).append(("Hortalez 1D3", roll))
@@ -410,16 +411,17 @@ class FrenchBot(BaseBot):
             # F6: must pay exactly 1D3 — abort if can’t afford
             if state["resources"][C.FRENCH] < roll:
                 push_history(state, f"Roderigue Hortalez et Cie (pre‑Treaty): Cannot afford {roll}, skipped")
-                return
+                return False
             pay = roll
         else:
             # F11: spend up to 1D3
             pay = min(state["resources"][C.FRENCH], roll)
         if pay < 1:
-            return
+            return False
         hortelez.execute(state, C.FRENCH, {}, pay=pay)
         phase = "pre‑Treaty" if before_treaty else "post‑Treaty"
         push_history(state, f"Roderigue Hortalez et Cie ({phase}): Pay {pay}")
+        return True
 
     def _can_hortelez(self, state: Dict) -> bool:
         return state["resources"][C.FRENCH] > 0
@@ -433,13 +435,13 @@ class FrenchBot(BaseBot):
           Muster in West Indies.
         - Otherwise, Muster first in a Colony or City with Continentals, then random.
         """
-        west_indies = state["spaces"].get(WEST_INDIES)
+        wi_exists = WEST_INDIES in state["spaces"]
         avail_regs = state["available"].get(C.REGULAR_FRE, 0)
         ctrl = state.get("control", {})
         west_rebel = ctrl.get(WEST_INDIES) == "REBELLION"
 
         if avail_regs < 4 and not west_rebel:
-            targets = [WEST_INDIES] if west_indies else []
+            targets = [WEST_INDIES] if wi_exists else []
         else:
             # Muster first in a Colony or City with Continentals and Rebel Control
             targets = [
@@ -449,11 +451,13 @@ class FrenchBot(BaseBot):
                     and _MAP_DATA.get(sid, {}).get("type") in ("Colony", "City"))
             ]
             if not targets:
-                # Fallback: any space with Rebel Control
+                # Fallback: any space with Rebel Control or the West Indies
                 targets = [
                     sid for sid in state["spaces"]
                     if ctrl.get(sid) == "REBELLION"
                 ]
+                if wi_exists and WEST_INDIES not in targets:
+                    targets.append(WEST_INDIES)
 
         if not targets:
             return False
@@ -661,10 +665,12 @@ class FrenchBot(BaseBot):
                 leader_locs[loc] = leader_locs.get(loc, 0) + 1
 
         for sid, sp in state["spaces"].items():
-            # Rebel force: cubes + Active Militia (Underground don't count)
+            # Rebel force: cubes + Forts + Active Militia (per §3.6 FL = cubes + Forts)
             rebel_cubes = sp.get(C.REGULAR_FRE, 0) + sp.get(C.REGULAR_PAT, 0)
             active_militia = sp.get(C.MILITIA_A, 0)
-            rebel_force = rebel_cubes + active_militia + leader_locs.get(sid, 0)
+            rebel_force = (rebel_cubes + active_militia
+                           + sp.get(C.FORT_PAT, 0)
+                           + leader_locs.get(sid, 0))
 
             # Royalist force: British cubes + Forts + Active WP
             british_pieces = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)

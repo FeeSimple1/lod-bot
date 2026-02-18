@@ -1868,3 +1868,77 @@ The Patriot bot implementation is **fully compliant** with the reference documen
 ### Tests
 
 915 tests passing (no new tests needed — no bugs found).
+
+---
+
+## Session 14: French Bot Compliance Review (Independent)
+
+### Scope
+
+Independent node-by-node comparison of the entire French bot flowchart implementation in `lod_ai/bots/french.py` against `Reference Documents/french bot flowchart and reference.txt`, Manual Ch 3 (§3.5, §3.6), Manual Ch 4 (§4.5), and Manual Ch 8 (§8.6). Also reviewed `base_bot.py`, `event_instructions.py`, `event_eval.py`, `commands/hortelez.py`, `commands/french_agent_mobilization.py`, `special_activities/naval_pressure.py`, `special_activities/skirmish.py`, and `rules_consts.py`.
+
+### Label Compliance: PASS
+
+No string literal violations found. All piece tags, faction names, markers, and control values use proper constants from `rules_consts.py`.
+
+### Nodes verified CORRECT
+
+| Node | Description | Status |
+|------|-------------|--------|
+| F1 | Sword icon skip / Event vs Command | CORRECT — handled by `base_bot._choose_event_vs_flowchart()` |
+| F2 | Event conditions (6 bullets) | CORRECT — all 6 conditions verified against flowchart |
+| F3 | French Resources > 0 gate | CORRECT |
+| F4 | Treaty of Alliance played? | CORRECT |
+| F5 | Patriot Resources < 1D3 | CORRECT — strict less-than, `state["rng"]` |
+| F7 | Agent Mobilization | CORRECT — correct provinces, priority, Active Support filter |
+| F8 | Préparer pre-Treaty | CORRECT |
+| F9 | 1D6 < Available Regulars | CORRECT — strict less-than |
+| F11 | Hortalez after Treaty | CORRECT — `min(resources, roll)` |
+| F12 | Skirmish | CORRECT — WI priority, affected space exclusion, Fort-first option |
+| F13 | Can Battle (decision gate) | CORRECT — cubes + Leaders only, excludes WP |
+| F14 | March (all 4 bullets) | CORRECT — lose-no-control, Cities/British priority, BFS toward British, fallback |
+| F15 | Préparer post-Treaty | CORRECT — D6 gate, +2 Resources fallback |
+| F17 | Naval Pressure | CORRECT — Battle space first, then most Support, fallback chain |
+| Event instructions | Cards 52, 62, 70, 73, 83, 88, 89, 95 | CORRECT |
+| OPS | All methods (supply, redeploy, desertion, ToA trigger, BS trigger) | CORRECT |
+
+### FIXED issues (this session — 3 bugs)
+
+#### 1. F6 `_hortelez` / `_before_treaty` — Préparer ran even when Hortalez couldn't afford roll
+
+**Reference (F6):** "Spend 1D3 French Resource to add Patriot Resources. If none, Pass."
+
+**Bug:** `_hortelez()` returned `None` (void) regardless of whether it executed or skipped. `_before_treaty()` always called `_preparer_la_guerre()` and returned `True` after `_hortelez()`, even when Hortalez was skipped due to insufficient resources. This caused the bot to execute Préparer (SA) without a Command, and to report a successful turn when it should have Passed.
+
+**Fix:** Changed `_hortelez()` return type from `None` to `bool` — returns `True` on success, `False` on skip. Changed `_before_treaty()` to check the return value: `if self._can_hortelez(state) and self._hortelez(state, before_treaty=True):`.
+
+#### 2. F16 `_battle` — Missing FORT_PAT in Rebel Force Level
+
+**Reference (§3.6):** "Force Level of each side = its cubes + Forts."
+
+**Bug:** The `_battle()` method calculated `rebel_force` as `rebel_cubes + active_militia + leader_bonus`, omitting `FORT_PAT`. Patriot Forts contribute to Rebel Force Level and their absence could cause the bot to miss valid battle spaces where a Fort tips the balance.
+
+**Fix:** Added `sp.get(C.FORT_PAT, 0)` to the `rebel_force` calculation.
+
+#### 3. F10 `_muster` — Fallback targets excluded West Indies
+
+**Reference (F10):** "In 1 space with Rebel Control **or the West Indies**."
+
+**Bug:** When `avail_regs >= 4` and no Colony/City with Continentals had Rebel Control, the fallback target list only included Rebel Control spaces. West Indies was excluded even though the overarching condition explicitly includes it as always-valid. Additionally, the `west_indies` variable was checked with `if west_indies` which evaluated the space dict — an empty WI dict `{}` is falsy in Python, so even the first branch (`avail_regs < 4`) could incorrectly exclude WI.
+
+**Fix:** Changed `west_indies = state["spaces"].get(WEST_INDIES)` to `wi_exists = WEST_INDIES in state["spaces"]` (boolean membership test). Added `if wi_exists and WEST_INDIES not in targets: targets.append(WEST_INDIES)` to the fallback branch.
+
+### DOCUMENTED — minor deviations (unchanged from Session 10)
+
+- **F14 March / F16 Battle: Active Militia included unconditionally** — optimistic assumption that Patriots will pay for Militia participation. Reasonable heuristic.
+- **get_bs_limited_command skips F9 D6 gate** — minor, affects BS LimCom selection only.
+- **ops_redeploy_leader missing Blockade rearrangement** — belongs in year_end.py, not bot method.
+
+### Tests added (4 new, 919 total)
+
+| Test | Verifies |
+|------|----------|
+| `test_f6_hortalez_cant_afford_does_not_run_preparer` | F6 skip → no Préparer, returns False |
+| `test_f6_hortalez_returns_bool` | `_hortelez` returns True/False correctly |
+| `test_f16_battle_includes_patriot_forts_in_rebel_force` | FORT_PAT included in Rebel FL |
+| `test_f10_muster_fallback_includes_west_indies` | WI in fallback targets when not Rebel Controlled |
