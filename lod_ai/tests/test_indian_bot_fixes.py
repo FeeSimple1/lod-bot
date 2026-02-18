@@ -699,3 +699,113 @@ class TestDesertionPriorityControlChange:
         result = bot.ops_patriot_desertion_priority(state, candidates)
         # Village space first regardless of control change
         assert result[0] == ("VillageSpace", C.REGULAR_PAT)
+
+
+# =====================================================================
+#  Session 15: Independent Indian Bot Compliance Review — New Tests
+# =====================================================================
+
+class TestI4RaidRebelCountIncludesFortForNeedsMove:
+    """I4 _raid(): needs_move check must include FORT_PAT in rebel count."""
+
+    def test_raid_moves_wp_when_fort_makes_wp_not_exceed_rebels(self):
+        """Target has 1 WP, 0 cubes, 1 FORT_PAT → rebels=1, WP=1.
+        WP don't exceed rebels → needs_move should be True → move WP in."""
+        bot = IndianBot()
+        state = _base_state(spaces={
+            "Virginia": _empty_space(**{
+                C.WARPARTY_U: 1, C.FORT_PAT: 1,
+            }),
+            "Northwest": _empty_space(**{C.WARPARTY_U: 3}),
+        })
+        state["support"] = {"Virginia": -1, "Northwest": 0}
+        refresh_control(state)
+        # Virginia is an Opposition Colony with 1 UG WP and 1 Fort
+        # rebels_in_tgt = 1 (Fort), wp_in_tgt = 1 → needs_move = True
+        targets = bot._raid_targets(state)
+        assert "Virginia" in targets
+
+    def test_raid_no_move_when_wp_exceeds_rebels_with_fort(self):
+        """Target has 3 WP, 0 cubes, 1 FORT_PAT → rebels=1, WP=3.
+        WP > rebels → needs_move should be False → no extra WP needed."""
+        bot = IndianBot()
+        state = _base_state(spaces={
+            "Virginia": _empty_space(**{
+                C.WARPARTY_U: 3, C.FORT_PAT: 1,
+            }),
+        })
+        state["support"] = {"Virginia": -1}
+        refresh_control(state)
+        result = bot._raid(state)
+        assert result is True
+        # Virginia should be raided without needing to move any WP in
+        affected = state.get("_turn_affected_spaces", set())
+        assert "Virginia" in affected
+
+
+class TestI12ScoutToryCap:
+    """I12 _scout(): Tories moved may not exceed Regulars per §3.4.3."""
+
+    def test_scout_caps_tories_to_regulars(self):
+        """Space with 2 Regulars and 5 Tories: should move at most 2 Tories."""
+        bot = IndianBot()
+        state = _base_state(spaces={
+            "Quebec": _empty_space(**{
+                C.WARPARTY_U: 3, C.REGULAR_BRI: 2, C.TORY: 5,
+            }),
+            "Northwest": _empty_space(**{C.MILITIA_A: 1}),
+        })
+        state["support"] = {"Quebec": 0, "Northwest": -1}
+        refresh_control(state)
+        # This should NOT crash (previously would pass n_tories=5, n_regs=2
+        # to scout.execute which raises ValueError)
+        result = bot._scout(state)
+        assert result is True
+        # Quebec should have lost 1 WP + 2 Regulars + at most 2 Tories
+        sp = state["spaces"]["Quebec"]
+        assert sp.get(C.TORY, 0) >= 3  # at most 2 Tories moved out of 5
+
+    def test_scout_all_tories_when_le_regulars(self):
+        """Space with 3 Regulars and 2 Tories: all Tories may move."""
+        bot = IndianBot()
+        state = _base_state(spaces={
+            "Quebec": _empty_space(**{
+                C.WARPARTY_U: 3, C.REGULAR_BRI: 3, C.TORY: 2,
+            }),
+            "Northwest": _empty_space(**{C.MILITIA_A: 1}),
+        })
+        state["support"] = {"Quebec": 0, "Northwest": -1}
+        refresh_control(state)
+        result = bot._scout(state)
+        assert result is True
+
+
+class TestI12ScoutCityFilter:
+    """I12 _scout(): Destination must be a Province per §3.4.3 (not City)."""
+
+    def test_scout_skips_city_selects_province(self):
+        """Scout should skip Boston (City) and pick Connecticut_Rhode_Island
+        (Colony/Province) instead, even though Boston has a Fort."""
+        bot = IndianBot()
+        # Massachusetts is adjacent to Boston (City), New_York (Colony),
+        # Connecticut_Rhode_Island (Colony) per map data.
+        state = _base_state(spaces={
+            "Massachusetts": _empty_space(**{
+                C.WARPARTY_U: 3, C.REGULAR_BRI: 3,
+            }),
+            "Boston": _empty_space(**{C.FORT_PAT: 1, C.MILITIA_A: 2}),
+            "Connecticut_Rhode_Island": _empty_space(**{C.MILITIA_A: 1}),
+            "New_York": _empty_space(),
+        })
+        state["support"] = {
+            "Massachusetts": 0, "Boston": -1,
+            "Connecticut_Rhode_Island": -1, "New_York": 0,
+        }
+        refresh_control(state)
+        result = bot._scout(state)
+        assert result is True
+        # Should NOT have scouted to Boston (City)
+        affected = state.get("_turn_affected_spaces", set())
+        assert "Boston" not in affected
+        # Should have scouted to a Province instead
+        assert any(s != "Boston" for s in affected)

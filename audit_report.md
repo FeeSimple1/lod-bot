@@ -1942,3 +1942,109 @@ No string literal violations found. All piece tags, faction names, markers, and 
 | `test_f6_hortalez_returns_bool` | `_hortelez` returns True/False correctly |
 | `test_f16_battle_includes_patriot_forts_in_rebel_force` | FORT_PAT included in Rebel FL |
 | `test_f10_muster_fallback_includes_west_indies` | WI in fallback targets when not Rebel Controlled |
+
+---
+
+## Session 15: Indian Bot Compliance Review (Independent)
+
+### Scope
+
+Independent node-by-node comparison of the entire Indian bot flowchart implementation in `lod_ai/bots/indians.py` against `Reference Documents/indian bot flowchart and reference.txt`, Manual Ch 3 (§3.4), Manual Ch 4 (§4.4), and Manual Ch 8 (§8.7). Also reviewed `base_bot.py`, `event_instructions.py`, `event_eval.py`, `commands/scout.py`, `commands/raid.py`, `commands/gather.py`, `commands/march.py`, `special_activities/war_path.py`, `special_activities/trade.py`, `special_activities/plunder.py`, and `rules_consts.py`.
+
+### Label Compliance: PASS
+
+No string literal violations found. All piece tags, faction names, markers, and control values use proper constants from `rules_consts.py`.
+
+### Nodes verified CORRECT
+
+| Node | Description | Status |
+|------|-------------|--------|
+| I1 | Sword icon skip / Event vs Command | CORRECT — handled by `base_bot._choose_event_vs_flowchart()` |
+| I2 | Event conditions (4 bullets) | CORRECT — uses `CARD_EFFECTS` unshaded side per §8.3.2; all 4 conditions verified |
+| I3 | Support+1D6 > Opposition test | CORRECT — `randint(1,6)`, `(support + roll) <= opposition` routes to Raid |
+| I4 | Raid (Max 3) — space selection, DC range, Plunder-first priority | CORRECT (with FORT_PAT fix below) |
+| I4 | Raid — WP movement and village leave-behind | CORRECT (with FORT_PAT fix below) |
+| I4 | Raid — mid-Raid Plunder/Trade when resources=0 | CORRECT |
+| I5 | Plunder target selection (Raid spaces, WP > rebels, highest Pop) | CORRECT |
+| I6 | Gather worthwhile (2+ Villages OR D6 < Available WP) | CORRECT |
+| I7 | Gather Bullet 1 (Village placement, Cornplanter threshold, leader priority) | CORRECT |
+| I7 | Gather Bullet 2 (WP at Villages: enemies, no UG WP, leader, random) | CORRECT |
+| I7 | Gather Bullet 3 (WP in Village-room spaces: 2 WP, 1 WP, random) | CORRECT |
+| I7 | Gather Bullet 4 (move adj Active WP, no Rebel Control, flip UG) | CORRECT |
+| I8 | War Path — target selection (Fort, most Rebels, Province+Village) | CORRECT |
+| I8 | War Path — option selection (3/2/1) | CORRECT |
+| I8 | War Path / Trade fallback (resources=0 → Trade) | CORRECT |
+| I9 | Space with WP + British Regulars? (both Active and Underground) | CORRECT |
+| I10 | March — Phase 1 (Village dest: Neutral/Passive, 3+ WP, room) | CORRECT |
+| I10 | March — Phase 2 (Rebel Control, first no Active Support) | CORRECT |
+| I10 | March — movement constraints (UG first, no last-WP-from-Village, no Rebel Control) | CORRECT |
+| I10 | March → Gather fallback (`_visited` prevents infinite recursion) | CORRECT |
+| I11 | Trade — space selection (Village with most Underground WP) | CORRECT |
+| I11 | Trade — British resource request (D6 < British Resources → ceil(roll/2)) | CORRECT |
+| I12 | Scout — origin selection (WP + British Regulars, most Regs+Tories) | CORRECT |
+| I12 | Scout — destination priority (Patriot Fort, Village+enemy, Rebel Control) | CORRECT (with City filter fix below) |
+| I12 | Scout — control preservation | CORRECT |
+| I12 | Scout + Skirmish (Fort option 3, 2+ enemy option 2, else option 1) | CORRECT |
+| I12 | Scout — Tory cap (§3.4.3) | CORRECT (with Tory cap fix below) |
+| Event | Cards 4/72/90 Village condition | CORRECT |
+| Event | Cards 18/44 eligible enemy condition | CORRECT |
+| Event | Card 38 WP condition | CORRECT |
+| Event | Card 83 shaded/unshaded selection | CORRECT |
+| Event | Cards 4/32/38 force_shaded | CORRECT (Session 12 fix confirmed) |
+| OPS | Supply priority (prevent Rebel Control, then Village room) | CORRECT |
+| OPS | Patriot Desertion (Village first, control change, last of type, random) | CORRECT (Session 12 fix confirmed) |
+| OPS | Redeploy leaders (Brant/DC to most WP; Cornplanter to Neutral/Passive) | CORRECT |
+| OPS | BS trigger (ToA + WQ + player/Rebel BS + Leader + 3 WP) | CORRECT (Session 12 fix confirmed) |
+| OPS | Leader Movement (largest group from origin) | CORRECT |
+| OPS | Defending in Battle (Village → activate all but 1 UG WP; no Village → none) | CORRECT |
+| BS | get_bs_limited_command (walks I3→I4/I6→I9→I10) | CORRECT |
+
+### FIXED issues (this session — 3 bugs)
+
+#### 1. I4 `_raid()` — Missing FORT_PAT in `rebels_in_tgt` for needs_move check (MEDIUM)
+
+**Reference (I4):** "move an Underground War Party into each Raid target with none OR where War Parties don't exceed Rebels."
+
+**Bug:** The `rebels_in_tgt` calculation at line 314 counted `MILITIA_A + MILITIA_U + REGULAR_PAT + REGULAR_FRE` but omitted `FORT_PAT`. Patriot Forts are Rebellion pieces per §1.4. This meant the `needs_move` check (`wp_in_tgt <= rebels_in_tgt`) underestimated rebel presence. A target with 1 WP and 1 Fort (rebels=1, but code counted rebels=0) would NOT trigger a move-in, even though WP don't exceed the true rebel count.
+
+This is the same pattern as Session 12 bug #3 (FORT_PAT missing from `score()`, `_can_plunder()`, `_plunder()`), but that fix missed this one calculation within `_raid()`.
+
+**Fix:** Added `+ tgt_sp.get(C.FORT_PAT, 0)` to `rebels_in_tgt`.
+
+#### 2. I12 `_scout()` — Missing Tory ≤ Regulars cap (MEDIUM, crash risk)
+
+**Reference (§3.4.3):** "at least one British Regular must (and Tories up to the number of Regulars may) move with the War Parties."
+
+**Bug:** The code set `n_tories = sp.get(C.TORY, 0)` and `n_regs = sp.get(C.REGULAR_BRI, 0)`, then applied a control-preservation cap on the total, but never enforced `n_tories ≤ n_regs`. In a space with 2 Regulars and 5 Tories, if the moveable cap was large enough, `n_tories=5, n_regs=2` would be passed to `scout.execute()`, which raises `ValueError("Tories moved may not exceed number of Regulars.")`.
+
+**Fix:** Added `n_tories = min(n_tories, n_regs)` after the control-preservation block.
+
+#### 3. I12 `_scout()` — Missing City filter for destination (MEDIUM, crash risk)
+
+**Reference (§3.4.3):** "move at least one War Party into an adjacent Province (not City)."
+
+**Bug:** The destination selection loop iterated through all `_adjacent(origin)` without filtering out Cities. If a City (e.g., Boston adjacent to Massachusetts) had enemy pieces or a Patriot Fort, it could be selected as the highest-scoring destination. `scout.execute()` would then raise `ValueError("Destination must be a Province.")`.
+
+**Fix:** Added `if _MAP_DATA.get(dst, {}).get("type") == "City": continue` to the destination selection loop.
+
+### DOCUMENTED — minor deviations (unchanged from Session 12)
+
+- **Gather Bullet 1: Excludes spaces with existing Villages** — rarely strategically optimal, minor.
+- **Mid-Raid Plunder/Trade is atomic** — architectural limitation, no mid-command interrupt support.
+- **get_bs_limited_command skips I3 D6 gate** — minor, affects BS LimCom selection only.
+- **I2 Event conditions: CARD_EFFECTS static lookup** — correct but cannot verify dynamic game-state conditions.
+
+### Previously documented issues (unchanged)
+
+- **OPS methods not wired into year_end** — all 4 bots define OPS methods but `year_end.py` uses ad-hoc logic.
+- **B10 March + Common Cause timing** — CC invoked post-March.
+
+### Tests added (5 new, 924 total)
+
+| Test | Verifies |
+|------|----------|
+| `test_raid_moves_wp_when_fort_makes_wp_not_exceed_rebels` | FORT_PAT included in needs_move rebel count |
+| `test_raid_no_move_when_wp_exceeds_rebels_with_fort` | Raid proceeds without extra move when WP > rebels incl. Fort |
+| `test_scout_caps_tories_to_regulars` | Tories capped at Regulars count (no crash with 5 Tories, 2 Regs) |
+| `test_scout_all_tories_when_le_regulars` | All Tories move when count ≤ Regulars |
+| `test_scout_skips_city_selects_province` | City destination filtered out, Province selected instead |

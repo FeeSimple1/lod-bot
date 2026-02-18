@@ -312,7 +312,8 @@ class IndianBot(BaseBot):
             tgt_sp = state["spaces"][tgt]
             wp_in_tgt = tgt_sp.get(C.WARPARTY_U, 0) + tgt_sp.get(C.WARPARTY_A, 0)
             rebels_in_tgt = (tgt_sp.get(C.MILITIA_A, 0) + tgt_sp.get(C.MILITIA_U, 0)
-                             + tgt_sp.get(C.REGULAR_PAT, 0) + tgt_sp.get(C.REGULAR_FRE, 0))
+                             + tgt_sp.get(C.REGULAR_PAT, 0) + tgt_sp.get(C.REGULAR_FRE, 0)
+                             + tgt_sp.get(C.FORT_PAT, 0))
             # Move a WP into target if: none present OR WP don't exceed Rebels
             needs_move = (wp_in_tgt == 0) or (wp_in_tgt <= rebels_in_tgt)
             if needs_move:
@@ -880,6 +881,9 @@ class IndianBot(BaseBot):
         for dst in dests:
             if dst not in state.get("spaces", {}):
                 continue
+            # §3.4.3: destination must be a Province (not City)
+            if _MAP_DATA.get(dst, {}).get("type") == "City":
+                continue
             dsp = state["spaces"][dst]
             has_pat_fort = 1 if dsp.get(C.FORT_PAT, 0) else 0
             has_village = dsp.get(C.VILLAGE, 0)
@@ -930,6 +934,9 @@ class IndianBot(BaseBot):
                 excess -= tory_cut
                 if excess > 0:
                     n_regs = max(1, n_regs - excess)
+
+        # §3.4.3: "Tories up to the number of Regulars may" move
+        n_tories = min(n_tories, n_regs)
 
         # I12: Skirmish option — "first a Patriot Fort then most enemy pieces"
         # Calculate post-move enemy cubes (Scout flips all Militia Active)
