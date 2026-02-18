@@ -2493,3 +2493,90 @@ def test_p7_bullet4_caps_at_available_continentals():
     sp = state["spaces"]["Boston"]
     # Only 2 Continentals should be placed (capped by available)
     assert sp.get(C.REGULAR_PAT, 0) <= 2
+
+
+# ===================================================================
+# Card 51 (Bermuda Gunpowder Plot) Tests
+# ===================================================================
+
+def test_card51_force_if_rebel_exceeds():
+    """force_if_51: returns True when Rebel force already exceeds at a space with enemy."""
+    bot = PatriotBot()
+    state = _full_state()
+    state["spaces"]["Boston"] = {
+        C.REGULAR_PAT: 4, C.REGULAR_FRE: 0,
+        C.MILITIA_A: 0, C.MILITIA_U: 0,
+        C.REGULAR_BRI: 2, C.TORY: 0, C.FORT_BRI: 0,
+        C.WARPARTY_A: 0, C.WARPARTY_U: 0, C.VILLAGE: 0,
+        C.FORT_PAT: 0,
+    }
+    # Rebel force = 4, Brit force = 2 → exceeds → True
+    assert bot._force_condition_met("force_if_51", state, {}) is True
+
+
+def test_card51_force_if_march_tips_balance():
+    """force_if_51: returns True when adjacent cubes could march in to exceed."""
+    bot = PatriotBot()
+    state = _full_state()
+    # Boston is adjacent to Massachusetts and Connecticut_Rhode_Island
+    state["spaces"]["Boston"] = {
+        C.REGULAR_PAT: 1, C.REGULAR_FRE: 0,
+        C.MILITIA_A: 0, C.MILITIA_U: 0,
+        C.REGULAR_BRI: 3, C.TORY: 0, C.FORT_BRI: 0,
+        C.WARPARTY_A: 0, C.WARPARTY_U: 0, C.VILLAGE: 0,
+        C.FORT_PAT: 0,
+    }
+    state["spaces"]["Massachusetts"] = {
+        C.REGULAR_PAT: 3, C.REGULAR_FRE: 0,
+        C.MILITIA_A: 0, C.MILITIA_U: 0,
+        C.REGULAR_BRI: 0, C.TORY: 0, C.FORT_BRI: 0,
+        C.WARPARTY_A: 0, C.WARPARTY_U: 0, C.VILLAGE: 0,
+        C.FORT_PAT: 0,
+    }
+    # Rebel in Boston = 1, Brit = 3.  Adjacent Massachusetts has 3 cubes → 1+3=4 > 3 → True
+    assert bot._force_condition_met("force_if_51", state, {}) is True
+
+
+def test_card51_force_if_not_possible():
+    """force_if_51: returns False when no battle is feasible."""
+    bot = PatriotBot()
+    state = _full_state()
+    state["spaces"]["Boston"] = {
+        C.REGULAR_PAT: 0, C.REGULAR_FRE: 0,
+        C.MILITIA_A: 0, C.MILITIA_U: 1,
+        C.REGULAR_BRI: 5, C.TORY: 2, C.FORT_BRI: 1,
+        C.WARPARTY_A: 0, C.WARPARTY_U: 0, C.VILLAGE: 0,
+        C.FORT_PAT: 0,
+    }
+    state["spaces"]["New_York"] = {
+        C.REGULAR_PAT: 0, C.REGULAR_FRE: 0,
+        C.MILITIA_A: 1, C.MILITIA_U: 0,
+        C.REGULAR_BRI: 0, C.TORY: 0, C.FORT_BRI: 0,
+        C.WARPARTY_A: 0, C.WARPARTY_U: 0, C.VILLAGE: 0,
+        C.FORT_PAT: 0,
+    }
+    # No cubes to march, huge British force → False
+    assert bot._force_condition_met("force_if_51", state, {}) is False
+
+
+def test_card51_militia_only_not_counted_as_march_cubes():
+    """force_if_51: militia in adjacent spaces don't count as march cubes."""
+    bot = PatriotBot()
+    state = _full_state()
+    state["spaces"]["Boston"] = {
+        C.REGULAR_PAT: 0, C.REGULAR_FRE: 0,
+        C.MILITIA_A: 0, C.MILITIA_U: 0,
+        C.REGULAR_BRI: 2, C.TORY: 0, C.FORT_BRI: 0,
+        C.WARPARTY_A: 0, C.WARPARTY_U: 0, C.VILLAGE: 0,
+        C.FORT_PAT: 0,
+    }
+    # Massachusetts is adjacent to Boston
+    state["spaces"]["Massachusetts"] = {
+        C.REGULAR_PAT: 0, C.REGULAR_FRE: 0,
+        C.MILITIA_A: 5, C.MILITIA_U: 3,
+        C.REGULAR_BRI: 0, C.TORY: 0, C.FORT_BRI: 0,
+        C.WARPARTY_A: 0, C.WARPARTY_U: 0, C.VILLAGE: 0,
+        C.FORT_PAT: 0,
+    }
+    # Only militia in Massachusetts (no cubes), rebel force at Boston = 0, Brit = 2 → False
+    assert bot._force_condition_met("force_if_51", state, {}) is False

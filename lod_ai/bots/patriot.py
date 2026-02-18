@@ -1218,28 +1218,36 @@ class PatriotBot(BaseBot):
                     return True
             return False
         if directive == "force_if_51":
-            # Card 51: "March to set up Battle per the Battle instructions.
-            # If not possible, choose Command & Special Activity instead."
-            # Check: can any March destination lead to a valid Battle space?
+            # Card 51 (shaded): "Patriots free March to then free Battle in
+            # one space."  Patriot bot instruction: "March to set up Battle
+            # per the Battle instructions.  If not possible, choose Command
+            # & Special Activity instead."
+            # Check: any space with British pieces where Rebel force already
+            # exceeds, OR where marching adjacent rebel cubes could tip it?
             refresh_control(state)
             for sid, sp in state["spaces"].items():
+                regs = sp.get(C.REGULAR_BRI, 0)
+                tories = sp.get(C.TORY, 0)
+                active_wp = sp.get(C.WARPARTY_A, 0)
+                if regs + tories + active_wp == 0:
+                    continue  # no enemy to battle
+                brit_force = regs + tories + (active_wp // 2) + sp.get(C.FORT_BRI, 0)
                 pat_cubes = sp.get(C.REGULAR_PAT, 0)
                 fre_cubes = min(sp.get(C.REGULAR_FRE, 0), pat_cubes)
                 active_mil = sp.get(C.MILITIA_A, 0)
                 rebel_force = pat_cubes + fre_cubes + (active_mil // 2)
-                regs = sp.get(C.REGULAR_BRI, 0)
-                tories = sp.get(C.TORY, 0)
-                active_wp = sp.get(C.WARPARTY_A, 0)
-                brit_force = regs + tories + (active_wp // 2) + sp.get(C.FORT_BRI, 0)
-                if (regs + tories + active_wp) > 0:
-                    # Could marching units here tip the balance?
-                    adj_set = map_adj.adjacent_spaces(sid)
-                    extra = 0
-                    for adj_sid in adj_set:
-                        adj_sp = state["spaces"].get(adj_sid, {})
-                        extra += self._rebel_group_size(adj_sp)
-                    if rebel_force + extra > brit_force:
-                        return True
+                # Already exceeds → can battle here
+                if rebel_force > brit_force:
+                    return True
+                # Check adjacent rebel cubes that could march in
+                adj_set = map_adj.adjacent_spaces(sid)
+                march_cubes = 0
+                for adj_sid in adj_set:
+                    adj_sp = state["spaces"].get(adj_sid, {})
+                    march_cubes += adj_sp.get(C.REGULAR_PAT, 0)
+                    march_cubes += adj_sp.get(C.REGULAR_FRE, 0)
+                if rebel_force + march_cubes > brit_force:
+                    return True
             return False
         return True  # default: play the event
 
