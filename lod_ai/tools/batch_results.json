@@ -58,7 +58,7 @@
     "seed": 7,
     "winner": "PATRIOTS",
     "end_reason": "WINNER",
-    "cards_played": 32,
+    "cards_played": 40,
     "error": null,
     "traceback": null
   },
@@ -130,7 +130,7 @@
     "seed": 15,
     "winner": "PATRIOTS",
     "end_reason": "WINNER",
-    "cards_played": 54,
+    "cards_played": 43,
     "error": null,
     "traceback": null
   },
@@ -299,9 +299,9 @@
   {
     "scenario": "1776",
     "seed": 14,
-    "winner": null,
-    "end_reason": "DECK_EXHAUSTED",
-    "cards_played": 44,
+    "winner": "PATRIOTS",
+    "end_reason": "WINNER",
+    "cards_played": 27,
     "error": null,
     "traceback": null
   },
@@ -317,9 +317,9 @@
   {
     "scenario": "1776",
     "seed": 16,
-    "winner": "PATRIOTS",
-    "end_reason": "WINNER",
-    "cards_played": 41,
+    "winner": null,
+    "end_reason": "DECK_EXHAUSTED",
+    "cards_played": 44,
     "error": null,
     "traceback": null
   },
@@ -371,9 +371,9 @@
   {
     "scenario": "1778",
     "seed": 2,
-    "winner": "PATRIOTS",
-    "end_reason": "WINNER",
-    "cards_played": 27,
+    "winner": null,
+    "end_reason": "DECK_EXHAUSTED",
+    "cards_played": 33,
     "error": null,
     "traceback": null
   },

@@ -17,6 +17,7 @@ class BaseBot:
     def take_turn(self, state: Dict, card: Dict, *, notes: str | None = None) -> Dict[str, object]:
         """Main driver called by engine.play_turn()."""
         if self._choose_event_vs_flowchart(state, card):
+            state.pop('_pass_reason', None)
             return {
                 "action": "event",
                 "used_special": bool(state.get("_turn_used_special")),
@@ -24,6 +25,7 @@ class BaseBot:
             }  # Event executed
 
         if state["resources"][self.faction] <= 0:
+            state['_pass_reason'] = 'resource_gate'
             push_history(state, f"{self.faction} PASS (no Resources)")
             return {
                 "action": "pass",
@@ -33,9 +35,19 @@ class BaseBot:
 
         self._follow_flowchart(state)   # implemented by subclass
         history = state.get("history") or []
-        last_entry = history[-1] if history else ""
-        last_text = last_entry.upper() if isinstance(last_entry, str) else ""
+        last_entry = history[-1] if history else None
+        # History entries are dicts with a "msg" key; handle both formats
+        if isinstance(last_entry, dict):
+            last_text = (last_entry.get("msg", "") or "").upper()
+        elif isinstance(last_entry, str):
+            last_text = last_entry.upper()
+        else:
+            last_text = ""
         action = "pass" if last_text.startswith(f"{self.faction} PASS") else "command"
+        if action == "pass" and '_pass_reason' not in state:
+            state['_pass_reason'] = 'no_valid_command'
+        elif action != "pass":
+            state.pop('_pass_reason', None)
         return {
             "action": action,
             "used_special": bool(state.get("_turn_used_special")),

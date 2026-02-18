@@ -216,6 +216,7 @@ class PatriotBot(BaseBot):
     def _follow_flowchart(self, state: Dict) -> None:
         # Node P3
         if state["resources"][self.faction] == 0:
+            state['_pass_reason'] = 'resource_gate'
             push_history(state, "PATRIOTS PASS (no Resources)")
             return
 
@@ -236,6 +237,7 @@ class PatriotBot(BaseBot):
                 if self._march_chain(state):
                     return
 
+        state['_pass_reason'] = 'no_valid_command'
         push_history(state, "PATRIOTS PASS")
 
     # ===================================================================
