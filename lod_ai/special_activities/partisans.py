@@ -75,6 +75,8 @@ def execute(
 
     if sp.get(MILITIA_U, 0) == 0:
         raise ValueError("Partisans requires at least one Underground Militia.")
+    if option in (2, 3) and sp.get(MILITIA_U, 0) < 2:
+        raise ValueError("Options 2/3 require at least two Underground Militia (§4.3.2).")
 
     roy_pieces = sum(sp.get(tag, 0) for tag in ROYALIST_TAGS)
     if roy_pieces == 0:

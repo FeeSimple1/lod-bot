@@ -27,6 +27,7 @@ from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.board.pieces      import remove_piece, add_piece, flip_pieces
 from lod_ai.economy.resources import spend, add as add_res
+from lod_ai.map import adjacency as map_adj
 
 SA_NAME = "TRADE"          # auto-registered by special_activities/__init__.py
 
@@ -61,6 +62,10 @@ def execute(
     sp = state["spaces"][space_id]
 
     # Eligibility checks
+    # §4.4.1: "any one Province" — Provinces are Colonies and Reserves (§1.3.1)
+    stype = map_adj.space_type(space_id)
+    if stype not in ("Colony", "Reserve"):
+        raise ValueError(f"Trade requires a Province (Colony/Reserve), not {stype} (§4.4.1).")
     if sp.get(WARPARTY_U, 0) == 0:
         raise ValueError("Trade requires at least one Underground War-Party.")
     if sp.get(VILLAGE, 0) == 0:

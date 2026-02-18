@@ -82,7 +82,7 @@ def execute(
 
 
         # ---- Place Propaganda marker if pool available -----------------
-        if marker_state.get("pool", 0) > 0 and len(marks_pool) < MAX_PROPAGANDA:
+        if marker_state.get("pool", 0) > 0 and len(marks_pool) < MAX_PROPAGANDA and sid not in marks_pool:
             marker_state["pool"] -= 1
             marker_state["on_map"].add(sid)
             added_markers += 1
