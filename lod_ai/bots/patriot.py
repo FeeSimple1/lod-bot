@@ -384,7 +384,13 @@ class PatriotBot(BaseBot):
 
         # Win-the-Day: per-space callback for free Rally + Blockade move
         def _win_callback(st, battle_sid):
-            """Per-space Win-the-Day callback per §3.6.8."""
+            """Per-space Win-the-Day callback per §3.6.8.
+
+            Returns (rally_space, rally_kwargs, blockade_dest) for this
+            battle space.  Rally uses P7 priorities; Blockade moves to
+            the City with most Support (excluding the battle city itself).
+            """
+            # Free Rally: pick best space per P7 priorities
             rally_space = self._best_rally_space(st)
             rally_kwargs = {}
             if rally_space:
@@ -393,7 +399,8 @@ class PatriotBot(BaseBot):
                         and self._rebel_group_size(sp_r) >= 4
                         and st["available"].get(C.FORT_PAT, 0) > 0):
                     rally_kwargs["build_fort"] = {rally_space}
-            blockade_dest = self._best_blockade_city(st)
+            # Blockade: move FROM battle city TO city with most Support
+            blockade_dest = self._best_blockade_city(st, exclude=battle_sid)
             return rally_space, rally_kwargs, blockade_dest
 
         battle.execute(
@@ -442,11 +449,20 @@ class PatriotBot(BaseBot):
             return candidates[0][4]
         return None
 
-    def _best_blockade_city(self, state: Dict) -> str | None:
-        """Select City with most Support for French Blockade move (P4)."""
+    def _best_blockade_city(self, state: Dict,
+                            exclude: str | None = None) -> str | None:
+        """Select City with most Support for French Blockade move (P4).
+
+        Parameters
+        ----------
+        exclude : str | None
+            A city to exclude (the battle city the blockade moves FROM).
+        """
         best = None
         best_support = -999
         for sid in CITIES:
+            if sid == exclude:
+                continue
             sup = self._support_level(state, sid)
             if sup > best_support:
                 best_support = sup
@@ -627,6 +643,31 @@ class PatriotBot(BaseBot):
         if not move_plans:
             return False
 
+        # --- Post-planning verification: Lose no Rebel Control ---
+        # Aggregate total removals per source across all moves, then verify
+        # that no Rebellion-controlled origin would flip to Crown control.
+        agg_removals: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        for plan in move_plans:
+            for tag, cnt in plan["pieces"].items():
+                agg_removals[plan["src"]][tag] += cnt
+
+        verified_plans = []
+        for plan in move_plans:
+            src = plan["src"]
+            if src in agg_removals and self._would_lose_rebel_control(
+                    state, src, dict(agg_removals[src])):
+                # Skip this plan — would lose Rebel Control at origin
+                # Also reduce aggregated removals for this source
+                for tag, cnt in plan["pieces"].items():
+                    agg_removals[src][tag] -= cnt
+                continue
+            verified_plans.append(plan)
+
+        if not verified_plans:
+            return False
+
+        move_plans = verified_plans
+
         # Collect all unique destinations
         all_dests = list(dict.fromkeys(p["dst"] for p in move_plans))
         all_srcs = list(dict.fromkeys(p["src"] for p in move_plans))
@@ -727,6 +768,7 @@ class PatriotBot(BaseBot):
         ctrl = state.get("control", {})
         spaces_used: List[str] = []  # Track Rally spaces (Max 4)
         build_fort_set: Set[str] = set()
+        place_one_set: Set[str] = set()   # Spaces that need explicit Militia placement
         promote_space: str | None = None
         promote_n: int | None = None
         move_plan_list: List[Tuple[str, str, int]] = []
@@ -757,27 +799,39 @@ class PatriotBot(BaseBot):
                 avail_forts -= 1
 
         # --- Bullet 2: Militia at lonely Fort spaces ---
-        for sid, sp in state["spaces"].items():
-            if len(spaces_used) >= 4:
-                break
-            if sp.get(C.FORT_PAT, 0) == 0:
-                continue
-            # "no other Rebellion pieces" = only the Fort itself
-            other = (sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0) +
-                     sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0))
-            if other == 0 and sid not in spaces_used:
+        # §8.5.2: "place Militia, first at each Patriot Fort with no other
+        # Rebellion pieces"
+        # Only add if Militia are actually Available to place.
+        if avail_militia > 0:
+            lonely_forts = []
+            for sid, sp in state["spaces"].items():
+                if sp.get(C.FORT_PAT, 0) == 0:
+                    continue
+                # "no other Rebellion pieces" = only the Fort itself
+                other = (sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0) +
+                         sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0))
+                if other == 0 and sid not in spaces_used:
+                    lonely_forts.append(sid)
+            # Sort for determinism (alphabetical)
+            lonely_forts.sort()
+            for sid in lonely_forts:
+                if len(spaces_used) >= 4 or avail_militia <= 0:
+                    break
                 spaces_used.append(sid)
+                place_one_set.add(sid)  # explicit placement needed at Fort spaces
+                avail_militia -= 1  # track placement against available
 
         # --- Bullet 3: Continental placement at Fort with most Militia ---
         # §8.5.2: "then if any Continentals are Available at the Fort with
         # the largest number of Militia already."
         # This adds a new Rally space (the Fort with most Militia globally).
+        # Unlike Bullet 4, this may select a Fort not yet in spaces_used.
         if avail_cont > 0 and len(spaces_used) < 4:
             best_cont_fort = None
             best_cont_mil = -1
             for sid, sp in state["spaces"].items():
                 if sid in spaces_used:
-                    continue  # already selected
+                    continue  # already selected — checked separately in Bullet 4
                 if sp.get(C.FORT_PAT, 0) == 0 and sid not in build_fort_set:
                     continue
                 mil = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
@@ -804,7 +858,8 @@ class PatriotBot(BaseBot):
                     best_fort = sid
             if best_fort and best_mil > 0:
                 promote_space = best_fort
-                promote_n = max(0, best_mil - 1)
+                # Replace all except 1 Underground, capped by available Continentals
+                promote_n = min(max(0, best_mil - 1), avail_cont)
                 if promote_n == 0:
                     promote_space = None
                     promote_n = None
@@ -917,6 +972,8 @@ class PatriotBot(BaseBot):
             kw = {}
             if sid in build_fort_set:
                 kw["build_fort"] = {sid}
+            if sid in place_one_set:
+                kw["place_one"] = {sid}
             if promote_space == sid:
                 kw["promote_space"] = promote_space
                 kw["promote_n"] = promote_n
@@ -1161,28 +1218,36 @@ class PatriotBot(BaseBot):
                     return True
             return False
         if directive == "force_if_51":
-            # Card 51: "March to set up Battle per the Battle instructions.
-            # If not possible, choose Command & Special Activity instead."
-            # Check: can any March destination lead to a valid Battle space?
+            # Card 51 (shaded): "Patriots free March to then free Battle in
+            # one space."  Patriot bot instruction: "March to set up Battle
+            # per the Battle instructions.  If not possible, choose Command
+            # & Special Activity instead."
+            # Check: any space with British pieces where Rebel force already
+            # exceeds, OR where marching adjacent rebel cubes could tip it?
             refresh_control(state)
             for sid, sp in state["spaces"].items():
+                regs = sp.get(C.REGULAR_BRI, 0)
+                tories = sp.get(C.TORY, 0)
+                active_wp = sp.get(C.WARPARTY_A, 0)
+                if regs + tories + active_wp == 0:
+                    continue  # no enemy to battle
+                brit_force = regs + tories + (active_wp // 2) + sp.get(C.FORT_BRI, 0)
                 pat_cubes = sp.get(C.REGULAR_PAT, 0)
                 fre_cubes = min(sp.get(C.REGULAR_FRE, 0), pat_cubes)
                 active_mil = sp.get(C.MILITIA_A, 0)
                 rebel_force = pat_cubes + fre_cubes + (active_mil // 2)
-                regs = sp.get(C.REGULAR_BRI, 0)
-                tories = sp.get(C.TORY, 0)
-                active_wp = sp.get(C.WARPARTY_A, 0)
-                brit_force = regs + tories + (active_wp // 2) + sp.get(C.FORT_BRI, 0)
-                if (regs + tories + active_wp) > 0:
-                    # Could marching units here tip the balance?
-                    adj_set = map_adj.adjacent_spaces(sid)
-                    extra = 0
-                    for adj_sid in adj_set:
-                        adj_sp = state["spaces"].get(adj_sid, {})
-                        extra += self._rebel_group_size(adj_sp)
-                    if rebel_force + extra > brit_force:
-                        return True
+                # Already exceeds → can battle here
+                if rebel_force > brit_force:
+                    return True
+                # Check adjacent rebel cubes that could march in
+                adj_set = map_adj.adjacent_spaces(sid)
+                march_cubes = 0
+                for adj_sid in adj_set:
+                    adj_sp = state["spaces"].get(adj_sid, {})
+                    march_cubes += adj_sp.get(C.REGULAR_PAT, 0)
+                    march_cubes += adj_sp.get(C.REGULAR_FRE, 0)
+                if rebel_force + march_cubes > brit_force:
+                    return True
             return False
         return True  # default: play the event
 
