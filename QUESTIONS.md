@@ -92,3 +92,25 @@ Implemented:
 **Evidence:** Analysis of all 18 shaded cards that place Underground Militia shows the largest cluster (cards 28, 47, 58, 78, 89) targets Active Support spaces (Tory-occupied, British-controlled territory). "Active Opposition with no militia" is a near-impossible board state. "Active Support or Village" forms a coherent strategic grouping: enemy-aligned territory lacking Patriot military presence.
 
 **Implementation:** `_faction_event_conditions()` now checks the board for Active Support or Village spaces with no existing militia, instead of the previous over-broad flag check.
+
+---
+
+## Q12: French Agent Mobilization (§3.5.1) — "Quebec" vs "Quebec City"
+
+**What I was trying to verify:** Whether `french_agent_mobilization.py` uses the correct space ID for the "Quebec" option.
+
+**What the references say:**
+
+- **Manual §3.5.1:** "Select one of the following: Quebec, New York, New Hampshire, or Massachusetts." Procedure text says "In the selected Province, place two Available Militia or one Continental."
+- **French bot flowchart (F7):** "Place 2 Militia, or—if not possible—1 Continental, in Quebec City, New York, New Hampshire, or Massachusetts."
+
+**What's ambiguous:** Manual §3.5.1 says "Quebec" and calls it a "Province" in the procedure. The map has two spaces: "Quebec" (type Reserve) and "Quebec_City" (type City). The bot flowchart explicitly says "Quebec City" while the manual command definition says "Quebec". These are different spaces on the map.
+
+**Current code:** Both `french_agent_mobilization.py` and `bots/french.py` use `"Quebec_City"`, matching the bot flowchart but not the manual command definition.
+
+**Options:**
+1. Use `"Quebec"` (Reserve) — matches Manual §3.5.1 command definition text
+2. Use `"Quebec_City"` (City) — matches the bot flowchart reference text
+3. Allow both — the command accepts either interpretation
+
+**Impact:** If the answer is "Quebec" (Reserve), the bot flowchart reference and bot code also need updating. If the answer is "Quebec_City" (City), the manual text is treated as using an informal name for the city.

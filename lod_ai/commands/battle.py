@@ -288,13 +288,16 @@ def _apply_shifts_to(
     state: Dict, space_id: str, winner: str, remaining: int,
 ) -> int:
     """Apply up to *remaining* support shifts in *space_id* toward the
-    *winner*'s preferred direction.  Return the number of shifts still unused."""
+    *winner*'s preferred direction.  Return the number of shifts still unused.
+
+    §3.6.8: Royalist winner shifts toward Support (positive); Rebellion
+    winner shifts toward Opposition (negative)."""
     for i in range(remaining):
         cur = state.get("support", {}).get(space_id, NEUTRAL)
-        if winner == "ROYALIST" and cur > ACTIVE_OPPOSITION:
-            state.setdefault("support", {})[space_id] = cur - 1
-        elif winner == "REBELLION" and cur < ACTIVE_SUPPORT:
+        if winner == "ROYALIST" and cur < ACTIVE_SUPPORT:
             state.setdefault("support", {})[space_id] = cur + 1
+        elif winner == "REBELLION" and cur > ACTIVE_OPPOSITION:
+            state.setdefault("support", {})[space_id] = cur - 1
         else:
             return remaining - i
     return 0

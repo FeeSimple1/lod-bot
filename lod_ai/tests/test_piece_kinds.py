@@ -48,7 +48,9 @@ def test_washington_doubles_win_the_day(monkeypatch):
     monkeypatch.setattr(battle, "_roll_d3", lambda st: 3)
     battle.execute(state, C.PATRIOTS, {}, ["Boston"])
 
-    assert state["support"]["Boston"] == C.ACTIVE_SUPPORT
+    # §3.6.8: Rebellion wins → shifts toward Opposition. Washington doubles
+    # the shift.  NEUTRAL(0) with 2 shifts → ACTIVE_OPPOSITION(-2).
+    assert state["support"]["Boston"] == C.ACTIVE_OPPOSITION
 
 
 def _raid_state():
