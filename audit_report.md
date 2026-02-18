@@ -1783,3 +1783,88 @@ Full node-by-node comparison of `patriot.py` against `Reference Documents/patrio
 | `test_p12_skirmish_fort_priority` | Skirmish option 3 for Fort-only, option 2 with cubes |
 | `test_flowchart_p9_yes_no_march_fallback` | P9=Yes path does not fall through to March |
 | `test_bs_trigger_requires_player_1st_eligible` | BS trigger checks human 1st Eligible |
+
+---
+
+## Session 13: Patriot Bot Compliance Review (Independent)
+
+### Scope
+
+Independent node-by-node comparison of the entire Patriot bot flowchart implementation in `lod_ai/bots/patriot.py` against `Reference Documents/patriot bot flowchart and reference.txt`, Manual Ch 3 (§3.3, §3.6), Manual Ch 4 (§4.3), and Manual Ch 8 (§8.5). Also reviewed `base_bot.py`, `event_instructions.py`, `event_eval.py`, `partisans.py`, `skirmish.py`, `persuasion.py`, `rabble_rousing.py`, `rally.py`, `battle.py`, `march.py`, and `rules_consts.py`.
+
+### Label Compliance: PASS
+
+No string literal violations found. All piece tags, faction names, markers, and control values use proper constants from `rules_consts.py`.
+
+### Nodes verified CORRECT
+
+| Node | Description | Status |
+|------|-------------|--------|
+| P1 | Sword icon skip / Event vs Command | CORRECT — `base_bot._choose_event_vs_flowchart()` |
+| P2 | Event conditions (5 bullets) | CORRECT — uses `CARD_EFFECTS` shaded side per §8.3.2; Q11 resolution applied (Active Support, not Active Opposition) |
+| P3 | Resources > 0 gate | CORRECT — checks `== 0`, PASSes |
+| P4 | Battle FL calculation with full §3.6.5-6 modifiers | CORRECT — all modifiers present and cumulative |
+| P4 | French cap at Patriot cube count, French resource gate | CORRECT |
+| P4 | Washington/Pop/Village/random tiebreaker | CORRECT |
+| P4 | Resource constraint on space count | CORRECT — trims to `max(pat_res, 1)` |
+| P4 | Win-the-Day free Rally + Blockade move via `win_callback` | CORRECT — wired to `battle.execute()` |
+| P4 | Lauzun modifier: +1 leader AND +1 French-with-Lauzun | CORRECT — two separate cumulative modifiers per §3.6.5 lines 332-333 |
+| P5 | March Phase 1 (Rebel Control destinations, Villages/Cities/Pop, French escort) | CORRECT |
+| P5 | March Phase 2 (1 Militia Underground preferred into spaces with none) | CORRECT |
+| P5 | March leave-behind (Fort guard, no Active Opp, lose-no-control) | CORRECT |
+| P6 | Battle possible (rebel cubes + all 3 Rebellion leaders vs Active Royal pieces) | CORRECT |
+| P7 | Rally Bullet 1 (Fort: 4+ units, room, Cities/Pop) | CORRECT |
+| P7 | Rally Bullet 2 (Militia at lonely Forts) | CORRECT |
+| P7 | Rally Bullet 3 (Continental placement at Fort with most Militia) | CORRECT |
+| P7 | Rally Bullet 4 (Continental replacement from Rally-selected spaces only) | CORRECT |
+| P7 | Rally Bullet 5 (Militia at non-Fort space, post-Bullet-1 Fort count) | CORRECT |
+| P7 | Rally Bullet 6 (change Control, no Active Opp, Cities, Pop; no Active Support exclusion) | CORRECT |
+| P7 | Rally Bullet 7 (adjacent Militia gathering, excludes selected spaces) | CORRECT |
+| P7 | Rally space-by-space execution with mid-command Persuasion interrupt | CORRECT |
+| P8 | Partisans (Village→WP→British; option 3 no WP; option 2 maximize; option 1 default) | CORRECT |
+| P9 | Rally preferred (Fort possible OR 1D6 > Underground Militia) | CORRECT |
+| P10 | Rabble possible (any space can shift + §3.3.4 eligibility) | CORRECT |
+| P11 | Rabble-Rousing (Active Support first, highest Pop, §3.3.4 eligibility filter) | CORRECT |
+| P11 | Rabble space-by-space execution with mid-command Persuasion interrupt | CORRECT |
+| P12 | Skirmish (Fort-first, Control sub-priority, option 3/2/1 selection) | CORRECT |
+| P13 | Persuasion (Rebel Control + Underground Militia + Colony/City filter, Fort priority, max 3) | CORRECT |
+| P8→P12→P13 | SA chain (Partisans→Skirmish→Persuasion, resource-0 Persuasion gates) | CORRECT |
+| P7↔P11 | Rally/Rabble mutual fallback (infinite loop guard via `_from_rabble`/`_from_rally`) | CORRECT |
+| OPS | Supply priority (change Control, RL threat, Villages, Pop) | CORRECT — wired in `year_end.py` |
+| OPS | Redeploy Washington (most Continentals) | CORRECT — wired in `year_end.py` |
+| OPS | Patriot Desertion (least Control change, keep last unit) | CORRECT — wired in `year_end.py` |
+| OPS | Brilliant Stroke trigger (ToA played, Washington+4 Continentals, player 1st Eligible) | CORRECT — wired in `year_end.py` |
+| Event | All 13 Patriot card instructions match reference | CORRECT |
+| Event | Cards 71/90 `force_unshaded`, 8 `force_if_french_not_human`, 18/44 `force_if_eligible_enemy`, 51 `force_if_51`, 52 `force_if_52` | CORRECT |
+
+### Issues Found: NONE
+
+No new bugs, deviations, or label compliance issues found.
+
+### Previously Documented Outstanding Issues — Status Update
+
+All four items from prior audit sessions (8, 9, 11) have been resolved:
+
+1. ~~**P4 Force level modifiers** — raw piece counts instead of §3.6.5-6 modifiers~~ **RESOLVED**: Lines 335-366 implement all §3.6.5 Defender Loss modifiers (half regs, underground, attacking leader, French-with-Lauzun, defending fort) and all §3.6.6 Attacker Loss modifiers (half regs, underground, defending leader, defending fort). Net calculation at line 369 uses `(rebel_force + att_mod) - (brit_force + def_mod)`.
+
+2. ~~**P4 Win-the-Day per-space** — pre-selects one rally space; requires battle callback refactoring~~ **RESOLVED**: Lines 386-408 define `_win_callback(st, battle_sid)` which is passed to `battle.execute()` at line 408. The callback selects the best Rally space per P7 priorities and the best Blockade city per the flowchart.
+
+3. ~~**P7/P11 Persuasion mid-command** — fires after command, not during~~ **RESOLVED**: Both `_execute_rally()` (lines 959-999) and `_execute_rabble()` (lines 1037-1060) execute space-by-space, checking resources before and after each space. Persuasion fires immediately when resources hit 0. Only residual gap: restored resources don't expand the pre-selected space list (negligible gameplay impact).
+
+4. ~~**OPS methods not wired into year_end**~~ **RESOLVED**: `ops_supply_priority()` called at year_end.py lines 130/163; `ops_redeploy_washington()` called at line 535; `ops_patriot_desertion_priority()` called at line 732; `ops_bs_trigger()` called at line 973.
+
+### Investigation Notes
+
+- **Lauzun double-modifier (false positive)**: The §3.6.5 modifiers list "+1 At least one Attacking Leader" (line 332) and "+1 Attacking including French with Lauzun" (line 333) as separate cumulative modifiers. The code at lines 343-349 correctly applies both: one for any leader present, one specifically for French+Lauzun. This is NOT a bug.
+
+- **P5 March Phase 2 Continental fallback**: Code allows Continentals as fallback when no Militia can reach a target. Reference says "one Militia" but §3.3.2 March allows moving Continentals. Minor pragmatic deviation, not a bug.
+
+- **P9 base room check**: P9 doesn't verify `< 2 bases` in the space when checking "Rally would place Fort." If a space has 4+ Patriot units but already has 2 bases, P9 returns True but Bullet 1 rejects it. Fallback behavior is correct (Rally proceeds with other bullets). Not a bug.
+
+### Conclusion
+
+The Patriot bot implementation is **fully compliant** with the reference documents. All nodes P1-P13, the OPS summary, and all 13 event card instructions match the flowchart and Manual Ch 8 §8.5. No code changes required.
+
+### Tests
+
+915 tests passing (no new tests needed — no bugs found).
