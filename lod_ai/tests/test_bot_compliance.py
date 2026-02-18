@@ -185,13 +185,13 @@ def test_british_rl_picks_fewest_markers():
 
 
 # =========================================================================
-# French Agent Mobilization: Quebec_City not Quebec
+# French Agent Mobilization: Quebec per §3.5.1
 # =========================================================================
-def test_french_agent_mob_quebec_city():
-    """Province validation should accept Quebec_City (not Quebec)."""
+def test_french_agent_mob_quebec():
+    """Province validation should accept Quebec (Reserve) per §3.5.1."""
     from lod_ai.commands.french_agent_mobilization import _VALID_PROVINCES
-    assert "Quebec_City" in _VALID_PROVINCES
-    assert "Quebec" not in _VALID_PROVINCES
+    assert "Quebec" in _VALID_PROVINCES
+    assert "Quebec_City" not in _VALID_PROVINCES
 
 
 # =========================================================================
