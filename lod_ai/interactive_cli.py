@@ -3,13 +3,17 @@
 Menu-driven CLI for Liberty or Death.
 
 All selections are presented as numbered menus (spaces, actions, counts).
-Upgraded with board state display, bot summaries, card display, and
-meta-commands (status/history/quit) at every input prompt.
+Upgraded with board state display, bot summaries, card display, crash/bug
+reports, autosave, game stats tracking, legal move logging, and
+meta-commands (status/history/victory/bug/quit) at every input prompt.
 """
 
 from __future__ import annotations
 
+import traceback
+from collections import Counter
 from copy import deepcopy
+from datetime import datetime
 from typing import Any, Callable, Dict, List, Tuple
 
 from lod_ai import rules_consts as RC
@@ -21,6 +25,7 @@ from lod_ai.cli_display import (
     display_bot_summary,
     display_turn_context,
     display_game_end,
+    display_game_report,
     display_setup_confirmation,
     display_winter_quarters_header,
     display_wq_phase,
@@ -33,6 +38,13 @@ from lod_ai.engine import Engine
 from lod_ai.map import adjacency as map_adj
 from lod_ai.state.setup_state import build_state
 from lod_ai.leaders import leader_location
+from lod_ai.tools.state_serializer import (
+    build_crash_report,
+    build_autosave,
+    build_game_report,
+    save_report,
+    serialize_state,
+)
 
 from lod_ai.commands import (
     march,
@@ -58,6 +70,90 @@ from lod_ai.special_activities import (
     trade,
     war_path,
 )
+
+
+# ---------------------------------------------------------------------------
+# Game stats accumulator
+# ---------------------------------------------------------------------------
+
+_ALL_FACTIONS = (RC.BRITISH, RC.PATRIOTS, RC.INDIANS, RC.FRENCH)
+
+
+def _new_game_stats(human_factions: set) -> Dict[str, Any]:
+    """Create a fresh game stats accumulator."""
+    faction_stats = {}
+    for fac in _ALL_FACTIONS:
+        faction_stats[fac] = {
+            "is_human": fac in human_factions,
+            "commands": Counter(),
+            "events_played": [],
+            "special_activities": Counter(),
+            "passes": 0,
+            "pass_reasons": Counter(),
+        }
+    return {
+        "cards_played": 0,
+        "wq_count": 0,
+        "campaign_years": "",
+        "winner": None,
+        "victory_type": None,
+        "wq_margins": [],
+        "faction_stats": faction_stats,
+    }
+
+
+def _record_turn_stats(game_stats: Dict[str, Any], state: Dict[str, Any]) -> None:
+    """Parse the engine's _card_turn_log and accumulate stats."""
+    card_turn_log = state.get("_card_turn_log", [])
+    for entry in card_turn_log:
+        faction = entry.get("faction")
+        if faction not in _ALL_FACTIONS:
+            continue
+        fs = game_stats["faction_stats"][faction]
+        action = entry.get("action")
+        if action == "pass":
+            fs["passes"] += 1
+            reason = entry.get("pass_reason", "unknown")
+            fs["pass_reasons"][reason] += 1
+        elif action == "command":
+            cmd_type = entry.get("command_type", "unknown")
+            fs["commands"][cmd_type] += 1
+            if entry.get("used_special"):
+                # SA type tracked as command_meta if available
+                fs["special_activities"]["(with command)"] += 1
+        elif action == "event":
+            card_id = entry.get("event_card_id")
+            if card_id is not None:
+                fs["events_played"].append(card_id)
+
+
+def _record_wq_margins(game_stats: Dict[str, Any], state: Dict[str, Any]) -> None:
+    """Extract the latest victory check margins from history."""
+    history = state.get("history", [])
+    for entry in reversed(history[-30:]):
+        msg = entry.get("msg", "") if isinstance(entry, dict) else str(entry)
+        if "Victory Check" in msg and "BRI(" in msg:
+            game_stats["wq_margins"].append(msg)
+            break
+    game_stats["wq_count"] += 1
+
+
+def _detect_winner(game_stats: Dict[str, Any], state: Dict[str, Any]) -> None:
+    """Parse history for winner and victory type."""
+    history = state.get("history", [])
+    for entry in reversed(history[-40:]):
+        msg = entry.get("msg", "") if isinstance(entry, dict) else str(entry)
+        if "Winner:" in msg:
+            game_stats["winner"] = msg
+            if "Rule 7.3" in msg:
+                game_stats["victory_type"] = "final_scoring"
+            else:
+                game_stats["victory_type"] = "victory_condition"
+            break
+        elif "Victory achieved" in msg:
+            game_stats["winner"] = msg
+            game_stats["victory_type"] = "victory_condition"
+            break
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +205,27 @@ def _movable_sources(state: Dict[str, Any], faction: str, bring_escorts: bool = 
     return sources
 
 
+def _log_wizard_filter(state: Dict[str, Any], command: str, total: int, shown: int,
+                       filtered: List[Dict[str, str]]) -> None:
+    """Record what a wizard filtered out."""
+    state.setdefault("_cli_wizard_log", []).append({
+        "command": command,
+        "total_spaces": total,
+        "shown_spaces": shown,
+        "filtered_out": filtered,
+    })
+
+
+def _log_empty_menu(state: Dict[str, Any], faction: str, command: str) -> None:
+    """Record when a wizard finds zero legal options."""
+    state.setdefault("_cli_wizard_log", []).append({
+        "command": command,
+        "faction": faction,
+        "no_legal_options": True,
+    })
+    print(f"  No legal options for {command} -- this may indicate a bug. Type 'bug' to report.")
+
+
 # ---------------------------------------------------------------------------
 # Command wizards
 # ---------------------------------------------------------------------------
@@ -117,15 +234,21 @@ def _march_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
     bring = choose_one("Bring escorts?", [("No", False), ("Yes", True)])
     sources = _movable_sources(engine.state, faction, bring_escorts=bring)
     if not sources:
+        _log_empty_menu(engine.state, faction, "March")
         raise ValueError("No pieces available to March.")
+    all_space_ids = map_adj.all_space_ids()
     dest_options = set()
+    filtered_out = []
     for src in sources:
-        for dst in map_adj.all_space_ids():
+        for dst in all_space_ids:
             if map_adj.is_adjacent(src, dst):
                 if faction == RC.INDIANS and map_adj.space_type(dst) == "City":
+                    filtered_out.append({"space": dst, "reason": "Indians cannot march to City"})
                     continue
                 dest_options.add(dst)
+    _log_wizard_filter(engine.state, "March", len(all_space_ids), len(dest_options), filtered_out)
     if not dest_options:
+        _log_empty_menu(engine.state, faction, "March (destinations)")
         raise ValueError("No legal destinations.")
     dests = choose_multiple(
         "Select March destinations:",
@@ -167,7 +290,9 @@ def _march_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
 def _battle_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
     candidates = _battle_candidates(engine.state, faction)
     if not candidates:
+        _log_empty_menu(engine.state, faction, "Battle")
         raise ValueError("No legal Battle spaces.")
+    _log_wizard_filter(engine.state, "Battle", len(engine.state.get("spaces", {})), len(candidates), [])
     spaces = choose_multiple(
         "Select Battle spaces:",
         [(s, s) for s in candidates],
@@ -178,12 +303,22 @@ def _battle_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
 
 
 def _rally_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
-    options = _space_options(engine.state, lambda sid, _sp: engine.state.get("support", {}).get(sid, 0) < RC.ACTIVE_SUPPORT)
-    if not options:
+    all_spaces = list(engine.state.get("spaces", {}).keys())
+    filtered_out = []
+    valid = []
+    for sid in sorted(all_spaces):
+        sup = engine.state.get("support", {}).get(sid, 0)
+        if sup >= RC.ACTIVE_SUPPORT:
+            filtered_out.append({"space": sid, "reason": f"already Active Support ({sup})"})
+        else:
+            valid.append((sid, sid))
+    _log_wizard_filter(engine.state, "Rally", len(all_spaces), len(valid), filtered_out)
+    if not valid:
+        _log_empty_menu(engine.state, faction, "Rally")
         raise ValueError("No spaces available for Rally.")
     selected = choose_multiple(
         "Select Rally spaces:",
-        options,
+        valid,
         min_sel=1,
         max_sel=1 if limited else None,
     )
@@ -234,12 +369,25 @@ def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
             options.append("move_plan")
         return options
 
-    province_options = [
-        (sid, sid)
-        for sid in state.get("spaces", {})
-        if _gather_choices_for(sid)
-    ]
+    all_spaces = list(state.get("spaces", {}).keys())
+    filtered_out = []
+    province_options = []
+    for sid in all_spaces:
+        choices = _gather_choices_for(sid)
+        if choices:
+            province_options.append((sid, sid))
+        else:
+            sup = state.get("support", {}).get(sid, 0)
+            if sup not in support_ok:
+                filtered_out.append({"space": sid, "reason": f"support level {sup} not in {support_ok}"})
+            elif sid == RC.WEST_INDIES_ID:
+                filtered_out.append({"space": sid, "reason": "West Indies excluded"})
+            else:
+                filtered_out.append({"space": sid, "reason": "no available gather actions"})
+    _log_wizard_filter(engine.state, "Gather", len(all_spaces), len(province_options), filtered_out)
+
     if not province_options:
+        _log_empty_menu(engine.state, faction, "Gather")
         raise ValueError("No legal Provinces for Gather.")
 
     selected = choose_multiple(
@@ -299,10 +447,10 @@ def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
             bulk_place[prov] = n_place
             remaining_available_wp -= n_place
         elif isinstance(choice, tuple) and choice[0] == "move_plan":
-            sources = choice[1]
+            mp_sources = choice[1]
             selected_sources = choose_multiple(
                 f"Select sources to move War Parties into {prov}:",
-                [(s, s) for s in sources],
+                [(s, s) for s in mp_sources],
                 min_sel=1,
                 max_sel=None,
             )
@@ -333,6 +481,9 @@ def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
 
 def _muster_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
     options = _space_options(engine.state)
+    if not options:
+        _log_empty_menu(engine.state, faction, "Muster")
+        raise ValueError("No spaces available for Muster.")
     if faction == RC.BRITISH:
         selected = choose_multiple(
             "Select Muster spaces:",
@@ -376,8 +527,13 @@ def _muster_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
 
 def _scout_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
     options = _space_options(engine.state, lambda sid, sp: sp.get(RC.WARPARTY_U, 0) + sp.get(RC.WARPARTY_A, 0) > 0)
+    if not options:
+        _log_empty_menu(engine.state, faction, "Scout")
+        raise ValueError("No War Parties available for Scout.")
     src = choose_one("Select Scout source:", options)
     dest_options = _space_options(engine.state, lambda sid, _sp: map_adj.is_adjacent(src, sid))
+    if not dest_options:
+        raise ValueError("No adjacent destinations for Scout.")
     dst = choose_one("Select Scout destination:", dest_options)
     wp_avail = engine.state["spaces"][src].get(RC.WARPARTY_U, 0) + engine.state["spaces"][src].get(RC.WARPARTY_A, 0)
     n_wp = choose_count("War Parties to move:", min_val=1, max_val=wp_avail)
@@ -407,33 +563,44 @@ def _raid_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict,
     dragging_loc = leader_location(state, "LEADER_DRAGGING_CANOE")
 
     def _sources_for(dest: str) -> List[str]:
-        sources: List[str] = []
+        sources_list: List[str] = []
         for sid, count in remaining_underground.items():
             if count <= 0:
                 continue
             path = map_adj.shortest_path(sid, dest)
             distance = len(path) - 1 if path else None
             if distance == 1:
-                sources.append(sid)
+                sources_list.append(sid)
             elif dragging_loc and sid == dragging_loc and distance is not None and distance <= 2:
-                sources.append(sid)
-        return sources
+                sources_list.append(sid)
+        return sources_list
 
-    def _eligible(space_id: str, sp: Dict[str, Any]) -> bool:
-        if space_id == RC.WEST_INDIES_ID:
-            return False
-        if state.get("support", {}).get(space_id, 0) not in support_ok:
-            return False
-        underground_here = remaining_underground.get(space_id, 0) > 0
-        return underground_here or bool(_sources_for(space_id))
+    all_spaces = list(state.get("spaces", {}).keys())
+    filtered_out = []
+    valid_options = []
+    for sid in sorted(all_spaces):
+        sp = state["spaces"][sid]
+        if sid == RC.WEST_INDIES_ID:
+            filtered_out.append({"space": sid, "reason": "West Indies excluded"})
+            continue
+        sup = state.get("support", {}).get(sid, 0)
+        if sup not in support_ok:
+            filtered_out.append({"space": sid, "reason": f"support level {sup} not Opposition"})
+            continue
+        underground_here = remaining_underground.get(sid, 0) > 0
+        if underground_here or bool(_sources_for(sid)):
+            valid_options.append((sid, sid))
+        else:
+            filtered_out.append({"space": sid, "reason": "no underground WP here or adjacent"})
+    _log_wizard_filter(state, "Raid", len(all_spaces), len(valid_options), filtered_out)
 
-    options = _space_options(state, _eligible)
-    if not options:
+    if not valid_options:
+        _log_empty_menu(state, faction, "Raid")
         raise ValueError("No legal Provinces for Raid.")
 
     selected = choose_multiple(
         "Select Raid Provinces:",
-        options,
+        valid_options,
         min_sel=1,
         max_sel=1 if limited else 3,
     )
@@ -441,13 +608,13 @@ def _raid_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict,
     move_plan: List[tuple[str, str]] = []
     for dest in selected:
         underground_here = remaining_underground.get(dest, 0) > 0
-        sources = _sources_for(dest)
-        if not underground_here and not sources:
+        sources_list = _sources_for(dest)
+        if not underground_here and not sources_list:
             raise ValueError(f"{dest} has no accessible Underground War Party.")
 
         should_move = False
         if underground_here:
-            if sources:
+            if sources_list:
                 should_move = choose_one(f"Move an Underground War Party into {dest}?", [("No", False), ("Yes", True)])
             else:
                 should_move = False
@@ -457,7 +624,7 @@ def _raid_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict,
         if should_move:
             src = choose_one(
                 f"Select source for 1 Underground War Party into {dest}:",
-                [(s, s) for s in sources],
+                [(s, s) for s in sources_list],
             )
             move_plan.append((src, dest))
             remaining_underground[src] -= 1
@@ -466,8 +633,18 @@ def _raid_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict,
 
 
 def _garrison_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
-    src_options = _space_options(engine.state, lambda sid, sp: sp.get(RC.REGULAR_BRI, 0) > 0)
+    all_spaces = list(engine.state.get("spaces", {}).keys())
+    filtered_out = []
+    src_options = []
+    for sid in sorted(all_spaces):
+        sp = engine.state["spaces"][sid]
+        if sp.get(RC.REGULAR_BRI, 0) > 0:
+            src_options.append((sid, sid))
+        else:
+            filtered_out.append({"space": sid, "reason": "no British Regulars"})
+    _log_wizard_filter(engine.state, "Garrison", len(all_spaces), len(src_options), filtered_out)
     if not src_options:
+        _log_empty_menu(engine.state, faction, "Garrison")
         raise ValueError("No Regulars available for Garrison.")
     moves: Dict[str, Dict[str, int]] = {}
     max_moves = 1 if limited else 3
@@ -483,21 +660,32 @@ def _garrison_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[d
 
 def _rabble_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
     state = engine.state
-    def _eligible(space_id: str, sp: Dict[str, Any]) -> bool:
-        if state.get("control", {}).get(space_id) != "REBELLION":
-            return False
+    all_spaces = list(state.get("spaces", {}).keys())
+    filtered_out = []
+    valid_options = []
+
+    for sid in sorted(all_spaces):
+        sp = state["spaces"][sid]
+        ctrl = state.get("control", {}).get(sid)
+        if ctrl != "REBELLION":
+            filtered_out.append({"space": sid, "reason": f"control={ctrl}, not REBELLION"})
+            continue
         has_patriot_piece = any(
             sp.get(tag, 0) > 0
             for tag in (RC.REGULAR_PAT, RC.MILITIA_A, RC.MILITIA_U, RC.FORT_PAT)
         )
-        return has_patriot_piece or sp.get(RC.MILITIA_U, 0) > 0
+        if has_patriot_piece or sp.get(RC.MILITIA_U, 0) > 0:
+            valid_options.append((sid, sid))
+        else:
+            filtered_out.append({"space": sid, "reason": "no Patriot pieces despite REBELLION control"})
 
-    options = _space_options(state, _eligible)
-    if not options:
+    _log_wizard_filter(state, "Rabble-Rousing", len(all_spaces), len(valid_options), filtered_out)
+    if not valid_options:
+        _log_empty_menu(state, faction, "Rabble-Rousing")
         raise ValueError("No eligible spaces for Rabble-Rousing.")
     selected = choose_multiple(
         "Select Rabble-Rousing spaces:",
-        options,
+        valid_options,
         min_sel=1,
         max_sel=1 if limited else None,
     )
@@ -505,7 +693,11 @@ def _rabble_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
 
 
 def _agent_mobilization_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
-    province = choose_one("Select Province for Agent Mobilization:", _space_options(engine.state))
+    options = _space_options(engine.state)
+    if not options:
+        _log_empty_menu(engine.state, faction, "Agent Mobilization")
+        raise ValueError("No spaces available for Agent Mobilization.")
+    province = choose_one("Select Province for Agent Mobilization:", options)
     place_continental = choose_one("Place Continental instead of Militia?", [("No", False), ("Yes", True)])
     return lambda s, c: french_agent_mobilization.execute(s, faction, c, province, place_continental=place_continental)
 
@@ -521,14 +713,22 @@ def _hortelez_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[d
 # ---------------------------------------------------------------------------
 
 def _special_wizard(state: Dict[str, Any], faction: str) -> Callable[[dict, dict], Any] | None:
-    def _legal_space_list(builder: Callable[[dict, dict, str], Any]) -> List[Tuple[str, str]]:
+    sa_log = state.setdefault("_cli_sa_log", [])
+
+    def _legal_space_list(sa_name: str, builder: Callable[[dict, dict, str], Any]) -> List[Tuple[str, str]]:
         legal: List[Tuple[str, str]] = []
         for sid, _ in _space_options(state):
             test_state = deepcopy(state)
             test_ctx: dict = {}
             try:
                 builder(test_state, test_ctx, sid)
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
+                sa_log.append({
+                    "sa_name": sa_name,
+                    "space": sid,
+                    "exception_type": type(exc).__name__,
+                    "exception_message": str(exc),
+                })
                 continue
             legal.append((sid, sid))
         return legal
@@ -536,19 +736,19 @@ def _special_wizard(state: Dict[str, Any], faction: str) -> Callable[[dict, dict
     options: List[Tuple[str, Callable[[dict, dict], Any] | None]] = []
 
     if faction == RC.BRITISH:
-        naval_spaces = _legal_space_list(lambda s, c, sid: naval_pressure.execute(s, RC.BRITISH, c, city_choice=sid))
+        naval_spaces = _legal_space_list("Naval Pressure", lambda s, c, sid: naval_pressure.execute(s, RC.BRITISH, c, city_choice=sid))
         if naval_spaces:
             options.append((
                 "Naval Pressure",
                 lambda s, c: naval_pressure.execute(s, RC.BRITISH, c, city_choice=choose_one("Select City for Naval Pressure:", naval_spaces)),
             ))
-        skirmish_spaces = _legal_space_list(lambda s, c, sid: skirmish.execute(s, RC.BRITISH, c, sid, option=1))
+        skirmish_spaces = _legal_space_list("Skirmish", lambda s, c, sid: skirmish.execute(s, RC.BRITISH, c, sid, option=1))
         if skirmish_spaces:
             options.append((
                 "Skirmish",
                 lambda s, c: skirmish.execute(s, RC.BRITISH, c, choose_one("Skirmish space:", skirmish_spaces), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3)),
             ))
-        cc_spaces = _legal_space_list(lambda s, c, sid: common_cause.execute(s, RC.BRITISH, c, [sid]))
+        cc_spaces = _legal_space_list("Common Cause", lambda s, c, sid: common_cause.execute(s, RC.BRITISH, c, [sid]))
         if cc_spaces:
             options.append((
                 "Common Cause",
@@ -560,13 +760,13 @@ def _special_wizard(state: Dict[str, Any], faction: str) -> Callable[[dict, dict
                 ),
             ))
     elif faction == RC.PATRIOTS:
-        part_spaces = _legal_space_list(lambda s, c, sid: partisans.execute(s, RC.PATRIOTS, c, sid, option=1))
+        part_spaces = _legal_space_list("Partisans", lambda s, c, sid: partisans.execute(s, RC.PATRIOTS, c, sid, option=1))
         if part_spaces:
             options.append((
                 "Partisans",
                 lambda s, c: partisans.execute(s, RC.PATRIOTS, c, choose_one("Partisans space:", part_spaces), option=choose_count("Option (1-3):", min_val=1, max_val=3)),
             ))
-        persuasion_spaces = _legal_space_list(lambda s, c, sid: persuasion.execute(s, RC.PATRIOTS, c, spaces=[sid]))
+        persuasion_spaces = _legal_space_list("Persuasion", lambda s, c, sid: persuasion.execute(s, RC.PATRIOTS, c, spaces=[sid]))
         if persuasion_spaces:
             options.append((
                 "Persuasion",
@@ -577,40 +777,40 @@ def _special_wizard(state: Dict[str, Any], faction: str) -> Callable[[dict, dict
                     spaces=[v for v in choose_multiple("Spaces for Persuasion (up to 3):", persuasion_spaces, min_sel=1, max_sel=3)],
                 ),
             ))
-        skirmish_spaces = _legal_space_list(lambda s, c, sid: skirmish.execute(s, RC.PATRIOTS, c, sid, option=1))
+        skirmish_spaces = _legal_space_list("Skirmish", lambda s, c, sid: skirmish.execute(s, RC.PATRIOTS, c, sid, option=1))
         if skirmish_spaces:
             options.append((
                 "Skirmish",
                 lambda s, c: skirmish.execute(s, RC.PATRIOTS, c, choose_one("Skirmish space:", skirmish_spaces), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3)),
             ))
     elif faction == RC.INDIANS:
-        plunder_spaces = _legal_space_list(lambda s, c, sid: plunder.execute(s, RC.INDIANS, c, sid))
+        plunder_spaces = _legal_space_list("Plunder", lambda s, c, sid: plunder.execute(s, RC.INDIANS, c, sid))
         if plunder_spaces:
             options.append((
                 "Plunder",
                 lambda s, c: plunder.execute(s, RC.INDIANS, c, choose_one("Province to Plunder:", plunder_spaces)),
             ))
-        trade_spaces = _legal_space_list(lambda s, c, sid: trade.execute(s, RC.INDIANS, c, sid, transfer=0))
+        trade_spaces = _legal_space_list("Trade", lambda s, c, sid: trade.execute(s, RC.INDIANS, c, sid, transfer=0))
         if trade_spaces:
             options.append((
                 "Trade",
                 lambda s, c: trade.execute(s, RC.INDIANS, c, choose_one("Province to Trade in:", trade_spaces), transfer=choose_count("Resource transfer (0=roll D3):", min_val=0, max_val=3)),
             ))
-        war_path_spaces = _legal_space_list(lambda s, c, sid: war_path.execute(s, RC.INDIANS, c, sid, option=1))
+        war_path_spaces = _legal_space_list("War Path", lambda s, c, sid: war_path.execute(s, RC.INDIANS, c, sid, option=1))
         if war_path_spaces:
             options.append((
                 "War Path",
                 lambda s, c: war_path.execute(s, RC.INDIANS, c, choose_one("Province for War Path:", war_path_spaces), option=choose_count("Option (1-3):", min_val=1, max_val=3)),
             ))
     elif faction == RC.FRENCH:
-        skirmish_spaces = _legal_space_list(lambda s, c, sid: skirmish.execute(s, RC.FRENCH, c, sid, option=1))
+        skirmish_spaces = _legal_space_list("Skirmish", lambda s, c, sid: skirmish.execute(s, RC.FRENCH, c, sid, option=1))
         if skirmish_spaces:
             options.append((
                 "Skirmish",
                 lambda s, c: skirmish.execute(s, RC.FRENCH, c, choose_one("Skirmish space:", skirmish_spaces), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3)),
             ))
         bloc = state.setdefault("markers", {}).setdefault(RC.BLOCKADE, {"pool": 0, "on_map": set()})
-        naval_spaces = _legal_space_list(lambda s, c, sid: naval_pressure.execute(s, RC.FRENCH, c, city_choice=sid))
+        naval_spaces = _legal_space_list("Naval Pressure", lambda s, c, sid: naval_pressure.execute(s, RC.FRENCH, c, city_choice=sid))
         if naval_spaces or bloc.get("pool", 0) == 0 and bloc.get("on_map"):
             def _french_naval_runner(s: dict, c: dict) -> Any:
                 current_bloc = s.setdefault("markers", {}).setdefault(RC.BLOCKADE, {"pool": 0, "on_map": set()})
@@ -636,7 +836,13 @@ def _special_wizard(state: Dict[str, Any], faction: str) -> Callable[[dict, dict
             test_state = deepcopy(state)
             try:
                 preparer.execute(test_state, RC.FRENCH, {}, choice=val)
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
+                sa_log.append({
+                    "sa_name": "Preparer la Guerre",
+                    "choice": val,
+                    "exception_type": type(exc).__name__,
+                    "exception_message": str(exc),
+                })
                 continue
             prep_choices.append((label, val))
         if prep_choices:
@@ -696,6 +902,10 @@ def _command_runner_for(faction: str, engine: Engine, limited: bool) -> Callable
                 ("Battle", _battle_wizard),
             ]
 
+    if not options:
+        _log_empty_menu(engine.state, faction, "(any command)")
+        raise ValueError(f"No commands available for {faction}.")
+
     runner_factory = choose_one("Select Command:", options)
     return runner_factory(engine, faction, limited)
 
@@ -715,6 +925,8 @@ def _human_decider(faction: str, card: dict, allowed: Dict[str, Any], engine: En
             actions.append(("Event", "event"))
         if "command" in allowed["actions"]:
             label = "Command (Limited)" if allowed.get("limited_only") else "Command"
+            if allowed.get("special_allowed") and not allowed.get("limited_only"):
+                label += " + Special Activity"
             actions.append((label, "command"))
 
         choice = choose_one(f"\n{faction} turn. Choose action:", actions)
@@ -778,7 +990,49 @@ def _human_decider(faction: str, card: dict, allowed: Dict[str, Any], engine: En
             if sim_state:
                 display_bot_summary(faction, sim_state, pre_snap, result)
             return result, True, sim_state, sim_ctx
-        print("That action was not legal for this slot. Please choose again.")
+
+        # Log rejection details
+        illegal_reason = (sim_state or {}).get("_illegal_reason", "unknown")
+        rejection_entry = {
+            "faction": faction,
+            "action_type": result.get("action"),
+            "rejection_reason": illegal_reason,
+        }
+        engine.state.setdefault("_cli_rejection_log", []).append(rejection_entry)
+
+        # Show specific rejection reason
+        reason_msgs = {
+            "action_type_not_allowed": "That action type is not allowed in this slot.",
+            "event_not_allowed": "Events are not allowed as 2nd Eligible after a Command.",
+            "limited_used_special": "Limited Command does not allow a Special Activity.",
+            "special_forbidden": "Special Activities are not allowed in this slot.",
+            "no_affected_spaces": "Action affected 0 spaces -- at least 1 required.",
+        }
+        if "limited_wrong_count" in illegal_reason:
+            msg = "Limited Command allows only 1 space."
+        else:
+            msg = reason_msgs.get(illegal_reason, f"Not legal for this slot: {illegal_reason}")
+        print(f"  {msg} Please choose again.")
+
+
+# ---------------------------------------------------------------------------
+# Autosave helper
+# ---------------------------------------------------------------------------
+
+def _do_autosave(state: Dict[str, Any], seed: int, scenario: str, deck_method: str,
+                 human_factions: set) -> None:
+    """Overwrite autosave.json with current state."""
+    try:
+        report = build_autosave(
+            state,
+            seed=seed,
+            scenario=scenario,
+            setup_method=deck_method,
+            human_factions=human_factions,
+        )
+        save_report(report, "lod_ai/reports/autosave.json")
+    except Exception:  # noqa: BLE001
+        pass  # autosave failure is non-fatal
 
 
 # ---------------------------------------------------------------------------
@@ -832,7 +1086,11 @@ def _choose_seed() -> int:
 
 def main() -> None:
     print("Liberty or Death -- Interactive CLI")
-    print("Type 'status'/'s' for board state, 'history'/'h' for log, 'quit'/'q' to exit\n")
+    print("Commands at any prompt:")
+    print("  status/s  - board state    history/h - log")
+    print("  victory/v - margins        bug/b     - file bug report")
+    print("  quit/q    - exit game")
+    print()
 
     scenario, deck_method = _choose_scenario()
     seed = _choose_seed()
@@ -849,19 +1107,31 @@ def main() -> None:
         human_factions = _choose_humans()
 
     initial_state = build_state(scenario, seed=seed, setup_method=deck_method)
+    # Store setup metadata in state for reports
+    initial_state["_seed"] = seed
+    initial_state["_scenario"] = scenario
+    initial_state["_setup_method"] = deck_method
+
     engine = Engine(initial_state=initial_state, use_cli=True)
     engine.set_human_factions(human_factions)
 
-    # Register state for meta-commands
-    set_game_state(engine.state)
+    # Register state for meta-commands (pass engine too for bug reports)
+    set_game_state(engine.state, engine=engine)
+
+    # Initialize game stats tracker
+    game_stats = _new_game_stats(engine.human_factions)
 
     print(f"\nGame start! (seed={seed}, method={deck_method})")
 
-    while True:
+    game_ended = False
+
+    while not game_ended:
         card = engine.draw_card()
         if not card:
             print("No more cards in deck.")
+            _detect_winner(game_stats, engine.state)
             display_game_end(engine.state)
+            game_ended = True
             break
 
         # Display the card
@@ -885,7 +1155,24 @@ def main() -> None:
 
             # Run the full WQ resolution via play_card
             pre_snap = _snapshot_state(engine.state)
-            engine.play_card(card, human_decider=_human_decider)
+            try:
+                engine.play_card(card, human_decider=_human_decider)
+            except Exception as exc:
+                tb_str = traceback.format_exc()
+                print(f"\nCRASH during Winter Quarters: {exc}")
+                report = build_crash_report(
+                    engine.state, exc, tb_str,
+                    human_factions=engine.human_factions,
+                    seed=seed, scenario=scenario, setup_method=deck_method,
+                )
+                ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+                saved = save_report(report, f"lod_ai/reports/crash_{ts}.json")
+                print(f"Crash report saved to {saved}")
+                raise
+
+            # Record WQ stats
+            _record_wq_margins(game_stats, engine.state)
+            game_stats["cards_played"] += 1
 
             # Show what changed
             print("\nWinter Quarters complete.")
@@ -895,13 +1182,18 @@ def main() -> None:
             if raw in ("status", "s"):
                 display_board_state(engine.state)
 
+            # Autosave after WQ
+            _do_autosave(engine.state, seed, scenario, deck_method, engine.human_factions)
+
             # Check if game ended
             history = engine.state.get("history", [])
             for entry in reversed(history[-20:]):
                 msg = entry.get("msg", "") if isinstance(entry, dict) else str(entry)
                 if "Winner:" in msg or "Victory achieved" in msg:
+                    _detect_winner(game_stats, engine.state)
                     display_game_end(engine.state)
-                    return
+                    game_ended = True
+                    break
             continue
 
         # Normal card play
@@ -911,7 +1203,24 @@ def main() -> None:
         # Store first action marker for human context display
         engine.state["_first_action_this_card"] = None
 
-        actions = engine.play_card(card, human_decider=_human_decider)
+        try:
+            actions = engine.play_card(card, human_decider=_human_decider)
+        except Exception as exc:
+            tb_str = traceback.format_exc()
+            print(f"\nCRASH during play_card: {exc}")
+            report = build_crash_report(
+                engine.state, exc, tb_str,
+                human_factions=engine.human_factions,
+                seed=seed, scenario=scenario, setup_method=deck_method,
+            )
+            ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            saved = save_report(report, f"lod_ai/reports/crash_{ts}.json")
+            print(f"Crash report saved to {saved}")
+            raise
+
+        # Record stats from this card
+        _record_turn_stats(game_stats, engine.state)
+        game_stats["cards_played"] += 1
 
         # Show bot summaries for non-human factions
         for fac, result in actions:
@@ -926,6 +1235,29 @@ def main() -> None:
 
         # Clean up temp marker
         engine.state.pop("_first_action_this_card", None)
+
+        # Autosave after every card
+        _do_autosave(engine.state, seed, scenario, deck_method, engine.human_factions)
+
+    # --- End of game: generate and save game report ---
+    if game_stats.get("winner") is None:
+        _detect_winner(game_stats, engine.state)
+
+    # Display the game report
+    display_game_report(game_stats, engine.state)
+
+    # Save game report JSON
+    try:
+        report = build_game_report(
+            engine.state, game_stats,
+            seed=seed, scenario=scenario, setup_method=deck_method,
+            human_factions=engine.human_factions,
+        )
+        ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        saved = save_report(report, f"lod_ai/reports/game_report_{ts}.json")
+        print(f"Game report saved to {saved}")
+    except Exception:  # noqa: BLE001
+        print("(Could not save game report)")
 
     print("Thanks for playing!")
 

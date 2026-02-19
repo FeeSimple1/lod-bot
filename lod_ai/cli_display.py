@@ -9,6 +9,7 @@ output but never mutate game state.
 
 from __future__ import annotations
 
+from collections import Counter
 from copy import deepcopy
 from typing import Any, Dict, List, Tuple
 
@@ -110,13 +111,15 @@ def display_board_state(state: Dict[str, Any]) -> None:
         fp = state.get("french_preparations", 0)
         print(f"French Preparations: {fp}  |  Treaty of Alliance: NOT PLAYED")
 
-    # Leaders
+    # Leaders with locations
     leaders = state.get("leaders", {})
     leader_locs = state.get("leader_locs", {})
-    print(f"Leaders:  British={leaders.get(RC.BRITISH, '?')}  "
-          f"Patriots={leaders.get(RC.PATRIOTS, '?')}  "
-          f"Indians={leaders.get(RC.INDIANS, '?')}  "
-          f"French={leaders.get(RC.FRENCH, '?')}")
+    leader_parts = []
+    for fac in (RC.BRITISH, RC.PATRIOTS, RC.INDIANS, RC.FRENCH):
+        name = leaders.get(fac, "?")
+        loc = leader_locs.get(name, "?")
+        leader_parts.append(f"{fac}={name} @{loc}")
+    print(f"Leaders:  {', '.join(leader_parts)}")
 
     # Eligibility
     elig = state.get("eligible", {})
@@ -299,6 +302,9 @@ def _snapshot_state(state: Dict[str, Any]) -> Dict[str, Any]:
         "control": dict(state.get("control", {})),
         "support": dict(state.get("support", {})),
         "history_len": len(state.get("history", [])),
+        "cbc": state.get("cbc", 0),
+        "crc": state.get("crc", 0),
+        "fni_level": state.get("fni_level", 0),
         "pieces": {},
     }
     for sid, sp in state.get("spaces", {}).items():
@@ -373,6 +379,18 @@ def display_bot_summary(faction: str, state: Dict[str, Any],
             sup_changes.append(f"{sid} {_support_label(old_s)}\u2192{_support_label(new_s)}")
     if sup_changes:
         print(f"  Support changes: {', '.join(sup_changes)}")
+
+    # CBC/CRC/FNI changes
+    misc_changes = []
+    for key, label in (("cbc", "CBC"), ("crc", "CRC"), ("fni_level", "FNI")):
+        old_v = pre_snapshot.get(key, 0)
+        new_v = state.get(key, 0)
+        if old_v != new_v:
+            diff = new_v - old_v
+            sign = "+" if diff > 0 else ""
+            misc_changes.append(f"{label} {old_v}\u2192{new_v} ({sign}{diff})")
+    if misc_changes:
+        print(f"  Other changes: {', '.join(misc_changes)}")
 
     print()
 
@@ -459,19 +477,37 @@ def display_game_end(state: Dict[str, Any]) -> None:
     print("  GAME OVER")
     print("=" * 70)
 
-    # Check who won from history
+    # Detect victory type from history
     history = state.get("history", [])
     winner_msg = None
-    for entry in reversed(history):
+    victory_type = None
+    final_scoring_msg = None
+    for entry in reversed(history[-40:]):
         msg = entry.get("msg", "") if isinstance(entry, dict) else str(entry)
-        if "Winner:" in msg or "Victory achieved" in msg:
+        if "Winner:" in msg:
             winner_msg = msg
-            break
+            if "Rule 7.3" in msg:
+                victory_type = "final_scoring"
+            elif victory_type is None:
+                victory_type = "victory_condition"
+        elif "Victory achieved" in msg:
+            if winner_msg is None:
+                winner_msg = msg
+            victory_type = "victory_condition"
+        elif "Final Scoring" in msg:
+            final_scoring_msg = msg
+
+    if victory_type == "final_scoring":
+        print("\n  Game ended by FINAL SCORING (Rule 7.3)")
+    elif victory_type == "victory_condition":
+        print("\n  Game ended by VICTORY CONDITION at Winter Quarters")
+    else:
+        print("\n  Game ended (deck exhausted or manual stop)")
 
     if winner_msg:
-        print(f"\n  {winner_msg}")
-    else:
-        print("\n  No faction achieved victory conditions.")
+        print(f"  {winner_msg}")
+    if final_scoring_msg:
+        print(f"  {final_scoring_msg}")
 
     print("\nFinal Victory Margins:")
     display_victory_margins(state)
@@ -480,6 +516,14 @@ def display_game_end(state: Dict[str, Any]) -> None:
     res = state.get("resources", {})
     for fac in (RC.BRITISH, RC.PATRIOTS, RC.INDIANS, RC.FRENCH):
         print(f"  {fac}: {res.get(fac, 0)}")
+
+    # Final board snapshot
+    cbc = state.get("cbc", 0)
+    crc = state.get("crc", 0)
+    fni = state.get("fni_level", 0)
+    toa = state.get("toa_played", state.get("treaty_of_alliance", False))
+    print(f"\nCBC: {cbc}  CRC: {crc}  FNI: {fni}  ToA: {'PLAYED' if toa else 'not played'}")
+    print(f"Cards played: {len(state.get('played_cards', []))}")
 
     print()
     raw = input("Type 'status' to see final board state, or Enter to finish: ").strip().lower()
@@ -505,3 +549,83 @@ def display_setup_confirmation(scenario: str, deck_method: str, seed: int,
     print(f"  Seed: {seed}")
     print(f"  Deck method: {deck_method}")
     print()
+
+
+# ---------------------------------------------------------------------------
+# 10. End-of-game report display
+# ---------------------------------------------------------------------------
+
+_ALL_FACTIONS = (RC.BRITISH, RC.PATRIOTS, RC.INDIANS, RC.FRENCH)
+
+
+def display_game_report(game_stats: Dict[str, Any], state: Dict[str, Any]) -> None:
+    """Print a concise end-of-game summary report."""
+    print()
+    print("=" * 70)
+    print("  GAME SUMMARY REPORT")
+    print("=" * 70)
+
+    # --- Winner & Victory ---
+    winner = game_stats.get("winner", "Unknown")
+    victory_type = game_stats.get("victory_type", "unknown")
+    print(f"\n  Winner: {winner} ({victory_type})")
+
+    print("\n  Victory Margins:")
+    display_victory_margins(state)
+
+    # --- Game Tempo ---
+    print(f"\n  Cards played: {game_stats.get('cards_played', 0)}")
+    print(f"  Winter Quarters resolved: {game_stats.get('wq_count', 0)}")
+    print(f"  Campaign years: {game_stats.get('campaign_years', '?')}")
+
+    # --- Faction Performance ---
+    print("\n  --- Faction Performance ---")
+    faction_stats = game_stats.get("faction_stats", {})
+    for fac in _ALL_FACTIONS:
+        fs = faction_stats.get(fac, {})
+        role = "HUMAN" if fs.get("is_human") else "BOT"
+        print(f"\n  {fac} ({role})")
+
+        # Commands executed
+        cmds = fs.get("commands", {})
+        if cmds:
+            cmd_parts = [f"{cmd}={count}" for cmd, count in sorted(cmds.items()) if count > 0]
+            if cmd_parts:
+                print(f"    Commands: {', '.join(cmd_parts)}")
+
+        # Events
+        events = fs.get("events_played", [])
+        if events:
+            print(f"    Events played: {len(events)} (cards: {', '.join(str(e) for e in events)})")
+
+        # Special activities
+        sas = fs.get("special_activities", {})
+        if sas:
+            sa_parts = [f"{sa}={count}" for sa, count in sorted(sas.items()) if count > 0]
+            if sa_parts:
+                print(f"    Special Activities: {', '.join(sa_parts)}")
+
+        # Passes
+        passes = fs.get("passes", 0)
+        if passes:
+            reasons = fs.get("pass_reasons", {})
+            reason_parts = [f"{r}={c}" for r, c in sorted(reasons.items()) if c > 0]
+            reason_str = f" ({', '.join(reason_parts)})" if reason_parts else ""
+            print(f"    Passes: {passes}{reason_str}")
+
+    # --- Combat & Casualties ---
+    print(f"\n  --- Final State ---")
+    print(f"  CBC: {state.get('cbc', 0)}  CRC: {state.get('crc', 0)}")
+    print(f"  FNI: {state.get('fni_level', 0)}")
+    toa = state.get("toa_played", state.get("treaty_of_alliance", False))
+    print(f"  Treaty of Alliance: {'PLAYED' if toa else 'not played'}")
+
+    # --- Victory Margin Trajectory ---
+    trajectory = game_stats.get("wq_margins", [])
+    if trajectory:
+        print("\n  --- Victory Margin Trajectory (at each WQ) ---")
+        for entry in trajectory:
+            print(f"    {entry}")
+
+    print()
+    print("=" * 70)
