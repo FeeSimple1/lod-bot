@@ -397,23 +397,32 @@ class Engine:
     def _is_action_legal(self, result: dict, allowed: Dict[str, Any], state: dict) -> bool:
         action = result.get("action")
         if action not in allowed.get("actions", set()):
+            state["_illegal_reason"] = "action_type_not_allowed"
             return False
 
         used_special = bool(state.get("_turn_used_special"))
         affected = self._command_effect_count(state)
 
         if action == "event":
-            return allowed.get("event_allowed", False)
+            if not allowed.get("event_allowed", False):
+                state["_illegal_reason"] = "event_not_allowed"
+                return False
+            return True
 
         if action == "command":
             if allowed.get("limited_only") and affected != 1:
+                state["_illegal_reason"] = f"limited_wrong_count (affected={affected})"
                 return False
             if allowed.get("limited_only") and used_special:
+                state["_illegal_reason"] = "limited_used_special"
                 return False
             if (not allowed.get("special_allowed", True)) and used_special:
+                state["_illegal_reason"] = "special_forbidden"
                 return False
             if affected < 1:
+                state["_illegal_reason"] = "no_affected_spaces"
                 return False
+        state.pop("_illegal_reason", None)
         return True
 
     def _ensure_result_dict(self, result: Any, state: dict, notes: str = "") -> dict:
@@ -841,6 +850,24 @@ class Engine:
                 )
                 if not legal:
                     pass_reason = sandbox_state.get('_pass_reason', 'illegal_action')
+                    # Capture detailed illegal_action diagnostics
+                    card_id = card.get("id") if card else None
+                    illegal_entry = {
+                        "faction": faction,
+                        "card_number": card_id,
+                        "pass_reason": pass_reason,
+                        "attempted_command": sandbox_state.get("_turn_command"),
+                        "affected_spaces": list(sandbox_state.get("_turn_affected_spaces", set())),
+                        "affected_count": self._command_effect_count(sandbox_state),
+                        "used_special": bool(sandbox_state.get("_turn_used_special")),
+                        "illegal_reason": sandbox_state.get("_illegal_reason", "unknown"),
+                        "limited_only": bool(allowed.get("limited_only")),
+                        "special_allowed": bool(allowed.get("special_allowed", True)),
+                        "event_allowed": bool(allowed.get("event_allowed", True)),
+                        "bot_action_type": result.get("action") if result else None,
+                        "bot_notes": result.get("notes") if result else None,
+                    }
+                    self.state.setdefault("_illegal_action_log", []).append(illegal_entry)
                     self._award_pass(faction)
                     return {"action": "pass", "used_special": False, "pass_reason": pass_reason}
                 self._commit_state(sandbox_state, sandbox_ctx)
