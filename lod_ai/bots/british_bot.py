@@ -939,20 +939,31 @@ class BritishBot(BaseBot):
             ]
             if rl_candidates:
                 best_rl = min(rl_candidates, key=_rl_key)
-                # Estimate RL cost: marker removals + shift_levels - Gage discount
+                # §3.2.1: "There is no limit to the number of levels shifted
+                # when Rewarding Loyalty during Muster."
+                # Calculate maximum affordable shift levels for the best space.
                 _sp_rl = state["spaces"].get(best_rl, {})
                 _rl_markers = sum(
                     1 for m in (raid_on_map, prop_on_map) if best_rl in m
                 )
-                _rl_shift = max(0, 1)  # 1 shift level
+                _current_sup = self._support_level(state, best_rl)
+                _max_shift = C.ACTIVE_SUPPORT - _current_sup  # levels to reach Active Support
                 _rl_gage = 1 if self._is_gage(state) else 0
-                _rl_cost = _rl_markers + _rl_shift - _rl_gage
                 # Muster cost: 1 per selected space (RL space may add 1 more)
                 _muster_count = len(all_selected) + (0 if best_rl in all_selected else 1)
-                _total_cost = _muster_count + max(0, _rl_cost)
-                if state["resources"].get(C.BRITISH, 0) >= _total_cost:
-                    chosen_rl_space = best_rl
-                    reward_levels = 1
+                # RL cost = markers + shift_levels - gage_discount
+                # Available for RL = total resources - muster space cost
+                _avail_for_rl = state["resources"].get(C.BRITISH, 0) - _muster_count
+                # Affordable shifts: avail_for_rl >= markers + shifts - gage
+                # => shifts <= avail_for_rl - markers + gage
+                _affordable_shifts = max(0, _avail_for_rl - _rl_markers + _rl_gage)
+                _rl_shift = min(_max_shift, _affordable_shifts)
+                if _rl_shift > 0:
+                    _rl_cost = _rl_markers + _rl_shift - _rl_gage
+                    _total_cost = _muster_count + max(0, _rl_cost)
+                    if state["resources"].get(C.BRITISH, 0) >= _total_cost:
+                        chosen_rl_space = best_rl
+                        reward_levels = _rl_shift
 
         if chosen_rl_space is None and state["available"].get(C.FORT_BRI, 0):
             fort_targets = [
