@@ -938,12 +938,19 @@ class Engine:
                 result = {"action": "command", "used_special": bool(self.state.get("_turn_used_special"))}
 
             # Record this faction's turn for diagnostic tracking
-            self.state.setdefault('_card_turn_log', []).append({
+            _log_entry = {
                 'faction': faction,
                 'eligible_position': eligible_position,
                 'action': result.get('action'),
                 'pass_reason': result.get('pass_reason'),
-            })
+            }
+            if result.get('action') == 'command':
+                _log_entry['command_type'] = self.state.get('_turn_command')
+                _log_entry['used_special'] = result.get('used_special', False)
+            elif result.get('action') == 'event':
+                _log_entry['event_card_id'] = card.get('id')
+                _log_entry['event_side'] = result.get('event_side')
+            self.state.setdefault('_card_turn_log', []).append(_log_entry)
 
             if result.get("action") == "pass":
                 continue
