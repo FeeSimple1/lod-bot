@@ -30,7 +30,7 @@ PATRIOTS = {
     52: "force_if_52",                  # French Fleet Arrives in the Wrong Spot — select space per Battle, else ignore
     70: "force",                      # British Gain From French in India
     71: "force_unshaded",             # Treaty of Amity and Commerce — use unshaded text
-    80: "force",                      # Confusion Allows Slaves to Escape
+    80: "force_if_80",                # Confusion Allows Slaves to Escape — errata: Village removable, else C&SA
     83: "force",                      # Guy Carleton and Indians Negotiate
     86: "force",                      # Stockbridge Indians
     88: "force",                      # "If it hadn't been so foggy…"
@@ -48,8 +48,9 @@ INDIANS = {
     44: "force",   # Earl of Mansfield Recalled from Paris (eligible-enemy condition in IndianBot override)
     70: "force",   # British Gain From French in India
     72: "force",   # French Settlers Help (village condition in IndianBot override)
-    80: "force",   # Confusion Allows Slaves to Escape
+    80: "force_if_80",   # Confusion Allows Slaves to Escape — errata: Patriot Fort removable, else C&SA
     83: "force",   # Guy Carleton and Indians Negotiate (special handling in IndianBot override)
+    86: "force",   # Stockbridge Indians — "Select a Village space if possible."
     88: "force",   # "If it hadn't been so foggy…"
     89: "force",   # War Damages Colonies' Economy
     90: "force",   # "The World Turned Upside Down" (village condition in IndianBot override)

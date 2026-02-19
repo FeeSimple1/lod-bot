@@ -60,10 +60,12 @@ class TestI10MarchMax3:
         """Phase 1: If Villages Available, march to get 3+ WP in a
         Neutral/Passive space with room for Village."""
         bot = IndianBot()
-        # Quebec (Reserve) has 4 WP, Northwest (Reserve, adjacent) has 1 WP.
+        # Quebec (Reserve) has 6 WP, Northwest (Reserve, adjacent) has 1 WP.
         # Northwest is Neutral with room for Village → needs 2 more WP.
+        # Quebec must keep 3 WP (§8.7.3 Gather-eligible retention) so it can
+        # donate up to 3.
         state = _base_state(spaces={
-            "Quebec": _empty_space(**{C.WARPARTY_U: 4}),
+            "Quebec": _empty_space(**{C.WARPARTY_U: 6}),
             "Northwest": _empty_space(**{C.WARPARTY_U: 1}),
         })
         state["available"][C.VILLAGE] = 2
@@ -79,12 +81,10 @@ class TestI10MarchMax3:
     def test_march_rebel_control_phase(self):
         """Phase 2: March to remove Rebel Control, first no Active Support."""
         bot = IndianBot()
-        # Quebec has 5 WP. New_Hampshire (Colony, adjacent to Quebec_City which
-        # is adjacent to Quebec) has 3 Militia = Rebel-Controlled.
-        # Use Northwest which IS directly adjacent to Quebec.
-        # Northwest is Rebel-Controlled with Militia.
+        # Quebec has 7 WP (must keep 3 per §8.7.3 Gather-eligible retention,
+        # so can donate 4). Northwest is Rebel-Controlled with Militia.
         state = _base_state(spaces={
-            "Quebec": _empty_space(**{C.WARPARTY_U: 5}),
+            "Quebec": _empty_space(**{C.WARPARTY_U: 7}),
             "Northwest": _empty_space(**{C.MILITIA_A: 2}),
         })
         state["available"][C.VILLAGE] = 0  # no Villages → skip Phase 1
@@ -133,8 +133,10 @@ class TestI10MarchMax3:
     def test_march_prefers_underground_wp(self):
         """Move Underground then Active WP (Underground first)."""
         bot = IndianBot()
+        # Quebec needs 6+ WP total so it can donate while keeping 3 per
+        # §8.7.3 Gather-eligible retention constraint.
         state = _base_state(spaces={
-            "Quebec": _empty_space(**{C.WARPARTY_U: 2, C.WARPARTY_A: 2}),
+            "Quebec": _empty_space(**{C.WARPARTY_U: 4, C.WARPARTY_A: 3}),
             "Northwest": _empty_space(**{C.MILITIA_A: 1}),
         })
         state["available"][C.VILLAGE] = 0

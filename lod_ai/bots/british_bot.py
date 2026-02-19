@@ -209,8 +209,8 @@ class BritishBot(BaseBot):
         Each card instruction specifies a condition; if not met, the bot
         skips the event and proceeds to Command & SA instead.
         """
-        if directive in ("force_if_51", "force_if_52"):
-            # Cards 51/52: "March to set up Battle per the Battle instructions.
+        if directive == "force_if_51":
+            # Card 51: "March to set up Battle per the Battle instructions.
             # If not possible, choose Command & Special Activity instead."
             # Check: any space where Royalist FL exceeds Rebel FL and British
             # could march there from adjacent?
@@ -235,6 +235,24 @@ class BritishBot(BaseBot):
                     march_regs = adj_sp.get(C.REGULAR_BRI, 0)
                     if march_regs > 0 and (royal_force + march_regs) > rebel_force:
                         return True
+            return False
+
+        if directive == "force_if_52":
+            # Card 52 ERRATA: "If possible remove French Regulars from spaces
+            # where Rebels outnumber present British."
+            # Condition: any French Regulars in a space where Rebel pieces
+            # outnumber British pieces?
+            for sid, sp in state["spaces"].items():
+                fre_regs = sp.get(C.REGULAR_FRE, 0)
+                if fre_regs == 0:
+                    continue
+                rebel = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+                         + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                         + sp.get(C.FORT_PAT, 0))
+                british = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                           + sp.get(C.FORT_BRI, 0))
+                if rebel > british:
+                    return True
             return False
 
         if directive == "force_if_62":

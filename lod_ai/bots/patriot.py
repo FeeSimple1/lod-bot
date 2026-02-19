@@ -1293,6 +1293,14 @@ class PatriotBot(BaseBot):
                 if rebel_force + march_cubes > brit_force:
                     return True
             return False
+        if directive == "force_if_80":
+            # Card 80 ERRATA: "Choose Indians and select spaces where an Indian
+            # Village would be removed. If none, choose Command & SA instead."
+            # Condition: any Indian Village on the map?
+            for sp in state["spaces"].values():
+                if sp.get(C.VILLAGE, 0) > 0:
+                    return True
+            return False
         return True  # default: play the event
 
     # ===================================================================
