@@ -27,6 +27,7 @@ from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.board.pieces      import remove_piece, add_piece
 from lod_ai.economy.resources import spend, add as add_res
+from lod_ai.map             import adjacency as map_adj
 
 SA_NAME = "PLUNDER"   # auto-registered by special_activities/__init__.py
 
@@ -65,7 +66,8 @@ def execute(
     if wp_total <= reb_total:
         raise ValueError("War Parties do not exceed Rebellion pieces here.")
 
-    pop = sp.get("population", 0)
+    meta = map_adj.space_meta(province) or {}
+    pop = meta.get("population", 0)
     if pop <= 0:
         raise ValueError("Province has no population to plunder.")
 

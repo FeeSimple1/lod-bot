@@ -32,6 +32,7 @@ from lod_ai.special_activities import plunder, war_path, trade
 from lod_ai.board.control import refresh_control
 from lod_ai.leaders import leader_location
 from lod_ai.util.history import push_history
+from lod_ai.map import adjacency as map_adj
 from lod_ai.map.adjacency import shortest_path
 from lod_ai.economy.resources import can_afford
 
@@ -43,10 +44,8 @@ _MAP_DATA = json.load(
 )
 
 def _adjacent(space: str) -> List[str]:
-    adj = []
-    for token in _MAP_DATA[space]["adj"]:
-        adj.extend(token.split("|"))
-    return adj
+    """Return adjacent spaces (bidirectional)."""
+    return list(map_adj.adjacent_spaces(space))
 
 
 class IndianBot(BaseBot):
@@ -346,7 +345,16 @@ class IndianBot(BaseBot):
                 elif tgt_sp.get(C.WARPARTY_U, 0) > 0:
                     selected.append(tgt)  # has UG WP, no move needed
             else:
-                selected.append(tgt)
+                # WP exceed Rebels, but raid still needs an Underground WP
+                if tgt_sp.get(C.WARPARTY_U, 0) > 0:
+                    selected.append(tgt)
+                else:
+                    # All WP are Active — move in an Underground one
+                    src = _reserve_source(tgt)
+                    if src is not None:
+                        selected.append(tgt)
+                        move_plan.append((src, tgt))
+                        available_wp[src] -= 1
 
         if not selected:
             return False
@@ -392,6 +400,9 @@ class IndianBot(BaseBot):
         # I5: Plunder candidates restricted to Raid spaces only
         raid_spaces = state.get("_turn_affected_spaces", set())
         for sid in raid_spaces:
+            pop = _MAP_DATA.get(sid, {}).get("population", 0)
+            if pop <= 0:
+                continue  # no population to plunder
             sp = state["spaces"].get(sid, {})
             wp = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
             rebels = (
@@ -412,6 +423,9 @@ class IndianBot(BaseBot):
         choices = []
         for sid in raid_spaces:
             sp = state["spaces"].get(sid, {})
+            pop = _MAP_DATA.get(sid, {}).get("population", 0)
+            if pop <= 0:
+                continue  # no population to plunder
             wp = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
             rebels = (
                 sp.get(C.MILITIA_A, 0)
@@ -421,7 +435,7 @@ class IndianBot(BaseBot):
                 + sp.get(C.FORT_PAT, 0)
             )
             if wp > rebels and wp > 0:
-                choices.append((_MAP_DATA.get(sid, {}).get("population", 0), sid))
+                choices.append((pop, sid))
         if not choices:
             return False
         target = max(choices)[1]
@@ -464,6 +478,11 @@ class IndianBot(BaseBot):
         bases = sp.get(C.VILLAGE, 0) + sp.get(C.FORT_BRI, 0) + sp.get(C.FORT_PAT, 0)
         return bases < 2
 
+    def _gather_support_ok(self, state: Dict, sid: str) -> bool:
+        """Return True if *sid* is at an eligible support level for Gather."""
+        sup = self._support_level(state, sid)
+        return sup in (C.NEUTRAL, C.PASSIVE_SUPPORT, C.PASSIVE_OPPOSITION)
+
     def _gather(self, state: Dict) -> bool:
         """I7: Gather (Max 4 spaces).
 
@@ -494,6 +513,8 @@ class IndianBot(BaseBot):
         # --- Bullet 1: Place Villages where room and 3+ WP (2+ if Cornplanter) ---
         village_cands = []
         for sid, sp in state["spaces"].items():
+            if not self._gather_support_ok(state, sid):
+                continue
             if not self._village_room(state, sid):
                 continue
             if sp.get(C.VILLAGE, 0) > 0:
@@ -520,6 +541,8 @@ class IndianBot(BaseBot):
         if avail_wp > 0:
             wp_cands = []
             for sid, sp in state["spaces"].items():
+                if not self._gather_support_ok(state, sid):
+                    continue
                 if sp.get(C.VILLAGE, 0) == 0 and sid not in build_village:
                     continue  # needs a Village (or about to get one)
                 enemies = (sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
@@ -550,6 +573,8 @@ class IndianBot(BaseBot):
         if remaining_avail_villages > 0 and avail_wp > 0:
             room_cands = []
             for sid, sp in state["spaces"].items():
+                if not self._gather_support_ok(state, sid):
+                    continue
                 if not self._village_room(state, sid):
                     continue
                 if sp.get(C.VILLAGE, 0) > 0:
@@ -596,6 +621,8 @@ class IndianBot(BaseBot):
             best_total = 0
             for sid, sp in state["spaces"].items():
                 if sp.get(C.VILLAGE, 0) == 0:
+                    continue
+                if not self._gather_support_ok(state, sid):
                     continue
                 moves = []
                 total = 0
@@ -710,8 +737,10 @@ class IndianBot(BaseBot):
             option = 3
         elif rebel_cubes >= 2 and tsp.get(C.WARPARTY_U, 0) >= 2:
             option = 2
-        else:
+        elif rebel_cubes >= 1:
             option = 1
+        else:
+            return False  # no valid option (Fort only but can't use option 3)
         return war_path.execute(state, C.INDIANS, {}, target, option=option)
 
     # ------------------------------------------------------------------

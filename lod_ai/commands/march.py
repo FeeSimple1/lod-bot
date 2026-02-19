@@ -279,11 +279,8 @@ def execute(
     first_free = (faction == INDIANS) and ctx.get("all_reserve_origin", False)
     _pay_cost(state, faction, len(destinations_set), first_free=first_free, free=free)
 
-    # §3.5.4: French March with Continental escorts → Patriots also pay per
-    # destination that Continentals enter.
-    if faction == FRENCH and bring_escorts:
-        fee = len(destinations_set)
-        spend(state, PATRIOTS, fee)
+    # §3.5.4: French March escort billing deferred to after moves execute
+    # (see post-move section below)
 
     # Leader hooks (placeholder for future modifiers)
     ctx = apply_leader_modifiers(state, faction, "pre_march", ctx)
@@ -299,15 +296,27 @@ def execute(
     dst_groups: Dict[str, list] = {}   # dst → list of tracking dicts
     french_entered_dsts: set = set()
 
+    continental_entered_dsts: set = set()
+
     for entry in plan:
         info = _apply_move(entry["src"], entry["dst"], entry["pieces"])
         moved_overall += info["total"]
         dst_groups.setdefault(entry["dst"], []).append(info)
         if info.get("french_entered"):
             french_entered_dsts.add(entry["dst"])
+        # Track Continental escort entries for French March billing
+        if faction == FRENCH and entry["pieces"].get(REGULAR_PAT, 0) > 0:
+            continental_entered_dsts.add(entry["dst"])
 
     if moved_overall <= 0:
         raise ValueError("March must move at least one piece.")
+
+    # §3.5.4: French March — Patriots also pay 1 Resource per destination
+    # that Continental escorts enter.
+    if faction == FRENCH and continental_entered_dsts and not free:
+        fee = len(continental_entered_dsts)
+        if can_afford(state, PATRIOTS, fee):
+            spend(state, PATRIOTS, fee)
 
     # §3.3.2: Patriot March — French also pay 1 Resource per destination
     # that French Regulars enter.

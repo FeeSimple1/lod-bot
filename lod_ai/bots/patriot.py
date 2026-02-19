@@ -788,7 +788,11 @@ class PatriotBot(BaseBot):
                 bases = sp.get(C.FORT_PAT, 0) + sp.get(C.FORT_BRI, 0) + sp.get(C.VILLAGE, 0)
                 if bases >= 2:
                     continue
-                if self._rebel_group_size(sp) >= 4:
+                # Need at least 2 Patriot-owned units (Militia or Continentals)
+                # to replace with a Fort, and 4+ total rebel pieces
+                pat_units = (sp.get(C.MILITIA_U, 0) + sp.get(C.MILITIA_A, 0)
+                             + sp.get(C.REGULAR_PAT, 0))
+                if self._rebel_group_size(sp) >= 4 and pat_units >= 2:
                     is_city = 1 if _MAP_DATA.get(sid, {}).get("type") == "City" else 0
                     pop = _MAP_DATA.get(sid, {}).get("population", 0)
                     fort_candidates.append((-is_city, -pop, sid))

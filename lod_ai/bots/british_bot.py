@@ -26,6 +26,7 @@ from lod_ai.special_activities import naval_pressure, skirmish, common_cause
 from lod_ai.util.history import push_history
 from lod_ai.leaders import leader_location, apply_leader_modifiers
 from lod_ai.economy.resources import can_afford
+from lod_ai.map import adjacency as map_adj
 
 # ---------------------------------------------------------------------------
 #  Shared geography helpers
@@ -37,11 +38,8 @@ CITIES: List[str] = [n for n, d in _MAP_DATA.items() if d.get("type") == "City"]
 WEST_INDIES = C.WEST_INDIES_ID
 
 def _adjacent(space: str) -> List[str]:
-    """Return list of adjacent space IDs (split multi‑edge tokens)."""
-    adj = []
-    for token in _MAP_DATA[space]["adj"]:
-        adj.extend(token.split("|"))
-    return adj
+    """Return list of adjacent space IDs (bidirectional)."""
+    return list(map_adj.adjacent_spaces(space))
 
 
 class BritishBot(BaseBot):
@@ -563,6 +561,10 @@ class BritishBot(BaseBot):
         # Phase 4: Displacement — pick city with most Rebels as source
         displace_city, displace_target = self._select_displacement(state, dest_cities)
 
+        # Affordability check: Garrison costs 2 Resources
+        if state["resources"].get(C.BRITISH, 0) < 2:
+            return self._muster(state, tried_march=False)
+
         garrison.execute(
             state,
             C.BRITISH,
@@ -896,6 +898,7 @@ class BritishBot(BaseBot):
                 for sid, sp in state["spaces"].items()
                 if _MAP_DATA.get(sid, {}).get("type") == "Colony"
                 and sp.get(C.FORT_BRI, 0) == 0
+                and (sp.get(C.FORT_PAT, 0) + sp.get(C.VILLAGE, 0) + sp.get(C.FORT_BRI, 0)) < 2
                 and (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)) >= 5
             ]
             fort_targets.sort(key=lambda n: (0 if n in all_selected else 1))
@@ -926,6 +929,13 @@ class BritishBot(BaseBot):
             reg_plan = {"space": all_muster_spaces[0], "n": 0}
 
         if not all_muster_spaces:
+            if not tried_march:
+                return self._march(state, tried_muster=True)
+            return False
+
+        # Affordability check: Muster costs 1 per selected space
+        muster_cost = len(all_muster_spaces)
+        if state["resources"].get(C.BRITISH, 0) < muster_cost:
             if not tried_march:
                 return self._march(state, tried_muster=True)
             return False
@@ -990,15 +1000,20 @@ class BritishBot(BaseBot):
                 return self._muster(state, tried_march=True)
             return False
 
+        # Track committed pieces per origin across all moves in this plan
+        _committed: Dict[str, Dict[str, int]] = {}
+
         def _movable_from(sid: str) -> Dict[str, int]:
             """Compute how many pieces of each type can leave *sid*.
 
             Rules: lose no British Control. Leave last Tory and War Party.
             Leave last Regular if British Control but no Active Support.
+            Accounts for pieces already committed to earlier moves.
             """
             sp = state["spaces"][sid]
-            regs = sp.get(C.REGULAR_BRI, 0)
-            tories = sp.get(C.TORY, 0)
+            already = _committed.get(sid, {})
+            regs = sp.get(C.REGULAR_BRI, 0) - already.get(C.REGULAR_BRI, 0)
+            tories = sp.get(C.TORY, 0) - already.get(C.TORY, 0)
             wp_a = sp.get(C.WARPARTY_A, 0)
             wp_u = sp.get(C.WARPARTY_U, 0)
             royalist = regs + tories + wp_a + wp_u + sp.get(C.FORT_BRI, 0)
@@ -1104,13 +1119,25 @@ class BritishBot(BaseBot):
             if total <= 0:
                 continue
             pieces: Dict[str, int] = {}
-            if movable.get(C.REGULAR_BRI, 0) > 0:
-                pieces[C.REGULAR_BRI] = movable[C.REGULAR_BRI]
-            if movable.get(C.TORY, 0) > 0:
-                pieces[C.TORY] = movable[C.TORY]
+            reg_count = movable.get(C.REGULAR_BRI, 0)
+            if reg_count > 0:
+                pieces[C.REGULAR_BRI] = reg_count
+            # Enforce 1:1 escort cap: Tories + CC War Parties <= Regulars
+            tory_count = movable.get(C.TORY, 0)
+            escort_cap = reg_count - cc_wp_count
+            if tory_count > 0:
+                pieces[C.TORY] = min(tory_count, max(0, escort_cap))
             if cc_wp_count > 0:
                 cc_spaces[origin] = cc_wp_count
+            # Skip if no pieces to move after escort capping
+            actual_total = sum(pieces.values()) + cc_wp_count
+            if actual_total <= 0:
+                continue
             move_plan.append({"src": origin, "dst": dst, "pieces": pieces})
+            # Track committed pieces for this origin
+            orig_committed = _committed.setdefault(origin, {})
+            for tag, cnt in pieces.items():
+                orig_committed[tag] = orig_committed.get(tag, 0) + cnt
             seen_dst.add(dst)
             spaces_used += 1
 
@@ -1146,11 +1173,20 @@ class BritishBot(BaseBot):
                 if total <= 0:
                     continue
                 pieces = {}
-                if movable.get(C.REGULAR_BRI, 0) > 0:
-                    pieces[C.REGULAR_BRI] = movable[C.REGULAR_BRI]
+                reg_count = movable.get(C.REGULAR_BRI, 0)
+                if reg_count > 0:
+                    pieces[C.REGULAR_BRI] = reg_count
+                # Enforce 1:1 escort cap: Tories <= Regulars
                 if movable.get(C.TORY, 0) > 0:
-                    pieces[C.TORY] = movable[C.TORY]
+                    pieces[C.TORY] = min(movable[C.TORY], reg_count)
+                # Skip if no pieces to move
+                if sum(pieces.values()) <= 0:
+                    continue
                 move_plan.append({"src": origin, "dst": dst, "pieces": pieces})
+                # Track committed pieces for this origin
+                orig_committed = _committed.setdefault(origin, {})
+                for tag, cnt in pieces.items():
+                    orig_committed[tag] = orig_committed.get(tag, 0) + cnt
                 seen_dst.add(dst)
                 spaces_used += 1
 
@@ -1320,6 +1356,13 @@ class BritishBot(BaseBot):
 
         targets.sort()
         chosen = [sid for _, sid in targets]
+
+        # Affordability check: Battle costs 1 per space
+        brit_res = state["resources"].get(C.BRITISH, 0)
+        if brit_res < len(chosen):
+            chosen = chosen[:max(brit_res, 0)]
+        if not chosen:
+            return False
 
         # Common Cause before the battles
         used_cc = self._try_common_cause(state)
