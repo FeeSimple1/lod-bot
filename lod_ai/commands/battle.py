@@ -48,7 +48,7 @@ from lod_ai.leaders        import apply_leader_modifiers, leader_location
 from lod_ai.util.piece_kinds import is_cube, loss_value
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
-from lod_ai.board.pieces   import remove_piece, add_piece
+from lod_ai.board.pieces   import remove_piece, add_piece, increment_casualties
 from lod_ai.economy.resources import spend, can_afford
 from lod_ai.util.loss_mod  import pop_loss_mod
 from lod_ai.util.naval     import has_blockade, move_blockade_city_to_city
@@ -458,6 +458,9 @@ def _resolve_space(
                     # §3.6.7: "Forts also count as Casualties but return to
                     # Available immediately."
                     remove_piece(state, FORT_BRI, sid, 1, to="available")
+                    # §1.6.4: Forts count toward CBC even though they
+                    # return to Available, not the Casualties box.
+                    increment_casualties(state, FORT_BRI, 1)
                     removed += 1
                     remaining_loss -= loss_value(FORT_BRI)
                     removed_cube_or_fort = True
@@ -475,6 +478,9 @@ def _resolve_space(
                     # §3.6.7: "Forts also count as Casualties but return to
                     # Available immediately."
                     remove_piece(state, FORT_PAT, sid, 1, to="available")
+                    # §1.6.4: Forts count toward CRC even though they
+                    # return to Available, not the Casualties box.
+                    increment_casualties(state, FORT_PAT, 1)
                     removed += 1
                     remaining_loss -= loss_value(FORT_PAT)
                     removed_cube_or_fort = True

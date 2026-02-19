@@ -400,6 +400,9 @@ def build_state(
             # add further marker families here
         },
         # ---------------------------------------------------------------
+        # §1.6.4 Cumulative casualty counters (game-long, never decrement)
+        "cbc":       0,   # Cumulative British Casualties
+        "crc":       0,   # Cumulative Rebellion Casualties
         "rng":       random.Random(seed),
         "rng_log":   [],
         "history":   [],
