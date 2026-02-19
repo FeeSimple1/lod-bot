@@ -36,13 +36,18 @@ for space_id, info in _RAW_MAP.items():
 # 2. Public helpers
 # ----------------------------------------------------------------------
 def is_adjacent(a: str, b: str) -> bool:
-    """Return True if spaces *a* and *b* share an adjacency edge."""
-    return b in _ADJ.get(a, set())
+    """Return True if spaces *a* and *b* share an adjacency edge (bidirectional)."""
+    return b in _ADJ.get(a, set()) or a in _ADJ.get(b, set())
 
 
 def adjacent_spaces(space_id: str) -> Set[str]:
-    """Return the set of spaces adjacent to *space_id*."""
-    return set(_ADJ.get(space_id, set()))
+    """Return the set of spaces adjacent to *space_id* (bidirectional)."""
+    result = set(_ADJ.get(space_id, set()))
+    # Include reverse edges from other spaces that list this one
+    for sid, adj_set in _ADJ.items():
+        if space_id in adj_set:
+            result.add(sid)
+    return result
 
 
 def space_type(space_id: str) -> str | None:
@@ -80,7 +85,7 @@ def shortest_path(start: str, goal: str) -> List[str]:
 
     while queue:
         node, path = queue.popleft()
-        for nbr in _ADJ.get(node, set()):
+        for nbr in adjacent_spaces(node):
             if nbr in visited:
                 continue
             next_path = path + [nbr]

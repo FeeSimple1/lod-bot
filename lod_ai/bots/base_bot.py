@@ -239,7 +239,10 @@ class BaseBot:
         before = deepcopy(state)
         after = deepcopy(state)
         shaded = card.get("dual") and self.faction in {C.PATRIOTS, C.FRENCH}
-        handler(after, shaded=shaded)
+        try:
+            handler(after, shaded=shaded)
+        except Exception:
+            return True  # treat as ineffective if handler crashes
         before.pop("history", None)
         after.pop("history", None)
         return before == after

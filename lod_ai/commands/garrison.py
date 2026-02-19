@@ -45,6 +45,7 @@ from lod_ai.rules_consts import (
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent
+from lod_ai.map            import adjacency as map_adj
 from lod_ai.leaders        import apply_leader_modifiers
 from lod_ai.board.pieces      import remove_piece, add_piece, flip_pieces
 from lod_ai.economy.resources import spend, can_afford
@@ -155,7 +156,7 @@ def execute(
             if n <= 0:
                 continue
             sp_dst = state["spaces"][dst_city]
-            if not sp_dst.get("is_city"):
+            if not map_adj.is_city(dst_city):
                 raise ValueError(f"Destination {dst_city} is not a City")
             if _is_blockaded(dst_city, state):
                 raise ValueError(f"Destination {dst_city} is Blockaded; cannot Garrison into it")
@@ -176,13 +177,15 @@ def execute(
     if limited:
         city_list = list({d for inner in move_map.values() for d in inner})
     else:
-        city_list = [name for name, sp in state["spaces"].items() if sp.get("is_city") and not _is_blockaded(name, state)]
+        city_list = [name for name in state["spaces"] if map_adj.is_city(name) and not _is_blockaded(name, state)]
 
     for city in city_list:
         _activate_militia(state, city)
 
     # Optional displacement -----------------------------------------
     if displace_city and displace_target:
+        # Refresh control after moves so the check reflects current board state
+        refresh_control(state)
         if _is_blockaded(displace_city, state):
             raise ValueError("Cannot displace from a Blockaded City")
         sp_city = state["spaces"][displace_city]
