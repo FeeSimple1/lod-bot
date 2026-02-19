@@ -131,6 +131,7 @@ class IndianBot(BaseBot):
             if self._raid_sequence(state):    # I4 → I5
                 return
             # If Raid impossible: fall through to I6 decision path
+            self._reset_command_trace(state)
 
         # ---------- I6 decision ----------------------------------------
         if self._gather_worthwhile(state):
@@ -141,6 +142,7 @@ class IndianBot(BaseBot):
             if self._space_has_wp_and_regulars(state):
                 if self._scout_sequence(state):   # I12 → I8 / I10
                     return
+                self._reset_command_trace(state)
             # Otherwise I10 March chain
             if self._march_sequence(state):   # I10 → I8 / I7
                 return
@@ -187,6 +189,7 @@ class IndianBot(BaseBot):
             return False
         if not self._gather(state):
             # If Gather impossible → I10 March
+            self._reset_command_trace(state)
             return self._march_sequence(state, _visited)
         # After Gather comes War‑Path (I8) then Trade fallback (skip if limited)
         if not (state.get("_limited") or state.get("_no_special")):
@@ -199,6 +202,7 @@ class IndianBot(BaseBot):
             return False
         if not self._scout(state):
             # If Scout impossible → I10 March
+            self._reset_command_trace(state)
             return self._march_sequence(state)
         # Then War‑Path (+ Trade) (skip if limited)
         if not (state.get("_limited") or state.get("_no_special")):
@@ -213,8 +217,10 @@ class IndianBot(BaseBot):
             return False
         _visited.add("march")
         if not self._can_march(state):
+            self._reset_command_trace(state)
             return self._gather_sequence(state, _visited)  # arrow "If none → Gather"
         if not self._march(state):
+            self._reset_command_trace(state)
             return self._gather_sequence(state, _visited)
         # War‑Path (+ Trade) (skip if limited)
         if not (state.get("_limited") or state.get("_no_special")):
@@ -707,6 +713,32 @@ class IndianBot(BaseBot):
         build_village = build_village & set(selected)
         # Remove bulk_place entries for spaces not selected
         bulk_place = {s: n for s, n in bulk_place.items() if s in selected}
+        # Remove move_plan entries whose destination was pruned from selected
+        selected_set = set(selected)
+        move_plan_list = [(s, d, n) for s, d, n in move_plan_list
+                          if d in selected_set]
+
+        # Validate move_plan against actual state: gather.execute() processes
+        # build_village first (removing 2 WP from the space), so if a source
+        # space is also a build_village target, the planned move count may
+        # exceed the post-village WP count.
+        if move_plan_list:
+            _wp_avail: Dict[str, int] = {}
+            for src, _, _ in move_plan_list:
+                if src not in _wp_avail:
+                    sp_s = state["spaces"].get(src, {})
+                    total_wp = sp_s.get(C.WARPARTY_U, 0) + sp_s.get(C.WARPARTY_A, 0)
+                    # Account for WP removed by build_village
+                    if src in build_village:
+                        total_wp -= 2
+                    _wp_avail[src] = max(0, total_wp)
+            capped_moves = []
+            for src, dst, n in move_plan_list:
+                take = min(n, _wp_avail.get(src, 0))
+                if take > 0:
+                    capped_moves.append((src, dst, take))
+                    _wp_avail[src] -= take
+            move_plan_list = capped_moves
 
         gather.execute(
             state, C.INDIANS, {}, selected,
@@ -951,7 +983,32 @@ class IndianBot(BaseBot):
             {"src": src, "dst": dst, "pieces": pieces}
             for (src, dst), pieces in planned.items()
         ]
-        march.execute(state, C.INDIANS, {}, [], [], plan=plan)
+
+        # Validate plan against actual state: the planning snapshot may
+        # over-count WP_U at spaces that received virtual arrivals.
+        # Cap each piece tag to what actually exists, tracking cumulative
+        # draws from each source across all plan entries.
+        _drawn: Dict[str, Dict[str, int]] = {}
+        validated_plan = []
+        for entry in plan:
+            src = entry["src"]
+            sp = state["spaces"].get(src, {})
+            drawn_here = _drawn.setdefault(src, {})
+            capped = {}
+            for tag, count in entry["pieces"].items():
+                actual = sp.get(tag, 0) - drawn_here.get(tag, 0)
+                take = min(count, max(0, actual))
+                if take > 0:
+                    capped[tag] = take
+                    drawn_here[tag] = drawn_here.get(tag, 0) + take
+            if capped:
+                validated_plan.append({"src": src, "dst": entry["dst"],
+                                       "pieces": capped})
+
+        if not validated_plan:
+            return False
+
+        march.execute(state, C.INDIANS, {}, [], [], plan=validated_plan)
         return True
 
     # ------------------------------------------------------------------

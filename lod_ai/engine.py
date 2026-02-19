@@ -241,6 +241,8 @@ class Engine:
         target_state["_turn_affected_spaces"] = set()
         target_state.pop("_turn_command", None)
         target_state.pop("_turn_command_meta", None)
+        target_state.pop("_limited", None)
+        target_state.pop("_no_special", None)
 
     def _execute_free_ops(self, target_state: dict, target_ctx: dict, faction: str) -> bool:
         """Execute and log any queued free ops for *faction*."""

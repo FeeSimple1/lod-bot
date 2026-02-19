@@ -245,6 +245,7 @@ class PatriotBot(BaseBot):
     # ===================================================================
     def _battle_chain(self, state: Dict) -> bool:
         if not self._execute_battle(state):
+            self._reset_command_trace(state)
             return self._rally_chain(state)
         if not (state.get("_limited") or state.get("_no_special")):
             self._partisans_loop(state)
@@ -252,6 +253,7 @@ class PatriotBot(BaseBot):
 
     def _march_chain(self, state: Dict) -> bool:
         if not self._execute_march(state):
+            self._reset_command_trace(state)
             return self._rally_chain(state)
         if not (state.get("_limited") or state.get("_no_special")):
             self._partisans_loop(state)
@@ -261,6 +263,7 @@ class PatriotBot(BaseBot):
         if not self._execute_rally(state):
             if _from_rabble:
                 return False  # prevent infinite Rally<->Rabble loop
+            self._reset_command_trace(state)
             return self._rabble_chain(state, _from_rally=True)
         no_sa = state.get("_limited") or state.get("_no_special")
         # §8.5.2: "if no Persuasion was used during the Rally"
@@ -277,6 +280,7 @@ class PatriotBot(BaseBot):
         if not self._execute_rabble(state):
             if _from_rally:
                 return False  # prevent infinite Rabble<->Rally loop
+            self._reset_command_trace(state)
             return self._rally_chain(state, _from_rabble=True)
         no_sa = state.get("_limited") or state.get("_no_special")
         # §8.5.3: "if no Persuasion was used during Rabble-Rousing"
@@ -402,13 +406,17 @@ class PatriotBot(BaseBot):
             battle space.  Rally uses P7 priorities; Blockade moves to
             the City with most Support (excluding the battle city itself).
             """
-            # Free Rally: pick best space per P7 priorities
-            rally_space = self._best_rally_space(st)
+            # §3.6.8: Win-the-Day free Rally is in the battle space
+            rally_space = battle_sid
             rally_kwargs = {}
             if rally_space:
                 sp_r = st["spaces"].get(rally_space, {})
+                removable = (sp_r.get(C.MILITIA_U, 0)
+                             + sp_r.get(C.MILITIA_A, 0)
+                             + sp_r.get(C.REGULAR_PAT, 0))
                 if (sp_r.get(C.FORT_PAT, 0) == 0
                         and self._rebel_group_size(sp_r) >= 4
+                        and removable >= 2
                         and st["available"].get(C.FORT_PAT, 0) > 0):
                     rally_kwargs["build_fort"] = {rally_space}
             # Blockade: move FROM battle city TO city with most Support
@@ -992,7 +1000,18 @@ class PatriotBot(BaseBot):
 
             kw = {}
             if sid in build_fort_set:
-                kw["build_fort"] = {sid}
+                # Guard: verify the space still has >= 2 removable Patriot
+                # units before requesting a fort build.  State may have
+                # changed from earlier operations in this turn.
+                sp_check = state["spaces"].get(sid, {})
+                removable = (sp_check.get(C.MILITIA_U, 0)
+                             + sp_check.get(C.MILITIA_A, 0)
+                             + sp_check.get(C.REGULAR_PAT, 0))
+                if removable >= 2:
+                    kw["build_fort"] = {sid}
+                else:
+                    # Can't build fort — fall back to place_one
+                    kw["place_one"] = {sid}
             if sid in place_one_set:
                 kw["place_one"] = {sid}
             if promote_space == sid:

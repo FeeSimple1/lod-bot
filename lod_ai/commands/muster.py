@@ -268,8 +268,20 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
                          and sp_rl.get(TORY, 0) >= 1
                          and state.get("control", {}).get(target) == BRITISH)
                 if rl_ok:
-                    _reward_loyalty(state, sp_rl, target, reward_levels,
-                                    free_first=rl_free_first)
+                    # Pre-check affordability: compute RL cost and verify
+                    # the bot can afford it after muster payment.
+                    marker_state_check = state.get("markers", {})
+                    _markers_count = sum(
+                        1 for m in (PROPAGANDA, RAID)
+                        if target in marker_state_check.get(m, {}).get("on_map", set())
+                    )
+                    _current_sup = _support_value(state, target)
+                    _shift = min(reward_levels, ACTIVE_SUPPORT - _current_sup)
+                    _discount = 1 if rl_free_first and _shift > 0 else 0
+                    _rl_cost = _markers_count + _shift - _discount
+                    if _shift > 0 and state["resources"].get(BRITISH, 0) >= _rl_cost:
+                        _reward_loyalty(state, sp_rl, target, reward_levels,
+                                        free_first=rl_free_first)
 
     # -------------------------------------------------------------------
     # FRENCH flow

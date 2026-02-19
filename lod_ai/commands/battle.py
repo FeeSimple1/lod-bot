@@ -95,15 +95,20 @@ def execute(
         spend(state, faction, len(spaces))
 
     # §3.3.3 / §3.5.5: Allied fee is 1 Resource per space where the ally's
-    # pieces are involved, NOT per piece.
+    # pieces are involved, NOT per piece.  Cap fee at what the ally can
+    # afford to prevent resource-underflow errors.
     if faction == PATRIOTS:
         fee = sum(1 for s in spaces if state["spaces"][s].get(REGULAR_FRE, 0) > 0)
         if fee:
-            spend(state, FRENCH, fee)
+            fee = min(fee, state["resources"].get(FRENCH, 0))
+            if fee > 0:
+                spend(state, FRENCH, fee)
     elif faction == FRENCH:
         fee = sum(1 for s in spaces if state["spaces"][s].get(REGULAR_PAT, 0) > 0)
         if fee:
-            spend(state, PATRIOTS, fee)
+            fee = min(fee, state["resources"].get(PATRIOTS, 0))
+            if fee > 0:
+                spend(state, PATRIOTS, fee)
 
     ctx = apply_leader_modifiers(state, faction, "pre_battle", ctx)
     push_history(state, f"{faction} BATTLE in {', '.join(spaces)}")
@@ -137,11 +142,17 @@ def execute(
                         # spend() doesn't raise, then restore original.
                         rally_cost = 1  # rallying in 1 space
                         state["resources"][PATRIOTS] = max(pre_res, rally_cost)
+                        # Save command trace: WTD rally is part of Battle,
+                        # not a separate command affecting extra spaces.
+                        _saved_cmd = state.get("_turn_command")
+                        _saved_aff = state.get("_turn_affected_spaces", set()).copy()
                         rally.execute(
                             state, PATRIOTS, {},
                             [cb_rally],
                             **(cb_rally_kw or {}),
                         )
+                        state["_turn_command"] = _saved_cmd
+                        state["_turn_affected_spaces"] = _saved_aff
                         state["resources"][PATRIOTS] = pre_res
                 if cb_blockade and map_adj.is_city(battle_sid):
                     move_blockade_city_to_city(state, battle_sid, cb_blockade)
@@ -157,11 +168,16 @@ def execute(
                     # ensure Patriots can afford the rally cost.
                     rally_cost = 1
                     state["resources"][PATRIOTS] = max(pre_res, rally_cost)
+                    # Save command trace: WTD rally is part of Battle
+                    _saved_cmd2 = state.get("_turn_command")
+                    _saved_aff2 = state.get("_turn_affected_spaces", set()).copy()
                     rally.execute(
                         state, PATRIOTS, {},
                         [win_rally_space],
                         **(win_rally_kwargs or {}),
                     )
+                    state["_turn_command"] = _saved_cmd2
+                    state["_turn_affected_spaces"] = _saved_aff2
                     state["resources"][PATRIOTS] = pre_res
 
             if win_blockade_dest:

@@ -298,26 +298,31 @@ class BritishBot(BaseBot):
             return
 
         # --- B6–B8 : MUSTER decision --------------------------------------
+        self._reset_command_trace(state)
         if self._can_muster(state):
             tried_muster = True
             if self._muster(state, tried_march=tried_march):
                 return
             # B8 "If none" → B10 (March)
+            self._reset_command_trace(state)
             tried_march = True
             if self._march(state, tried_muster=tried_muster):
                 return
 
         # --- B9 / B12 : BATTLE decision -----------------------------------
+        self._reset_command_trace(state)
         if self._can_battle(state):
             if self._battle(state):
                 return
             # B12 "If none" → B10 (March)
+            self._reset_command_trace(state)
             if not tried_march:
                 tried_march = True
                 if self._march(state, tried_muster=tried_muster):
                     return
 
         # --- B10 : MARCH decision -----------------------------------------
+        self._reset_command_trace(state)
         if not tried_march:
             tried_march = True
             if self._march(state, tried_muster=tried_muster):
@@ -933,8 +938,21 @@ class BritishBot(BaseBot):
                 and sp.get(C.TORY, 0) >= 1
             ]
             if rl_candidates:
-                chosen_rl_space = min(rl_candidates, key=_rl_key)
-                reward_levels = 1
+                best_rl = min(rl_candidates, key=_rl_key)
+                # Estimate RL cost: marker removals + shift_levels - Gage discount
+                _sp_rl = state["spaces"].get(best_rl, {})
+                _rl_markers = sum(
+                    1 for m in (raid_on_map, prop_on_map) if best_rl in m
+                )
+                _rl_shift = max(0, 1)  # 1 shift level
+                _rl_gage = 1 if self._is_gage(state) else 0
+                _rl_cost = _rl_markers + _rl_shift - _rl_gage
+                # Muster cost: 1 per selected space (RL space may add 1 more)
+                _muster_count = len(all_selected) + (0 if best_rl in all_selected else 1)
+                _total_cost = _muster_count + max(0, _rl_cost)
+                if state["resources"].get(C.BRITISH, 0) >= _total_cost:
+                    chosen_rl_space = best_rl
+                    reward_levels = 1
 
         if chosen_rl_space is None and state["available"].get(C.FORT_BRI, 0):
             fort_targets = [
@@ -966,6 +984,7 @@ class BritishBot(BaseBot):
 
         if not reg_plan and not tory_plan and not reward_levels and not fort_space:
             if not tried_march:
+                self._reset_command_trace(state)
                 return self._march(state, tried_muster=True)
             return False
 
@@ -974,6 +993,7 @@ class BritishBot(BaseBot):
 
         if not all_muster_spaces:
             if not tried_march:
+                self._reset_command_trace(state)
                 return self._march(state, tried_muster=True)
             return False
 
@@ -981,6 +1001,7 @@ class BritishBot(BaseBot):
         muster_cost = len(all_muster_spaces)
         if state["resources"].get(C.BRITISH, 0) < muster_cost:
             if not tried_march:
+                self._reset_command_trace(state)
                 return self._march(state, tried_muster=True)
             return False
 
@@ -1002,6 +1023,7 @@ class BritishBot(BaseBot):
 
         if not did_something:
             if not tried_march:
+                self._reset_command_trace(state)
                 return self._march(state, tried_muster=True)
             return False
 
@@ -1176,9 +1198,10 @@ class BritishBot(BaseBot):
                 pieces[C.TORY] = min(tory_count, max(0, escort_cap))
             if cc_wp_count > 0:
                 cc_spaces[origin] = cc_wp_count
-            # Skip if no pieces to move after escort capping
-            actual_total = sum(pieces.values()) + cc_wp_count
-            if actual_total <= 0:
+            # Skip if no march-movable pieces after escort capping.
+            # CC War Parties contribute to destination attractiveness but are
+            # moved by common_cause.execute(), not by march.execute().
+            if sum(pieces.values()) <= 0:
                 continue
             move_plan.append({"src": origin, "dst": dst, "pieces": pieces})
             # Track committed pieces for this origin
@@ -1260,6 +1283,7 @@ class BritishBot(BaseBot):
 
         if not move_plan and not activate_in_place:
             if not tried_muster:
+                self._reset_command_trace(state)
                 return self._muster(state, tried_march=True)
             return False
 
@@ -1288,6 +1312,7 @@ class BritishBot(BaseBot):
             march_cost = len(set(p["dst"] for p in move_plan[:4]))
             if not can_afford(state, C.BRITISH, march_cost):
                 if not tried_muster:
+                    self._reset_command_trace(state)
                     return self._muster(state, tried_march=True)
                 return False
             # Set bring_escorts=True when any move includes Tories or

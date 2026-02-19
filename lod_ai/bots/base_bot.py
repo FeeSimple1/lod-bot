@@ -70,6 +70,20 @@ class BaseBot:
         }
     # ------------ helpers ---------------
 
+    @staticmethod
+    def _reset_command_trace(state: Dict) -> None:
+        """Reset per-command trace between fallback attempts.
+
+        When a bot's flowchart tries command A, which partially modifies
+        ``_turn_affected_spaces``, and then falls through to command B,
+        the accumulated affected spaces would cause false positives in the
+        engine's legality check.  Call this before each fallback attempt.
+        """
+        state["_turn_used_special"] = False
+        state["_turn_affected_spaces"] = set()
+        state.pop("_turn_command", None)
+        state.pop("_turn_command_meta", None)
+
     #  NEW: look-up table for musket-underline directives
     def _event_directive(self, card_id: int) -> str:
         tables = {

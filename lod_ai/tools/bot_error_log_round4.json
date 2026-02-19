@@ -1,0 +1,2420 @@
+[
+  {
+    "scenario": "1775",
+    "seed": 1,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 66,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 34,
+      "PATRIOTS": 35,
+      "INDIANS": 32,
+      "FRENCH": 27
+    },
+    "success_counts": {
+      "BRITISH": 25,
+      "PATRIOTS": 26,
+      "INDIANS": 28,
+      "FRENCH": 27
+    },
+    "pass_counts": {
+      "BRITISH": 9,
+      "PATRIOTS": 9,
+      "INDIANS": 4,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 5,
+        "no_valid_command": 4
+      },
+      "PATRIOTS": {
+        "resource_gate": 8,
+        "no_valid_command": 1
+      },
+      "INDIANS": {
+        "resource_gate": 4
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 2,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 54,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 27,
+      "PATRIOTS": 27,
+      "INDIANS": 28,
+      "FRENCH": 24
+    },
+    "success_counts": {
+      "BRITISH": 18,
+      "PATRIOTS": 24,
+      "INDIANS": 18,
+      "FRENCH": 23
+    },
+    "pass_counts": {
+      "BRITISH": 9,
+      "PATRIOTS": 3,
+      "INDIANS": 10,
+      "FRENCH": 1
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 6,
+        "resource_gate": 3
+      },
+      "PATRIOTS": {
+        "resource_gate": 3
+      },
+      "INDIANS": {
+        "resource_gate": 10
+      },
+      "FRENCH": {
+        "no_valid_command": 1
+      }
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 3,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 31,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 17,
+      "PATRIOTS": 14,
+      "INDIANS": 17,
+      "FRENCH": 15
+    },
+    "success_counts": {
+      "BRITISH": 9,
+      "PATRIOTS": 13,
+      "INDIANS": 10,
+      "FRENCH": 14
+    },
+    "pass_counts": {
+      "BRITISH": 8,
+      "PATRIOTS": 1,
+      "INDIANS": 7,
+      "FRENCH": 1
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 3,
+        "resource_gate": 5
+      },
+      "PATRIOTS": {
+        "resource_gate": 1
+      },
+      "INDIANS": {
+        "resource_gate": 7
+      },
+      "FRENCH": {
+        "resource_gate": 1
+      }
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 4,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 49,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 26,
+      "PATRIOTS": 20,
+      "INDIANS": 24,
+      "FRENCH": 22
+    },
+    "success_counts": {
+      "BRITISH": 22,
+      "PATRIOTS": 20,
+      "INDIANS": 16,
+      "FRENCH": 20
+    },
+    "pass_counts": {
+      "BRITISH": 4,
+      "PATRIOTS": 0,
+      "INDIANS": 8,
+      "FRENCH": 2
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 2,
+        "no_valid_command": 2
+      },
+      "PATRIOTS": {},
+      "INDIANS": {
+        "resource_gate": 8
+      },
+      "FRENCH": {
+        "resource_gate": 1,
+        "no_valid_command": 1
+      }
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 5,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 66,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 35,
+      "PATRIOTS": 29,
+      "INDIANS": 32,
+      "FRENCH": 29
+    },
+    "success_counts": {
+      "BRITISH": 23,
+      "PATRIOTS": 28,
+      "INDIANS": 24,
+      "FRENCH": 27
+    },
+    "pass_counts": {
+      "BRITISH": 12,
+      "PATRIOTS": 1,
+      "INDIANS": 8,
+      "FRENCH": 2
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 8,
+        "resource_gate": 4
+      },
+      "PATRIOTS": {
+        "resource_gate": 1
+      },
+      "INDIANS": {
+        "resource_gate": 8
+      },
+      "FRENCH": {
+        "no_valid_command": 2
+      }
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 6,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 66,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 36,
+      "PATRIOTS": 31,
+      "INDIANS": 34,
+      "FRENCH": 32
+    },
+    "success_counts": {
+      "BRITISH": 19,
+      "PATRIOTS": 27,
+      "INDIANS": 26,
+      "FRENCH": 29
+    },
+    "pass_counts": {
+      "BRITISH": 17,
+      "PATRIOTS": 4,
+      "INDIANS": 8,
+      "FRENCH": 3
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 8,
+        "no_valid_command": 9
+      },
+      "PATRIOTS": {
+        "resource_gate": 4
+      },
+      "INDIANS": {
+        "resource_gate": 8
+      },
+      "FRENCH": {
+        "no_valid_command": 2,
+        "resource_gate": 1
+      }
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 7,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 66,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 33,
+      "PATRIOTS": 30,
+      "INDIANS": 33,
+      "FRENCH": 30
+    },
+    "success_counts": {
+      "BRITISH": 25,
+      "PATRIOTS": 25,
+      "INDIANS": 27,
+      "FRENCH": 28
+    },
+    "pass_counts": {
+      "BRITISH": 8,
+      "PATRIOTS": 5,
+      "INDIANS": 6,
+      "FRENCH": 2
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 4,
+        "resource_gate": 4
+      },
+      "PATRIOTS": {
+        "resource_gate": 5
+      },
+      "INDIANS": {
+        "resource_gate": 6
+      },
+      "FRENCH": {
+        "resource_gate": 2
+      }
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 8,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 66,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 34,
+      "PATRIOTS": 30,
+      "INDIANS": 32,
+      "FRENCH": 32
+    },
+    "success_counts": {
+      "BRITISH": 23,
+      "PATRIOTS": 27,
+      "INDIANS": 23,
+      "FRENCH": 29
+    },
+    "pass_counts": {
+      "BRITISH": 11,
+      "PATRIOTS": 3,
+      "INDIANS": 9,
+      "FRENCH": 3
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 3,
+        "no_valid_command": 8
+      },
+      "PATRIOTS": {
+        "resource_gate": 3
+      },
+      "INDIANS": {
+        "resource_gate": 9
+      },
+      "FRENCH": {
+        "resource_gate": 2,
+        "no_valid_command": 1
+      }
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 9,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 29,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 15,
+      "PATRIOTS": 14,
+      "INDIANS": 16,
+      "FRENCH": 13
+    },
+    "success_counts": {
+      "BRITISH": 8,
+      "PATRIOTS": 13,
+      "INDIANS": 9,
+      "FRENCH": 13
+    },
+    "pass_counts": {
+      "BRITISH": 7,
+      "PATRIOTS": 1,
+      "INDIANS": 7,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 4,
+        "no_valid_command": 3
+      },
+      "PATRIOTS": {
+        "resource_gate": 1
+      },
+      "INDIANS": {
+        "resource_gate": 7
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 10,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 66,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 34,
+      "PATRIOTS": 31,
+      "INDIANS": 33,
+      "FRENCH": 29
+    },
+    "success_counts": {
+      "BRITISH": 19,
+      "PATRIOTS": 31,
+      "INDIANS": 25,
+      "FRENCH": 27
+    },
+    "pass_counts": {
+      "BRITISH": 15,
+      "PATRIOTS": 0,
+      "INDIANS": 8,
+      "FRENCH": 2
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 10,
+        "resource_gate": 5
+      },
+      "PATRIOTS": {},
+      "INDIANS": {
+        "resource_gate": 8
+      },
+      "FRENCH": {
+        "no_valid_command": 1,
+        "resource_gate": 1
+      }
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 11,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 61,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 34,
+      "PATRIOTS": 30,
+      "INDIANS": 29,
+      "FRENCH": 28
+    },
+    "success_counts": {
+      "BRITISH": 19,
+      "PATRIOTS": 27,
+      "INDIANS": 20,
+      "FRENCH": 26
+    },
+    "pass_counts": {
+      "BRITISH": 15,
+      "PATRIOTS": 3,
+      "INDIANS": 9,
+      "FRENCH": 2
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 13,
+        "resource_gate": 2
+      },
+      "PATRIOTS": {
+        "resource_gate": 3
+      },
+      "INDIANS": {
+        "resource_gate": 9
+      },
+      "FRENCH": {
+        "resource_gate": 2
+      }
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 12,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 31,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 15,
+      "PATRIOTS": 14,
+      "INDIANS": 14,
+      "FRENCH": 16
+    },
+    "success_counts": {
+      "BRITISH": 11,
+      "PATRIOTS": 14,
+      "INDIANS": 10,
+      "FRENCH": 13
+    },
+    "pass_counts": {
+      "BRITISH": 4,
+      "PATRIOTS": 0,
+      "INDIANS": 4,
+      "FRENCH": 3
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 4
+      },
+      "PATRIOTS": {},
+      "INDIANS": {
+        "resource_gate": 4
+      },
+      "FRENCH": {
+        "no_valid_command": 1,
+        "resource_gate": 2
+      }
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 13,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 16,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 8,
+      "PATRIOTS": 7,
+      "INDIANS": 9,
+      "FRENCH": 8
+    },
+    "success_counts": {
+      "BRITISH": 5,
+      "PATRIOTS": 6,
+      "INDIANS": 4,
+      "FRENCH": 8
+    },
+    "pass_counts": {
+      "BRITISH": 3,
+      "PATRIOTS": 1,
+      "INDIANS": 5,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 2,
+        "no_valid_command": 1
+      },
+      "PATRIOTS": {
+        "resource_gate": 1
+      },
+      "INDIANS": {
+        "resource_gate": 5
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 14,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 51,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 25,
+      "PATRIOTS": 22,
+      "INDIANS": 27,
+      "FRENCH": 25
+    },
+    "success_counts": {
+      "BRITISH": 17,
+      "PATRIOTS": 20,
+      "INDIANS": 16,
+      "FRENCH": 24
+    },
+    "pass_counts": {
+      "BRITISH": 8,
+      "PATRIOTS": 2,
+      "INDIANS": 11,
+      "FRENCH": 1
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 5,
+        "no_valid_command": 3
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {
+        "resource_gate": 11
+      },
+      "FRENCH": {
+        "resource_gate": 1
+      }
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 15,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 28,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 15,
+      "PATRIOTS": 14,
+      "INDIANS": 14,
+      "FRENCH": 12
+    },
+    "success_counts": {
+      "BRITISH": 9,
+      "PATRIOTS": 12,
+      "INDIANS": 10,
+      "FRENCH": 10
+    },
+    "pass_counts": {
+      "BRITISH": 6,
+      "PATRIOTS": 2,
+      "INDIANS": 4,
+      "FRENCH": 2
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 3,
+        "resource_gate": 3
+      },
+      "PATRIOTS": {
+        "resource_gate": 1,
+        "no_valid_command": 1
+      },
+      "INDIANS": {
+        "resource_gate": 4
+      },
+      "FRENCH": {
+        "no_valid_command": 2
+      }
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 16,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 66,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 33,
+      "PATRIOTS": 30,
+      "INDIANS": 34,
+      "FRENCH": 29
+    },
+    "success_counts": {
+      "BRITISH": 21,
+      "PATRIOTS": 28,
+      "INDIANS": 24,
+      "FRENCH": 29
+    },
+    "pass_counts": {
+      "BRITISH": 12,
+      "PATRIOTS": 2,
+      "INDIANS": 10,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 8,
+        "resource_gate": 4
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {
+        "resource_gate": 10
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 17,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 66,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 33,
+      "PATRIOTS": 31,
+      "INDIANS": 35,
+      "FRENCH": 30
+    },
+    "success_counts": {
+      "BRITISH": 22,
+      "PATRIOTS": 30,
+      "INDIANS": 25,
+      "FRENCH": 28
+    },
+    "pass_counts": {
+      "BRITISH": 11,
+      "PATRIOTS": 1,
+      "INDIANS": 10,
+      "FRENCH": 2
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 5,
+        "no_valid_command": 6
+      },
+      "PATRIOTS": {
+        "resource_gate": 1
+      },
+      "INDIANS": {
+        "resource_gate": 10
+      },
+      "FRENCH": {
+        "resource_gate": 1,
+        "no_valid_command": 1
+      }
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 18,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 32,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 17,
+      "PATRIOTS": 15,
+      "INDIANS": 17,
+      "FRENCH": 14
+    },
+    "success_counts": {
+      "BRITISH": 11,
+      "PATRIOTS": 15,
+      "INDIANS": 11,
+      "FRENCH": 14
+    },
+    "pass_counts": {
+      "BRITISH": 6,
+      "PATRIOTS": 0,
+      "INDIANS": 6,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 4,
+        "no_valid_command": 2
+      },
+      "PATRIOTS": {},
+      "INDIANS": {
+        "resource_gate": 6
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 19,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 66,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 35,
+      "PATRIOTS": 31,
+      "INDIANS": 32,
+      "FRENCH": 31
+    },
+    "success_counts": {
+      "BRITISH": 21,
+      "PATRIOTS": 26,
+      "INDIANS": 27,
+      "FRENCH": 28
+    },
+    "pass_counts": {
+      "BRITISH": 14,
+      "PATRIOTS": 5,
+      "INDIANS": 5,
+      "FRENCH": 3
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 5,
+        "no_valid_command": 9
+      },
+      "PATRIOTS": {
+        "resource_gate": 5
+      },
+      "INDIANS": {
+        "resource_gate": 5
+      },
+      "FRENCH": {
+        "resource_gate": 1,
+        "no_valid_command": 2
+      }
+    }
+  },
+  {
+    "scenario": "1775",
+    "seed": 20,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 66,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 34,
+      "PATRIOTS": 29,
+      "INDIANS": 31,
+      "FRENCH": 30
+    },
+    "success_counts": {
+      "BRITISH": 23,
+      "PATRIOTS": 27,
+      "INDIANS": 23,
+      "FRENCH": 27
+    },
+    "pass_counts": {
+      "BRITISH": 11,
+      "PATRIOTS": 2,
+      "INDIANS": 8,
+      "FRENCH": 3
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 4,
+        "no_valid_command": 7
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {
+        "resource_gate": 8
+      },
+      "FRENCH": {
+        "resource_gate": 1,
+        "no_valid_command": 2
+      }
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 1,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 39,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 21,
+      "PATRIOTS": 18,
+      "INDIANS": 18,
+      "FRENCH": 16
+    },
+    "success_counts": {
+      "BRITISH": 16,
+      "PATRIOTS": 16,
+      "INDIANS": 16,
+      "FRENCH": 16
+    },
+    "pass_counts": {
+      "BRITISH": 5,
+      "PATRIOTS": 2,
+      "INDIANS": 2,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 4,
+        "no_valid_command": 1
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {
+        "resource_gate": 2
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 2,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 40,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 20,
+      "PATRIOTS": 20,
+      "INDIANS": 16,
+      "FRENCH": 18
+    },
+    "success_counts": {
+      "BRITISH": 15,
+      "PATRIOTS": 18,
+      "INDIANS": 15,
+      "FRENCH": 18
+    },
+    "pass_counts": {
+      "BRITISH": 5,
+      "PATRIOTS": 2,
+      "INDIANS": 1,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 4,
+        "resource_gate": 1
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {
+        "resource_gate": 1
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 3,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 44,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 24,
+      "PATRIOTS": 20,
+      "INDIANS": 20,
+      "FRENCH": 20
+    },
+    "success_counts": {
+      "BRITISH": 13,
+      "PATRIOTS": 17,
+      "INDIANS": 18,
+      "FRENCH": 20
+    },
+    "pass_counts": {
+      "BRITISH": 11,
+      "PATRIOTS": 3,
+      "INDIANS": 2,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 7,
+        "resource_gate": 4
+      },
+      "PATRIOTS": {
+        "resource_gate": 3
+      },
+      "INDIANS": {
+        "resource_gate": 2
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 4,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 17,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 9,
+      "PATRIOTS": 7,
+      "INDIANS": 8,
+      "FRENCH": 8
+    },
+    "success_counts": {
+      "BRITISH": 4,
+      "PATRIOTS": 7,
+      "INDIANS": 7,
+      "FRENCH": 8
+    },
+    "pass_counts": {
+      "BRITISH": 5,
+      "PATRIOTS": 0,
+      "INDIANS": 1,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 4,
+        "resource_gate": 1
+      },
+      "PATRIOTS": {},
+      "INDIANS": {
+        "resource_gate": 1
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 5,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 44,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 22,
+      "PATRIOTS": 20,
+      "INDIANS": 21,
+      "FRENCH": 21
+    },
+    "success_counts": {
+      "BRITISH": 16,
+      "PATRIOTS": 17,
+      "INDIANS": 19,
+      "FRENCH": 16
+    },
+    "pass_counts": {
+      "BRITISH": 6,
+      "PATRIOTS": 3,
+      "INDIANS": 2,
+      "FRENCH": 5
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 1,
+        "resource_gate": 5
+      },
+      "PATRIOTS": {
+        "resource_gate": 3
+      },
+      "INDIANS": {
+        "resource_gate": 2
+      },
+      "FRENCH": {
+        "resource_gate": 3,
+        "no_valid_command": 2
+      }
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 6,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 44,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 22,
+      "PATRIOTS": 21,
+      "INDIANS": 20,
+      "FRENCH": 19
+    },
+    "success_counts": {
+      "BRITISH": 15,
+      "PATRIOTS": 18,
+      "INDIANS": 19,
+      "FRENCH": 18
+    },
+    "pass_counts": {
+      "BRITISH": 7,
+      "PATRIOTS": 3,
+      "INDIANS": 1,
+      "FRENCH": 1
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 4,
+        "no_valid_command": 3
+      },
+      "PATRIOTS": {
+        "resource_gate": 3
+      },
+      "INDIANS": {
+        "resource_gate": 1
+      },
+      "FRENCH": {
+        "resource_gate": 1
+      }
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 7,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 21,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 11,
+      "PATRIOTS": 10,
+      "INDIANS": 10,
+      "FRENCH": 10
+    },
+    "success_counts": {
+      "BRITISH": 6,
+      "PATRIOTS": 9,
+      "INDIANS": 8,
+      "FRENCH": 9
+    },
+    "pass_counts": {
+      "BRITISH": 5,
+      "PATRIOTS": 1,
+      "INDIANS": 2,
+      "FRENCH": 1
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 5
+      },
+      "PATRIOTS": {
+        "resource_gate": 1
+      },
+      "INDIANS": {
+        "resource_gate": 2
+      },
+      "FRENCH": {
+        "resource_gate": 1
+      }
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 8,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 44,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 22,
+      "PATRIOTS": 22,
+      "INDIANS": 20,
+      "FRENCH": 22
+    },
+    "success_counts": {
+      "BRITISH": 15,
+      "PATRIOTS": 18,
+      "INDIANS": 17,
+      "FRENCH": 19
+    },
+    "pass_counts": {
+      "BRITISH": 7,
+      "PATRIOTS": 4,
+      "INDIANS": 3,
+      "FRENCH": 3
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 3,
+        "resource_gate": 4
+      },
+      "PATRIOTS": {
+        "resource_gate": 4
+      },
+      "INDIANS": {
+        "resource_gate": 3
+      },
+      "FRENCH": {
+        "no_valid_command": 1,
+        "resource_gate": 2
+      }
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 9,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 29,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 14,
+      "PATRIOTS": 14,
+      "INDIANS": 15,
+      "FRENCH": 11
+    },
+    "success_counts": {
+      "BRITISH": 11,
+      "PATRIOTS": 13,
+      "INDIANS": 12,
+      "FRENCH": 11
+    },
+    "pass_counts": {
+      "BRITISH": 3,
+      "PATRIOTS": 1,
+      "INDIANS": 3,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 1,
+        "resource_gate": 2
+      },
+      "PATRIOTS": {
+        "resource_gate": 1
+      },
+      "INDIANS": {
+        "resource_gate": 3
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 10,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 43,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 22,
+      "PATRIOTS": 19,
+      "INDIANS": 22,
+      "FRENCH": 20
+    },
+    "success_counts": {
+      "BRITISH": 14,
+      "PATRIOTS": 19,
+      "INDIANS": 17,
+      "FRENCH": 16
+    },
+    "pass_counts": {
+      "BRITISH": 8,
+      "PATRIOTS": 0,
+      "INDIANS": 5,
+      "FRENCH": 4
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 6,
+        "resource_gate": 2
+      },
+      "PATRIOTS": {},
+      "INDIANS": {
+        "resource_gate": 5
+      },
+      "FRENCH": {
+        "resource_gate": 3,
+        "no_valid_command": 1
+      }
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 11,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 30,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 16,
+      "PATRIOTS": 14,
+      "INDIANS": 14,
+      "FRENCH": 15
+    },
+    "success_counts": {
+      "BRITISH": 10,
+      "PATRIOTS": 12,
+      "INDIANS": 13,
+      "FRENCH": 15
+    },
+    "pass_counts": {
+      "BRITISH": 6,
+      "PATRIOTS": 2,
+      "INDIANS": 1,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 3,
+        "resource_gate": 3
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {
+        "resource_gate": 1
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 12,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 44,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 23,
+      "PATRIOTS": 19,
+      "INDIANS": 19,
+      "FRENCH": 22
+    },
+    "success_counts": {
+      "BRITISH": 16,
+      "PATRIOTS": 17,
+      "INDIANS": 17,
+      "FRENCH": 21
+    },
+    "pass_counts": {
+      "BRITISH": 7,
+      "PATRIOTS": 2,
+      "INDIANS": 2,
+      "FRENCH": 1
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 4,
+        "resource_gate": 3
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {
+        "resource_gate": 2
+      },
+      "FRENCH": {
+        "resource_gate": 1
+      }
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 13,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 16,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 7,
+      "PATRIOTS": 7,
+      "INDIANS": 8,
+      "FRENCH": 8
+    },
+    "success_counts": {
+      "BRITISH": 6,
+      "PATRIOTS": 6,
+      "INDIANS": 7,
+      "FRENCH": 8
+    },
+    "pass_counts": {
+      "BRITISH": 1,
+      "PATRIOTS": 1,
+      "INDIANS": 1,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 1
+      },
+      "PATRIOTS": {
+        "resource_gate": 1
+      },
+      "INDIANS": {
+        "resource_gate": 1
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 14,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 44,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 23,
+      "PATRIOTS": 18,
+      "INDIANS": 20,
+      "FRENCH": 21
+    },
+    "success_counts": {
+      "BRITISH": 17,
+      "PATRIOTS": 17,
+      "INDIANS": 17,
+      "FRENCH": 20
+    },
+    "pass_counts": {
+      "BRITISH": 6,
+      "PATRIOTS": 1,
+      "INDIANS": 3,
+      "FRENCH": 1
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 4,
+        "no_valid_command": 2
+      },
+      "PATRIOTS": {
+        "resource_gate": 1
+      },
+      "INDIANS": {
+        "resource_gate": 3
+      },
+      "FRENCH": {
+        "no_valid_command": 1
+      }
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 15,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 28,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 13,
+      "PATRIOTS": 14,
+      "INDIANS": 14,
+      "FRENCH": 12
+    },
+    "success_counts": {
+      "BRITISH": 10,
+      "PATRIOTS": 11,
+      "INDIANS": 11,
+      "FRENCH": 12
+    },
+    "pass_counts": {
+      "BRITISH": 3,
+      "PATRIOTS": 3,
+      "INDIANS": 3,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 1,
+        "resource_gate": 2
+      },
+      "PATRIOTS": {
+        "resource_gate": 3
+      },
+      "INDIANS": {
+        "resource_gate": 3
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 16,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 44,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 22,
+      "PATRIOTS": 20,
+      "INDIANS": 21,
+      "FRENCH": 19
+    },
+    "success_counts": {
+      "BRITISH": 15,
+      "PATRIOTS": 18,
+      "INDIANS": 20,
+      "FRENCH": 19
+    },
+    "pass_counts": {
+      "BRITISH": 7,
+      "PATRIOTS": 2,
+      "INDIANS": 1,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 6,
+        "resource_gate": 1
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {
+        "resource_gate": 1
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 17,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 44,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 23,
+      "PATRIOTS": 20,
+      "INDIANS": 21,
+      "FRENCH": 20
+    },
+    "success_counts": {
+      "BRITISH": 14,
+      "PATRIOTS": 18,
+      "INDIANS": 19,
+      "FRENCH": 19
+    },
+    "pass_counts": {
+      "BRITISH": 9,
+      "PATRIOTS": 2,
+      "INDIANS": 2,
+      "FRENCH": 1
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 7,
+        "resource_gate": 2
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {
+        "resource_gate": 2
+      },
+      "FRENCH": {
+        "no_valid_command": 1
+      }
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 18,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 32,
+    "end_reason": "WINNER",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 15,
+      "PATRIOTS": 15,
+      "INDIANS": 14,
+      "FRENCH": 14
+    },
+    "success_counts": {
+      "BRITISH": 11,
+      "PATRIOTS": 14,
+      "INDIANS": 11,
+      "FRENCH": 14
+    },
+    "pass_counts": {
+      "BRITISH": 4,
+      "PATRIOTS": 1,
+      "INDIANS": 3,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 2,
+        "no_valid_command": 2
+      },
+      "PATRIOTS": {
+        "resource_gate": 1
+      },
+      "INDIANS": {
+        "resource_gate": 3
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 19,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 44,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 23,
+      "PATRIOTS": 21,
+      "INDIANS": 21,
+      "FRENCH": 19
+    },
+    "success_counts": {
+      "BRITISH": 15,
+      "PATRIOTS": 18,
+      "INDIANS": 19,
+      "FRENCH": 18
+    },
+    "pass_counts": {
+      "BRITISH": 8,
+      "PATRIOTS": 3,
+      "INDIANS": 2,
+      "FRENCH": 1
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 7,
+        "resource_gate": 1
+      },
+      "PATRIOTS": {
+        "resource_gate": 3
+      },
+      "INDIANS": {
+        "resource_gate": 2
+      },
+      "FRENCH": {
+        "no_valid_command": 1
+      }
+    }
+  },
+  {
+    "scenario": "1776",
+    "seed": 20,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 44,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 23,
+      "PATRIOTS": 20,
+      "INDIANS": 19,
+      "FRENCH": 20
+    },
+    "success_counts": {
+      "BRITISH": 16,
+      "PATRIOTS": 19,
+      "INDIANS": 15,
+      "FRENCH": 18
+    },
+    "pass_counts": {
+      "BRITISH": 7,
+      "PATRIOTS": 1,
+      "INDIANS": 4,
+      "FRENCH": 2
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 4,
+        "resource_gate": 3
+      },
+      "PATRIOTS": {
+        "resource_gate": 1
+      },
+      "INDIANS": {
+        "resource_gate": 4
+      },
+      "FRENCH": {
+        "no_valid_command": 1,
+        "resource_gate": 1
+      }
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 1,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 17,
+      "PATRIOTS": 16,
+      "INDIANS": 15,
+      "FRENCH": 14
+    },
+    "success_counts": {
+      "BRITISH": 12,
+      "PATRIOTS": 12,
+      "INDIANS": 15,
+      "FRENCH": 14
+    },
+    "pass_counts": {
+      "BRITISH": 5,
+      "PATRIOTS": 4,
+      "INDIANS": 0,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 5
+      },
+      "PATRIOTS": {
+        "resource_gate": 4
+      },
+      "INDIANS": {},
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 2,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 16,
+      "PATRIOTS": 17,
+      "INDIANS": 14,
+      "FRENCH": 15
+    },
+    "success_counts": {
+      "BRITISH": 12,
+      "PATRIOTS": 15,
+      "INDIANS": 14,
+      "FRENCH": 15
+    },
+    "pass_counts": {
+      "BRITISH": 4,
+      "PATRIOTS": 2,
+      "INDIANS": 0,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 2,
+        "no_valid_command": 2
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {},
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 3,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 18,
+      "PATRIOTS": 15,
+      "INDIANS": 15,
+      "FRENCH": 15
+    },
+    "success_counts": {
+      "BRITISH": 11,
+      "PATRIOTS": 13,
+      "INDIANS": 15,
+      "FRENCH": 15
+    },
+    "pass_counts": {
+      "BRITISH": 7,
+      "PATRIOTS": 2,
+      "INDIANS": 0,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 7
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {},
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 4,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 18,
+      "PATRIOTS": 15,
+      "INDIANS": 16,
+      "FRENCH": 13
+    },
+    "success_counts": {
+      "BRITISH": 12,
+      "PATRIOTS": 11,
+      "INDIANS": 16,
+      "FRENCH": 13
+    },
+    "pass_counts": {
+      "BRITISH": 6,
+      "PATRIOTS": 4,
+      "INDIANS": 0,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 3,
+        "no_valid_command": 3
+      },
+      "PATRIOTS": {
+        "no_valid_command": 3,
+        "resource_gate": 1
+      },
+      "INDIANS": {},
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 5,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 17,
+      "PATRIOTS": 16,
+      "INDIANS": 15,
+      "FRENCH": 14
+    },
+    "success_counts": {
+      "BRITISH": 12,
+      "PATRIOTS": 14,
+      "INDIANS": 15,
+      "FRENCH": 14
+    },
+    "pass_counts": {
+      "BRITISH": 5,
+      "PATRIOTS": 2,
+      "INDIANS": 0,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 5
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {},
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 6,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 16,
+      "PATRIOTS": 19,
+      "INDIANS": 16,
+      "FRENCH": 15
+    },
+    "success_counts": {
+      "BRITISH": 11,
+      "PATRIOTS": 10,
+      "INDIANS": 16,
+      "FRENCH": 15
+    },
+    "pass_counts": {
+      "BRITISH": 5,
+      "PATRIOTS": 9,
+      "INDIANS": 0,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 5
+      },
+      "PATRIOTS": {
+        "resource_gate": 6,
+        "no_valid_command": 3
+      },
+      "INDIANS": {},
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 7,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 15,
+      "PATRIOTS": 19,
+      "INDIANS": 15,
+      "FRENCH": 13
+    },
+    "success_counts": {
+      "BRITISH": 14,
+      "PATRIOTS": 11,
+      "INDIANS": 15,
+      "FRENCH": 13
+    },
+    "pass_counts": {
+      "BRITISH": 1,
+      "PATRIOTS": 8,
+      "INDIANS": 0,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 1
+      },
+      "PATRIOTS": {
+        "resource_gate": 5,
+        "no_valid_command": 3
+      },
+      "INDIANS": {},
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 8,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 18,
+      "PATRIOTS": 17,
+      "INDIANS": 13,
+      "FRENCH": 17
+    },
+    "success_counts": {
+      "BRITISH": 11,
+      "PATRIOTS": 12,
+      "INDIANS": 12,
+      "FRENCH": 16
+    },
+    "pass_counts": {
+      "BRITISH": 7,
+      "PATRIOTS": 5,
+      "INDIANS": 1,
+      "FRENCH": 1
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 7
+      },
+      "PATRIOTS": {
+        "resource_gate": 5
+      },
+      "INDIANS": {
+        "resource_gate": 1
+      },
+      "FRENCH": {
+        "resource_gate": 1
+      }
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 9,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 15,
+      "PATRIOTS": 17,
+      "INDIANS": 15,
+      "FRENCH": 15
+    },
+    "success_counts": {
+      "BRITISH": 10,
+      "PATRIOTS": 13,
+      "INDIANS": 14,
+      "FRENCH": 15
+    },
+    "pass_counts": {
+      "BRITISH": 5,
+      "PATRIOTS": 4,
+      "INDIANS": 1,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 2,
+        "no_valid_command": 3
+      },
+      "PATRIOTS": {
+        "resource_gate": 4
+      },
+      "INDIANS": {
+        "resource_gate": 1
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 10,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 18,
+      "PATRIOTS": 16,
+      "INDIANS": 15,
+      "FRENCH": 15
+    },
+    "success_counts": {
+      "BRITISH": 9,
+      "PATRIOTS": 14,
+      "INDIANS": 15,
+      "FRENCH": 15
+    },
+    "pass_counts": {
+      "BRITISH": 9,
+      "PATRIOTS": 2,
+      "INDIANS": 0,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 5,
+        "resource_gate": 4
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {},
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 11,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 17,
+      "PATRIOTS": 14,
+      "INDIANS": 15,
+      "FRENCH": 15
+    },
+    "success_counts": {
+      "BRITISH": 13,
+      "PATRIOTS": 12,
+      "INDIANS": 15,
+      "FRENCH": 15
+    },
+    "pass_counts": {
+      "BRITISH": 4,
+      "PATRIOTS": 2,
+      "INDIANS": 0,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 4
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {},
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 12,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 16,
+      "PATRIOTS": 16,
+      "INDIANS": 15,
+      "FRENCH": 14
+    },
+    "success_counts": {
+      "BRITISH": 10,
+      "PATRIOTS": 13,
+      "INDIANS": 15,
+      "FRENCH": 14
+    },
+    "pass_counts": {
+      "BRITISH": 6,
+      "PATRIOTS": 3,
+      "INDIANS": 0,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 4,
+        "resource_gate": 2
+      },
+      "PATRIOTS": {
+        "resource_gate": 3
+      },
+      "INDIANS": {},
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 13,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 15,
+      "PATRIOTS": 15,
+      "INDIANS": 16,
+      "FRENCH": 16
+    },
+    "success_counts": {
+      "BRITISH": 12,
+      "PATRIOTS": 11,
+      "INDIANS": 15,
+      "FRENCH": 14
+    },
+    "pass_counts": {
+      "BRITISH": 3,
+      "PATRIOTS": 4,
+      "INDIANS": 1,
+      "FRENCH": 2
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 3
+      },
+      "PATRIOTS": {
+        "resource_gate": 2,
+        "no_valid_command": 2
+      },
+      "INDIANS": {
+        "resource_gate": 1
+      },
+      "FRENCH": {
+        "resource_gate": 2
+      }
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 14,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 16,
+      "PATRIOTS": 14,
+      "INDIANS": 16,
+      "FRENCH": 14
+    },
+    "success_counts": {
+      "BRITISH": 14,
+      "PATRIOTS": 13,
+      "INDIANS": 16,
+      "FRENCH": 14
+    },
+    "pass_counts": {
+      "BRITISH": 2,
+      "PATRIOTS": 1,
+      "INDIANS": 0,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 1,
+        "no_valid_command": 1
+      },
+      "PATRIOTS": {
+        "resource_gate": 1
+      },
+      "INDIANS": {},
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 15,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 18,
+      "PATRIOTS": 17,
+      "INDIANS": 14,
+      "FRENCH": 13
+    },
+    "success_counts": {
+      "BRITISH": 13,
+      "PATRIOTS": 15,
+      "INDIANS": 14,
+      "FRENCH": 13
+    },
+    "pass_counts": {
+      "BRITISH": 5,
+      "PATRIOTS": 2,
+      "INDIANS": 0,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 4,
+        "resource_gate": 1
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {},
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 16,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 16,
+      "PATRIOTS": 16,
+      "INDIANS": 15,
+      "FRENCH": 14
+    },
+    "success_counts": {
+      "BRITISH": 11,
+      "PATRIOTS": 14,
+      "INDIANS": 14,
+      "FRENCH": 14
+    },
+    "pass_counts": {
+      "BRITISH": 5,
+      "PATRIOTS": 2,
+      "INDIANS": 1,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 3,
+        "resource_gate": 2
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {
+        "resource_gate": 1
+      },
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 17,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 17,
+      "PATRIOTS": 16,
+      "INDIANS": 14,
+      "FRENCH": 15
+    },
+    "success_counts": {
+      "BRITISH": 12,
+      "PATRIOTS": 13,
+      "INDIANS": 14,
+      "FRENCH": 15
+    },
+    "pass_counts": {
+      "BRITISH": 5,
+      "PATRIOTS": 3,
+      "INDIANS": 0,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "resource_gate": 4,
+        "no_valid_command": 1
+      },
+      "PATRIOTS": {
+        "resource_gate": 3
+      },
+      "INDIANS": {},
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 18,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 17,
+      "PATRIOTS": 16,
+      "INDIANS": 13,
+      "FRENCH": 16
+    },
+    "success_counts": {
+      "BRITISH": 12,
+      "PATRIOTS": 14,
+      "INDIANS": 13,
+      "FRENCH": 16
+    },
+    "pass_counts": {
+      "BRITISH": 5,
+      "PATRIOTS": 2,
+      "INDIANS": 0,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 4,
+        "resource_gate": 1
+      },
+      "PATRIOTS": {
+        "resource_gate": 2
+      },
+      "INDIANS": {},
+      "FRENCH": {}
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 19,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 16,
+      "PATRIOTS": 18,
+      "INDIANS": 16,
+      "FRENCH": 14
+    },
+    "success_counts": {
+      "BRITISH": 11,
+      "PATRIOTS": 13,
+      "INDIANS": 16,
+      "FRENCH": 13
+    },
+    "pass_counts": {
+      "BRITISH": 5,
+      "PATRIOTS": 5,
+      "INDIANS": 0,
+      "FRENCH": 1
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 4,
+        "resource_gate": 1
+      },
+      "PATRIOTS": {
+        "resource_gate": 5
+      },
+      "INDIANS": {},
+      "FRENCH": {
+        "resource_gate": 1
+      }
+    }
+  },
+  {
+    "scenario": "1778",
+    "seed": 20,
+    "bot_errors": [],
+    "illegal_actions": [],
+    "cards_played": 33,
+    "end_reason": "DECK_EXHAUSTED",
+    "crash": null,
+    "turn_counts": {
+      "BRITISH": 17,
+      "PATRIOTS": 16,
+      "INDIANS": 15,
+      "FRENCH": 14
+    },
+    "success_counts": {
+      "BRITISH": 14,
+      "PATRIOTS": 11,
+      "INDIANS": 15,
+      "FRENCH": 14
+    },
+    "pass_counts": {
+      "BRITISH": 3,
+      "PATRIOTS": 5,
+      "INDIANS": 0,
+      "FRENCH": 0
+    },
+    "pass_reasons": {
+      "BRITISH": {
+        "no_valid_command": 3
+      },
+      "PATRIOTS": {
+        "resource_gate": 5
+      },
+      "INDIANS": {},
+      "FRENCH": {}
+    }
+  }
+]
