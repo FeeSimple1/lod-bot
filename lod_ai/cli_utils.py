@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from typing import Iterable, List, Tuple, TypeVar
 
 T = TypeVar("T")
@@ -9,16 +10,63 @@ T = TypeVar("T")
 # Global state reference for meta-commands (set by interactive_cli.main)
 # ---------------------------------------------------------------------------
 _game_state = None
+_engine_ref = None  # optional Engine reference for bug reports
 
 
-def set_game_state(state) -> None:
+def set_game_state(state, engine=None) -> None:
     """Register the live game state so meta-commands can access it."""
-    global _game_state
+    global _game_state, _engine_ref
     _game_state = state
+    _engine_ref = engine
+
+
+def _save_bug_report() -> None:
+    """Prompt for description and save a bug report snapshot."""
+    if _game_state is None:
+        print("(No game state available yet.)")
+        return
+
+    from lod_ai.tools.state_serializer import build_bug_report, save_report
+
+    description = input("Describe the bug (one line): ").strip()
+    if not description:
+        description = "(no description)"
+
+    human_factions = None
+    seed = None
+    scenario = None
+    setup_method = None
+    if _engine_ref is not None:
+        human_factions = getattr(_engine_ref, "human_factions", None)
+    seed = _game_state.get("_seed")
+    scenario = _game_state.get("_scenario")
+    setup_method = _game_state.get("_setup_method")
+
+    # Gather diagnostic logs from state
+    wizard_log = _game_state.get("_cli_wizard_log")
+    sa_log = _game_state.get("_cli_sa_log")
+    rejection_log = _game_state.get("_cli_rejection_log")
+
+    report = build_bug_report(
+        _game_state,
+        description,
+        human_factions=human_factions,
+        seed=seed,
+        scenario=scenario,
+        setup_method=setup_method,
+        wizard_log=wizard_log,
+        sa_log=sa_log,
+        rejection_log=rejection_log,
+    )
+
+    ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    filepath = f"lod_ai/reports/bug_{ts}.json"
+    saved = save_report(report, filepath)
+    print(f"Bug report saved to {saved}")
 
 
 def _handle_meta_command(raw: str) -> bool:
-    """Check for status/history/quit meta-commands. Returns True if handled."""
+    """Check for status/history/victory/bug/quit meta-commands. Returns True if handled."""
     cmd = raw.strip().lower()
     if cmd in ("status", "s"):
         if _game_state is not None:
@@ -33,6 +81,18 @@ def _handle_meta_command(raw: str) -> bool:
             display_history(_game_state)
         else:
             print("(No game state available yet.)")
+        return True
+    if cmd in ("victory", "v"):
+        if _game_state is not None:
+            from lod_ai.cli_display import display_victory_margins
+            print()
+            display_victory_margins(_game_state)
+            print()
+        else:
+            print("(No game state available yet.)")
+        return True
+    if cmd in ("bug", "b"):
+        _save_bug_report()
         return True
     if cmd in ("quit", "q"):
         print("\nExiting game. Goodbye!")
