@@ -96,7 +96,7 @@ nodes:
     title: "March"
     limitation: Max 3
     text: |
-      * With: Underground then Active War Parties, without moving last War Party from any Village or adding any Rebel Control.
+      * With: Underground then Active War Parties, without moving last War Party from any Village, moving the last 3 War Parties from a space where Gather could place a Village, or adding any Rebel Control.
       * If 1+ Villages Available, March to get 3+ War Parties in 1 additional Neutral or Passive space with room for a Village.
       * Then to remove most Rebel Control, first where no Active Support.
       If no March possible, Gather.
@@ -196,12 +196,17 @@ French Settlers Help:
 Confusion Allows Slaves to Escape:
   number: 80
   instruction: |
-    Select a space shared with another Faction, then move per March from that origin.
+    Choose Patriots and select spaces where a Patriot Fort would be removed. If none, choose Command & Special Activity instead.
 
 Guy Carleton and Indians Negotiate:
   number: 83
   instruction: |
     Use the shaded text if a Village can be placed, otherwise the unshaded text.
+
+Stockbridge Indians:
+  number: 86
+  instruction: |
+    Select a Village space if possible.
 
 “If it hadn’t been so foggy…”:
   number: 88
@@ -216,4 +221,5 @@ War Damages Colonies’ Economy:
 “The World Turned Upside Down”:
   number: 90
   instruction: |
+
     If no Village can be placed, choose Command & Special Activity instead.
