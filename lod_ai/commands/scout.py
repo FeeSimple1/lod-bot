@@ -150,9 +150,14 @@ def execute(
         sp_dst[MILITIA_A] = sp_dst.get(MILITIA_A, 0) + mil_u
 
     # -------- Optional Skirmish ---------------------------------------------
+    # §3.4.3: The Skirmish within Scout is part of the command, NOT a
+    # separate Special Activity.  Preserve _turn_used_special so the
+    # engine doesn't flag it as SA usage.
     if skirmish:
         from lod_ai.special_activities import skirmish as sa_skirmish
+        _saved_special = state.get("_turn_used_special", False)
         ctx = sa_skirmish.execute(state, BRITISH, ctx, dst, option=skirmish_option)
+        state["_turn_used_special"] = _saved_special
 
     # -------- Final housekeeping --------------------------------------------
     refresh_control(state)

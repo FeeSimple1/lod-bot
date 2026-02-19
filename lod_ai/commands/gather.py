@@ -195,10 +195,14 @@ def execute(
         for src, n in moves:
             sp_src = state["spaces"][src]
 
-            # Available WP in src
+            # Available WP in src — cap to what's actually there since
+            # bot planning snapshots may over-count after village builds
+            # or multi-phase interactions.
             available = sp_src.get(WARPARTY_U, 0) + sp_src.get(WARPARTY_A, 0)
             if n > available:
-                raise ValueError(f"{src}: only {available} WP available, cannot move {n}.")
+                n = available
+            if n <= 0:
+                continue
 
             # Move WP one by one and mark each as moved
             for _ in range(n):

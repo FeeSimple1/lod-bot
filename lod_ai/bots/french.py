@@ -472,6 +472,9 @@ class FrenchBot(BaseBot):
 
         if not targets:
             return False
+        # French Muster costs 2 Resources (§3.5.3)
+        if state["resources"].get(C.FRENCH, 0) < 2:
+            return False
         target = state["rng"].choice(targets)
         state.setdefault("_turn_affected_spaces", set()).add(target)
         muster.execute(state, C.FRENCH, {}, [target])
@@ -598,11 +601,26 @@ class FrenchBot(BaseBot):
         if move_plans:
             all_srcs = list(dict.fromkeys(p["src"] for p in move_plans))
             all_dsts = list(dict.fromkeys(p["dst"] for p in move_plans))
-            march.execute(state, C.FRENCH, {}, all_srcs, all_dsts,
-                          bring_escorts=True, move_plan=move_plans)
-            return True
+            # Affordability: march costs 1 per destination
+            french_res = state["resources"].get(C.FRENCH, 0)
+            if len(all_dsts) > french_res:
+                # Trim to affordable destinations, keeping priority order
+                all_dsts = all_dsts[:max(french_res, 0)]
+                dst_set = set(all_dsts)
+                move_plans = [p for p in move_plans if p["dst"] in dst_set]
+                all_srcs = list(dict.fromkeys(p["src"] for p in move_plans))
+            if not move_plans:
+                pass  # fall through to Step 3
+            else:
+                march.execute(state, C.FRENCH, {}, all_srcs, all_dsts,
+                              bring_escorts=True, move_plan=move_plans)
+                return True
 
         # ---- Step 3: March isolated French toward nearest British ----
+        # Affordability gate: Steps 3 and 4 each use 1 destination
+        if state["resources"].get(C.FRENCH, 0) <= 0:
+            return False
+
         british_spaces = set()
         for sid, sp in state["spaces"].items():
             if sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0) > 0:
@@ -718,6 +736,12 @@ class FrenchBot(BaseBot):
                 pat_fee_count += 1
             capped_targets.append((pop, sid))
         targets = capped_targets
+        if not targets:
+            return False
+        # Affordability: battle costs 1 per space
+        french_res = state["resources"].get(C.FRENCH, 0)
+        if len(targets) > french_res:
+            targets = targets[:max(french_res, 0)]
         if not targets:
             return False
         # Track affected spaces so Skirmish can exclude them
