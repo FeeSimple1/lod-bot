@@ -847,7 +847,15 @@ class IndianBot(BaseBot):
             # Don't move last WP from Village
             if sp.get(C.VILLAGE, 0) > 0 and (u + a) <= 1:
                 return False
-            # Don't add Rebel Control (Village starts with "V", not counted)
+            # §8.7.3: Don't move the last 3 WP from a space where Gather
+            # could place a Village (Province with room, no Village already)
+            src_meta = _MAP_DATA.get(src, {})
+            if (src_meta.get("type") != "City"
+                    and sp.get(C.VILLAGE, 0) == 0
+                    and self._village_room(state, src)
+                    and (u + a) <= 3):
+                return False
+            # Don't add Rebel Control
             if ctrl.get(src) != "REBELLION":
                 reb = sum(sp.get(t, 0) for t in (
                     C.REGULAR_PAT, C.REGULAR_FRE, C.MILITIA_A, C.MILITIA_U, C.FORT_PAT))
@@ -885,6 +893,13 @@ class IndianBot(BaseBot):
                 nbr_sp = state["spaces"].get(nbr, {})
                 nbr_total = _total(nbr)
                 min_keep = 1 if nbr_sp.get(C.VILLAGE, 0) > 0 else 0
+                # §8.7.3: Keep at least 3 WP in Gather-eligible spaces
+                nbr_meta = _MAP_DATA.get(nbr, {})
+                if (nbr_meta.get("type") != "City"
+                        and nbr_sp.get(C.VILLAGE, 0) == 0
+                        and self._village_room(state, nbr)
+                        and min_keep < 3):
+                    min_keep = 3
                 can_give = max(0, nbr_total - min_keep)
                 if can_give > 0:
                     result.append((nbr, can_give))
@@ -1410,6 +1425,18 @@ class IndianBot(BaseBot):
 
         # Delegate to base class for normal processing
         return super()._choose_event_vs_flowchart(state, card)
+
+    def _force_condition_met(self, directive: str, state: Dict, card: Dict) -> bool:
+        """Evaluate force_if_X directives from the Indian instruction sheet."""
+        if directive == "force_if_80":
+            # Card 80 ERRATA: "Choose Patriots and select spaces where a Patriot
+            # Fort would be removed. If none, choose Command & SA instead."
+            # Condition: any Patriot Fort on the map?
+            for sp in state["spaces"].values():
+                if sp.get(C.FORT_PAT, 0) > 0:
+                    return True
+            return False
+        return True  # default: play the event
 
     def _faction_event_conditions(self, state: Dict, card: Dict) -> bool:
         """I2: Check unshaded Event conditions for Indian bot via CARD_EFFECTS."""
