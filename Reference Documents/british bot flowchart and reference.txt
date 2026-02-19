@@ -231,7 +231,7 @@ nodes:
 "French Fleet Arrives in the Wrong Spot":
   number: 52
   instruction: |
-    March to set up Battle per the Battle instructions. If not possible, choose Command & Special Activity instead.
+    If possible, remove French Regulars from spaces where Rebels outnumber present British.
 
 "Charles Michel de Langlade":
   number: 62
@@ -257,3 +257,4 @@ nodes:
   number: 95
   instruction: |
     Place War Parties first.
+
