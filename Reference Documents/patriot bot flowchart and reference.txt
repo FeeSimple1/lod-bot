@@ -13,7 +13,7 @@ nodes:
     text: |
       Check Event Instructions (⚫), then play Event (shaded if no other Instruction) if any of:
         • Support > Opposition, and Event shifts Support/Opposition in Rebel favor?
-        • Event places Underground Militia in at least one Active Opposition or Village space with none?
+        • Event places Underground Militia in at least one Active Support or Village space with none?
         • Event places a Patriot Fort or removes an Indian Village?
         • Event adds 3+ Patriot Resources?
         • Event is effective, Patriots have 25+ pieces on the map, and a D6 rolls 5+?
@@ -223,7 +223,7 @@ nodes:
 "Confusion Allows Slaves to Escape":
   number: 80
   instruction: |
-    Select a space shared with another Faction, then move per March from that origin.
+    Choose Indians and select spaces where an Indian Village would be removed. If none, choose Command & Special Activity instead.
 
 "Guy Carleton and Indians Negotiate":
   number: 83
@@ -243,4 +243,5 @@ nodes:
 “The World Turned Upside Down”:
   number: 90
   instruction: |
+
     Use the unshaded text.
