@@ -914,6 +914,17 @@ class Engine:
         queue = self._prepare_card(card)
         self.state['_card_turn_log'] = []
         if card.get("winter_quarters"):
+            # §7.3 / §6.4.3: Check if this is the final Winter Quarters card.
+            # If no more WQ cards remain in the deck or upcoming, set the flag
+            # so year_end.resolve() will call final_scoring() after the
+            # Support Phase instead of continuing play.
+            remaining_wq_in_deck = any(
+                c.get("winter_quarters") for c in self.state.get("deck", [])
+            )
+            upcoming = self.state.get("upcoming_card")
+            upcoming_is_wq = bool(upcoming and upcoming.get("winter_quarters"))
+            if not remaining_wq_in_deck and not upcoming_is_wq:
+                self.state["final_winter_round"] = True
             resolve_year_end(self.state, bots=self.bots, human_factions=self.human_factions)
             if card.get("id"):
                 self._record_played_card(card["id"])

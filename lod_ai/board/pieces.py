@@ -41,6 +41,28 @@ _RECLAIM_ELIGIBLE = {
     C.WARPARTY_A,
 }
 
+# §1.6.4 Cumulative Casualties tracking
+# CBC: British Regular, Tory, British Fort casualties (entire game)
+# CRC: French Regular, Patriot Continental, Patriot Fort casualties (entire game)
+_CBC_PIECES = {C.REGULAR_BRI, C.TORY, C.FORT_BRI}
+_CRC_PIECES = {C.REGULAR_PAT, C.REGULAR_FRE, C.FORT_PAT}
+
+
+def increment_casualties(state: Dict[str, Any], tag: str, qty: int) -> None:
+    """Increment CBC or CRC cumulative counter per §1.6.4.
+
+    Called whenever a piece enters the Casualties box, or when a Fort
+    is removed as a battle casualty (Forts return to Available immediately
+    but still count toward cumulative casualties).
+    These counters never decrement.
+    """
+    if qty <= 0:
+        return
+    if tag in _CBC_PIECES:
+        state["cbc"] = state.get("cbc", 0) + qty
+    elif tag in _CRC_PIECES:
+        state["crc"] = state.get("crc", 0) + qty
+
 # --------------------------------------------------------------------------- #
 # internal utils
 # --------------------------------------------------------------------------- #
@@ -193,13 +215,19 @@ def remove_piece(state: Dict[str, Any], tag: str, loc: str | None,
         return removed
 
     if loc:
-        return move_piece(state, tag, loc, to, qty)
+        actual = move_piece(state, tag, loc, to, qty)
+        if to == "casualties":
+            increment_casualties(state, tag, actual)
+        return actual
 
     remaining = qty
     for name in list(state["spaces"]):
         if remaining == 0:
             break
-        remaining -= move_piece(state, tag, name, to, remaining)
+        moved = move_piece(state, tag, name, to, remaining)
+        if to == "casualties":
+            increment_casualties(state, tag, moved)
+        remaining -= moved
     return qty - remaining
 
 # --------------------------------------------------------------------------- #
