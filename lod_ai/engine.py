@@ -846,7 +846,7 @@ class Engine:
                     faction,
                     card,
                     allowed,
-                    lambda s, _c: bot.take_turn(s, card),
+                    lambda s, _c: bot.take_turn(s, card, allowed=allowed),
                 )
                 if not legal:
                     pass_reason = sandbox_state.get('_pass_reason', 'illegal_action')

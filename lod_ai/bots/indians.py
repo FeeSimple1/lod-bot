@@ -159,19 +159,21 @@ class IndianBot(BaseBot):
         if not self._raid(state):            # nothing moved → treat as failure
             return False
 
-        # I4: "If Resources fall to zero, Plunder then Trade before completing"
-        if state["resources"].get(C.INDIANS, 0) == 0:
-            if self._can_plunder(state):
-                self._plunder(state)
-            self._trade(state)
+        no_sa = state.get("_limited") or state.get("_no_special")
+        if not no_sa:
+            # I4: "If Resources fall to zero, Plunder then Trade before completing"
+            if state["resources"].get(C.INDIANS, 0) == 0:
+                if self._can_plunder(state):
+                    self._plunder(state)
+                self._trade(state)
 
-        # optional Plunder (I5)
-        if self._can_plunder(state):
-            if not self._plunder(state):
-                # if plunder impossible, War‑Path instead (arrow "Else I8")
+            # optional Plunder (I5)
+            if self._can_plunder(state):
+                if not self._plunder(state):
+                    # if plunder impossible, War‑Path instead (arrow "Else I8")
+                    self._war_path_or_trade(state)
+            else:
                 self._war_path_or_trade(state)
-        else:
-            self._war_path_or_trade(state)
         return True
 
     # ---- I7 Gather then I8 / I10 -------------------------------------
@@ -186,8 +188,9 @@ class IndianBot(BaseBot):
         if not self._gather(state):
             # If Gather impossible → I10 March
             return self._march_sequence(state, _visited)
-        # After Gather comes War‑Path (I8) then Trade fallback
-        self._war_path_or_trade(state)
+        # After Gather comes War‑Path (I8) then Trade fallback (skip if limited)
+        if not (state.get("_limited") or state.get("_no_special")):
+            self._war_path_or_trade(state)
         return True
 
     # ---- I12 Scout then I8 / I10 -------------------------------------
@@ -197,8 +200,9 @@ class IndianBot(BaseBot):
         if not self._scout(state):
             # If Scout impossible → I10 March
             return self._march_sequence(state)
-        # Then War‑Path (+ Trade)
-        self._war_path_or_trade(state)
+        # Then War‑Path (+ Trade) (skip if limited)
+        if not (state.get("_limited") or state.get("_no_special")):
+            self._war_path_or_trade(state)
         return True
 
     # ---- I10 March then I8 / I7 --------------------------------------
@@ -212,7 +216,9 @@ class IndianBot(BaseBot):
             return self._gather_sequence(state, _visited)  # arrow "If none → Gather"
         if not self._march(state):
             return self._gather_sequence(state, _visited)
-        self._war_path_or_trade(state)
+        # War‑Path (+ Trade) (skip if limited)
+        if not (state.get("_limited") or state.get("_no_special")):
+            self._war_path_or_trade(state)
         return True
 
     # ---- I8 War‑Path, else I11 Trade ---------------------------------
@@ -324,6 +330,8 @@ class IndianBot(BaseBot):
             return None
 
         max_raid = min(3, state["resources"].get(C.INDIANS, 0))
+        if state.get("_limited"):
+            max_raid = min(max_raid, 1)
         for tgt in targets:
             if len(selected) >= max_raid:
                 break
@@ -385,6 +393,27 @@ class IndianBot(BaseBot):
         for tgt in selected:
             if tgt not in plan_dsts and tgt not in validated_selected:
                 validated_selected.append(tgt)
+
+        if not validated_selected:
+            return False
+
+        # Final Underground WP check: after all validated moves, every target
+        # must have at least 1 Underground WP.  Moves OUT of a target as a
+        # source can leave it without an Underground WP.
+        wp_delta: Dict[str, int] = {}
+        for src, dst in validated_plan:
+            wp_delta[src] = wp_delta.get(src, 0) - 1
+            wp_delta[dst] = wp_delta.get(dst, 0) + 1
+        final_selected = []
+        for tgt in validated_selected:
+            base_ug = state["spaces"][tgt].get(C.WARPARTY_U, 0)
+            after_ug = base_ug + wp_delta.get(tgt, 0)
+            if after_ug >= 1:
+                final_selected.append(tgt)
+            else:
+                # Remove any validated moves targeting this space
+                validated_plan = [(s, d) for s, d in validated_plan if d != tgt]
+        validated_selected = final_selected
 
         if not validated_selected:
             return False
@@ -506,6 +535,7 @@ class IndianBot(BaseBot):
         avail_villages = state["available"].get(C.VILLAGE, 0)
         avail_wp = state["available"].get(C.WARPARTY_U, 0) + state["available"].get(C.WARPARTY_A, 0)
 
+        gather_max = 1 if state.get("_limited") else 4
         selected: List[str] = []
         build_village: set = set()
         bulk_place: Dict[str, int] = {}
@@ -531,7 +561,7 @@ class IndianBot(BaseBot):
         for _, _, sid in village_cands:
             if villages_placed >= avail_villages:
                 break
-            if len(selected) >= 4:
+            if len(selected) >= gather_max:
                 break
             selected.append(sid)
             build_village.add(sid)
@@ -553,7 +583,7 @@ class IndianBot(BaseBot):
                 wp_cands.append((-enemies, has_ug, -has_leader, state["rng"].random(), sid))
             wp_cands.sort()
             for _, _, _, _, sid in wp_cands:
-                if len(selected) >= 4:
+                if len(selected) >= gather_max:
                     break
                 if avail_wp <= 0:
                     break
@@ -595,7 +625,7 @@ class IndianBot(BaseBot):
             for _, _, sid in room_cands:
                 if placed_count >= 2:
                     break
-                if len(selected) >= 4:
+                if len(selected) >= gather_max:
                     break
                 if avail_wp <= 0:
                     break
@@ -763,6 +793,8 @@ class IndianBot(BaseBot):
         ctrl = state.get("control", {})
         indian_res = state["resources"].get(C.INDIANS, 0)
         max_dests = min(3, indian_res)
+        if state.get("_limited"):
+            max_dests = min(max_dests, 1)
         if max_dests <= 0:
             return False
 
@@ -933,6 +965,9 @@ class IndianBot(BaseBot):
         )
 
     def _can_scout(self, state: Dict) -> bool:
+        # Scout costs 1 Indian + 1 British Resource (§3.4.3)
+        if state["resources"].get(C.BRITISH, 0) < 1:
+            return False
         return self._space_has_wp_and_regulars(state)
 
     def _scout(self, state: Dict) -> bool:

@@ -677,15 +677,18 @@ class TestB5GarrisonMultiPhase:
                                   C.MILITIA_A: 0, C.MILITIA_U: 0,
                                   C.FORT_PAT: 0, C.FORT_BRI: 0,
                                   C.WARPARTY_A: 0, C.WARPARTY_U: 0},
-                "Virginia": {C.REGULAR_BRI: 0, C.TORY: 0,
+                "Massachusetts": {C.REGULAR_BRI: 0, C.TORY: 0,
                              C.REGULAR_PAT: 0, C.REGULAR_FRE: 0,
                              C.MILITIA_A: 0, C.MILITIA_U: 0,
                              C.FORT_PAT: 0, C.FORT_BRI: 0,
                              C.WARPARTY_A: 0, C.WARPARTY_U: 0},
             },
-            support={"Virginia": C.ACTIVE_OPPOSITION},
+            support={"Massachusetts": C.ACTIVE_OPPOSITION},
         )
-        city, province = bot._select_displacement(state, ["Boston", "New_York_City"])
+        # Provide a move_map that brings enough regulars to make Boston
+        # British-controlled after moves (3 existing + 3 incoming = 6 > 5 rebels)
+        move_map = {"Quebec_City": {"Boston": 3, "New_York_City": 1}}
+        city, province = bot._select_displacement(state, ["Boston", "New_York_City"], move_map)
         # Boston has 5 rebels, NYC has 1 → Boston should be the displacement source
         assert city == "Boston"
         assert province is not None

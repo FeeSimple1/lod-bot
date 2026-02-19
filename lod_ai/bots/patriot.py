@@ -246,13 +246,15 @@ class PatriotBot(BaseBot):
     def _battle_chain(self, state: Dict) -> bool:
         if not self._execute_battle(state):
             return self._rally_chain(state)
-        self._partisans_loop(state)
+        if not (state.get("_limited") or state.get("_no_special")):
+            self._partisans_loop(state)
         return True
 
     def _march_chain(self, state: Dict) -> bool:
         if not self._execute_march(state):
             return self._rally_chain(state)
-        self._partisans_loop(state)
+        if not (state.get("_limited") or state.get("_no_special")):
+            self._partisans_loop(state)
         return True
 
     def _rally_chain(self, state: Dict, *, _from_rabble: bool = False) -> bool:
@@ -260,13 +262,15 @@ class PatriotBot(BaseBot):
             if _from_rabble:
                 return False  # prevent infinite Rally<->Rabble loop
             return self._rabble_chain(state, _from_rally=True)
+        no_sa = state.get("_limited") or state.get("_no_special")
         # §8.5.2: "if no Persuasion was used during the Rally"
         # _execute_rally returns (True, persuasion_used) — check mid-Rally usage
         persuasion_during = state.pop("_rally_persuasion_used", False)
-        if not persuasion_during and state["resources"][self.faction] == 0:
-            persuasion_during = self._try_persuasion(state)
-        if not persuasion_during:
-            self._partisans_loop(state)
+        if not no_sa:
+            if not persuasion_during and state["resources"][self.faction] == 0:
+                persuasion_during = self._try_persuasion(state)
+            if not persuasion_during:
+                self._partisans_loop(state)
         return True
 
     def _rabble_chain(self, state: Dict, *, _from_rally: bool = False) -> bool:
@@ -274,12 +278,14 @@ class PatriotBot(BaseBot):
             if _from_rally:
                 return False  # prevent infinite Rabble<->Rally loop
             return self._rally_chain(state, _from_rabble=True)
+        no_sa = state.get("_limited") or state.get("_no_special")
         # §8.5.3: "if no Persuasion was used during Rabble-Rousing"
         persuasion_during = state.pop("_rabble_persuasion_used", False)
-        if not persuasion_during and state["resources"][self.faction] == 0:
-            persuasion_during = self._try_persuasion(state)
-        if not persuasion_during:
-            self._partisans_loop(state)
+        if not no_sa:
+            if not persuasion_during and state["resources"][self.faction] == 0:
+                persuasion_during = self._try_persuasion(state)
+            if not persuasion_during:
+                self._partisans_loop(state)
         return True
 
     # -------------- Partisans -> Skirmish -> Persuasion ---------------
@@ -378,6 +384,10 @@ class PatriotBot(BaseBot):
             return False
         targets.sort()
         chosen = [sid for *_, sid in targets]
+
+        # Limited Command: cap to 1 space
+        if state.get("_limited"):
+            chosen = chosen[:1]
 
         # §8.5.1: If Patriot Resources too low for all spaces, trim list
         pat_res = state["resources"].get(self.faction, 0)
@@ -518,12 +528,13 @@ class PatriotBot(BaseBot):
         phase1_dests.sort()
 
         # Build move plans for Phase 1
+        march_max = 1 if state.get("_limited") else 4
         move_plans: List[Dict] = []
         used_destinations: Set[str] = set()
         moved_from: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
         for _, _, _, dst in phase1_dests:
-            if len(used_destinations) >= 2:
+            if len(used_destinations) >= min(2, march_max):
                 break
             dst_sp = state["spaces"][dst]
             royalist_at_dst = self._royalist_pieces_in(dst_sp)
@@ -613,6 +624,8 @@ class PatriotBot(BaseBot):
         phase2_targets.sort()
 
         for _, _, _, dst in phase2_targets:
+            if len(used_destinations) >= march_max:
+                break
             adj_set = map_adj.adjacent_spaces(dst)
             found = False
             for src in sorted(adj_set):
@@ -768,7 +781,8 @@ class PatriotBot(BaseBot):
         """
         refresh_control(state)
         ctrl = state.get("control", {})
-        spaces_used: List[str] = []  # Track Rally spaces (Max 4)
+        max_rally = 1 if state.get("_limited") else 4
+        spaces_used: List[str] = []  # Track Rally spaces (Max max_rally)
         build_fort_set: Set[str] = set()
         place_one_set: Set[str] = set()   # Spaces that need explicit Militia placement
         promote_space: str | None = None
@@ -798,7 +812,7 @@ class PatriotBot(BaseBot):
                     fort_candidates.append((-is_city, -pop, sid))
             fort_candidates.sort()
             for _, _, sid in fort_candidates:
-                if len(spaces_used) >= 4 or avail_forts <= 0:
+                if len(spaces_used) >= max_rally or avail_forts <= 0:
                     break
                 build_fort_set.add(sid)
                 spaces_used.append(sid)
@@ -821,7 +835,7 @@ class PatriotBot(BaseBot):
             # Sort for determinism (alphabetical)
             lonely_forts.sort()
             for sid in lonely_forts:
-                if len(spaces_used) >= 4 or avail_militia <= 0:
+                if len(spaces_used) >= max_rally or avail_militia <= 0:
                     break
                 spaces_used.append(sid)
                 place_one_set.add(sid)  # explicit placement needed at Fort spaces
@@ -832,7 +846,7 @@ class PatriotBot(BaseBot):
         # the largest number of Militia already."
         # This adds a new Rally space (the Fort with most Militia globally).
         # Unlike Bullet 4, this may select a Fort not yet in spaces_used.
-        if avail_cont > 0 and len(spaces_used) < 4:
+        if avail_cont > 0 and len(spaces_used) < max_rally:
             best_cont_fort = None
             best_cont_mil = -1
             for sid, sp in state["spaces"].items():
@@ -881,14 +895,14 @@ class PatriotBot(BaseBot):
                 no_fort_spaces.append((-pat_units, sid))
             no_fort_spaces.sort()
             for _, sid in no_fort_spaces:
-                if len(spaces_used) >= 4:
+                if len(spaces_used) >= max_rally:
                     break
                 if sid not in spaces_used:
                     spaces_used.append(sid)
                     break
 
         # --- Bullet 6: Militia to change Control or no Active Opposition ---
-        remaining_slots = 4 - len(spaces_used)
+        remaining_slots = max_rally - len(spaces_used)
         if remaining_slots > 0:
             militia_targets = []
             for sid, sp in state["spaces"].items():
@@ -901,7 +915,7 @@ class PatriotBot(BaseBot):
                 militia_targets.append((-changes_ctrl, -no_active_opp, -is_city, -pop, sid))
             militia_targets.sort()
             for _, _, _, _, sid in militia_targets:
-                if len(spaces_used) >= 4:
+                if len(spaces_used) >= max_rally:
                     break
                 spaces_used.append(sid)
 
@@ -911,7 +925,7 @@ class PatriotBot(BaseBot):
             sid for sid, sp in state["spaces"].items()
             if sid not in spaces_used
             and (sp.get(C.FORT_PAT, 0) > 0 or sid in build_fort_set)
-            and len(spaces_used) < 4  # must have room for one more space
+            and len(spaces_used) < max_rally  # must have room for one more space
         ]
         if fort_spaces_for_gather:
             # Pick the Fort that can gather the most adjacent Active Militia
@@ -952,7 +966,7 @@ class PatriotBot(BaseBot):
                 move_plan_list = best_gather_moves
                 # Ensure the Fort is in spaces_used
                 if best_gather_fort and best_gather_fort not in spaces_used:
-                    if len(spaces_used) < 4:
+                    if len(spaces_used) < max_rally:
                         spaces_used.append(best_gather_fort)
 
         if not spaces_used:
@@ -967,10 +981,11 @@ class PatriotBot(BaseBot):
         # Track whether Persuasion was used during Rally for SA chain gate.
         executed_any = False
         persuasion_used = False
+        no_sa = state.get("_limited") or state.get("_no_special")
         for sid in spaces_used:
             if state["resources"][self.faction] < 1:
-                # Try mid-command Persuasion to restore resources
-                if self._try_persuasion(state):
+                # Try mid-command Persuasion to restore resources (skip if limited)
+                if not no_sa and self._try_persuasion(state):
                     persuasion_used = True
                 if state["resources"][self.faction] < 1:
                     break  # still no resources — stop
@@ -994,8 +1009,8 @@ class PatriotBot(BaseBot):
                     **kw,
                 )
                 executed_any = True
-                # Check for mid-Rally Persuasion interrupt
-                if state["resources"][self.faction] == 0:
+                # Check for mid-Rally Persuasion interrupt (skip if limited)
+                if not no_sa and state["resources"][self.faction] == 0:
                     if self._try_persuasion(state):
                         persuasion_used = True
             except (ValueError, KeyError):
@@ -1037,26 +1052,30 @@ class PatriotBot(BaseBot):
             -self._support_level(state, n),
             -_MAP_DATA[n].get("population", 0),
         ))
+        # Limited Command: 1 space only
+        if state.get("_limited"):
+            spaces = spaces[:1]
         if state["resources"][self.faction] < 1:
             return False
 
         # §8.5.3/P11+P13: Execute space-by-space, checking after each space
         # whether resources hit 0 and triggering Persuasion mid-command.
         # Track whether Persuasion was used for SA chain gate.
+        no_sa = state.get("_limited") or state.get("_no_special")
         executed_any = False
         persuasion_used = False
         for sid in spaces:
             if state["resources"][self.faction] < 1:
-                # Try mid-command Persuasion to restore resources
-                if self._try_persuasion(state):
+                # Try mid-command Persuasion to restore resources (skip if limited)
+                if not no_sa and self._try_persuasion(state):
                     persuasion_used = True
                 if state["resources"][self.faction] < 1:
                     break  # still no resources — stop
             try:
                 rabble_rousing.execute(state, self.faction, {}, [sid])
                 executed_any = True
-                # Check for mid-Rabble Persuasion interrupt
-                if state["resources"][self.faction] == 0:
+                # Check for mid-Rabble Persuasion interrupt (skip if limited)
+                if not no_sa and state["resources"][self.faction] == 0:
                     if self._try_persuasion(state):
                         persuasion_used = True
             except (ValueError, KeyError):
