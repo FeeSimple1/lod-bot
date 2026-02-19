@@ -14,9 +14,24 @@ class BaseBot:
     faction: str            # e.g. "BRITISH"
 
     # ------------ public entry ------------
-    def take_turn(self, state: Dict, card: Dict, *, notes: str | None = None) -> Dict[str, object]:
-        """Main driver called by engine.play_turn()."""
-        if self._choose_event_vs_flowchart(state, card):
+    def take_turn(self, state: Dict, card: Dict, *, notes: str | None = None,
+                  allowed: Dict | None = None) -> Dict[str, object]:
+        """Main driver called by engine.play_turn().
+
+        *allowed* carries slot constraints from the engine:
+          - event_allowed (bool): False -> skip event evaluation
+          - limited_only (bool): True -> 1 space, no SA
+          - special_allowed (bool): False -> skip SA
+        """
+        # Propagate slot constraints into state so command methods can check.
+        if allowed:
+            if allowed.get("limited_only"):
+                state["_limited"] = True
+            if not allowed.get("special_allowed", True):
+                state["_no_special"] = True
+
+        event_ok = allowed.get("event_allowed", True) if allowed else True
+        if event_ok and self._choose_event_vs_flowchart(state, card):
             state.pop('_pass_reason', None)
             return {
                 "action": "event",

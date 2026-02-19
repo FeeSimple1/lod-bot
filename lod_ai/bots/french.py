@@ -196,6 +196,7 @@ class FrenchBot(BaseBot):
     #  PRE‑TREATY implementation (F5 → F8)
     # -------------------------------------------------------------------
     def _before_treaty(self, state: Dict) -> bool:
+        no_sa = state.get("_limited") or state.get("_no_special")
         # F5: Patriot Resources < 1D3 ?
         need_hortalez = (
             state["resources"][C.PATRIOTS]
@@ -205,12 +206,14 @@ class FrenchBot(BaseBot):
         # F7: Agent Mobilisation max 1
         if not need_hortalez and self._can_agent_mobilization(state):
             if self._agent_mobilization(state):
-                _preparer_la_guerre(state, post_treaty=False)  # F8
+                if not no_sa:
+                    _preparer_la_guerre(state, post_treaty=False)  # F8
                 return True
 
         # F6: Roderigue Hortalez et Cie
         if self._can_hortelez(state) and self._hortelez(state, before_treaty=True):
-            _preparer_la_guerre(state, post_treaty=False)  # F8
+            if not no_sa:
+                _preparer_la_guerre(state, post_treaty=False)  # F8
             return True
 
         return False
@@ -234,13 +237,16 @@ class FrenchBot(BaseBot):
     #  (wrap Command + SA loops exactly as chart dictates)
     # -------------------------------------------------------------------
     def _muster_chain(self, state: Dict) -> bool:
+        no_sa = state.get("_limited") or state.get("_no_special")
         if self._can_muster(state) and self._muster(state):  # F10
-            self._skirmish_loop(state)                      # F12 etc.
+            if not no_sa:
+                self._skirmish_loop(state)                  # F12 etc.
             return True
         # F11 fallback: Roderigue Hortalez
         if self._can_hortelez(state):
             self._hortelez(state, before_treaty=False)
-            self._skirmish_loop(state)
+            if not no_sa:
+                self._skirmish_loop(state)
             return True
         return False
 
@@ -256,12 +262,14 @@ class FrenchBot(BaseBot):
         self._try_naval_pressure(state)    # F17 (may fall back to Skirmish)
 
     def _battle_chain(self, state: Dict) -> bool:
+        no_sa = state.get("_limited") or state.get("_no_special")
         # F13: Rebel cubes + Leader exceed British?
         if self._can_battle(state) and self._battle(state):  # F16
             return True
         # F13 No (or F16 none) → F14 March
         if self._can_march(state) and self._march(state):    # F14
-            self._skirmish_loop(state)                       # F12 loop
+            if not no_sa:
+                self._skirmish_loop(state)                   # F12 loop
             return True
         # F14 "If none" → F10 (Muster)
         return self._muster_chain(state)
@@ -539,8 +547,12 @@ class FrenchBot(BaseBot):
 
         move_plans = []
         used_from: Dict[str, int] = defaultdict(int)  # track committed pieces per source
+        march_max = 1 if state.get("_limited") else len(dest_candidates)
+        dest_used = 0
 
         for _, _, _, dst, adj_sources in dest_candidates:
+            if dest_used >= march_max:
+                break
             dsp = state["spaces"][dst]
             royalist = self._royalist_pieces_in(dsp)
             rebel = self._rebel_pieces_in(dsp)
@@ -581,6 +593,7 @@ class FrenchBot(BaseBot):
                     for tag, cnt in entry["pieces"].items():
                         if tag == C.REGULAR_FRE:
                             used_from[entry["src"]] += cnt
+                dest_used += 1
 
         if move_plans:
             all_srcs = list(dict.fromkeys(p["src"] for p in move_plans))
@@ -688,12 +701,33 @@ class FrenchBot(BaseBot):
         if not targets:
             return False
         targets.sort(reverse=True)
+        # Limited Command: cap to 1 space
+        if state.get("_limited"):
+            targets = targets[:1]
+        # Allied fee check: French Battle charges Patriots 1 Resource per space
+        # where Patriot Regulars are present (§3.3.3 / §3.5.5).  Cap targets so
+        # the total allied fee doesn't exceed Patriot Resources.
+        pat_res = state["resources"].get(C.PATRIOTS, 0)
+        pat_fee_count = 0
+        capped_targets = []
+        for pop, sid in targets:
+            has_pat = state["spaces"].get(sid, {}).get(C.REGULAR_PAT, 0) > 0
+            if has_pat:
+                if pat_fee_count >= pat_res:
+                    continue  # skip — Patriots can't afford another allied fee
+                pat_fee_count += 1
+            capped_targets.append((pop, sid))
+        targets = capped_targets
+        if not targets:
+            return False
         # Track affected spaces so Skirmish can exclude them
         state.setdefault("_turn_affected_spaces", set()).update(
             sid for _, sid in targets
         )
+        no_sa = state.get("_limited") or state.get("_no_special")
         # F16: "First execute a Special Activity." SA entry at F17 (Naval Pressure)
-        self._try_naval_pressure(state)
+        if not no_sa:
+            self._try_naval_pressure(state)
         battle.execute(state, C.FRENCH, {}, [sid for _, sid in targets])
         return True
 

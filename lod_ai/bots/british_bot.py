@@ -495,10 +495,13 @@ class BritishBot(BaseBot):
         Phase 4: If cubes moved, Activate Underground Militia and displace
                   Rebels (first most Opposition, then least Support, lowest Pop).
         """
-        # Phase 1: SA first
-        self._apply_howe_fni(state)  # B38 Howe lowers FNI before SA
-        self._skirmish_then_naval(state)
-        state["_sa_done_this_turn"] = True
+        # Phase 1: SA first (skip if limited/no-SA slot)
+        limited = state.get("_limited")
+        no_sa = state.get("_no_special") or limited
+        if not no_sa:
+            self._apply_howe_fni(state)  # B38 Howe lowers FNI before SA
+            self._skirmish_then_naval(state)
+            state["_sa_done_this_turn"] = True
 
         refresh_control(state)
 
@@ -513,7 +516,10 @@ class BritishBot(BaseBot):
         total_moved = 0
         dest_cities: List[str] = []
 
+        max_dest = 1 if limited else None  # Limited Command: 1 city only
         for city, needed in phase2a_targets:
+            if max_dest is not None and len(dest_cities) >= max_dest:
+                break
             if needed <= 0:
                 continue
             still_needed = needed
@@ -534,32 +540,36 @@ class BritishBot(BaseBot):
                 dest_cities.append(city)
 
         # Phase 2b: Reinforce existing British Control cities
-        reinforce_targets = self._garrison_phase2b_targets(state)
-        for city, need in reinforce_targets:
-            if need <= 0:
-                continue
-            still_need = need
-            for origin in sorted(origin_avail, key=lambda o: -origin_avail.get(o, 0)):
-                if still_need <= 0:
+        # (skip if limited — already filled 1 dest from phase 2a)
+        if not (max_dest is not None and len(dest_cities) >= max_dest):
+            reinforce_targets = self._garrison_phase2b_targets(state)
+            for city, need in reinforce_targets:
+                if max_dest is not None and len(dest_cities) >= max_dest:
                     break
-                avail = origin_avail.get(origin, 0)
-                if avail <= 0 or origin == city:
+                if need <= 0:
                     continue
-                give = min(avail, still_need)
-                move_map.setdefault(origin, {})[city] = \
-                    move_map.get(origin, {}).get(city, 0) + give
-                origin_avail[origin] -= give
-                still_need -= give
-                total_moved += give
-            if still_need < need:
-                dest_cities.append(city)
+                still_need = need
+                for origin in sorted(origin_avail, key=lambda o: -origin_avail.get(o, 0)):
+                    if still_need <= 0:
+                        break
+                    avail = origin_avail.get(origin, 0)
+                    if avail <= 0 or origin == city:
+                        continue
+                    give = min(avail, still_need)
+                    move_map.setdefault(origin, {})[city] = \
+                        move_map.get(origin, {}).get(city, 0) + give
+                    origin_avail[origin] -= give
+                    still_need -= give
+                    total_moved += give
+                if still_need < need:
+                    dest_cities.append(city)
 
         # Phase 3: If no cubes moved, Muster fallback
         if total_moved == 0:
             return self._muster(state, tried_march=False)
 
         # Phase 4: Displacement — pick city with most Rebels as source
-        displace_city, displace_target = self._select_displacement(state, dest_cities)
+        displace_city, displace_target = self._select_displacement(state, dest_cities, move_map)
 
         # Affordability check: Garrison costs 2 Resources
         if state["resources"].get(C.BRITISH, 0) < 2:
@@ -672,25 +682,55 @@ class BritishBot(BaseBot):
         targets.sort()
         return [(city, need) for _, city, need in targets]
 
-    def _select_displacement(self, state: Dict, dest_cities: List[str]) -> Tuple[str | None, str | None]:
+    def _select_displacement(
+        self, state: Dict, dest_cities: List[str],
+        move_map: dict | None = None,
+    ) -> Tuple[str | None, str | None]:
         """Phase 4: Activate Militia then displace most Rebels.
         Pick the destination city with most Rebels as the displacement source.
-        Pick Province with most Opposition, then least Support, then lowest Pop.
+        Pick adjacent Province with most Opposition, then least Support, then lowest Pop.
+        Only consider cities that will be British-controlled after the planned moves.
         """
         if not dest_cities:
             return (None, None)
 
-        # Pick city with most Rebels for displacement
+        # Pick city with most Rebels for displacement, but only if the city
+        # will be British-controlled after the planned garrison moves and
+        # has no Patriot Fort (garrison.execute rejects both conditions).
         best_city = None
         most_rebels = -1
         for city in dest_cities:
             sp = state["spaces"].get(city, {})
+            # Skip if Patriot Fort present
+            if sp.get(C.FORT_PAT, 0) > 0:
+                continue
             rebels = (
                 sp.get(C.REGULAR_PAT, 0)
                 + sp.get(C.REGULAR_FRE, 0)
                 + sp.get(C.MILITIA_A, 0)
                 + sp.get(C.MILITIA_U, 0)
             )
+            if rebels == 0:
+                continue
+            # Simulate post-move British Control: current royalist pieces
+            # plus incoming regulars from move_map must exceed rebel pieces.
+            royalist = (
+                sp.get(C.REGULAR_BRI, 0)
+                + sp.get(C.TORY, 0)
+                + sp.get(C.WARPARTY_A, 0)
+                + sp.get(C.WARPARTY_U, 0)
+                + sp.get(C.FORT_BRI, 0)
+            )
+            incoming = 0
+            if move_map:
+                for inner in move_map.values():
+                    incoming += inner.get(city, 0)
+            rebel_total = (
+                rebels
+                + sp.get(C.FORT_PAT, 0)
+            )
+            if (royalist + incoming) <= rebel_total:
+                continue  # won't be British-controlled after moves
             if rebels > most_rebels:
                 most_rebels = rebels
                 best_city = city
@@ -698,11 +738,14 @@ class BritishBot(BaseBot):
         if not best_city or most_rebels == 0:
             return (None, None)
 
-        # Pick Colony/Province target: most Opposition, least Support, lowest Pop
-        # (The game's "Province" spaces are "Colony" type in map data)
+        # Pick Colony/Province target: must be ADJACENT to the city.
+        # Priority: most Opposition, least Support, lowest Pop.
+        adj_spaces = set(_adjacent(best_city))
         best_province = None
         best_key = None
-        for sid in state["spaces"]:
+        for sid in adj_spaces:
+            if sid not in state["spaces"]:
+                continue
             stype = _MAP_DATA.get(sid, {}).get("type", "")
             if stype not in ("Colony", "Province"):
                 continue
@@ -745,6 +788,7 @@ class BritishBot(BaseBot):
             return False
 
         refresh_control(state)
+        max_spaces = 1 if state.get("_limited") else 4
 
         # ----- step 1: choose spaces for Regular placement (sorted) --------
         reg_candidates: List[Tuple[tuple, str]] = []
@@ -811,7 +855,7 @@ class BritishBot(BaseBot):
                 tory_p1.append(((just_placed,), sid))
         tory_p1.sort()
         for _, sid in tory_p1:
-            if avail_tories <= 0 or len(tory_plan) + len(selected_spaces) >= 4:
+            if avail_tories <= 0 or len(tory_plan) + len(selected_spaces) >= max_spaces:
                 break
             n = min(_tory_max(sid), avail_tories)
             tory_plan[sid] = n
@@ -831,7 +875,7 @@ class BritishBot(BaseBot):
                 tory_p2.append((-gap, sid))
             tory_p2.sort()
             for _, sid in tory_p2:
-                if avail_tories <= 0 or len(tory_plan) + len(selected_spaces) >= 4:
+                if avail_tories <= 0 or len(tory_plan) + len(selected_spaces) >= max_spaces:
                     break
                 if sid in tory_plan:
                     continue
@@ -852,7 +896,7 @@ class BritishBot(BaseBot):
                     tory_p3.append((-pop, sid))
             tory_p3.sort()
             for _, sid in tory_p3:
-                if avail_tories <= 0 or len(tory_plan) + len(selected_spaces) >= 4:
+                if avail_tories <= 0 or len(tory_plan) + len(selected_spaces) >= max_spaces:
                     break
                 n = min(_tory_max(sid), avail_tories)
                 tory_plan[sid] = n
@@ -961,8 +1005,10 @@ class BritishBot(BaseBot):
                 return self._march(state, tried_muster=True)
             return False
 
-        # Execute SA (skip if already done during Garrison fallback)
-        if not state.get("_sa_done_this_turn"):
+        # Execute SA (skip if already done during Garrison fallback, or limited/no-SA slot)
+        if (not state.get("_sa_done_this_turn")
+                and not state.get("_limited")
+                and not state.get("_no_special")):
             self._apply_howe_fni(state)  # B38 Howe lowers FNI before SA
             self._skirmish_then_naval(state)
         return True
@@ -1069,6 +1115,7 @@ class BritishBot(BaseBot):
         )
 
         # === Phase 1: Add British Control to up to 2 Cities then Colonies ===
+        march_max = 1 if state.get("_limited") else 4
         control_targets: List[Tuple[tuple, str]] = []
         for sid in origins:
             for dst in _adjacent(sid):
@@ -1092,7 +1139,7 @@ class BritishBot(BaseBot):
         cc_spaces: Dict[str, int] = {}  # B13: CC War Parties per space
         spaces_used = 0
         for _, dst, origin in control_targets:
-            if dst in seen_dst or spaces_used >= 2:
+            if dst in seen_dst or spaces_used >= min(2, march_max):
                 continue
             movable = _movable_from(origin)
             total = movable.get(C.REGULAR_BRI, 0) + movable.get(C.TORY, 0)
@@ -1142,7 +1189,7 @@ class BritishBot(BaseBot):
             spaces_used += 1
 
         # === Phase 2: Pop 1+ spaces not at Active Support ===
-        if spaces_used < 4:
+        if spaces_used < march_max:
             phase2_targets: List[Tuple[tuple, str, str]] = []
             for sid in origins:
                 for dst in _adjacent(sid):
@@ -1166,7 +1213,7 @@ class BritishBot(BaseBot):
                     phase2_targets.append(((tier, -pop), dst, sid))
             phase2_targets.sort()
             for _, dst, origin in phase2_targets:
-                if spaces_used >= 4 or dst in seen_dst:
+                if spaces_used >= march_max or dst in seen_dst:
                     continue
                 movable = _movable_from(origin)
                 total = movable.get(C.REGULAR_BRI, 0) + movable.get(C.TORY, 0)
@@ -1194,7 +1241,7 @@ class BritishBot(BaseBot):
         # "March in place" activates Underground Militia where British are present.
         # These are handled separately since the march command requires actual moves.
         activate_in_place: List[str] = []
-        if spaces_used < 4:
+        if spaces_used < march_max:
             activate_targets: List[Tuple[tuple, str]] = []
             for sid, sp in state["spaces"].items():
                 if sid in seen_dst:
@@ -1205,7 +1252,7 @@ class BritishBot(BaseBot):
                     activate_targets.append((-sup, sid))
             activate_targets.sort()
             for _, sid in activate_targets:
-                if spaces_used >= 4:
+                if spaces_used >= march_max:
                     break
                 activate_in_place.append(sid)
                 seen_dst.add(sid)
@@ -1218,9 +1265,11 @@ class BritishBot(BaseBot):
 
         # B10+B13: Execute Common Cause BEFORE the March so that WP from CC
         # contribute to group sizes for adjacent Province destinations.
+        # (Skip CC and all SAs if in a limited/no-SA slot.)
+        no_sa = state.get("_limited") or state.get("_no_special")
         used_cc = False
         march_ctx = {}
-        if cc_spaces:
+        if cc_spaces and not no_sa:
             try:
                 cc_ctx = common_cause.execute(
                     state, C.BRITISH, {}, list(cc_spaces.keys()),
@@ -1271,8 +1320,8 @@ class BritishBot(BaseBot):
                     push_history(state, f"BRITISH March in place: Activate {mu} Militia in {sid}")
 
         # If CC was not used during planning, try it post-March (fallback),
-        # otherwise skip to SA chain
-        if not used_cc:
+        # otherwise skip to SA chain.  Skip all SAs in limited/no-SA slot.
+        if not used_cc and not no_sa:
             if not self._try_common_cause(state, mode="MARCH"):
                 self._apply_howe_fni(state)
                 self._skirmish_then_naval(state)
@@ -1357,6 +1406,10 @@ class BritishBot(BaseBot):
         targets.sort()
         chosen = [sid for _, sid in targets]
 
+        # Limited Command: cap to 1 space
+        if state.get("_limited"):
+            chosen = chosen[:1]
+
         # Affordability check: Battle costs 1 per space
         brit_res = state["resources"].get(C.BRITISH, 0)
         if brit_res < len(chosen):
@@ -1364,13 +1417,16 @@ class BritishBot(BaseBot):
         if not chosen:
             return False
 
-        # Common Cause before the battles
-        used_cc = self._try_common_cause(state)
+        # SA chain (skip in limited/no-SA slot)
+        no_sa = state.get("_limited") or state.get("_no_special")
+        if not no_sa:
+            # Common Cause before the battles
+            used_cc = self._try_common_cause(state)
 
-        # If no Common Cause, execute Skirmish/Naval loop first
-        if not used_cc:
-            self._apply_howe_fni(state)  # B38 Howe lowers FNI before SA
-            self._skirmish_then_naval(state)
+            # If no Common Cause, execute Skirmish/Naval loop first
+            if not used_cc:
+                self._apply_howe_fni(state)  # B38 Howe lowers FNI before SA
+                self._skirmish_then_naval(state)
 
         battle.execute(state, C.BRITISH, {}, chosen)
         return True
