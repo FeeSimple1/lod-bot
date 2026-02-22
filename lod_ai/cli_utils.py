@@ -109,12 +109,13 @@ def _prompt_input(label: str = "Select: ") -> str:
         return raw
 
 
-def _print_menu(prompt: str, options: List[Tuple[str, T]], *, allow_back: bool) -> None:
+def _print_menu(prompt: str, options: List[Tuple[str, T]], *, allow_back: bool,
+                 back_label: str = "Back") -> None:
     print(prompt)
     for idx, (label, _) in enumerate(options, 1):
         print(f"  {idx}. {label}")
     if allow_back:
-        print("  0. Back")
+        print(f"  0. {back_label}")
 
 
 def choose_one(prompt: str, options: Iterable[Tuple[str, T]], *, allow_back: bool = False) -> T | None:
@@ -149,7 +150,8 @@ def choose_multiple(
     chosen: List[T] = []
     while True:
         remaining = [item for item in opts if item[1] not in chosen]
-        _print_menu(prompt + " (select 0 when done)", remaining, allow_back=True)
+        _print_menu(prompt + " (select 0 when done)", remaining, allow_back=True,
+                     back_label="Done")
         raw = _prompt_input()
         if raw == "0":
             if len(chosen) < min_sel:
