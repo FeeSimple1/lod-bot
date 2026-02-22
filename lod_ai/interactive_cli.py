@@ -1051,6 +1051,9 @@ def _choose_scenario() -> Tuple[str, str]:
 
 
 def _choose_humans() -> List[str]:
+    num = choose_count("Number of human players:", min_val=0, max_val=4, default=1)
+    if num == 0:
+        return []
     factions = [
         (RC.BRITISH, RC.BRITISH),
         (RC.PATRIOTS, RC.PATRIOTS),
@@ -1058,10 +1061,10 @@ def _choose_humans() -> List[str]:
         (RC.INDIANS, RC.INDIANS),
     ]
     humans = choose_multiple(
-        "Select human-controlled factions (remaining will be bots):",
+        "Select human-controlled factions:",
         factions,
-        min_sel=0,
-        max_sel=4,
+        min_sel=num,
+        max_sel=num,
     )
     return humans
 
