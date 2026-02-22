@@ -275,10 +275,10 @@ def _bucket_for_card(card: dict) -> str:
 
 
 def _insert_wq(pile: list[dict], wq_card: dict, rng: random.Random) -> list[dict]:
-    """Insert *wq_card* into the bottom 5 cards of *pile*."""
+    """Insert *wq_card* into the bottom 4 cards of *pile* (making 5), then shuffle."""
     if not pile:
         return [wq_card]
-    bottom = min(5, len(pile))
+    bottom = min(4, len(pile))
     top_cards = pile[:-bottom]
     bottom_cards = pile[-bottom:]
     bottom_cards.append(wq_card)

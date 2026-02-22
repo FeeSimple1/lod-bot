@@ -1,4 +1,5 @@
 import json
+import random
 import re
 from lod_ai.state import setup_state, map_loader
 from lod_ai import rules_consts as C
@@ -113,3 +114,26 @@ def test_unavailable_format_b_keys(tmp_path, monkeypatch):
     assert state["unavailable"][C.REGULAR_BRI] == 1
     assert state["available"][C.REGULAR_FRE] == C.MAX_REGULAR_FRE - 2
     assert state["unavailable"][C.REGULAR_FRE] == 2
+
+
+def test_wq_insertion_bottom_4():
+    """Winter Quarters card must be shuffled into bottom 4 event cards only (rulebook setup)."""
+    from lod_ai.state.setup_state import _insert_wq
+
+    # Create a 10-card pile with identifiable cards
+    pile = [{"id": i, "title": f"Event {i}"} for i in range(10)]
+    wq = {"id": 99, "title": "Winter Quarters", "winter_quarters": True}
+
+    # Run 1000 times and track where WQ lands
+    positions = []
+    for seed in range(1000):
+        rng = random.Random(seed)
+        result = _insert_wq(list(pile), wq, rng)
+        pos = next(i for i, c in enumerate(result) if c["id"] == 99)
+        positions.append(pos)
+
+    # Pile is 11 cards (10 events + 1 WQ). WQ should only appear in
+    # positions 6-10 (the last 5 cards = bottom 4 events + WQ shuffled).
+    # It should NEVER appear in positions 0-5.
+    assert min(positions) >= 6, f"WQ appeared at position {min(positions)}, earliest allowed is 6"
+    assert max(positions) <= 10
