@@ -113,13 +113,27 @@ def display_board_state(state: Dict[str, Any]) -> None:
 
     # Leaders with locations
     leaders = state.get("leaders", {})
-    leader_locs = state.get("leader_locs", {})
+    faction_leaders = {
+        RC.BRITISH: ["LEADER_GAGE", "LEADER_HOWE", "LEADER_CLINTON"],
+        RC.PATRIOTS: ["LEADER_WASHINGTON"],
+        RC.FRENCH: ["LEADER_ROCHAMBEAU", "LEADER_LAUZUN"],
+        RC.INDIANS: ["LEADER_BRANT", "LEADER_CORNPLANTER", "LEADER_DRAGGING_CANOE"],
+    }
     leader_parts = []
-    for fac in (RC.BRITISH, RC.PATRIOTS, RC.INDIANS, RC.FRENCH):
-        name = leaders.get(fac, "?")
-        loc = leader_locs.get(name, "?")
-        leader_parts.append(f"{fac}={name} @{loc}")
-    print(f"Leaders:  {', '.join(leader_parts)}")
+    for fac in (RC.BRITISH, RC.PATRIOTS, RC.FRENCH, RC.INDIANS):
+        active = []
+        for lid in faction_leaders.get(fac, []):
+            loc = leaders.get(lid)
+            if loc:  # on the map
+                name = lid.replace("LEADER_", "").replace("_", " ").title()
+                active.append(f"{name} @{loc}")
+        if active:
+            leader_parts.append(f"{fac}: {', '.join(active)}")
+        else:
+            leader_parts.append(f"{fac}: (none on map)")
+    print("Leaders:")
+    for part in leader_parts:
+        print(f"  {part}")
 
     # Eligibility
     elig = state.get("eligible", {})
