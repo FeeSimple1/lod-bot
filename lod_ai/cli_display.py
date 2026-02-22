@@ -211,30 +211,38 @@ def display_board_state(state: Dict[str, Any]) -> None:
 
 def display_card(card: Dict[str, Any], upcoming: Dict[str, Any] | None = None,
                  eligible: Dict[str, bool] | None = None) -> None:
-    """Display the current card in a bordered box."""
+    """Display the current card in a bordered box with faction icons inline."""
     cid = card.get("id", "?")
     title = card.get("title", "Unknown")
     order = card.get("order", [])
-    order_str = ", ".join(str(f) for f in order) if order else str(card.get("order_icons", ""))
+    faction_icons = card.get("faction_icons", {})
 
-    # Determine eligible factions
-    elig = eligible or {}
-    elig_facs = [f for f in order if elig.get(f, True)] if order else []
-    first_elig = elig_facs[0] if len(elig_facs) > 0 else "?"
-    second_elig = elig_facs[1] if len(elig_facs) > 1 else "?"
-
-    # Sword icon info
-    sword = card.get("sword", False)
-    sword_str = "  [Sword: must skip Event]" if sword else ""
+    # Build order string with icon suffixes per faction
+    order_parts = []
+    for fac in order:
+        icon = faction_icons.get(fac, "")
+        suffix = ""
+        if icon == "SWORD":
+            suffix = "[S]"
+        elif icon == "MUSKET":
+            suffix = "[M]"
+        order_parts.append(f"{fac}{suffix}")
+    order_str = ", ".join(order_parts) if order_parts else str(card.get("order_icons", ""))
 
     content_lines = [
         f"  Card {cid}: {title}",
         f"  Order: {order_str}",
-        f"  1st Eligible: {first_elig}",
-        f"  2nd Eligible: {second_elig}",
     ]
-    if sword_str:
-        content_lines.append(sword_str)
+
+    # Add icon legend only if icons are present
+    has_sword = any(v == "SWORD" for v in faction_icons.values())
+    has_musket = any(v == "MUSKET" for v in faction_icons.values())
+    if has_sword or has_musket:
+        content_lines.append("")  # blank line before legend
+    if has_sword:
+        content_lines.append("  [S] = Sword (must skip Event)")
+    if has_musket:
+        content_lines.append("  [M] = Musket (2nd Eligible: Limited Command only)")
 
     if card.get("winter_quarters"):
         content_lines.append("  ** WINTER QUARTERS **")
