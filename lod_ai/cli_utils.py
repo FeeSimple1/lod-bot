@@ -173,20 +173,17 @@ def choose_multiple(
 
 
 def choose_count(prompt: str, *, min_val: int = 0, max_val: int = 10, default: int | None = None) -> int:
-    numbers = list(range(min_val, max_val + 1))
-    options = [(str(n), n) for n in numbers]
-    if default is not None and default in numbers:
-        prompt = f"{prompt} (default {default})"
+    default_hint = f" (default {default})" if default is not None else ""
     while True:
-        _print_menu(prompt, options, allow_back=False)
+        print(f"{prompt}{default_hint} [{min_val}-{max_val}]")
         raw = _prompt_input()
         if raw == "" and default is not None:
             return default
         try:
-            idx = int(raw)
+            val = int(raw)
         except ValueError:
-            print("Enter a number from the list.")
+            print(f"Enter a number from {min_val} to {max_val}.")
             continue
-        if 1 <= idx <= len(options):
-            return options[idx - 1][1]
-        print("Invalid choice.")
+        if min_val <= val <= max_val:
+            return val
+        print(f"Enter a number from {min_val} to {max_val}.")
