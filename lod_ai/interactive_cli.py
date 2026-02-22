@@ -1193,14 +1193,27 @@ def main() -> None:
             continue
 
         # Normal card play
-        # Snapshot before bot turns
+        # Snapshot before bot turns (updated after each turn in callback)
         pre_snap = _snapshot_state(engine.state)
 
         # Store first action marker for human context display
         engine.state["_first_action_this_card"] = None
 
+        def _post_turn_cb(faction, result, card):
+            nonlocal pre_snap
+            if faction not in engine.human_factions:
+                display_bot_summary(faction, engine.state, pre_snap, result)
+                raw = pause_for_player()
+                if raw in ("status", "s"):
+                    display_board_state(engine.state)
+            # Track first action
+            if engine.state.get("_first_action_this_card") is None:
+                engine.state["_first_action_this_card"] = result
+            # Update snapshot so the next turn's diff is accurate
+            pre_snap = _snapshot_state(engine.state)
+
         try:
-            actions = engine.play_card(card, human_decider=_human_decider)
+            actions = engine.play_card(card, human_decider=_human_decider, post_turn_callback=_post_turn_cb)
         except Exception as exc:
             tb_str = traceback.format_exc()
             print(f"\nCRASH during play_card: {exc}")
@@ -1217,17 +1230,6 @@ def main() -> None:
         # Record stats from this card
         _record_turn_stats(game_stats, engine.state)
         game_stats["cards_played"] += 1
-
-        # Show bot summaries for non-human factions
-        for fac, result in actions:
-            if fac not in engine.human_factions:
-                display_bot_summary(fac, engine.state, pre_snap, result)
-                raw = pause_for_player()
-                if raw in ("status", "s"):
-                    display_board_state(engine.state)
-            # Track first action
-            if engine.state.get("_first_action_this_card") is None:
-                engine.state["_first_action_this_card"] = result
 
         # Clean up temp marker
         engine.state.pop("_first_action_this_card", None)
