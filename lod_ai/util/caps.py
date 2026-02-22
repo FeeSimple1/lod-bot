@@ -124,7 +124,7 @@ def enforce_global_caps(state: Dict) -> None:
         # B. West Indies restrictions
         if sid == WEST_INDIES_ID:
             for tag, qty in list(sp.items()):
-                if not isinstance(qty, int):
+                if not isinstance(qty, int) or qty <= 0:
                     continue
                 if tag not in WEST_INDIES_ALLOWED:
                     remove_piece(state, tag, sid, qty, to="available")
@@ -133,7 +133,7 @@ def enforce_global_caps(state: Dict) -> None:
         # C. Indians may not occupy a City space (assuming space meta flag)
         if map_adj.is_city(sid):
             for tag, qty in list(sp.items()):
-                if not isinstance(qty, int):
+                if not isinstance(qty, int) or qty <= 0:
                     continue
                 if _indian_tag(tag):
                     remove_piece(state, tag, sid, qty, to="available")
