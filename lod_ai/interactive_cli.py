@@ -917,6 +917,22 @@ def _human_decider(faction: str, card: dict, allowed: Dict[str, Any], engine: En
     slot = "1st Eligible" if first_action is None else "2nd Eligible"
     display_turn_context(faction, engine.state, slot=slot, card=card)
 
+    # Show event text before the action menu so the player can make an informed choice
+    faction_icons = card.get("faction_icons", {})
+    can_play_event = allowed.get("event_allowed", False) and "event" in allowed.get("actions", set())
+    has_sword = faction_icons.get(faction) == "SWORD"
+    if can_play_event and not has_sword:
+        unshaded = card.get("unshaded_event", "")
+        shaded = card.get("shaded_event", "")
+        if unshaded or shaded:
+            print()
+            print(f"  Event: {card.get('title', '?')}")
+            if unshaded:
+                print(f"    Unshaded: {unshaded}")
+            if shaded:
+                print(f"    Shaded:   {shaded}")
+            print()
+
     while True:
         actions = []
         if "pass" in allowed["actions"]:

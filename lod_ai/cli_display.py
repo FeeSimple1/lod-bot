@@ -258,8 +258,27 @@ def display_card(card: Dict[str, Any], upcoming: Dict[str, Any] | None = None,
     if upcoming:
         uid = upcoming.get("id", "?")
         utitle = upcoming.get("title", "Unknown")
-        wq_flag = " [Winter Quarters]" if upcoming.get("winter_quarters") else ""
-        print(f"  Upcoming: Card {uid} -- {utitle}{wq_flag}")
+        wq_flag = " ** WINTER QUARTERS **" if upcoming.get("winter_quarters") else ""
+
+        # Build order string with icons, same format as current card
+        up_order = upcoming.get("order", [])
+        up_icons = upcoming.get("faction_icons", {})
+        up_order_parts = []
+        for fac in up_order:
+            icon = up_icons.get(fac, "")
+            suffix = ""
+            if icon == "SWORD":
+                suffix = "[S]"
+            elif icon == "MUSKET":
+                suffix = "[M]"
+            up_order_parts.append(f"{fac}{suffix}")
+        up_order_str = ", ".join(up_order_parts) if up_order_parts else ""
+
+        print(f"\n  Upcoming: Card {uid} -- {utitle}")
+        if wq_flag:
+            print(f"  {wq_flag}")
+        if up_order_str:
+            print(f"  Order: {up_order_str}")
     print()
 
 
