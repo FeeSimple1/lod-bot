@@ -152,15 +152,27 @@ def display_board_state(state: Dict[str, Any]) -> None:
     # --- Markers ---
     print("\n--- Markers ---")
     markers = state.get("markers", {})
-    for tag in (RC.PROPAGANDA, RC.RAID, RC.BLOCKADE):
-        entry = markers.get(tag, {"pool": 0, "on_map": set()})
-        pool = entry.get("pool", 0)
+
+    for tag, total in ((RC.PROPAGANDA, 12), (RC.RAID, 12)):
+        entry = markers.get(tag, {"pool": total, "on_map": set()})
+        pool = entry.get("pool", total)
         on_map = entry.get("on_map", set())
+        placed = len(on_map)
         if on_map:
             spaces_str = ", ".join(sorted(on_map))
-            print(f"  {tag:12s}: Pool={pool}, On map: {spaces_str}")
+            print(f"  {tag:12s}: {placed} on map ({pool} remaining) -- {spaces_str}")
         else:
-            print(f"  {tag:12s}: Pool={pool}, On map: (none)")
+            print(f"  {tag:12s}: 0 on map ({pool} remaining)")
+
+    # Blockade is different — pool = Squadrons in WI, on_map = blockaded cities
+    bloc = markers.get(RC.BLOCKADE, {"pool": 0, "on_map": set()})
+    bloc_pool = bloc.get("pool", 0)
+    bloc_cities = bloc.get("on_map", set())
+    if bloc_cities:
+        cities_str = ", ".join(sorted(bloc_cities))
+        print(f"  {'Blockade':12s}: {bloc_pool} in West Indies, {len(bloc_cities)} on cities -- {cities_str}")
+    else:
+        print(f"  {'Blockade':12s}: {bloc_pool} in West Indies, 0 on cities")
 
     # --- Per-space summary ---
     print("\n--- Spaces ---")
@@ -246,6 +258,17 @@ def display_card(card: Dict[str, Any], upcoming: Dict[str, Any] | None = None,
         f"  Card {cid}: {title}",
         f"  Order: {order_str}",
     ]
+
+    # Eligibility line
+    if eligible:
+        elig = eligible or {}
+        elig_parts = []
+        for fac in order:
+            if elig.get(fac, True):
+                elig_parts.append(fac)
+            else:
+                elig_parts.append(f"({fac})")  # parentheses = ineligible
+        content_lines.append(f"  Eligible: {', '.join(elig_parts)}")
 
     # Add icon legend only if icons are present
     has_sword = any(v == "SWORD" for v in faction_icons.values())
