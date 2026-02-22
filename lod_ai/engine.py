@@ -909,8 +909,14 @@ class Engine:
     # -------------------------------------------------------------------
     # Main card resolution
     # -------------------------------------------------------------------
-    def play_card(self, card: dict, human_decider: Callable[..., Tuple[dict, bool, dict, dict]] | None = None) -> List[Tuple[str, dict]]:
-        """Execute all eligible turns for *card* (bot- and human-aware)."""
+    def play_card(self, card: dict, human_decider: Callable[..., Tuple[dict, bool, dict, dict]] | None = None, post_turn_callback: Callable[..., None] | None = None) -> List[Tuple[str, dict]]:
+        """Execute all eligible turns for *card* (bot- and human-aware).
+
+        *post_turn_callback*, when provided, is called after each faction's
+        turn resolves (and the log entry is recorded) but before the next
+        faction acts.  Signature: ``callback(faction, result, card)``.
+        This lets the CLI display bot summaries *before* a human is prompted.
+        """
         queue = self._prepare_card(card)
         self.state['_card_turn_log'] = []
         if card.get("winter_quarters"):
@@ -962,6 +968,11 @@ class Engine:
                 _log_entry['event_card_id'] = card.get('id')
                 _log_entry['event_side'] = result.get('event_side')
             self.state.setdefault('_card_turn_log', []).append(_log_entry)
+
+            # Fire the post-turn callback so the CLI can display bot
+            # summaries before the next faction (possibly human) acts.
+            if post_turn_callback and result.get("action") != "pass":
+                post_turn_callback(faction, result, card)
 
             if result.get("action") == "pass":
                 continue
