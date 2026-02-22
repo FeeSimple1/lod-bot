@@ -1051,9 +1051,6 @@ def _choose_scenario() -> Tuple[str, str]:
 
 
 def _choose_humans() -> List[str]:
-    num = choose_count("Number of human players:", min_val=0, max_val=4, default=1)
-    if num == 0:
-        return []
     factions = [
         (RC.BRITISH, RC.BRITISH),
         (RC.PATRIOTS, RC.PATRIOTS),
@@ -1061,23 +1058,19 @@ def _choose_humans() -> List[str]:
         (RC.INDIANS, RC.INDIANS),
     ]
     humans = choose_multiple(
-        "Select human-controlled factions:",
+        "Select human-controlled factions (remaining will be bots):",
         factions,
-        min_sel=num,
-        max_sel=num,
+        min_sel=0,
+        max_sel=4,
     )
     return humans
 
 
 def _choose_seed() -> int:
-    seeds = [(str(s), s) for s in (1, 2, 3, 4, 5)]
-    seeds.append(("Random (based on time)", None))
-    choice = choose_one("Select RNG seed:", seeds)
-    if choice is None:
-        import random
-
-        return random.randint(1, 10_000)
-    return int(choice)
+    import random
+    seed = random.randint(1, 10_000)
+    print(f"  RNG seed: {seed}")
+    return seed
 
 
 # ---------------------------------------------------------------------------
@@ -1093,8 +1086,8 @@ def main() -> None:
     print()
 
     scenario, deck_method = _choose_scenario()
-    seed = _choose_seed()
     human_factions = _choose_humans()
+    seed = _choose_seed()
 
     # Setup confirmation loop
     while True:
@@ -1103,8 +1096,8 @@ def main() -> None:
         if confirm:
             break
         scenario, deck_method = _choose_scenario()
-        seed = _choose_seed()
         human_factions = _choose_humans()
+        seed = _choose_seed()
 
     initial_state = build_state(scenario, seed=seed, setup_method=deck_method)
     # Store setup metadata in state for reports
