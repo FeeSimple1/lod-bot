@@ -148,12 +148,18 @@ def choose_multiple(
     if not opts:
         raise ValueError("No options available.")
     chosen: List[T] = []
+    exact_count = max_sel is not None and min_sel == max_sel
     while True:
         remaining = [item for item in opts if item[1] not in chosen]
-        _print_menu(prompt + " (select 0 when done)", remaining, allow_back=True,
-                     back_label="Done")
+        picks_left = (max_sel - len(chosen)) if max_sel is not None else None
+        if exact_count:
+            header = f"{prompt} (pick {picks_left})"
+            _print_menu(header, remaining, allow_back=False)
+        else:
+            header = f"{prompt} (select 0 when done)"
+            _print_menu(header, remaining, allow_back=True, back_label="Done")
         raw = _prompt_input()
-        if raw == "0":
+        if raw == "0" and not exact_count:
             if len(chosen) < min_sel:
                 print(f"Select at least {min_sel} option(s).")
                 continue

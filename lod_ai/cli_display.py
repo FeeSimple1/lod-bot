@@ -209,6 +209,19 @@ def display_board_state(state: Dict[str, Any]) -> None:
 # 2. Card display (fancy box)
 # ---------------------------------------------------------------------------
 
+def _print_event_text(card: Dict[str, Any]) -> None:
+    """Print shaded/unshaded event text for a card, if any."""
+    if card.get("winter_quarters"):
+        return
+    unshaded = card.get("unshaded_event", "")
+    shaded = card.get("shaded_event", "")
+    if unshaded or shaded:
+        if unshaded:
+            print(f"    Unshaded: {unshaded}")
+        if shaded:
+            print(f"    Shaded:   {shaded}")
+
+
 def display_card(card: Dict[str, Any], upcoming: Dict[str, Any] | None = None,
                  eligible: Dict[str, bool] | None = None) -> None:
     """Display the current card in a bordered box with faction icons inline."""
@@ -255,6 +268,9 @@ def display_card(card: Dict[str, Any], upcoming: Dict[str, Any] | None = None,
         print("\u2551" + f" {line:<{max_width - 1}}" + "\u2551")
     print("\u255A" + "\u2550" * max_width + "\u255D")
 
+    # Current card event text
+    _print_event_text(card)
+
     if upcoming:
         uid = upcoming.get("id", "?")
         utitle = upcoming.get("title", "Unknown")
@@ -279,6 +295,10 @@ def display_card(card: Dict[str, Any], upcoming: Dict[str, Any] | None = None,
             print(f"  {wq_flag}")
         if up_order_str:
             print(f"  Order: {up_order_str}")
+
+        # Upcoming card event text
+        _print_event_text(upcoming)
+
     print()
 
 
