@@ -485,9 +485,26 @@ def _muster_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
         _log_empty_menu(engine.state, faction, "Muster")
         raise ValueError("No spaces available for Muster.")
     if faction == RC.BRITISH:
+        # Filter to spaces adjacent to British Regulars/Forts (meaningful
+        # for Tory placement or already containing British power).
+        brit_options = []
+        for label, sid in options:
+            sp = engine.state["spaces"].get(sid, {})
+            has_brit = sp.get(RC.REGULAR_BRI, 0) > 0 or sp.get(RC.FORT_BRI, 0) > 0
+            adj_brit = any(
+                engine.state["spaces"].get(nbr, {}).get(RC.REGULAR_BRI, 0) > 0
+                or engine.state["spaces"].get(nbr, {}).get(RC.FORT_BRI, 0) > 0
+                for nbr in engine.state.get("spaces", {})
+                if map_adj.is_adjacent(sid, nbr)
+            )
+            if has_brit or adj_brit:
+                brit_options.append((label, sid))
+        if not brit_options:
+            _log_empty_menu(engine.state, faction, "Muster")
+            raise ValueError("No spaces adjacent to British Regulars or Forts for Muster.")
         selected = choose_multiple(
             "Select Muster spaces:",
-            options,
+            brit_options,
             min_sel=1,
             max_sel=1 if limited else None,
         )
@@ -521,7 +538,18 @@ def _muster_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
             reward_levels=reward_levels,
         )
     else:
-        selected = [choose_one("Select City/Colony for French Muster:", options)]
+        # §3.5.3: French Muster may select one Colony or City with
+        # Rebellion Control, or the West Indies.
+        french_options = []
+        for label, sid in options:
+            if sid == RC.WEST_INDIES_ID:
+                french_options.append((label, sid))
+            elif engine.state.get("control", {}).get(sid) == "REBELLION":
+                french_options.append((label, sid))
+        if not french_options:
+            _log_empty_menu(engine.state, faction, "Muster")
+            raise ValueError("No spaces with Rebellion Control (or West Indies) for French Muster.")
+        selected = [choose_one("Select City/Colony for French Muster:", french_options)]
         return lambda s, c: muster.execute(s, faction, c, selected)
 
 
@@ -810,7 +838,17 @@ def _special_wizard(state: Dict[str, Any], faction: str) -> Callable[[dict, dict
                 lambda s, c: skirmish.execute(s, RC.FRENCH, c, choose_one("Skirmish space:", skirmish_spaces), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3)),
             ))
         bloc = state.setdefault("markers", {}).setdefault(RC.BLOCKADE, {"pool": 0, "on_map": set()})
-        naval_spaces = _legal_space_list("Naval Pressure", lambda s, c, sid: naval_pressure.execute(s, RC.FRENCH, c, city_choice=sid))
+        # Only test cities for Naval Pressure blockade placement
+        city_filter = lambda sid, _sp: map_adj.is_city(sid)
+        naval_spaces = []
+        for sid, _ in _space_options(state, city_filter):
+            test_state = deepcopy(state)
+            test_ctx: dict = {}
+            try:
+                naval_pressure.execute(test_state, RC.FRENCH, test_ctx, city_choice=sid)
+            except Exception:
+                continue
+            naval_spaces.append((sid, sid))
         if naval_spaces or bloc.get("pool", 0) == 0 and bloc.get("on_map"):
             def _french_naval_runner(s: dict, c: dict) -> Any:
                 current_bloc = s.setdefault("markers", {}).setdefault(RC.BLOCKADE, {"pool": 0, "on_map": set()})
@@ -820,10 +858,11 @@ def _special_wizard(state: Dict[str, Any], faction: str) -> Callable[[dict, dict
                 existing = list(current_bloc.get("on_map", set()))
                 if not existing:
                     raise ValueError("No Blockades available for Naval Pressure.")
-                cities = _space_options(s)
+                # Only show cities for rearrangement
+                city_opts = _space_options(s, lambda sid, _sp: map_adj.is_city(sid))
                 selection = choose_multiple(
                     f"Select {len(existing)} cities to host Blockades after rearrange:",
-                    cities,
+                    city_opts,
                     min_sel=len(existing),
                     max_sel=len(existing),
                 )
@@ -1017,15 +1056,17 @@ def _human_decider(faction: str, card: dict, allowed: Dict[str, Any], engine: En
         engine.state.setdefault("_cli_rejection_log", []).append(rejection_entry)
 
         # Show specific rejection reason
+        action_type = result.get("action", "(none)")
         reason_msgs = {
-            "action_type_not_allowed": "That action type is not allowed in this slot.",
+            "action_type_not_allowed": f"Action type '{action_type}' is not allowed in this slot.",
             "event_not_allowed": "Events are not allowed as 2nd Eligible after a Command.",
             "limited_used_special": "Limited Command does not allow a Special Activity.",
             "special_forbidden": "Special Activities are not allowed in this slot.",
-            "no_affected_spaces": "Action affected 0 spaces -- at least 1 required.",
+            "no_affected_spaces": "Command affected 0 spaces -- at least 1 required.",
         }
         if "limited_wrong_count" in illegal_reason:
-            msg = "Limited Command allows only 1 space."
+            affected = (sim_state or {}).get("_turn_affected_spaces", set())
+            msg = f"Limited Command must affect exactly 1 space (affected {len(affected)})."
         else:
             msg = reason_msgs.get(illegal_reason, f"Not legal for this slot: {illegal_reason}")
         print(f"  {msg} Please choose again.")

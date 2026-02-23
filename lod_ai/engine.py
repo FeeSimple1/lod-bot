@@ -430,6 +430,7 @@ class Engine:
     def _ensure_result_dict(self, result: Any, state: dict, notes: str = "") -> dict:
         if not isinstance(result, dict):
             result = {"action": "command", "notes": notes}
+        result.setdefault("action", "command")
         result.setdefault("used_special", bool(state.get("_turn_used_special")))
         return result
 
