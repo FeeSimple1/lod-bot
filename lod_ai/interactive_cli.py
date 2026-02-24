@@ -1153,48 +1153,23 @@ def _choose_seed() -> int:
 # Main entry
 # ---------------------------------------------------------------------------
 
-def main() -> None:
-    print("Liberty or Death -- Interactive CLI")
-    print("Commands at any prompt:")
-    print("  status/s  - board state    history/h - log")
-    print("  victory/v - margins        bug/b     - file bug report")
-    print("  quit/q    - exit game")
-    print()
+def _game_loop(engine: Engine, game_stats: Dict[str, Any]) -> None:
+    """Main card-play loop shared by new game and load game paths."""
+    from lod_ai.save_game import save_game as _save_game
 
-    scenario, deck_method = _choose_scenario()
-    human_factions = _choose_humans()
-    seed = _choose_seed()
-
-    # Setup confirmation loop
-    while True:
-        display_setup_confirmation(scenario, deck_method, seed, human_factions)
-        confirm = choose_one("Start game?", [("Yes", True), ("No - re-select", False)])
-        if confirm:
-            break
-        scenario, deck_method = _choose_scenario()
-        human_factions = _choose_humans()
-        seed = _choose_seed()
-
-    initial_state = build_state(scenario, seed=seed, setup_method=deck_method)
-    # Store setup metadata in state for reports
-    initial_state["_seed"] = seed
-    initial_state["_scenario"] = scenario
-    initial_state["_setup_method"] = deck_method
-
-    engine = Engine(initial_state=initial_state, use_cli=True)
-    engine.set_human_factions(human_factions)
-
-    # Register state for meta-commands (pass engine too for bug reports)
-    set_game_state(engine.state, engine=engine)
-
-    # Initialize game stats tracker
-    game_stats = _new_game_stats(engine.human_factions)
-
-    print(f"\nGame start! (seed={seed}, method={deck_method})")
+    seed = engine.state.get("_seed", engine.state.get("seed", 0))
+    scenario = engine.state.get("_scenario", engine.state.get("scenario", "unknown"))
+    deck_method = engine.state.get("_setup_method", engine.state.get("setup_method", "standard"))
 
     game_ended = False
 
     while not game_ended:
+        # Auto-save between cards so we can resume from the last card
+        try:
+            _save_game(engine.state, engine.human_factions, filename="autosave")
+        except Exception:  # noqa: BLE001
+            pass  # auto-save failure is non-fatal
+
         card = engine.draw_card()
         if not card:
             print("No more cards in deck.")
@@ -1331,6 +1306,80 @@ def main() -> None:
         print("(Could not save game report)")
 
     print("Thanks for playing!")
+
+
+def main() -> None:
+    from lod_ai.save_game import list_saves, load_game
+
+    print("Liberty or Death -- Interactive CLI")
+    print("Commands at any prompt:")
+    print("  status/s  - board state    history/h - log")
+    print("  victory/v - margins        bug/b     - file bug report")
+    print("  save/w    - save game      quit/q    - exit game")
+    print()
+
+    # Check for existing saves
+    saves = list_saves()
+    if saves:
+        start_choice = choose_one("Start:", [
+            ("New Game", "new"),
+            ("Load Saved Game", "load"),
+        ])
+
+        if start_choice == "load":
+            save_options = [
+                (f"{s['filename']} | Seed {s['seed']} | {s['save_time'][:16]} | {', '.join(s['human_factions']) or 'all bots'}", s['filepath'])
+                for s in saves
+            ]
+            filepath = choose_one("Select save file:", save_options)
+            state, human_factions = load_game(filepath)
+
+            engine = Engine(initial_state=state, use_cli=True)
+            engine.set_human_factions(human_factions)
+            set_game_state(engine.state, engine=engine)
+
+            print(f"\n  Game loaded from: {filepath}")
+            print(f"  Seed: {state.get('_seed', state.get('seed', '?'))}")
+            hf_display = ', '.join(sorted(human_factions)) if human_factions else '(all bots)'
+            print(f"  Human factions: {hf_display}")
+            print()
+
+            game_stats = _new_game_stats(engine.human_factions)
+            _game_loop(engine, game_stats)
+            return
+
+    scenario, deck_method = _choose_scenario()
+    human_factions = _choose_humans()
+    seed = _choose_seed()
+
+    # Setup confirmation loop
+    while True:
+        display_setup_confirmation(scenario, deck_method, seed, human_factions)
+        confirm = choose_one("Start game?", [("Yes", True), ("No - re-select", False)])
+        if confirm:
+            break
+        scenario, deck_method = _choose_scenario()
+        human_factions = _choose_humans()
+        seed = _choose_seed()
+
+    initial_state = build_state(scenario, seed=seed, setup_method=deck_method)
+    # Store setup metadata in state for reports
+    initial_state["_seed"] = seed
+    initial_state["_scenario"] = scenario
+    initial_state["_setup_method"] = deck_method
+
+    engine = Engine(initial_state=initial_state, use_cli=True)
+    engine.set_human_factions(human_factions)
+
+    # Register state for meta-commands (pass engine too for bug reports)
+    set_game_state(engine.state, engine=engine)
+
+    # Initialize game stats tracker
+    game_stats = _new_game_stats(engine.human_factions)
+
+    print(f"\nGame start! (seed={seed}, method={deck_method})")
+
+    _game_loop(engine, game_stats)
 
 
 if __name__ == "__main__":

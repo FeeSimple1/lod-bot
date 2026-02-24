@@ -481,7 +481,7 @@ def display_bot_summary(faction: str, state: Dict[str, Any],
 
 def pause_for_player() -> str:
     """Pause and wait for player to press Enter. Returns any typed command."""
-    raw = input("[Press Enter to continue, or type 'status' for board state] ").strip().lower()
+    raw = input("[Press Enter to continue, or type 'status'/'save'] ").strip().lower()
     return raw
 
 
