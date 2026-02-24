@@ -39,7 +39,7 @@ from lod_ai.util.history import push_history
 from lod_ai.util.caps import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent
 from lod_ai.map import adjacency as map_adj
-from lod_ai.board.pieces      import remove_piece, add_piece        # NEW
+from lod_ai.board.pieces      import remove_piece, add_piece, move_piece
 from lod_ai.economy.resources import spend                          # NEW
 
 COMMAND_NAME = "SCOUT"          # auto-registered by commands/__init__.py
@@ -54,9 +54,8 @@ def _is_city(space_id: str) -> bool:
 
 
 def _move(state: Dict, tag: str, n: int, src_id: str, dst_id: str) -> None:
-    """Move *n* pieces of *tag* from src_id → dst_id via gate-keepers."""
-    remove_piece(state, tag, src_id, n)
-    add_piece(state,    tag, dst_id, n)
+    """Move *n* pieces of *tag* from src_id → dst_id directly."""
+    move_piece(state, tag, src_id, dst_id, n)
 
 # --------------------------------------------------------------------------- #
 # Public entry                                                                
