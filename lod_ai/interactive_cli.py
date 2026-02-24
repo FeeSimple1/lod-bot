@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, Tuple
 
 from lod_ai import rules_consts as RC
-from lod_ai.cli_utils import BackException, choose_count, choose_multiple, choose_one, choose_one_or_back, set_game_state
+from lod_ai.cli_utils import BackException, UndoException, choose_count, choose_multiple, choose_one, choose_one_or_back, set_game_state, set_undo_checkpoint
 from lod_ai.cli_display import (
     display_board_state,
     display_card,
@@ -1178,6 +1178,9 @@ def _game_loop(engine: Engine, game_stats: Dict[str, Any]) -> None:
             game_ended = True
             break
 
+        # Save undo checkpoint (full deep copy before any actions on this card)
+        set_undo_checkpoint(deepcopy(engine.state))
+
         # Display the card
         display_card(
             card,
@@ -1201,6 +1204,12 @@ def _game_loop(engine: Engine, game_stats: Dict[str, Any]) -> None:
             pre_snap = _snapshot_state(engine.state)
             try:
                 engine.play_card(card, human_decider=_human_decider)
+            except UndoException:
+                # Undo during Winter Quarters: state already restored,
+                # re-push card so draw_card() gets it again
+                engine.state.setdefault("deck", []).insert(0, card)
+                engine.state.pop("current_card", None)
+                continue
             except Exception as exc:
                 tb_str = traceback.format_exc()
                 print(f"\nCRASH during Winter Quarters: {exc}")
@@ -1262,6 +1271,12 @@ def _game_loop(engine: Engine, game_stats: Dict[str, Any]) -> None:
 
         try:
             actions = engine.play_card(card, human_decider=_human_decider, post_turn_callback=_post_turn_cb)
+        except UndoException:
+            # State already restored by the meta-command handler.
+            # Re-push the card so draw_card() gets it again next iteration.
+            engine.state.setdefault("deck", []).insert(0, card)
+            engine.state.pop("current_card", None)
+            continue
         except Exception as exc:
             tb_str = traceback.format_exc()
             print(f"\nCRASH during play_card: {exc}")
