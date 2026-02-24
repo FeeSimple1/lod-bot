@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, Tuple
 
 from lod_ai import rules_consts as RC
-from lod_ai.cli_utils import choose_count, choose_multiple, choose_one, set_game_state
+from lod_ai.cli_utils import BackException, choose_count, choose_multiple, choose_one, choose_one_or_back, set_game_state
 from lod_ai.cli_display import (
     display_board_state,
     display_card,
@@ -428,7 +428,7 @@ def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
         if not choices:
             raise ValueError(f"No legal Gather actions remain for {prov}.")
 
-        choice = choose_one(f"Choose Gather action for {prov}:", choices)
+        choice = choose_one_or_back(f"Choose Gather action for {prov}:", choices)
 
         if choice == "place_one":
             place_one.add(prov)
@@ -508,7 +508,7 @@ def _muster_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
             min_sel=1,
             max_sel=1 if limited else None,
         )
-        reg_space = choose_one("Place Regulars in which space?", [(s, s) for s in selected])
+        reg_space = choose_one_or_back("Place Regulars in which space?", [(s, s) for s in selected])
         available_regs = engine.state["available"].get(RC.REGULAR_BRI, 0)
         reg_num = choose_count("How many British Regulars to place? (max 6)", min_val=1, max_val=min(6, available_regs))
         tory_plan: Dict[str, int] = {}
@@ -549,7 +549,7 @@ def _muster_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
         if not french_options:
             _log_empty_menu(engine.state, faction, "Muster")
             raise ValueError("No spaces with Rebellion Control (or West Indies) for French Muster.")
-        selected = [choose_one("Select City/Colony for French Muster:", french_options)]
+        selected = [choose_one_or_back("Select City/Colony for French Muster:", french_options)]
         return lambda s, c: muster.execute(s, faction, c, selected)
 
 
@@ -558,11 +558,11 @@ def _scout_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
     if not options:
         _log_empty_menu(engine.state, faction, "Scout")
         raise ValueError("No War Parties available for Scout.")
-    src = choose_one("Select Scout source:", options)
+    src = choose_one_or_back("Select Scout source:", options)
     dest_options = _space_options(engine.state, lambda sid, _sp: map_adj.is_adjacent(src, sid))
     if not dest_options:
         raise ValueError("No adjacent destinations for Scout.")
-    dst = choose_one("Select Scout destination:", dest_options)
+    dst = choose_one_or_back("Select Scout destination:", dest_options)
     wp_avail = engine.state["spaces"][src].get(RC.WARPARTY_U, 0) + engine.state["spaces"][src].get(RC.WARPARTY_A, 0)
     n_wp = choose_count("War Parties to move:", min_val=1, max_val=wp_avail)
     n_reg = choose_count("British Regulars to move:", min_val=0, max_val=engine.state["spaces"][src].get(RC.REGULAR_BRI, 0))
@@ -650,7 +650,7 @@ def _raid_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict,
             should_move = True
 
         if should_move:
-            src = choose_one(
+            src = choose_one_or_back(
                 f"Select source for 1 Underground War Party into {dest}:",
                 [(s, s) for s in sources_list],
             )
@@ -678,8 +678,8 @@ def _garrison_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[d
     max_moves = 1 if limited else 3
     num_moves = choose_count("Number of Garrison moves:", min_val=1, max_val=max_moves)
     for idx in range(num_moves):
-        src = choose_one(f"Garrison move {idx+1} - Source City:", src_options)
-        dst = choose_one(f"Garrison move {idx+1} - Destination City:", _space_options(engine.state))
+        src = choose_one_or_back(f"Garrison move {idx+1} - Source City:", src_options)
+        dst = choose_one_or_back(f"Garrison move {idx+1} - Destination City:", _space_options(engine.state))
         max_reg = engine.state["spaces"][src].get(RC.REGULAR_BRI, 0)
         qty = choose_count(f"Regulars to move from {src} to {dst}:", min_val=1, max_val=max_reg)
         moves.setdefault(src, {})[dst] = qty
@@ -725,7 +725,7 @@ def _agent_mobilization_wizard(engine: Engine, faction: str, limited: bool) -> C
     if not options:
         _log_empty_menu(engine.state, faction, "Agent Mobilization")
         raise ValueError("No spaces available for Agent Mobilization.")
-    province = choose_one("Select Province for Agent Mobilization:", options)
+    province = choose_one_or_back("Select Province for Agent Mobilization:", options)
     place_continental = choose_one("Place Continental instead of Militia?", [("No", False), ("Yes", True)])
     return lambda s, c: french_agent_mobilization.execute(s, faction, c, province, place_continental=place_continental)
 
@@ -768,13 +768,13 @@ def _special_wizard(state: Dict[str, Any], faction: str) -> Callable[[dict, dict
         if naval_spaces:
             options.append((
                 "Naval Pressure",
-                lambda s, c: naval_pressure.execute(s, RC.BRITISH, c, city_choice=choose_one("Select City for Naval Pressure:", naval_spaces)),
+                lambda s, c: naval_pressure.execute(s, RC.BRITISH, c, city_choice=choose_one_or_back("Select City for Naval Pressure:", naval_spaces)),
             ))
         skirmish_spaces = _legal_space_list("Skirmish", lambda s, c, sid: skirmish.execute(s, RC.BRITISH, c, sid, option=1))
         if skirmish_spaces:
             options.append((
                 "Skirmish",
-                lambda s, c: skirmish.execute(s, RC.BRITISH, c, choose_one("Skirmish space:", skirmish_spaces), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3)),
+                lambda s, c: skirmish.execute(s, RC.BRITISH, c, choose_one_or_back("Skirmish space:", skirmish_spaces), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3)),
             ))
         cc_spaces = _legal_space_list("Common Cause", lambda s, c, sid: common_cause.execute(s, RC.BRITISH, c, [sid]))
         if cc_spaces:
@@ -792,7 +792,7 @@ def _special_wizard(state: Dict[str, Any], faction: str) -> Callable[[dict, dict
         if part_spaces:
             options.append((
                 "Partisans",
-                lambda s, c: partisans.execute(s, RC.PATRIOTS, c, choose_one("Partisans space:", part_spaces), option=choose_count("Option (1-3):", min_val=1, max_val=3)),
+                lambda s, c: partisans.execute(s, RC.PATRIOTS, c, choose_one_or_back("Partisans space:", part_spaces), option=choose_count("Option (1-3):", min_val=1, max_val=3)),
             ))
         persuasion_spaces = _legal_space_list("Persuasion", lambda s, c, sid: persuasion.execute(s, RC.PATRIOTS, c, spaces=[sid]))
         if persuasion_spaces:
@@ -809,33 +809,33 @@ def _special_wizard(state: Dict[str, Any], faction: str) -> Callable[[dict, dict
         if skirmish_spaces:
             options.append((
                 "Skirmish",
-                lambda s, c: skirmish.execute(s, RC.PATRIOTS, c, choose_one("Skirmish space:", skirmish_spaces), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3)),
+                lambda s, c: skirmish.execute(s, RC.PATRIOTS, c, choose_one_or_back("Skirmish space:", skirmish_spaces), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3)),
             ))
     elif faction == RC.INDIANS:
         plunder_spaces = _legal_space_list("Plunder", lambda s, c, sid: plunder.execute(s, RC.INDIANS, c, sid))
         if plunder_spaces:
             options.append((
                 "Plunder",
-                lambda s, c: plunder.execute(s, RC.INDIANS, c, choose_one("Province to Plunder:", plunder_spaces)),
+                lambda s, c: plunder.execute(s, RC.INDIANS, c, choose_one_or_back("Province to Plunder:", plunder_spaces)),
             ))
         trade_spaces = _legal_space_list("Trade", lambda s, c, sid: trade.execute(s, RC.INDIANS, c, sid, transfer=0))
         if trade_spaces:
             options.append((
                 "Trade",
-                lambda s, c: trade.execute(s, RC.INDIANS, c, choose_one("Province to Trade in:", trade_spaces), transfer=choose_count("Resource transfer (0=roll D3):", min_val=0, max_val=3)),
+                lambda s, c: trade.execute(s, RC.INDIANS, c, choose_one_or_back("Province to Trade in:", trade_spaces), transfer=choose_count("Resource transfer (0=roll D3):", min_val=0, max_val=3)),
             ))
         war_path_spaces = _legal_space_list("War Path", lambda s, c, sid: war_path.execute(s, RC.INDIANS, c, sid, option=1))
         if war_path_spaces:
             options.append((
                 "War Path",
-                lambda s, c: war_path.execute(s, RC.INDIANS, c, choose_one("Province for War Path:", war_path_spaces), option=choose_count("Option (1-3):", min_val=1, max_val=3)),
+                lambda s, c: war_path.execute(s, RC.INDIANS, c, choose_one_or_back("Province for War Path:", war_path_spaces), option=choose_count("Option (1-3):", min_val=1, max_val=3)),
             ))
     elif faction == RC.FRENCH:
         skirmish_spaces = _legal_space_list("Skirmish", lambda s, c, sid: skirmish.execute(s, RC.FRENCH, c, sid, option=1))
         if skirmish_spaces:
             options.append((
                 "Skirmish",
-                lambda s, c: skirmish.execute(s, RC.FRENCH, c, choose_one("Skirmish space:", skirmish_spaces), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3)),
+                lambda s, c: skirmish.execute(s, RC.FRENCH, c, choose_one_or_back("Skirmish space:", skirmish_spaces), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3)),
             ))
         bloc = state.setdefault("markers", {}).setdefault(RC.BLOCKADE, {"pool": 0, "on_map": set()})
         # Only test cities for Naval Pressure blockade placement
@@ -853,7 +853,7 @@ def _special_wizard(state: Dict[str, Any], faction: str) -> Callable[[dict, dict
             def _french_naval_runner(s: dict, c: dict) -> Any:
                 current_bloc = s.setdefault("markers", {}).setdefault(RC.BLOCKADE, {"pool": 0, "on_map": set()})
                 if current_bloc.get("pool", 0) > 0:
-                    city = choose_one("City to receive Blockade:", naval_spaces)
+                    city = choose_one_or_back("City to receive Blockade:", naval_spaces)
                     return naval_pressure.execute(s, RC.FRENCH, c, city_choice=city, rearrange_map=None)
                 existing = list(current_bloc.get("on_map", set()))
                 if not existing:
@@ -887,14 +887,14 @@ def _special_wizard(state: Dict[str, Any], faction: str) -> Callable[[dict, dict
         if prep_choices:
             options.append((
                 "Preparer la Guerre",
-                lambda s, c: preparer.execute(s, RC.FRENCH, c, choice=choose_one("Choose Preparer option:", prep_choices)),
+                lambda s, c: preparer.execute(s, RC.FRENCH, c, choice=choose_one_or_back("Choose Preparer option:", prep_choices)),
             ))
 
     if not options:
         return None
 
     options.append(("No Special Activity", None))
-    choice = choose_one("Select a Special Activity:", options)
+    choice = choose_one_or_back("Select a Special Activity:", options)
     return choice
 
 
@@ -945,7 +945,7 @@ def _command_runner_for(faction: str, engine: Engine, limited: bool) -> Callable
         _log_empty_menu(engine.state, faction, "(any command)")
         raise ValueError(f"No commands available for {faction}.")
 
-    runner_factory = choose_one("Select Command:", options)
+    runner_factory = choose_one_or_back("Select Command:", options)
     return runner_factory(engine, faction, limited)
 
 
@@ -1011,34 +1011,40 @@ def _human_decider(faction: str, card: dict, allowed: Dict[str, Any], engine: En
         else:  # command
             try:
                 command_runner = _command_runner_for(faction, engine, allowed.get("limited_only", False))
+
+                special_runner: Callable[[dict, dict], Any] | None = None
+                if choice == "command_special":
+                    preview_state = deepcopy(engine.state)
+                    preview_ctx = deepcopy(engine.ctx)
+                    try:
+                        command_runner(preview_state, preview_ctx)
+                        special_runner = _special_wizard(preview_state, faction)
+                    except BackException:
+                        raise
+                    except Exception as exc:  # noqa: BLE001
+                        print(f"Unable to add Special Activity: {exc}")
+                        special_runner = None
+
+                def _runner(state: dict, ctx: dict) -> Any:
+                    result = command_runner(state, ctx)
+                    if special_runner:
+                        special_runner(state, ctx)
+                    return result
+
+                runner = _runner
+            except BackException:
+                continue
             except ValueError as exc:
                 print(f"  Cannot execute: {exc}")
                 continue
-
-            special_runner: Callable[[dict, dict], Any] | None = None
-            if choice == "command_special":
-                preview_state = deepcopy(engine.state)
-                preview_ctx = deepcopy(engine.ctx)
-                try:
-                    command_runner(preview_state, preview_ctx)
-                    special_runner = _special_wizard(preview_state, faction)
-                except Exception as exc:  # noqa: BLE001
-                    print(f"Unable to add Special Activity: {exc}")
-                    special_runner = None
-
-            def _runner(state: dict, ctx: dict) -> Any:
-                result = command_runner(state, ctx)
-                if special_runner:
-                    special_runner(state, ctx)
-                return result
-
-            runner = _runner
 
         # Take snapshot before simulating for summary
         pre_snap = _snapshot_state(engine.state)
 
         try:
             result, legal, sim_state, sim_ctx = engine.simulate_action(faction, card, allowed, runner)
+        except BackException:
+            continue
         except Exception as exc:  # noqa: BLE001
             print(f"Action failed: {exc}")
             continue
