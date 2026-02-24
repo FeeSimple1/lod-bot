@@ -100,6 +100,14 @@ def _handle_meta_command(raw: str) -> bool:
     if cmd in ("bug", "b"):
         _save_bug_report()
         return True
+    if cmd in ("save", "w"):
+        if _engine_ref is not None:
+            from lod_ai.save_game import save_game
+            filepath = save_game(_engine_ref.state, _engine_ref.human_factions)
+            print(f"  Game saved to: {filepath}")
+        else:
+            print("(No game in progress to save.)")
+        return True
     if cmd in ("quit", "q"):
         print("\nExiting game. Goodbye!")
         sys.exit(0)
