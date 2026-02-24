@@ -12,11 +12,17 @@ class BackException(Exception):
     pass
 
 
+class UndoException(Exception):
+    """Raised when undo is triggered to restart the current card."""
+    pass
+
+
 # ---------------------------------------------------------------------------
 # Global state reference for meta-commands (set by interactive_cli.main)
 # ---------------------------------------------------------------------------
 _game_state = None
 _engine_ref = None  # optional Engine reference for bug reports
+_undo_checkpoint = None
 
 
 def set_game_state(state, engine=None) -> None:
@@ -24,6 +30,17 @@ def set_game_state(state, engine=None) -> None:
     global _game_state, _engine_ref
     _game_state = state
     _engine_ref = engine
+
+
+def set_undo_checkpoint(state_copy) -> None:
+    """Store a deep copy of the game state as an undo checkpoint."""
+    global _undo_checkpoint
+    _undo_checkpoint = state_copy
+
+
+def get_undo_checkpoint():
+    """Return the current undo checkpoint (or None)."""
+    return _undo_checkpoint
 
 
 def _save_bug_report() -> None:
@@ -91,11 +108,77 @@ def _handle_meta_command(raw: str) -> bool:
     if cmd in ("victory", "v"):
         if _game_state is not None:
             from lod_ai.cli_display import display_victory_margins
-            print()
+            from lod_ai.rules_consts import FORT_PAT, VILLAGE
+            print("\n  --- Victory Margins ---")
             display_victory_margins(_game_state)
+
+            # Show raw numbers that feed into the margins
+            sup_total = 0
+            opp_total = 0
+            for sid, lvl in _game_state.get("support", {}).items():
+                if lvl > 0:
+                    sup_total += lvl
+                elif lvl < 0:
+                    opp_total += abs(lvl)
+            cbc = _game_state.get("cbc", 0)
+            crc = _game_state.get("crc", 0)
+
+            forts = sum(
+                sp.get(FORT_PAT, 0)
+                for sp in _game_state.get("spaces", {}).values()
+            )
+            villages = sum(
+                sp.get(VILLAGE, 0)
+                for sp in _game_state.get("spaces", {}).values()
+            )
+
+            print(f"\n  Support Total: {sup_total}  |  Opposition Total: {opp_total}")
+            print(f"  CBC: {cbc}  |  CRC: {crc}")
+            print(f"  Patriot Forts: {forts}  |  Indian Villages: {villages}")
             print()
         else:
             print("(No game state available yet.)")
+        return True
+    if cmd in ("deck", "d"):
+        if _game_state is not None:
+            deck = _game_state.get("deck", [])
+            played = _game_state.get("played_cards", [])
+
+            # Find next Winter Quarters card
+            wq_distance = None
+            for i, c in enumerate(deck):
+                if isinstance(c, dict) and c.get("winter_quarters"):
+                    wq_distance = i + 1  # +1 because 0-indexed
+                    break
+
+            # Count remaining WQ cards
+            wq_remaining = sum(
+                1 for c in deck
+                if isinstance(c, dict) and c.get("winter_quarters")
+            )
+
+            print(f"\n  --- Deck ---")
+            print(f"  Cards played: {len(played)}")
+            print(f"  Cards remaining: {len(deck)}")
+            if wq_distance is not None:
+                print(f"  Next Winter Quarters: in {wq_distance} card{'s' if wq_distance != 1 else ''}")
+            else:
+                print(f"  Next Winter Quarters: none remaining in deck")
+            print(f"  Winter Quarters cards left: {wq_remaining}")
+            print()
+        else:
+            print("(No game state available yet.)")
+        return True
+    if cmd in ("undo", "u"):
+        if _undo_checkpoint is not None and _engine_ref is not None:
+            import copy
+            restored = copy.deepcopy(_undo_checkpoint)
+            _engine_ref.state.clear()
+            _engine_ref.state.update(restored)
+            print("  Undone! Replaying current card...")
+            raise UndoException()
+        else:
+            print("(No undo checkpoint available.)")
         return True
     if cmd in ("bug", "b"):
         _save_bug_report()
@@ -110,13 +193,15 @@ def _handle_meta_command(raw: str) -> bool:
         return True
     if cmd in ("help", "?"):
         print("\n  Available commands (can be typed at any prompt):")
-        print("    status / s   — Show full board state")
+        print("    status  / s  — Show full board state")
+        print("    victory / v  — Show victory margins for all factions")
+        print("    deck    / d  — Show cards played/remaining and next Winter Quarters")
         print("    history / h  — Show game log")
-        print("    victory / v  — Show victory margins")
-        print("    bug / b      — File a bug report")
-        print("    save / w     — Save game to file")
-        print("    help / ?     — Show this help")
-        print("    quit / q     — Exit game")
+        print("    undo    / u  — Revert to start of current card")
+        print("    bug     / b  — File a bug report")
+        print("    save    / w  — Save game to file")
+        print("    help    / ?  — Show this help")
+        print("    quit    / q  — Exit game")
         print()
         return True
     if cmd in ("quit", "q"):
