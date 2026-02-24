@@ -6,6 +6,12 @@ from typing import Iterable, List, Tuple, TypeVar
 
 T = TypeVar("T")
 
+
+class BackException(Exception):
+    """Raised when the user selects 'Back' in a menu."""
+    pass
+
+
 # ---------------------------------------------------------------------------
 # Global state reference for meta-commands (set by interactive_cli.main)
 # ---------------------------------------------------------------------------
@@ -135,6 +141,14 @@ def choose_one(prompt: str, options: Iterable[Tuple[str, T]], *, allow_back: boo
         if 1 <= idx <= len(opts):
             return opts[idx - 1][1]
         print("Invalid choice.")
+
+
+def choose_one_or_back(prompt: str, options: Iterable[Tuple[str, T]]) -> T:
+    """Like choose_one but raises BackException if user selects Back."""
+    result = choose_one(prompt, options, allow_back=True)
+    if result is None:
+        raise BackException()
+    return result
 
 
 def choose_multiple(
