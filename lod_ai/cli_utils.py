@@ -160,8 +160,15 @@ def _handle_meta_command(raw: str) -> bool:
             print(f"\n  --- Deck ---")
             print(f"  Cards played: {len(played)}")
             print(f"  Cards remaining: {len(deck)}")
+            mode = _game_state.get("_deck_display_mode", "exact")
             if wq_distance is not None:
-                print(f"  Next Winter Quarters: in {wq_distance} card{'s' if wq_distance != 1 else ''}")
+                if mode == "fuzzy":
+                    if wq_distance <= 4:
+                        print(f"  Next Winter Quarters: within the next 4 cards")
+                    else:
+                        print(f"  Next Winter Quarters: at least {wq_distance - 3} cards away")
+                else:
+                    print(f"  Next Winter Quarters: in {wq_distance} card{'s' if wq_distance != 1 else ''}")
             else:
                 print(f"  Next Winter Quarters: none remaining in deck")
             print(f"  Winter Quarters cards left: {wq_remaining}")
