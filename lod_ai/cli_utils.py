@@ -72,7 +72,7 @@ def _save_bug_report() -> None:
 
 
 def _handle_meta_command(raw: str) -> bool:
-    """Check for status/history/victory/bug/quit meta-commands. Returns True if handled."""
+    """Check for status/history/victory/bug/help/quit meta-commands. Returns True if handled."""
     cmd = raw.strip().lower()
     if cmd in ("status", "s"):
         if _game_state is not None:
@@ -107,6 +107,17 @@ def _handle_meta_command(raw: str) -> bool:
             print(f"  Game saved to: {filepath}")
         else:
             print("(No game in progress to save.)")
+        return True
+    if cmd in ("help", "?"):
+        print("\n  Available commands (can be typed at any prompt):")
+        print("    status / s   — Show full board state")
+        print("    history / h  — Show game log")
+        print("    victory / v  — Show victory margins")
+        print("    bug / b      — File a bug report")
+        print("    save / w     — Save game to file")
+        print("    help / ?     — Show this help")
+        print("    quit / q     — Exit game")
+        print()
         return True
     if cmd in ("quit", "q"):
         print("\nExiting game. Goodbye!")
