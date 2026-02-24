@@ -39,7 +39,7 @@ from lod_ai.util.caps        import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency   import is_adjacent
 from lod_ai.map import adjacency as map_adj
 from lod_ai.leaders          import apply_leader_modifiers
-from lod_ai.board.pieces      import remove_piece, add_piece          # NEW
+from lod_ai.board.pieces      import remove_piece, add_piece, move_piece
 from lod_ai.economy.resources import spend, can_afford               # NEW
 
 COMMAND_NAME = "MARCH"            # auto-registered by commands/__init__.py
@@ -64,8 +64,7 @@ def _pay_cost(
 def _move(state: Dict,
           tag: str, n: int,
           src_id: str, dst_id: str) -> None:
-    remove_piece(state, tag, src_id, n)
-    add_piece(state,    tag, dst_id, n)
+    move_piece(state, tag, src_id, dst_id, n)
 
 def _is_city(space_id: str) -> bool:
     return map_adj.space_type(space_id) == "City"
@@ -152,8 +151,7 @@ def execute(
                 return 0
             if sp_src.get(tag, 0) < count:
                 raise ValueError(f"Not enough {tag} in {src}.")
-            remove_piece(state, tag, src, count)
-            add_piece(state, tag, dst, count)
+            move_piece(state, tag, src, dst, count)
             moved_total += count
             return count
 
