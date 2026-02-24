@@ -979,10 +979,13 @@ def _human_decider(faction: str, card: dict, allowed: Dict[str, Any], engine: En
         if "event" in allowed["actions"] and allowed.get("event_allowed", False):
             actions.append(("Event", "event"))
         if "command" in allowed["actions"]:
-            label = "Command (Limited)" if allowed.get("limited_only") else "Command"
-            if allowed.get("special_allowed") and not allowed.get("limited_only"):
-                label += " + Special Activity"
-            actions.append((label, "command"))
+            if allowed.get("limited_only"):
+                actions.append(("Command (Limited)", "command_limited"))
+            elif allowed.get("special_allowed", False):
+                actions.append(("Command + Special Activity", "command_special"))
+                actions.append(("Command Only", "command_only"))
+            else:
+                actions.append(("Command", "command"))
 
         choice = choose_one(f"\n{faction} turn. Choose action:", actions)
 
@@ -1013,7 +1016,7 @@ def _human_decider(faction: str, card: dict, allowed: Dict[str, Any], engine: En
                 continue
 
             special_runner: Callable[[dict, dict], Any] | None = None
-            if allowed.get("special_allowed", False) and not allowed.get("limited_only", False):
+            if choice == "command_special":
                 preview_state = deepcopy(engine.state)
                 preview_ctx = deepcopy(engine.ctx)
                 try:
@@ -1039,6 +1042,13 @@ def _human_decider(faction: str, card: dict, allowed: Dict[str, Any], engine: En
         except Exception as exc:  # noqa: BLE001
             print(f"Action failed: {exc}")
             continue
+
+        # When the player chose "Command + Special Activity", mark
+        # used_special True so the 2nd eligible gets Event access per
+        # the COIN Sequence of Play, regardless of whether the SA
+        # wizard produced an actual activity.
+        if choice == "command_special":
+            result["used_special"] = True
 
         if legal:
             # Show structured summary of what the human action did
