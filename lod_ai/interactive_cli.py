@@ -1312,11 +1312,7 @@ def main() -> None:
     from lod_ai.save_game import list_saves, load_game
 
     print("Liberty or Death -- Interactive CLI")
-    print("Commands at any prompt:")
-    print("  status/s  - board state    history/h - log")
-    print("  victory/v - margins        bug/b     - file bug report")
-    print("  save/w    - save game      quit/q    - exit game")
-    print()
+    print("Type 'help' or '?' at any prompt for available commands\n")
 
     # Check for existing saves
     saves = list_saves()
