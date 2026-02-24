@@ -1373,11 +1373,17 @@ def main() -> None:
         human_factions = _choose_humans()
         seed = _choose_seed()
 
+    deck_display = choose_one("Deck info display:", [
+        ("Exact — show exact cards until Winter Quarters", "exact"),
+        ("Fuzzy — only show approximate range", "fuzzy"),
+    ])
+
     initial_state = build_state(scenario, seed=seed, setup_method=deck_method)
     # Store setup metadata in state for reports
     initial_state["_seed"] = seed
     initial_state["_scenario"] = scenario
     initial_state["_setup_method"] = deck_method
+    initial_state["_deck_display_mode"] = deck_display
 
     engine = Engine(initial_state=initial_state, use_cli=True)
     engine.set_human_factions(human_factions)
