@@ -51,7 +51,7 @@ def refresh_control(state: Dict[str, Any]) -> None:
 
         rebels = _tally(sp, REB_PREFIXES)
         bri = _tally(sp, BRI_PREFIXES)
-        ind = _tally(sp, IND_PREFIXES)
+        ind = _tally(sp, IND_PREFIXES) + sp.get("Village", 0)  # Villages are Indian pieces (§1.6.5)
         royalist = bri + ind
 
         control: str | None = None
