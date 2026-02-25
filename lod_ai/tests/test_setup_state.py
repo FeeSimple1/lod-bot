@@ -116,6 +116,45 @@ def test_unavailable_format_b_keys(tmp_path, monkeypatch):
     assert state["unavailable"][C.REGULAR_FRE] == 2
 
 
+def test_normalize_support_opposition_both_keys(tmp_path, monkeypatch):
+    """Bug fix: when a space has both Support=0 and Opposition=2, the
+    opposition value must not be silently dropped."""
+    scen = {
+        "scenario": "Test",
+        "spaces": {
+            "SpaceA": {"Support": 2, "Opposition": 0},
+            "SpaceB": {"Support": 0, "Opposition": 2},
+            "SpaceC": {"Support": 0, "Opposition": 1},
+            "SpaceD": {"Support": 1, "Opposition": 0},
+            "SpaceE": {"Support": 0, "Opposition": 0},
+        },
+        "resources": {"BRITISH": 0, "PATRIOTS": 0, "FRENCH": 0, "INDIANS": 0},
+    }
+    path = tmp_path / "scen_sup.json"
+    path.write_text(json.dumps(scen))
+    monkeypatch.setattr(setup_state, "_DATA_DIR", tmp_path)
+
+    state = setup_state.build_state(path.name, seed=1, setup_method="standard")
+
+    assert state["support"]["SpaceA"] == 2    # Active Support
+    assert state["support"]["SpaceB"] == -2   # Active Opposition
+    assert state["support"]["SpaceC"] == -1   # Passive Opposition
+    assert state["support"]["SpaceD"] == 1    # Passive Support
+    assert state["support"]["SpaceE"] == 0    # Neutral
+
+
+def test_1778_scenario_opposition_values():
+    """The 1778 scenario must have opposition values loaded, not zeroed."""
+    state = setup_state.build_state("1778", seed=42, setup_method="period")
+    # Per scenario data: Massachusetts should be Active Opposition (-2)
+    assert state["support"]["Massachusetts"] == -2
+    # Boston should be Passive Opposition (-1)
+    assert state["support"]["Boston"] == -1
+    # Check that total opposition spaces exist
+    opp_spaces = {sid: lvl for sid, lvl in state["support"].items() if lvl < 0}
+    assert len(opp_spaces) >= 7, f"Expected at least 7 opposition spaces, got {len(opp_spaces)}"
+
+
 def test_wq_insertion_bottom_4():
     """Winter Quarters card must be shuffled into bottom 4 event cards only (rulebook setup)."""
     from lod_ai.state.setup_state import _insert_wq

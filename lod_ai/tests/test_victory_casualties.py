@@ -301,6 +301,55 @@ class TestFinalWinterRound:
             f"Expected final scoring message in history, got: {history_msgs[-10:]}"
 
 
+class TestPopulationWeightedVictory:
+    """§1.6.2-1.6.3: Support/Opposition totals must be population-weighted."""
+
+    def test_summarize_board_multiplies_by_population(self):
+        """A pop-2 space at Active Support should contribute 4, not 2."""
+        from lod_ai.victory import _summarize_board
+        state = _base_state()
+        # Massachusetts is pop 2 in map.json
+        state["spaces"]["Massachusetts"] = {C.FORT_PAT: 0}
+        state["support"]["Massachusetts"] = 2  # Active Support
+        t = _summarize_board(state)
+        assert t["support"] == 4  # 2 (level) × 2 (pop) = 4
+
+    def test_summarize_board_opposition_population(self):
+        """A pop-2 space at Active Opposition should contribute 4."""
+        from lod_ai.victory import _summarize_board
+        state = _base_state()
+        state["spaces"]["Connecticut_Rhode_Island"] = {C.FORT_PAT: 0}
+        state["support"]["Connecticut_Rhode_Island"] = -2  # Active Opposition
+        t = _summarize_board(state)
+        assert t["opposition"] == 4  # 2 (level) × 2 (pop) = 4
+
+    def test_pop1_city_not_doubled(self):
+        """A pop-1 space at Active Support contributes exactly 2."""
+        from lod_ai.victory import _summarize_board
+        state = _base_state()
+        state["spaces"]["Boston"] = {}
+        state["support"]["Boston"] = 2  # Active Support, pop=1
+        t = _summarize_board(state)
+        assert t["support"] == 2  # 2 × 1 = 2
+
+    def test_reserve_pop0_contributes_nothing(self):
+        """A reserve space (pop=0) at any support level contributes 0."""
+        from lod_ai.victory import _summarize_board
+        state = _base_state()
+        state["spaces"]["Northwest"] = {}
+        state["support"]["Northwest"] = 2  # Active Support but pop=0
+        t = _summarize_board(state)
+        assert t["support"] == 0  # 2 × 0 = 0
+
+    def test_1778_scenario_totals(self):
+        """The 1778 scenario should produce Support=17, Opposition=16."""
+        from lod_ai.victory import _summarize_board
+        state = build_state("1778", seed=42, setup_method="period")
+        t = _summarize_board(state)
+        assert t["support"] == 17, f"Expected 17, got {t['support']}"
+        assert t["opposition"] == 16, f"Expected 16, got {t['opposition']}"
+
+
 class TestSetupStateInitialization:
     """Verify that build_state initializes cbc and crc to 0."""
 

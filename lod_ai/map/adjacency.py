@@ -60,6 +60,12 @@ def is_city(space_id: str) -> bool:
     return _TYPE.get(space_id) == "City"
 
 
+def population(space_id: str) -> int:
+    """Return the population value for *space_id* (0 for Reserves / unknown)."""
+    info = _RAW_MAP.get(space_id)
+    return info.get("population", 0) if info else 0
+
+
 def space_meta(space_id: str) -> Dict | None:
     """Return the raw map metadata for *space_id* or ``None`` if unknown."""
     return _RAW_MAP.get(space_id)

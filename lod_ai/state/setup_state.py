@@ -211,15 +211,18 @@ def _normalize_support(state: Dict[str, Any]) -> None:
     Populate state['support'] as {space_id: -2..+2} by reading each space's
     'Support' or 'Opposition' fields from state['spaces']. If neither is
     present, default to 0 (Neutral).
+
+    Support levels are stored as positive values (+1 Passive, +2 Active).
+    Opposition levels are stored as negative values (-1 Passive, -2 Active).
     """
     sup: Dict[str, int] = {}
     for sid, sp in state.get("spaces", {}).items():
-        if "Support" in sp:
-            sup[sid] = int(sp.pop("Support", 0))
-        elif "Opposition" in sp:
-            sup[sid] = -int(sp.pop("Opposition", 0))
-        elif "support" in sp:
-            sup[sid] = int(sp.pop("support", 0))
+        support_val = int(sp.pop("Support", sp.pop("support", 0)))
+        opposition_val = int(sp.pop("Opposition", sp.pop("opposition", 0)))
+        if support_val > 0:
+            sup[sid] = support_val
+        elif opposition_val > 0:
+            sup[sid] = -opposition_val
         else:
             sup[sid] = 0
     state["support"] = sup
