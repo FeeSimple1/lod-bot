@@ -119,14 +119,16 @@ def _count_controlled_spaces(state: dict) -> Dict[str, int]:
 
 
 def _support_opposition_totals(state: dict) -> Tuple[int, int]:
-    """Return (total_support, total_opposition) across all spaces."""
+    """Return (total_support, total_opposition) population-weighted per §1.6.2-1.6.3."""
+    from lod_ai.map.adjacency import population as _map_population
     sup = 0
     opp = 0
-    for lvl in state.get("support", {}).values():
+    for sid, lvl in state.get("support", {}).items():
+        pop = _map_population(sid)
         if lvl > 0:
-            sup += lvl
+            sup += lvl * pop
         elif lvl < 0:
-            opp += abs(lvl)
+            opp += abs(lvl) * pop
     return sup, opp
 
 
