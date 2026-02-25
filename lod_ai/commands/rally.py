@@ -69,6 +69,7 @@ from lod_ai.rules_consts import (
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent
+from lod_ai.map.adjacency    import population as _map_population, space_type as _space_type
 from lod_ai.board.pieces      import add_piece, remove_piece          # NEW
 from lod_ai.economy.resources import spend, can_afford               # NEW
 
@@ -83,8 +84,8 @@ def _support_value(state: Dict, space_id: str) -> int:
     return state.get("support", {}).get(space_id, NEUTRAL)
 
 
-def _is_indian_reserve(sp: Dict) -> bool:
-    return sp.get("indian_reserve", False)
+def _is_indian_reserve(space_id: str) -> bool:
+    return _space_type(space_id) == "Reserve"
 
 
 def _is_west_indies(space_id: str) -> bool:
@@ -211,7 +212,7 @@ def execute(
     # --- Phase 1: apply per‑space actions -----------------------------------
     for space_id in selected:
         sp = state["spaces"][space_id]
-        pop = sp.get("population", 0)
+        pop = _map_population(space_id)
         forts = sp.get(FORT_PAT, 0)
 
         if space_id in build_fort:
@@ -232,8 +233,7 @@ def execute(
     for space_id in place_one:
         if space_id in build_fort or space_id in bulk_place:
             continue
-        sp = state["spaces"][space_id]
-        if _is_indian_reserve(sp) or _is_west_indies(space_id):
+        if _is_indian_reserve(space_id) or _is_west_indies(space_id):
             raise ValueError("Cannot place Militia in Indian Reserve or West Indies.")
         _place_militia(state, space_id, 1)
 
@@ -243,10 +243,10 @@ def execute(
         forts = sp.get(FORT_PAT, 0)
         if forts == 0:
             raise ValueError("Bulk placement requires an existing Fort.")
-        max_n = forts + sp.get("population", 0)
+        max_n = forts + _map_population(space_id)
         if n > max_n:
             raise ValueError(f"Cannot place {n} Militia in {space_id}; limit is {max_n}.")
-        if _is_indian_reserve(sp) or _is_west_indies(space_id):
+        if _is_indian_reserve(space_id) or _is_west_indies(space_id):
             raise ValueError("Cannot place Militia in Indian Reserve or West Indies.")
         _place_militia(state, space_id, n)
 
