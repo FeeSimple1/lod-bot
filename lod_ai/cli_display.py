@@ -87,15 +87,16 @@ def display_board_state(state: Dict[str, Any]) -> None:
           f"Indians={res.get(RC.INDIANS, 0)}  "
           f"French={res.get(RC.FRENCH, 0)}")
 
-    # Support/Opposition totals
+    # Support/Opposition totals (population-weighted per §1.6.2-1.6.3)
     sup_total = 0
     opp_total = 0
     for sid in state.get("spaces", {}):
         lvl = state.get("support", {}).get(sid, 0)
+        pop = map_adj.population(sid)
         if lvl > 0:
-            sup_total += lvl
+            sup_total += lvl * pop
         elif lvl < 0:
-            opp_total += abs(lvl)
+            opp_total += abs(lvl) * pop
     print(f"Support Total: {sup_total}  |  Opposition Total: {opp_total}")
 
     fni = state.get("fni_level", 0)

@@ -15,6 +15,7 @@ If your project uses different keys, adjust the look-ups below.
 """
 
 from lod_ai.rules_consts import BRITISH, PATRIOTS, FRENCH, INDIANS, FORT_PAT, VILLAGE
+from lod_ai.map.adjacency import population as _map_population
 
 # --------------------------------------------------------------------------- #
 #  Board summarizer – converts the live map into the tallies used below       #
@@ -24,6 +25,10 @@ def _summarize_board(state) -> dict:
     Derive total Support, Opposition, forts, Villages, and casualty counts
     from the current game state.  Returns a dict with the keys that the
     margin helpers expect.
+
+    Per Rules §1.6.2-1.6.3:
+      Total Support    = sum(level × population) for spaces at Support
+      Total Opposition = sum(|level| × population) for spaces at Opposition
     """
     support_total     = 0
     opposition_total  = 0
@@ -32,10 +37,11 @@ def _summarize_board(state) -> dict:
 
     for sid, sp in state["spaces"].items():
         lvl = state["support"].get(sid, 0)
+        pop = _map_population(sid)
         if lvl > 0:
-            support_total += lvl
+            support_total += lvl * pop
         elif lvl < 0:
-            opposition_total += abs(lvl)
+            opposition_total += abs(lvl) * pop
 
         patriot_forts += sp.get(FORT_PAT, 0)
         villages      += sp.get(VILLAGE, 0)
