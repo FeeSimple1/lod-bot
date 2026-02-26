@@ -370,3 +370,142 @@ def test_check_bs_triggers_returns_empty_when_no_trigger():
     bots = {C.FRENCH: FakeFrenchBot()}
     result = year_end.check_bs_triggers(state, bots=bots, human_factions=set())
     assert C.FRENCH not in result
+
+
+# ──────────────────────────────────────────────────────────────
+#  Bug 1: Support Phase marker removal must NOT count against
+#          the 2-level shift cap (§6.4.1 / §6.4.2)
+# ──────────────────────────────────────────────────────────────
+
+def test_reward_loyalty_markers_dont_consume_shift_cap():
+    """§6.4.1: Space at Passive Opposition with both Raid and Propaganda markers.
+    British should remove both markers (2 Resources) AND shift 2 levels (2 Resources).
+    Total cost = 4 Resources. Final support = +1 (Active Support = Passive Opp -> Neutral -> Passive Support).
+    Wait, Passive Opposition is -1, so +2 shifts -> +1 (Passive Support)."""
+    state = basic_state()
+    state["resources"][C.BRITISH] = 10
+    state["spaces"] = {
+        "CityA": {
+            C.REGULAR_BRI: 1,
+            C.TORY: 1,
+        },
+    }
+    state["support"] = {"CityA": C.PASSIVE_OPPOSITION}  # -1
+    state["control"] = {"CityA": "BRITISH"}
+    state["markers"][C.RAID]["on_map"] = {"CityA"}
+    state["markers"][C.PROPAGANDA]["on_map"] = {"CityA"}
+
+    year_end._support_phase(state)
+
+    # Both markers should be removed
+    assert "CityA" not in state["markers"][C.RAID]["on_map"]
+    assert "CityA" not in state["markers"][C.PROPAGANDA]["on_map"]
+    # Support should have shifted 2 levels: -1 -> 0 -> +1
+    assert state["support"]["CityA"] == C.PASSIVE_SUPPORT  # +1
+    # Total Resources spent: 2 (markers) + 2 (shifts) = 4
+    assert state["resources"][C.BRITISH] == 6
+
+
+def test_committees_raid_marker_doesnt_consume_shift_cap():
+    """§6.4.2: Space at Passive Support with a Raid marker.
+    Patriots should remove the Raid marker (1 Resource) AND shift 2 levels (2 Resources).
+    Total cost = 3 Resources. Final support = -1 (Passive Opposition)."""
+    state = basic_state()
+    state["resources"][C.PATRIOTS] = 10
+    state["spaces"] = {
+        "ColA": {
+            C.MILITIA_A: 1,
+        },
+    }
+    state["support"] = {"ColA": C.PASSIVE_SUPPORT}  # +1
+    state["control"] = {"ColA": "REBELLION"}
+    state["markers"][C.RAID]["on_map"] = {"ColA"}
+
+    year_end._support_phase(state)
+
+    # Raid marker should be removed
+    assert "ColA" not in state["markers"][C.RAID]["on_map"]
+    # Support should have shifted 2 levels: +1 -> 0 -> -1
+    assert state["support"]["ColA"] == C.PASSIVE_OPPOSITION  # -1
+    # Total Resources spent: 1 (marker) + 2 (shifts) = 3
+    assert state["resources"][C.PATRIOTS] == 7
+
+
+# ──────────────────────────────────────────────────────────────
+#  Bug 2: Indian Supply — Reserve detection must use space_type()
+# ──────────────────────────────────────────────────────────────
+
+def test_indian_war_parties_in_reserve_are_supplied(monkeypatch):
+    """§6.2.1: War Parties in an Indian Reserve Province are in supply."""
+    monkeypatch.setattr(year_end.board_control, "refresh_control", lambda s: None, raising=False)
+    monkeypatch.setattr(year_end.caps_util, "enforce_global_caps", lambda s: None, raising=False)
+    monkeypatch.setattr(year_end, "battle_execute", lambda *a, **k: None, raising=False)
+
+    state = basic_state()
+    # Quebec is a Reserve space per map.json
+    state["spaces"] = {
+        "Quebec": {C.WARPARTY_A: 2, C.WARPARTY_U: 1},
+        C.WEST_INDIES_ID: {},
+    }
+    state["resources"][C.INDIANS] = 0  # No resources to pay
+
+    year_end._supply_phase(state)
+
+    # War Parties should NOT be removed — Quebec is a Reserve and they are in supply
+    assert state["spaces"]["Quebec"].get(C.WARPARTY_A, 0) == 2
+    assert state["spaces"]["Quebec"].get(C.WARPARTY_U, 0) == 1
+
+
+def test_indian_auto_village_places_in_reserve(monkeypatch):
+    """§6.2.1: When no Villages on map, auto-place a Village in a Reserve."""
+    monkeypatch.setattr(year_end.board_control, "refresh_control", lambda s: None, raising=False)
+    monkeypatch.setattr(year_end.caps_util, "enforce_global_caps", lambda s: None, raising=False)
+    monkeypatch.setattr(year_end, "battle_execute", lambda *a, **k: None, raising=False)
+
+    state = basic_state()
+    # No villages anywhere; Quebec is a Reserve per map.json
+    state["spaces"] = {
+        "Quebec": {C.WARPARTY_U: 1},
+        "Boston": {C.REGULAR_BRI: 0},
+        C.WEST_INDIES_ID: {},
+    }
+    # Ensure there is at least 1 Village in available pool
+    state["available"] = {C.VILLAGE: 5}
+
+    year_end._supply_phase(state)
+
+    # A Village should have been auto-placed in a Reserve space
+    reserve_spaces = ["Quebec", "Northwest", "Southwest", "Florida"]
+    village_placed = any(
+        state["spaces"].get(s, {}).get(C.VILLAGE, 0) > 0
+        for s in reserve_spaces
+        if s in state["spaces"]
+    )
+    assert village_placed, "Auto-Village should be placed in a Reserve space"
+
+
+# ──────────────────────────────────────────────────────────────
+#  Bug 3: French Supply — must require Colony/City for Rebellion
+#          control to count as in-supply (§6.2.1)
+# ──────────────────────────────────────────────────────────────
+
+def test_french_regulars_in_rebellion_province_are_unsupplied(monkeypatch):
+    """§6.2.1: French Regulars in a Rebellion-controlled Province (not Colony/City)
+    should be treated as unsupplied."""
+    monkeypatch.setattr(year_end.board_control, "refresh_control", lambda s: None, raising=False)
+    monkeypatch.setattr(year_end.caps_util, "enforce_global_caps", lambda s: None, raising=False)
+    monkeypatch.setattr(year_end, "battle_execute", lambda *a, **k: None, raising=False)
+
+    state = basic_state()
+    # Quebec is a Reserve (Province), not a Colony or City
+    state["spaces"] = {
+        "Quebec": {C.REGULAR_FRE: 2},
+        C.WEST_INDIES_ID: {},
+    }
+    state["control"] = {"Quebec": "REBELLION"}
+    state["resources"][C.FRENCH] = 0  # No resources to pay
+
+    year_end._supply_phase(state)
+
+    # French Regulars should be removed (unsupplied, can't pay, no Fort to move to)
+    assert state["spaces"]["Quebec"].get(C.REGULAR_FRE, 0) == 0

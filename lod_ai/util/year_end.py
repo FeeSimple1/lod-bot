@@ -153,7 +153,10 @@ def _supply_phase(state, *, bots=None, human_factions=None):
         if fr == 0 or sid == WEST_INDIES_ID:
             continue
 
-        in_supply = sp.get(FORT_PAT) or state.get("control", {}).get(sid) == "REBELLION"
+        stype = map_adj.space_type(sid)
+        in_supply = (sp.get(FORT_PAT)
+                     or (stype in ("Colony", "City")
+                         and state.get("control", {}).get(sid) == "REBELLION"))
         if in_supply:
             continue
         fre_unsupplied.append(sid)
@@ -197,7 +200,7 @@ def _supply_phase(state, *, bots=None, human_factions=None):
 
     # Indians – auto‑Village
     if not any(sp.get(VILLAGE, 0) for sp in state["spaces"].values()):
-        reserve = next((s for s, sp in state["spaces"].items() if sp.get("Indian_Reserve")), None)
+        reserve = next((s for s in state["spaces"] if map_adj.space_type(s) == "Reserve"), None)
         if reserve:
             place_with_caps(state, VILLAGE, reserve, 1)
             push_history(state, f"Indian Supply – auto‑Village in {reserve}")
@@ -207,7 +210,7 @@ def _supply_phase(state, *, bots=None, human_factions=None):
         wp_total = sp.get(WARPARTY_A, 0) + sp.get(WARPARTY_U, 0)
         if not wp_total:
             continue
-        if sp.get(VILLAGE) or sp.get("Indian_Reserve"):
+        if sp.get(VILLAGE) or map_adj.space_type(sid) == "Reserve":
             continue
         indian_unsupplied.append(sid)
 
@@ -419,15 +422,14 @@ def _support_phase(state):
             continue
 
         # first, remove Raid or Propaganda marker if present (costs 1 each)
+        # Per §6.4.1: marker removal does NOT count against the 2-shift cap
         for marker_tag, on_map in ((RAID, raid_on_map), (PROPAGANDA, propaganda_on_map)):
-            if steps_remaining <= 0 or not resources.can_afford(state, BRITISH, 1):
+            if not resources.can_afford(state, BRITISH, 1):
                 break
             if sid in on_map:
                 resources.spend(state, BRITISH, 1)
                 remove_piece(state, marker_tag, sid, 1, to="available")
                 push_history(state, f"British removed {marker_tag} in {sid} (6.4.1)")
-                shifted[sid] += 1
-                steps_remaining -= 1
 
         # pay 1 Resource per support shift, up to remaining steps
         while steps_remaining > 0 and resources.can_afford(state, BRITISH, 1) and level < ACTIVE_SUPPORT:
@@ -466,12 +468,11 @@ def _support_phase(state):
             continue
 
         # remove Raid markers first (cost 1 each)
-        if sid in raid_on_map and steps_remaining > 0 and resources.can_afford(state, PATRIOTS, 1):
+        # Per §6.4.2: marker removal does NOT count against the 2-shift cap
+        if sid in raid_on_map and resources.can_afford(state, PATRIOTS, 1):
             resources.spend(state, PATRIOTS, 1)
             remove_piece(state, RAID, sid, 1, to="available")
             push_history(state, f"Patriots removed Raid in {sid} (6.4.2)")
-            shifted[sid] += 1
-            steps_remaining -= 1
 
         # pay 1 Resource per shift toward Opposition
         while steps_remaining > 0 and resources.can_afford(state, PATRIOTS, 1) and level > ACTIVE_OPPOSITION:
