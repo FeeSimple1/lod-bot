@@ -267,13 +267,18 @@ class TestIndianBsLimCom:
         assert bot.get_bs_limited_command(state) == "raid"
 
     def test_i3_gate_raid_when_roll_low(self):
-        """I3: (Support + 1D6) <= Opposition → Raid branch."""
+        """I3: (Support + 1D6) <= Opposition → Raid branch.
+
+        Population-weighted totals (§1.6.3):
+          South_Carolina (pop=2) at -1 → opp += 1×2 = 2
+          Boston (pop=1) at -3         → opp += 3×1 = 3
+          Total Opposition = 5, Support = 0.
+        """
         bot = IndianBot()
-        # Support=0, Opposition=5. Need (0+roll)<=5, so roll<=5.
         state = _base_state(
             spaces={"South_Carolina": _sp(**{C.WARPARTY_A: 2, C.WARPARTY_U: 2})},
             leader_locs={"LEADER_BRANT": "South_Carolina"},
-            support={"South_Carolina": -2, "Boston": -3},  # Opp=5, Sup=0
+            support={"South_Carolina": -1, "Boston": -3},  # Pop-weighted Opp=5, Sup=0
             rng=random.Random(42),  # seed 42: first roll=6; (0+6)>5 → Gather
         )
         # With roll=6, (0+6)>5 is True → Gather branch

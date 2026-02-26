@@ -864,9 +864,7 @@ class FrenchBot(BaseBot):
             return False  # unknown card → fall through to Command
         eff = effects["shaded"]
 
-        support_map = state.get("support", {})
-        sup = sum(max(0, lvl) for lvl in support_map.values())
-        opp = sum(max(0, -lvl) for lvl in support_map.values())
+        sup, opp = self._support_opposition_totals(state)
 
         # 1. Support > Opposition and Event shifts in Rebel favor
         if sup > opp and eff["shifts_support_rebel"]:

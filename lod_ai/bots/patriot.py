@@ -1313,9 +1313,7 @@ class PatriotBot(BaseBot):
             return False
         eff = effects["shaded"]
 
-        support_map = state.get("support", {})
-        sup = sum(max(0, lvl) for lvl in support_map.values())
-        opp = sum(max(0, -lvl) for lvl in support_map.values())
+        sup, opp = self._support_opposition_totals(state)
 
         if sup > opp and eff["shifts_support_rebel"]:
             return True
@@ -1326,7 +1324,7 @@ class PatriotBot(BaseBot):
                 has_militia = (sp.get(C.MILITIA_U, 0) + sp.get(C.MILITIA_A, 0)) > 0
                 if has_militia:
                     continue
-                sup = support_map.get(sid, 0)
+                sup = state.get("support", {}).get(sid, 0)
                 if sup == C.ACTIVE_SUPPORT or sp.get(C.VILLAGE, 0) > 0:
                     return True
         if eff["places_patriot_fort"] or eff["removes_village"]:
