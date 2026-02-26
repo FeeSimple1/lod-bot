@@ -679,11 +679,11 @@ def _patriot_desertion(state, *, bots=None, human_factions=None):
     """
     human = human_factions or set()
 
-    # candidate lists restricted to Colonies
+    # §6.6.1: "Remove 1 in 5 Militia and 1 in 5 Continentals from the map"
     mil_spaces = [(sid, sp.get(MILITIA_U, 0) + sp.get(MILITIA_A, 0))
-                  for sid, sp in state["spaces"].items() if sp.get("type") == "Colony" and (sp.get(MILITIA_U,0)+sp.get(MILITIA_A,0))]
+                  for sid, sp in state["spaces"].items() if (sp.get(MILITIA_U,0)+sp.get(MILITIA_A,0))]
     con_spaces = [(sid, sp.get(REGULAR_PAT, 0))
-                  for sid, sp in state["spaces"].items() if sp.get("type") == "Colony" and sp.get(REGULAR_PAT,0)]
+                  for sid, sp in state["spaces"].items() if sp.get(REGULAR_PAT,0)]
 
     total_mil = sum(c for _, c in mil_spaces)
     total_con = sum(c for _, c in con_spaces)
@@ -734,8 +734,6 @@ def _patriot_desertion(state, *, bots=None, human_factions=None):
             if drop_mil == 0 and drop_con == 0:
                 break
             sp = state["spaces"].get(sid, {})
-            if sp.get("type") != "Colony":
-                continue
             if tag in (MILITIA_U, MILITIA_A) and drop_mil > 0:
                 qty = sp.get(tag, 0)
                 if qty > 0:
@@ -753,8 +751,6 @@ def _patriot_desertion(state, *, bots=None, human_factions=None):
     else:
         # Default: iterate spaces arbitrarily
         for sid, sp in state["spaces"].items():
-            if sp.get("type") != "Colony":
-                continue
             if drop_mil:
                 q = min(sp.get(MILITIA_U, 0), drop_mil)
                 if q:
@@ -800,7 +796,7 @@ def _tory_desertion(state, *, bots=None, human_factions=None):
             sid_choice = tory_spaces[0][0]
     else:
         # Default: colony with highest Patriot Support
-        sid_choice = max(tory_spaces, key=lambda t: state["support"].get(t[0], 0))[0]
+        sid_choice = max(tory_spaces, key=lambda t: state.get("support", {}).get(t[0], 0))[0]
 
     remove_piece(state, TORY, sid_choice, 1, to="available")
     push_history(state, f"Tory Desertion – French chose Tory in {sid_choice}")

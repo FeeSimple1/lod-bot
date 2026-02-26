@@ -21,6 +21,7 @@ from lod_ai.rules_consts import (
     WARPARTY_U, WARPARTY_A,
     BRITISH,
 )
+from lod_ai.map.adjacency import is_city as _is_city
 from lod_ai.util.history import push_history
 
 SA_NAME = "COMMON_CAUSE"      # auto-registered by special_activities/__init__.py
@@ -99,7 +100,7 @@ def execute(
     # March-specific validation: WP may not enter or move between Cities
     if mode == "MARCH" and destinations:
         for dst in destinations:
-            if state["spaces"][dst].get("city", False) or state["spaces"][dst].get("type") == "City":
+            if _is_city(dst):
                 raise ValueError("Common-Cause War Parties may not move into Cities.")
 
     return ctx

@@ -373,7 +373,7 @@ def execute(
             #   • The moving group's number of pieces plus the number of
             #     Militia in the destination Province exceed 3."
             is_reb_colony = (
-                sp_dst.get("type") == "Colony"
+                map_adj.space_type(dst) == "Colony"
                 and _pre_control.get(dst) == "REBELLION"
             )
             if is_reb_colony:

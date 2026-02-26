@@ -34,6 +34,7 @@ from lod_ai.rules_consts import (
 from lod_ai.util.history import push_history
 from lod_ai.util.caps import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent
+from lod_ai.map.adjacency    import space_type as _space_type
 from lod_ai.board.pieces      import add_piece, remove_piece
 from lod_ai.economy.resources import spend, can_afford
 
@@ -46,10 +47,9 @@ SUPPORT_OK = {NEUTRAL, PASSIVE_SUPPORT, PASSIVE_OPPOSITION}
 # Helper utilities
 # ---------------------------------------------------------------------------
 
-def _is_indian_reserve(space: Dict) -> bool:
+def _is_indian_reserve(space_id: str) -> bool:
     """Return True if this Province is an Indian Reserve."""
-    # Map loader should set a boolean; adapt here if your schema differs.
-    return space.get("indian_reserve", False)
+    return _space_type(space_id) == "Reserve"
 
 def _pay_cost(state: Dict, selected: List[str], free_one_reserve: bool) -> None:
     cost = len(selected) - (1 if free_one_reserve else 0)
@@ -119,7 +119,7 @@ def execute(
             raise ValueError(f"{prov} not at an eligible support level.")
 
         # One free reserve detection
-        if _is_indian_reserve(sp) and not free_reserve_granted:
+        if _is_indian_reserve(prov) and not free_reserve_granted:
             free_reserve_granted = True
 
     # ---- Pay Resources (1 each, first reserve free) --------------------------
