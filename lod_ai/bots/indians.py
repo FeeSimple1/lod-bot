@@ -72,9 +72,7 @@ class IndianBot(BaseBot):
         wp_total = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
 
         # I3: (Support + 1D6) > Opposition?
-        support_map = state.get("support", {})
-        support = sum(max(0, lvl) for lvl in support_map.values())
-        opposition = sum(max(0, -lvl) for lvl in support_map.values())
+        support, opposition = self._support_opposition_totals(state)
         roll = state["rng"].randint(1, 6)
         state.setdefault("rng_log", []).append(("I3 BS D6", roll))
         i3_yes = (support + roll) > opposition
@@ -121,9 +119,7 @@ class IndianBot(BaseBot):
         by BaseBot._choose_event_vs_flowchart().
         """
         # ---------- I3 test  (Support+1D6) > Opposition -----------------
-        support_map = state.get("support", {})
-        support = sum(max(0, lvl) for lvl in support_map.values())
-        opposition = sum(max(0, -lvl) for lvl in support_map.values())
+        support, opposition = self._support_opposition_totals(state)
         roll = state["rng"].randint(1, 6)
         state.setdefault("rng_log", []).append(("Support test 1D6", roll))
 
@@ -1445,9 +1441,7 @@ class IndianBot(BaseBot):
             return False  # unknown card → fall through to Command
         eff = effects["unshaded"]
 
-        support_map = state.get("support", {})
-        support = sum(max(0, lvl) for lvl in support_map.values())
-        opposition = sum(max(0, -lvl) for lvl in support_map.values())
+        support, opposition = self._support_opposition_totals(state)
 
         # 1. Opposition > Support and Event shifts in Royalist favor
         if opposition > support and eff["shifts_support_royalist"]:

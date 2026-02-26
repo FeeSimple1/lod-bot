@@ -153,9 +153,7 @@ class BritishBot(BaseBot):
             return False  # unknown card → fall through to Command
         eff = effects["unshaded"]
 
-        support_map = state.get("support", {})
-        sup = sum(max(0, lvl) for lvl in support_map.values())
-        opp = sum(max(0, -lvl) for lvl in support_map.values())
+        sup, opp = self._support_opposition_totals(state)
 
         # 1. "Opposition > Support, and Event shifts Support/Opposition in
         #     Royalist favor (including by removing a Blockade)?"
@@ -933,9 +931,7 @@ class BritishBot(BaseBot):
         die = state["rng"].randint(1, 3)
         state.setdefault("rng_log", []).append(("1D3", die))
 
-        support_map = state.get("support", {})
-        total_support = sum(max(0, lvl) for lvl in support_map.values())
-        total_opp = sum(max(0, -lvl) for lvl in support_map.values())
+        total_support, total_opp = self._support_opposition_totals(state)
         if total_opp > total_support + die or state["available"].get(C.FORT_BRI, 0) == 0:
             # Reward Loyalty
             raid_on_map = state.get("markers", {}).get(C.RAID, {}).get("on_map", set())

@@ -7,6 +7,7 @@ from lod_ai.bots.random_spaces import iter_random_spaces
 from lod_ai.bots import event_instructions as EI
 from lod_ai import dispatcher
 from lod_ai.cards import CARD_HANDLERS
+from lod_ai.map.adjacency import population as _map_population
 from lod_ai.util.history import push_history
 from lod_ai.util import eligibility as elig
 
@@ -83,6 +84,23 @@ class BaseBot:
         state["_turn_affected_spaces"] = set()
         state.pop("_turn_command", None)
         state.pop("_turn_command_meta", None)
+
+    @staticmethod
+    def _support_opposition_totals(state: Dict) -> tuple[int, int]:
+        """Population-weighted Support and Opposition totals (Rules §1.6.3).
+
+        Total Support    = sum(level × population) for spaces with level > 0
+        Total Opposition = sum(|level| × population) for spaces with level < 0
+        """
+        sup = 0
+        opp = 0
+        for sid, lvl in state.get("support", {}).items():
+            pop = _map_population(sid)
+            if lvl > 0:
+                sup += lvl * pop
+            elif lvl < 0:
+                opp += (-lvl) * pop
+        return sup, opp
 
     #  NEW: look-up table for musket-underline directives
     def _event_directive(self, card_id: int) -> str:
