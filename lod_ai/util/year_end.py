@@ -377,14 +377,13 @@ def _resource_income(state):
 from collections import defaultdict
 
 def _support_phase(state):
-    """
-    Rule 6.4 – British then Patriots may spend Resources to adjust
+    """Rule 6.4 - British then Patriots may spend Resources to adjust
     Support or Opposition.
 
-    • British (Reward Loyalty) and Patriots (Committees of Correspondence)
-      act in that order.
-    • A space may shift at most TWO levels during this phase.
-    • The routine below follows a deterministic “spend until blocked” policy.
+    British (Reward Loyalty) and Patriots (Committees of Correspondence)
+    act in that order. A space may shift at most TWO levels during this
+    phase. Spaces are sorted per bot priority rules (8.4.5 / 8.5.9)
+    and skipped if only markers would be removed.
     """
 
     from collections import defaultdict
@@ -404,24 +403,57 @@ def _support_phase(state):
     # ---------------------------------------------------------------
     # 6.4.1  Reward Loyalty  (British)
     # ---------------------------------------------------------------
-    spent = 0
+
+    # Build sorted list of eligible spaces per §8.4.5:
+    # "first select the space or spaces with the lowest total of Raid
+    #  and Propaganda markers, within that where the largest change in
+    #  (Support – Opposition) is possible."
+    brit_eligible = []
     for sid, sp in state["spaces"].items():
-        # skip if this space already shifted twice
+        if shifted[sid] >= 2:
+            continue
+        if not (_ctrl(sid, sp) == BRITISH and sp.get(REGULAR_BRI) and sp.get(TORY)):
+            continue
+        level = state["support"].get(sid, 0)
+        if level >= ACTIVE_SUPPORT:
+            continue
+
+        n_raid = 1 if sid in raid_on_map else 0
+        n_prop = 1 if sid in propaganda_on_map else 0
+        marker_count = n_raid + n_prop
+        pop = map_adj.population(sid)
+        potential = (ACTIVE_SUPPORT - level) * pop
+
+        brit_eligible.append(sid)
+        # Attach sort keys for this pass
+        brit_eligible[-1] = (sid, marker_count, potential)
+
+    # §8.4.5: fewest markers first, then largest population-weighted change
+    brit_eligible.sort(key=lambda x: (x[1], -x[2]))
+
+    spent = 0
+    for sid, _mc, _pot in brit_eligible:
+        sp = state["spaces"][sid]
         if shifted[sid] >= 2:
             continue
 
-        # must be British-controlled City/Colony and contain both Regulars & Tories
-        if not (_ctrl(sid, sp) == BRITISH and sp.get(REGULAR_BRI) and sp.get(TORY)):
-            continue
-
         level = state["support"].get(sid, 0)
-        if level >= ACTIVE_SUPPORT:          # already max Active Support
+        if level >= ACTIVE_SUPPORT:
             continue
         steps_remaining = 2 - shifted[sid]
         if steps_remaining <= 0:
             continue
 
-        # first, remove Raid or Propaganda marker if present (costs 1 each)
+        # §8.4.5: "Do not Reward Loyalty in a space if only Raid and/or
+        # Propaganda markers would be removed."
+        # Must be able to afford all marker removals PLUS at least 1 shift.
+        n_raid = 1 if sid in raid_on_map else 0
+        n_prop = 1 if sid in propaganda_on_map else 0
+        min_cost = n_raid + n_prop + 1
+        if not resources.can_afford(state, BRITISH, min_cost):
+            continue
+
+        # Remove Raid or Propaganda marker if present (costs 1 each)
         # Per §6.4.1: marker removal does NOT count against the 2-shift cap
         for marker_tag, on_map in ((RAID, raid_on_map), (PROPAGANDA, propaganda_on_map)):
             if not resources.can_afford(state, BRITISH, 1):
@@ -447,24 +479,52 @@ def _support_phase(state):
     # ---------------------------------------------------------------
     # 6.4.2  Committees of Correspondence  (Patriots)
     # ---------------------------------------------------------------
-    spent = 0
-    for sid, sp in state["spaces"].items():
-        if shifted[sid] >= 2:      # already shifted twice
-            continue
 
-        # must be Rebellion-controlled and contain Patriot pieces
+    # Build sorted list of eligible spaces per §8.5.9:
+    # "first select the spaces with the lowest number of Raid markers,
+    #  within that where the largest change in (Opposition - Support)
+    #  is possible."
+    pat_eligible = []
+    for sid, sp in state["spaces"].items():
+        if shifted[sid] >= 2:
+            continue
         if not (_ctrl(sid, sp) == "REBELLION" and (sp.get(MILITIA_A) or sp.get(MILITIA_U) or sp.get(REGULAR_PAT))):
             continue
-
         level = state["support"].get(sid, 0)
-        if level <= ACTIVE_OPPOSITION:            # already max Active Opposition
+        if level <= ACTIVE_OPPOSITION:
             continue
         steps_remaining = 2 - shifted[sid]
         if steps_remaining <= 0:
             continue
 
-        # Skip if only marker removal would occur
+        n_raid = 1 if sid in raid_on_map else 0
+        pop = map_adj.population(sid)
+        potential = (level - ACTIVE_OPPOSITION) * pop
+
+        pat_eligible.append((sid, n_raid, potential))
+
+    # §8.5.9: fewest Raid markers first, then largest population-weighted change
+    pat_eligible.sort(key=lambda x: (x[1], -x[2]))
+
+    spent = 0
+    for sid, _nr, _pot in pat_eligible:
+        sp = state["spaces"][sid]
+        if shifted[sid] >= 2:
+            continue
+
+        level = state["support"].get(sid, 0)
         if level <= ACTIVE_OPPOSITION:
+            continue
+        steps_remaining = 2 - shifted[sid]
+        if steps_remaining <= 0:
+            continue
+
+        # §8.5.9: "Do not execute Committees of Correspondence in a space
+        # if only Raid markers would be removed."
+        # Must be able to afford marker removal PLUS at least 1 shift.
+        n_raid = 1 if sid in raid_on_map else 0
+        min_cost = n_raid + 1
+        if not resources.can_afford(state, PATRIOTS, min_cost):
             continue
 
         # remove Raid markers first (cost 1 each)
