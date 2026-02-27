@@ -509,3 +509,93 @@ def test_french_regulars_in_rebellion_province_are_unsupplied(monkeypatch):
 
     # French Regulars should be removed (unsupplied, can't pay, no Fort to move to)
     assert state["spaces"]["Quebec"].get(C.REGULAR_FRE, 0) == 0
+
+
+# ──────────────────────────────────────────────────────────────
+#  Bug: Support Phase must sort eligible spaces per §8.4.5/§8.5.9
+# ──────────────────────────────────────────────────────────────
+
+def test_reward_loyalty_sorts_by_fewest_markers_then_population(monkeypatch):
+    """§8.4.5: Space B (0 markers, pop 2) should be shifted before Space A
+    (2 markers, pop 1), even if A appears first in dict order."""
+    # Control population lookups for test spaces
+    _pop = {"SpaceA": 1, "SpaceB": 2}
+    monkeypatch.setattr(year_end.map_adj, "population",
+                        lambda sid: _pop.get(sid, 0))
+
+    state = basic_state()
+    state["resources"][C.BRITISH] = 4
+    state["spaces"] = {
+        "SpaceA": {C.REGULAR_BRI: 1, C.TORY: 1},
+        "SpaceB": {C.REGULAR_BRI: 1, C.TORY: 1},
+    }
+    state["support"] = {"SpaceA": C.NEUTRAL, "SpaceB": C.NEUTRAL}
+    state["control"] = {"SpaceA": C.BRITISH, "SpaceB": C.BRITISH}
+    # SpaceA has Raid + Propaganda markers; SpaceB has none
+    state["markers"][C.RAID]["on_map"] = {"SpaceA"}
+    state["markers"][C.PROPAGANDA]["on_map"] = {"SpaceA"}
+
+    year_end._support_phase(state)
+
+    # SpaceB (0 markers, pop 2) should be shifted first: 2 Resources for 2 shifts
+    # SpaceA needs 2 markers + 1 shift = 3 minimum, only 2 left → skipped
+    assert state["support"]["SpaceB"] == C.ACTIVE_SUPPORT  # shifted 2 levels
+    assert state["support"]["SpaceA"] == C.NEUTRAL  # not shifted (insufficient)
+    assert state["resources"][C.BRITISH] == 2  # spent 2 on SpaceB shifts
+
+
+def test_committees_sorts_by_fewest_raid_then_population(monkeypatch):
+    """§8.5.9: Space B (0 Raid, pop 2) should be shifted before Space A
+    (1 Raid, pop 1)."""
+    _pop = {"SpaceA": 1, "SpaceB": 2}
+    monkeypatch.setattr(year_end.map_adj, "population",
+                        lambda sid: _pop.get(sid, 0))
+
+    state = basic_state()
+    state["resources"][C.PATRIOTS] = 4
+    state["spaces"] = {
+        "SpaceA": {C.MILITIA_A: 1},
+        "SpaceB": {C.MILITIA_A: 1},
+    }
+    state["support"] = {"SpaceA": C.NEUTRAL, "SpaceB": C.NEUTRAL}
+    state["control"] = {"SpaceA": "REBELLION", "SpaceB": "REBELLION"}
+    # SpaceA has a Raid marker; SpaceB has none
+    state["markers"][C.RAID]["on_map"] = {"SpaceA"}
+
+    year_end._support_phase(state)
+
+    # SpaceB (0 markers, pop 2) shifted first: 2 Resources for 2 shifts
+    # SpaceA needs 1 marker + 1 shift = 2 minimum, only 2 left → shifts once
+    assert state["support"]["SpaceB"] == C.ACTIVE_OPPOSITION  # shifted 2 levels
+    assert state["support"]["SpaceA"] <= C.NEUTRAL  # may or may not shift
+
+
+# ──────────────────────────────────────────────────────────────
+#  Bug: Do not spend on a space if only markers would be removed
+# ──────────────────────────────────────────────────────────────
+
+def test_reward_loyalty_skips_space_if_only_markers_removed(monkeypatch):
+    """§8.4.5: British have 2 Resources, space has 2 markers at Neutral.
+    Minimum cost = 2 (markers) + 1 (shift) = 3.  Can't afford → skip."""
+    _pop = {"SpaceA": 1}
+    monkeypatch.setattr(year_end.map_adj, "population",
+                        lambda sid: _pop.get(sid, 0))
+
+    state = basic_state()
+    state["resources"][C.BRITISH] = 2
+    state["spaces"] = {
+        "SpaceA": {C.REGULAR_BRI: 1, C.TORY: 1},
+    }
+    state["support"] = {"SpaceA": C.NEUTRAL}
+    state["control"] = {"SpaceA": C.BRITISH}
+    state["markers"][C.RAID]["on_map"] = {"SpaceA"}
+    state["markers"][C.PROPAGANDA]["on_map"] = {"SpaceA"}
+
+    year_end._support_phase(state)
+
+    # No resources should be spent — can't afford markers + shift
+    assert state["resources"][C.BRITISH] == 2
+    assert state["support"]["SpaceA"] == C.NEUTRAL
+    # Markers should still be present
+    assert "SpaceA" in state["markers"][C.RAID]["on_map"]
+    assert "SpaceA" in state["markers"][C.PROPAGANDA]["on_map"]
