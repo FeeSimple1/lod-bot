@@ -297,7 +297,7 @@ def evt_011_kosciuszko(state, shaded=False):
         for sid, sp in state.get("spaces", {}).items():
             if state.get("control", {}).get(sid) != "REBELLION":
                 continue
-            if _space_has_any(state, sid, _faction_piece_tags(PATRIOTS)):
+            if _space_has_any(state, sid, _faction_unit_tags(PATRIOTS)):
                 candidates.append(sid)
 
     done = 0
@@ -305,9 +305,9 @@ def evt_011_kosciuszko(state, shaded=False):
         if done == 2:
             break
         sp = _safe_get_space(state, sid)
-        if not _space_has_any(state, sid, _faction_piece_tags(PATRIOTS)):
+        if not _space_has_any(state, sid, _faction_unit_tags(PATRIOTS)):
             continue
-        for tag in (MILITIA_U, MILITIA_A, REGULAR_PAT, FORT_PAT):
+        for tag in (MILITIA_U, MILITIA_A, REGULAR_PAT):
             if sp.get(tag, 0):
                 remove_piece(state, tag, sid, 1, to="available")
                 break
