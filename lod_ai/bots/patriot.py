@@ -429,6 +429,19 @@ class PatriotBot(BaseBot):
         )
         return True
 
+    # ------------------------------------------------------------------
+    #  Rally / placement legality filter
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _is_illegal_rally_space(sid: str) -> bool:
+        """Return True if *sid* cannot receive Patriot Rally placement.
+
+        West Indies (§1.4.2): only British/French Regulars, British Forts,
+        French Squadrons may occupy.
+        Indian Reserve Provinces: Militia cannot exist there.
+        """
+        return sid == C.WEST_INDIES_ID or map_adj.space_type(sid) == "Reserve"
+
     def _best_rally_space(self, state: Dict) -> str | None:
         """Select Rally space per P7 priorities for Win-the-Day free Rally.
         Priority: Fort placement first (Cities, highest Pop), then Militia
@@ -442,6 +455,8 @@ class PatriotBot(BaseBot):
         if avail_forts > 0:
             candidates = []
             for sid, sp in state["spaces"].items():
+                if self._is_illegal_rally_space(sid):
+                    continue
                 if sp.get(C.FORT_PAT, 0) > 0:
                     continue
                 bases = sp.get(C.FORT_PAT, 0) + sp.get(C.FORT_BRI, 0) + sp.get(C.VILLAGE, 0)
@@ -458,6 +473,8 @@ class PatriotBot(BaseBot):
         # Priority 2: Space to change Control or no Active Opposition
         candidates = []
         for sid, sp in state["spaces"].items():
+            if self._is_illegal_rally_space(sid):
+                continue
             support = self._support_level(state, sid)
             changes_ctrl = 1 if ctrl.get(sid) != "REBELLION" else 0
             no_active_opp = 1 if support > C.ACTIVE_OPPOSITION else 0
@@ -805,6 +822,8 @@ class PatriotBot(BaseBot):
         if avail_forts > 0:
             fort_candidates = []
             for sid, sp in state["spaces"].items():
+                if self._is_illegal_rally_space(sid):
+                    continue
                 if sp.get(C.FORT_PAT, 0) > 0:
                     continue
                 bases = sp.get(C.FORT_PAT, 0) + sp.get(C.FORT_BRI, 0) + sp.get(C.VILLAGE, 0)
@@ -897,6 +916,8 @@ class PatriotBot(BaseBot):
         if avail_forts > 0:
             no_fort_spaces = []
             for sid, sp in state["spaces"].items():
+                if self._is_illegal_rally_space(sid):
+                    continue
                 if sp.get(C.FORT_PAT, 0) > 0 or sid in build_fort_set:
                     continue
                 pat_units = self._rebel_group_size(sp)
@@ -914,6 +935,8 @@ class PatriotBot(BaseBot):
         if remaining_slots > 0:
             militia_targets = []
             for sid, sp in state["spaces"].items():
+                if self._is_illegal_rally_space(sid):
+                    continue
                 if sid in spaces_used:
                     continue
                 changes_ctrl = 1 if ctrl.get(sid) != "REBELLION" else 0
