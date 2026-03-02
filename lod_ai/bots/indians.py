@@ -1448,11 +1448,16 @@ class IndianBot(BaseBot):
         if opposition > support and eff["shifts_support_royalist"]:
             return True
         # 2. Event places Village or grants free Gather
-        if eff["places_village"] or eff["grants_free_gather"]:
+        if eff["places_village"]:
+            if state.get("available", {}).get(C.VILLAGE, 0) > 0:
+                return True
+        if eff["grants_free_gather"]:
             return True
         # 3. Event removes a Patriot Fort
         if eff["removes_patriot_fort"]:
-            return True
+            if any(sp.get(C.FORT_PAT, 0) > 0
+                   for sp in state.get("spaces", {}).values()):
+                return True
         # 4. Event is effective, 4+ Villages on map, D6 >= 5
         if eff["is_effective"]:
             villages_on_map = sum(

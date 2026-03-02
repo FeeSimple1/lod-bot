@@ -1309,7 +1309,7 @@ def test_p2_bullet2_active_support_no_militia_returns_true():
         },
         "resources": {C.PATRIOTS: 5},
         "support": {"Boston": C.ACTIVE_SUPPORT},
-        "available": {},
+        "available": {C.MILITIA_U: 5},
     }
     # Card 3 shaded has places_patriot_militia_u=True
     card = {"id": 3}
@@ -1345,7 +1345,7 @@ def test_p2_bullet2_village_no_militia_returns_true():
         },
         "resources": {C.PATRIOTS: 5},
         "support": {"Quebec": C.NEUTRAL},
-        "available": {},
+        "available": {C.MILITIA_U: 5},
     }
     card = {"id": 3}
     assert bot._faction_event_conditions(state, card) is True

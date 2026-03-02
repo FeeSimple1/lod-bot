@@ -107,8 +107,9 @@ def test_i2_event_conditions_per_reference():
         "rng": __import__("random").Random(42),
     }
 
-    # Bullet 2: Card 79 unshaded places Village → True
+    # Bullet 2: Card 79 unshaded places Village → True (need Villages available)
     state = base_state()
+    state["available"][C.VILLAGE] = 1
     card_village = {"id": 79}
     assert bot._faction_event_conditions(state, card_village) is True
 
@@ -117,8 +118,9 @@ def test_i2_event_conditions_per_reference():
     card_gather = {"id": 75}
     assert bot._faction_event_conditions(state, card_gather) is True
 
-    # Bullet 3: Card 17 unshaded removes a Patriot Fort → True
+    # Bullet 3: Card 17 unshaded removes a Patriot Fort → True (need Fort on map)
     state = base_state()
+    state["spaces"]["A"][C.FORT_PAT] = 1
     card_fort = {"id": 17}
     assert bot._faction_event_conditions(state, card_fort) is True
 

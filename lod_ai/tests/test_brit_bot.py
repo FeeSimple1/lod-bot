@@ -273,9 +273,10 @@ def test_b2_bullet3_places_tories_needs_active_opp_without_tory():
     state["spaces"]["Boston"][C.TORY] = 1
     assert bot._faction_event_conditions(state, card) is False
 
-    # Active Opposition space WITHOUT Tories → bullet 3 fires
+    # Active Opposition space WITHOUT Tories, Tories available → bullet 3 fires
     state = _b2_state(support={"Boston": C.ACTIVE_OPPOSITION})
     state["spaces"]["Boston"][C.TORY] = 0
+    state["available"][C.TORY] = 5
     assert bot._faction_event_conditions(state, card) is True
 
 
