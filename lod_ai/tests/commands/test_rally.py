@@ -6,6 +6,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from lod_ai.commands import rally
 from lod_ai import rules_consts as C
+from lod_ai.bots.patriot import PatriotBot
 
 
 def simple_state():
@@ -162,8 +163,167 @@ def test_rally_rejects_militia_in_indian_reserve(monkeypatch):
         "available": {C.MILITIA_U: 10},
         "rng": __import__('random').Random(1),
     }
-    with pytest.raises(ValueError, match="Indian Reserve"):
+    with pytest.raises(ValueError, match="Cannot Rally"):
         rally.execute(
             state, C.PATRIOTS, {}, ["Northwest"],
             place_one={"Northwest"},
         )
+
+
+# --------------------------------------------------------------------------- #
+# Bug fix: rally.execute() must validate before charging resources
+# --------------------------------------------------------------------------- #
+def test_active_support_raises_without_spending(monkeypatch):
+    """Rally in an Active Support space must raise ValueError AND leave
+    Patriot Resources unchanged (validation before spend)."""
+    monkeypatch.setattr(rally, "refresh_control", lambda s: None)
+    monkeypatch.setattr(rally, "enforce_global_caps", lambda s: None)
+    state = {
+        "spaces": {
+            "Massachusetts": {C.MILITIA_U: 2},
+        },
+        "support": {"Massachusetts": C.ACTIVE_SUPPORT},
+        "resources": {C.BRITISH: 0, C.PATRIOTS: 3, C.FRENCH: 0, C.INDIANS: 0},
+        "available": {C.MILITIA_U: 10},
+        "rng": __import__('random').Random(1),
+    }
+    with pytest.raises(ValueError, match="Active Support"):
+        rally.execute(state, C.PATRIOTS, {}, ["Massachusetts"])
+    # Resources must be unchanged — validation happened before spend
+    assert state["resources"][C.PATRIOTS] == 3
+
+
+def test_active_support_multi_space_raises_without_spending(monkeypatch):
+    """When one space in a multi-space Rally is at Active Support, the
+    entire call must raise before any resources are spent."""
+    monkeypatch.setattr(rally, "refresh_control", lambda s: None)
+    monkeypatch.setattr(rally, "enforce_global_caps", lambda s: None)
+    state = {
+        "spaces": {
+            "Boston": {C.MILITIA_U: 1, C.FORT_PAT: 1},
+            "Massachusetts": {C.MILITIA_U: 2},
+        },
+        "support": {"Massachusetts": C.ACTIVE_SUPPORT},
+        "resources": {C.BRITISH: 0, C.PATRIOTS: 5, C.FRENCH: 0, C.INDIANS: 0},
+        "available": {C.MILITIA_U: 10},
+        "rng": __import__('random').Random(1),
+    }
+    with pytest.raises(ValueError, match="Active Support"):
+        rally.execute(
+            state, C.PATRIOTS, {}, ["Boston", "Massachusetts"],
+            place_one={"Boston", "Massachusetts"},
+        )
+    # No resources spent at all
+    assert state["resources"][C.PATRIOTS] == 5
+
+
+def test_indian_reserve_raises_without_spending(monkeypatch):
+    """Rally in Indian Reserve must raise before spending resources."""
+    monkeypatch.setattr(rally, "refresh_control", lambda s: None)
+    monkeypatch.setattr(rally, "enforce_global_caps", lambda s: None)
+    state = {
+        "spaces": {
+            "Northwest": {},
+        },
+        "resources": {C.BRITISH: 0, C.PATRIOTS: 3, C.FRENCH: 0, C.INDIANS: 0},
+        "available": {C.MILITIA_U: 10},
+        "rng": __import__('random').Random(1),
+    }
+    with pytest.raises(ValueError, match="Cannot Rally"):
+        rally.execute(state, C.PATRIOTS, {}, ["Northwest"])
+    assert state["resources"][C.PATRIOTS] == 3
+
+
+# --------------------------------------------------------------------------- #
+# Bug fix: PatriotBot._execute_rally() must skip Active Support spaces
+# --------------------------------------------------------------------------- #
+def _bot_rally_state(support_overrides=None):
+    """Minimal state for bot rally tests.  All four factions' spaces included
+    so the bot's iteration over state['spaces'] works."""
+    import json
+    from pathlib import Path
+    map_data = json.load(
+        open(Path(__file__).resolve().parents[2] / "map" / "data" / "map.json")
+    )
+    spaces = {}
+    for sid in map_data:
+        spaces[sid] = {}
+    # Put some rebel pieces in Massachusetts and Boston
+    spaces["Massachusetts"] = {C.MILITIA_U: 3, C.MILITIA_A: 1}
+    spaces["Boston"] = {C.MILITIA_U: 1}
+    spaces["New_York"] = {C.MILITIA_U: 2}
+    spaces["Connecticut_Rhode_Island"] = {C.MILITIA_U: 1}
+
+    support = {sid: C.NEUTRAL for sid in map_data}
+    if support_overrides:
+        support.update(support_overrides)
+
+    return {
+        "spaces": spaces,
+        "support": support,
+        "resources": {C.BRITISH: 5, C.PATRIOTS: 5, C.FRENCH: 5, C.INDIANS: 5},
+        "available": {
+            C.MILITIA_U: 10, C.REGULAR_PAT: 5,
+            C.FORT_PAT: 2, C.MILITIA_A: 0,
+        },
+        "control": {},
+        "rng": __import__('random').Random(42),
+    }
+
+
+def test_bot_rally_skips_active_support(monkeypatch):
+    """PatriotBot._execute_rally() must NOT select Massachusetts when it
+    is at Active Support, even though it has rebel pieces."""
+    monkeypatch.setattr(rally, "refresh_control", lambda s: None)
+    monkeypatch.setattr(rally, "enforce_global_caps", lambda s: None)
+    state = _bot_rally_state({"Massachusetts": C.ACTIVE_SUPPORT})
+    bot = PatriotBot()
+    result = bot._execute_rally(state)
+    # Rally should succeed (other spaces are valid)
+    assert result is True
+    # Massachusetts must not have been rallied — its pieces should be untouched
+    assert state["spaces"]["Massachusetts"][C.MILITIA_U] == 3
+    assert state["spaces"]["Massachusetts"][C.MILITIA_A] == 1
+
+
+def test_bot_rally_all_active_support_except_one(monkeypatch):
+    """When all spaces are Active Support except one, only that space
+    should be selected for Rally."""
+    monkeypatch.setattr(rally, "refresh_control", lambda s: None)
+    monkeypatch.setattr(rally, "enforce_global_caps", lambda s: None)
+    import json
+    from pathlib import Path
+    map_data = json.load(
+        open(Path(__file__).resolve().parents[2] / "map" / "data" / "map.json")
+    )
+    overrides = {sid: C.ACTIVE_SUPPORT for sid in map_data}
+    # Leave only New_York at Neutral
+    overrides["New_York"] = C.NEUTRAL
+    state = _bot_rally_state(overrides)
+    bot = PatriotBot()
+    result = bot._execute_rally(state)
+    assert result is True
+    # Resources should have decreased by exactly 1 (one space rallied)
+    assert state["resources"][C.PATRIOTS] == 4
+
+
+def test_bot_rally_integration_scenario(monkeypatch):
+    """Integration test matching the live-play scenario: Patriots have 3
+    Resources, Massachusetts at Active Support.  After _execute_rally(),
+    resources should only be spent for spaces that actually executed.
+    Note: Bullet 7 gather may move militia FROM Massachusetts (adjacent to
+    a fort) — that's valid, it's not rallying IN Massachusetts."""
+    monkeypatch.setattr(rally, "refresh_control", lambda s: None)
+    monkeypatch.setattr(rally, "enforce_global_caps", lambda s: None)
+    state = _bot_rally_state({"Massachusetts": C.ACTIVE_SUPPORT})
+    state["resources"][C.PATRIOTS] = 3
+    bot = PatriotBot()
+    result = bot._execute_rally(state)
+    assert result is True
+    # Resources should never go below 0 and should reflect only valid spaces
+    assert state["resources"][C.PATRIOTS] >= 0
+    # Massachusetts must NOT be among the rally-affected spaces
+    affected = state.get("_turn_affected_spaces", set())
+    assert "Massachusetts" not in affected, (
+        "Massachusetts at Active Support should not be a Rally space"
+    )
