@@ -2580,3 +2580,123 @@ def test_card51_militia_only_not_counted_as_march_cubes():
     }
     # Only militia in Massachusetts (no cubes), rebel force at Boston = 0, Brit = 2 → False
     assert bot._force_condition_met("force_if_51", state, {}) is False
+
+
+# ===================================================================
+#  Illegal rally space filtering  (West Indies, Indian Reserves)
+# ===================================================================
+
+def test_execute_rally_excludes_west_indies():
+    """_execute_rally must never select West Indies as a rally target.
+
+    West Indies scores high on the Bullet-6 sort (not Rebellion-controlled →
+    changes_ctrl=1) but Patriot Militia cannot occupy it (§1.4.2).
+    """
+    bot = PatriotBot()
+    state = _full_state()
+    # Provide West Indies in the state with no pieces — it would rank high
+    # in Bullet 6 because control != REBELLION (changes_ctrl = 1).
+    state["spaces"] = {
+        C.WEST_INDIES_ID: {},
+        "Boston": {C.MILITIA_U: 1},
+    }
+    state["support"] = {C.WEST_INDIES_ID: 0, "Boston": 0}
+    state["control"] = {"Boston": "REBELLION"}
+    state["available"] = {C.MILITIA_U: 10, C.FORT_PAT: 0, C.REGULAR_PAT: 0}
+    state["resources"] = {C.PATRIOTS: 10, C.BRITISH: 10, C.FRENCH: 10, C.INDIANS: 10}
+
+    result = bot._execute_rally(state)
+    # If rally executes, verify West Indies was never targeted
+    # (no pieces should appear there)
+    wi = state["spaces"].get(C.WEST_INDIES_ID, {})
+    assert wi.get(C.MILITIA_U, 0) == 0
+    assert wi.get(C.MILITIA_A, 0) == 0
+    assert wi.get(C.FORT_PAT, 0) == 0
+
+
+def test_execute_rally_excludes_indian_reserve():
+    """_execute_rally must never select an Indian Reserve as a rally target."""
+    from lod_ai.bots.patriot import _MAP_DATA
+    bot = PatriotBot()
+    state = _full_state()
+
+    # Find a real Reserve from the map
+    reserve_sids = [
+        sid for sid, d in _MAP_DATA.items() if d.get("type") == "Reserve"
+    ]
+    assert len(reserve_sids) > 0, "Map must have at least one Reserve Province"
+    rsid = reserve_sids[0]
+
+    state["spaces"] = {
+        rsid: {},
+        "Boston": {C.MILITIA_U: 1},
+    }
+    state["support"] = {rsid: 0, "Boston": 0}
+    state["control"] = {"Boston": "REBELLION"}
+    state["available"] = {C.MILITIA_U: 10, C.FORT_PAT: 0, C.REGULAR_PAT: 0}
+    state["resources"] = {C.PATRIOTS: 10, C.BRITISH: 10, C.FRENCH: 10, C.INDIANS: 10}
+
+    bot._execute_rally(state)
+    sp = state["spaces"].get(rsid, {})
+    assert sp.get(C.MILITIA_U, 0) == 0
+    assert sp.get(C.MILITIA_A, 0) == 0
+    assert sp.get(C.FORT_PAT, 0) == 0
+
+
+def test_best_rally_space_never_returns_west_indies():
+    """_best_rally_space must never return West Indies."""
+    bot = PatriotBot()
+    state = _full_state()
+    # West Indies: not Rebellion-controlled → changes_ctrl=1, would rank first
+    state["spaces"] = {
+        C.WEST_INDIES_ID: {},
+        "Boston": {C.MILITIA_U: 1},
+    }
+    state["support"] = {C.WEST_INDIES_ID: 0, "Boston": 0}
+    state["control"] = {"Boston": "REBELLION"}
+    state["available"] = {C.MILITIA_U: 10, C.FORT_PAT: 0, C.REGULAR_PAT: 0}
+
+    result = bot._best_rally_space(state)
+    assert result != C.WEST_INDIES_ID
+
+
+def test_best_rally_space_never_returns_reserve():
+    """_best_rally_space must never return an Indian Reserve Province."""
+    from lod_ai.bots.patriot import _MAP_DATA
+    bot = PatriotBot()
+    state = _full_state()
+
+    reserve_sids = [
+        sid for sid, d in _MAP_DATA.items() if d.get("type") == "Reserve"
+    ]
+    assert len(reserve_sids) > 0
+    rsid = reserve_sids[0]
+
+    state["spaces"] = {
+        rsid: {},
+        "Boston": {C.MILITIA_U: 1},
+    }
+    state["support"] = {rsid: 0, "Boston": 0}
+    state["control"] = {"Boston": "REBELLION"}
+    state["available"] = {C.MILITIA_U: 10, C.FORT_PAT: 0, C.REGULAR_PAT: 0}
+
+    result = bot._best_rally_space(state)
+    assert result != rsid
+
+
+def test_is_illegal_rally_space_helper():
+    """Smoke test for the _is_illegal_rally_space static method."""
+    from lod_ai.bots.patriot import _MAP_DATA
+    bot = PatriotBot()
+
+    # West Indies is always illegal
+    assert bot._is_illegal_rally_space(C.WEST_INDIES_ID) is True
+
+    # All Reserve provinces are illegal
+    for sid, d in _MAP_DATA.items():
+        if d.get("type") == "Reserve":
+            assert bot._is_illegal_rally_space(sid) is True
+
+    # Normal colonies/cities are legal
+    assert bot._is_illegal_rally_space("Boston") is False
+    assert bot._is_illegal_rally_space("Virginia") is False
