@@ -249,6 +249,60 @@ def test_card12_unshaded_executes_patriot_desertion_immediately():
     assert "winter_flag" not in state
 
 
+def test_card11_shaded_skips_fort_only_space():
+    """Card 11 shaded: A Rebellion-controlled space with only a Fort (no units)
+    must NOT be selected as a candidate. The Fort must not be touched."""
+    state = _base_state()
+    state["spaces"] = {
+        "FortOnly": {FORT_PAT: 1},
+        "HasMilitia": {MILITIA_U: 1},
+    }
+    state["available"] = {FORT_PAT: 2}
+    state["control"] = {"FortOnly": "REBELLION", "HasMilitia": "REBELLION"}
+
+    middle_war.evt_011_kosciuszko(state, shaded=True)
+
+    # FortOnly should be untouched — still exactly 1 Fort, no extra
+    assert state["spaces"]["FortOnly"].get(FORT_PAT, 0) == 1
+    # HasMilitia should have been fortified: militia removed, Fort placed
+    assert state["spaces"]["HasMilitia"].get(MILITIA_U, 0) == 0
+    assert state["spaces"]["HasMilitia"].get(FORT_PAT, 0) == 1
+
+
+def test_card11_shaded_removes_militia_places_fort():
+    """Card 11 shaded: In a Rebellion-controlled space with 1 militia and no Fort,
+    the militia is removed and a Fort is placed."""
+    state = _base_state()
+    state["spaces"] = {
+        "Virginia": {MILITIA_A: 1},
+    }
+    state["available"] = {FORT_PAT: 2}
+    state["control"] = {"Virginia": "REBELLION"}
+
+    middle_war.evt_011_kosciuszko(state, shaded=True)
+
+    assert state["spaces"]["Virginia"].get(MILITIA_A, 0) == 0
+    assert state["spaces"]["Virginia"].get(FORT_PAT, 0) == 1
+    assert state["available"].get(MILITIA_A, 0) == 1
+
+
+def test_card11_shaded_removes_militia_not_fort():
+    """Card 11 shaded: In a Rebellion-controlled space with 1 Fort and 1 militia,
+    the militia is removed (not the Fort) and a second Fort is placed."""
+    state = _base_state()
+    state["spaces"] = {
+        "Boston": {FORT_PAT: 1, MILITIA_U: 1},
+    }
+    state["available"] = {FORT_PAT: 2}
+    state["control"] = {"Boston": "REBELLION"}
+
+    middle_war.evt_011_kosciuszko(state, shaded=True)
+
+    assert state["spaces"]["Boston"].get(MILITIA_U, 0) == 0
+    assert state["spaces"]["Boston"].get(FORT_PAT, 0) == 2
+    assert state["available"].get(MILITIA_U, 0) == 1
+
+
 def test_card12_shaded_resources():
     """Card 12 shaded: Patriot Resources +5."""
     state = _base_state()
