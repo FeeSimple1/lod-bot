@@ -1340,7 +1340,7 @@ class PatriotBot(BaseBot):
 
         if sup > opp and eff["shifts_support_rebel"]:
             return True
-        if eff["places_patriot_militia_u"]:
+        if eff["places_patriot_militia_u"] and state.get("available", {}).get(C.MILITIA_U, 0) > 0:
             # P2 bullet 2 (§8.5): "places Underground Militia in at least one
             # Active Support or Village space that has none already"
             for sid, sp in state["spaces"].items():
@@ -1350,8 +1350,13 @@ class PatriotBot(BaseBot):
                 sup = state.get("support", {}).get(sid, 0)
                 if sup == C.ACTIVE_SUPPORT or sp.get(C.VILLAGE, 0) > 0:
                     return True
-        if eff["places_patriot_fort"] or eff["removes_village"]:
-            return True
+        if eff["places_patriot_fort"]:
+            if state.get("available", {}).get(C.FORT_PAT, 0) > 0:
+                return True
+        if eff["removes_village"]:
+            if any(sp.get(C.VILLAGE, 0) > 0
+                   for sp in state.get("spaces", {}).values()):
+                return True
         if eff["adds_patriot_resources_3plus"]:
             return True
         if eff["is_effective"]:

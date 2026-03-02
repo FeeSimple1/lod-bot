@@ -871,10 +871,17 @@ class FrenchBot(BaseBot):
             return True
         # 2. Places French pieces from Unavailable
         if eff["places_french_from_unavailable"]:
-            return True
+            unavail = state.get("unavailable", {})
+            if (unavail.get(C.FRENCH_UNAVAIL, 0) > 0
+                    or unavail.get(C.SQUADRON, 0) > 0):
+                return True
         # 3. Places French pieces on map
         if eff["places_french_on_map"]:
-            return True
+            fre_avail = state.get("available", {}).get(C.REGULAR_FRE, 0)
+            fre_wi = (state.get("spaces", {})
+                      .get(C.WEST_INDIES_ID, {}).get(C.REGULAR_FRE, 0))
+            if fre_avail > 0 or fre_wi > 0:
+                return True
         # 4. Inflicts British casualties
         if eff["inflicts_british_casualties"]:
             return True

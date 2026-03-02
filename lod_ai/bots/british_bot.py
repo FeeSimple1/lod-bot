@@ -162,21 +162,22 @@ class BritishBot(BaseBot):
 
         # 2. "Event places British pieces from Unavailable?"
         if eff["places_british_from_unavailable"]:
-            return True
+            if state.get("unavailable", {}).get(C.BRIT_UNAVAIL, 0) > 0:
+                return True
 
         # 3. "Event places Tories in Active Opposition with none, a British Fort
         #     in a Colony with none, or British Regulars in a City or Colony?"
-        if eff["places_tories"]:
+        if eff["places_tories"] and state.get("available", {}).get(C.TORY, 0) > 0:
             for sid, sp in state["spaces"].items():
                 if (self._support_level(state, sid) == C.ACTIVE_OPPOSITION
                         and sp.get(C.TORY, 0) == 0):
                     return True
-        if eff["places_british_fort"]:
+        if eff["places_british_fort"] and state.get("available", {}).get(C.FORT_BRI, 0) > 0:
             for sid in state["spaces"]:
                 if (_MAP_DATA.get(sid, {}).get("type") == "Colony"
                         and state["spaces"][sid].get(C.FORT_BRI, 0) == 0):
                     return True
-        if eff["places_british_regulars"]:
+        if eff["places_british_regulars"] and state.get("available", {}).get(C.REGULAR_BRI, 0) > 0:
             for sid in state["spaces"]:
                 if _MAP_DATA.get(sid, {}).get("type") in ("City", "Colony"):
                     return True
