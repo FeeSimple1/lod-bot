@@ -442,6 +442,18 @@ class PatriotBot(BaseBot):
         """
         return sid == C.WEST_INDIES_ID or map_adj.space_type(sid) == "Reserve"
 
+    def _can_rally_in(self, state: Dict, sid: str) -> bool:
+        """Return False if *sid* is illegal for Rally.
+
+        Combines the West Indies / Indian Reserve check with the §3.3.1
+        Active Support prohibition.
+        """
+        if self._support_level(state, sid) == C.ACTIVE_SUPPORT:
+            return False
+        if self._is_illegal_rally_space(sid):
+            return False
+        return True
+
     def _best_rally_space(self, state: Dict) -> str | None:
         """Select Rally space per P7 priorities for Win-the-Day free Rally.
         Priority: Fort placement first (Cities, highest Pop), then Militia
@@ -455,7 +467,7 @@ class PatriotBot(BaseBot):
         if avail_forts > 0:
             candidates = []
             for sid, sp in state["spaces"].items():
-                if self._is_illegal_rally_space(sid):
+                if not self._can_rally_in(state, sid):
                     continue
                 if sp.get(C.FORT_PAT, 0) > 0:
                     continue
@@ -473,7 +485,7 @@ class PatriotBot(BaseBot):
         # Priority 2: Space to change Control or no Active Opposition
         candidates = []
         for sid, sp in state["spaces"].items():
-            if self._is_illegal_rally_space(sid):
+            if not self._can_rally_in(state, sid):
                 continue
             support = self._support_level(state, sid)
             changes_ctrl = 1 if ctrl.get(sid) != "REBELLION" else 0
@@ -822,7 +834,7 @@ class PatriotBot(BaseBot):
         if avail_forts > 0:
             fort_candidates = []
             for sid, sp in state["spaces"].items():
-                if self._is_illegal_rally_space(sid):
+                if not self._can_rally_in(state, sid):
                     continue
                 if sp.get(C.FORT_PAT, 0) > 0:
                     continue
@@ -852,6 +864,8 @@ class PatriotBot(BaseBot):
         if avail_militia > 0:
             lonely_forts = []
             for sid, sp in state["spaces"].items():
+                if not self._can_rally_in(state, sid):
+                    continue
                 if sp.get(C.FORT_PAT, 0) == 0:
                     continue
                 # "no other Rebellion pieces" = only the Fort itself
@@ -877,6 +891,8 @@ class PatriotBot(BaseBot):
             best_cont_fort = None
             best_cont_mil = -1
             for sid, sp in state["spaces"].items():
+                if not self._can_rally_in(state, sid):
+                    continue
                 if sid in spaces_used:
                     continue  # already selected — checked separately in Bullet 4
                 if sp.get(C.FORT_PAT, 0) == 0 and sid not in build_fort_set:
@@ -916,7 +932,7 @@ class PatriotBot(BaseBot):
         if avail_forts > 0:
             no_fort_spaces = []
             for sid, sp in state["spaces"].items():
-                if self._is_illegal_rally_space(sid):
+                if not self._can_rally_in(state, sid):
                     continue
                 if sp.get(C.FORT_PAT, 0) > 0 or sid in build_fort_set:
                     continue
@@ -935,7 +951,7 @@ class PatriotBot(BaseBot):
         if remaining_slots > 0:
             militia_targets = []
             for sid, sp in state["spaces"].items():
-                if self._is_illegal_rally_space(sid):
+                if not self._can_rally_in(state, sid):
                     continue
                 if sid in spaces_used:
                     continue
@@ -954,7 +970,8 @@ class PatriotBot(BaseBot):
         # §8.5.2: "in one Fort space NOT already selected above"
         fort_spaces_for_gather = [
             sid for sid, sp in state["spaces"].items()
-            if sid not in spaces_used
+            if self._can_rally_in(state, sid)
+            and sid not in spaces_used
             and (sp.get(C.FORT_PAT, 0) > 0 or sid in build_fort_set)
             and len(spaces_used) < max_rally  # must have room for one more space
         ]

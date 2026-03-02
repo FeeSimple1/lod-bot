@@ -196,18 +196,20 @@ def execute(
 
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).update(selected)
-    # --- Cost payment -------------------------------------------------
+    # --- Validate all spaces before spending ----------------------------
+    for space_id in selected:
+        if _support_value(state, space_id) == ACTIVE_SUPPORT:
+            raise ValueError(f"{space_id} has Active Support; cannot Rally there.")
+        if _is_indian_reserve(space_id) or _is_west_indies(space_id):
+            raise ValueError(f"Cannot Rally in {space_id}.")
+
+    # --- Cost payment (after validation) ------------------------------
     cost = len(selected)
     spend(state, PATRIOTS, cost)
 
     push_history(state, f"PATRIOTS RALLY selected={selected}")
 
     moved_militia: Set[Tuple[str, str]] = set()  # (src_id, dst_id)
-
-    # Preload West Indies / reserve flags for validation
-    for space_id in selected:
-        if _support_value(state, space_id) == ACTIVE_SUPPORT:
-            raise ValueError(f"{space_id} has Active Support; cannot Rally there.")
 
     # --- Phase 1: apply per‑space actions -----------------------------------
     for space_id in selected:
