@@ -799,7 +799,8 @@ class IndianBot(BaseBot):
             option = 1
         else:
             return False  # no valid option (Fort only but can't use option 3)
-        return war_path.execute(state, C.INDIANS, {}, target, option=option)
+        war_path.execute(state, C.INDIANS, {}, target, option=option)
+        return True
 
     # ------------------------------------------------------------------
     # MARCH  (Command)  -------------------------------------------------

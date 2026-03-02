@@ -811,3 +811,79 @@ class TestI12ScoutCityFilter:
         assert "Boston" not in affected
         # Should have scouted to a Province instead
         assert any(s != "Boston" for s in affected)
+
+
+# =====================================================================
+#  War Path + Trade double Special Activity bug fix
+# =====================================================================
+
+class TestWarPathTradeNoDouble:
+    """§2.3.6: A faction may execute only one Special Activity per turn.
+    §8.7.2: After Gather, execute War Path OR Trade, never both."""
+
+    def test_war_path_returns_true_not_dict(self):
+        """_war_path() must return True (not an empty dict) on success."""
+        bot = IndianBot()
+        state = _base_state(spaces={
+            "Quebec": _empty_space(**{
+                C.WARPARTY_U: 2,
+                C.REGULAR_PAT: 1,
+            }),
+        })
+        state["resources"][C.INDIANS] = 5
+        state["support"] = {"Quebec": 0}
+        refresh_control(state)
+        result = bot._war_path(state)
+        assert result is True
+        assert type(result) is bool
+
+    def test_war_path_or_trade_does_not_double_sa(self):
+        """When War Path succeeds, Trade must NOT also execute."""
+        bot = IndianBot()
+        state = _base_state(spaces={
+            "Quebec": _empty_space(**{
+                C.WARPARTY_U: 2,
+                C.REGULAR_PAT: 1,
+                C.VILLAGE: 1,
+            }),
+        })
+        state["resources"][C.INDIANS] = 5
+        state["resources"][C.BRITISH] = 5
+        state["support"] = {"Quebec": 0}
+        refresh_control(state)
+        bot._war_path_or_trade(state)
+        log = state.get("log", [])
+        history = " ".join(str(h) for h in state.get("history", []))
+        # War Path should have executed
+        war_path_entries = [e for e in log if "WAR_PATH" in str(e)]
+        assert len(war_path_entries) >= 1, "War Path should have executed"
+        # Trade should NOT have executed
+        trade_entries = [e for e in log if "TRADE" in str(e)]
+        assert len(trade_entries) == 0, (
+            "Trade must not execute after successful War Path "
+            "(only one SA per turn per §2.3.6)"
+        )
+
+    def test_trade_executes_when_war_path_impossible(self):
+        """When War Path is not possible, Trade should execute instead."""
+        bot = IndianBot()
+        # No rebel units in any space → War Path impossible
+        state = _base_state(spaces={
+            "Quebec": _empty_space(**{
+                C.WARPARTY_U: 2,
+                C.VILLAGE: 1,
+            }),
+        })
+        state["resources"][C.INDIANS] = 5
+        state["resources"][C.BRITISH] = 5
+        state["support"] = {"Quebec": 0}
+        refresh_control(state)
+        bot._war_path_or_trade(state)
+        log = state.get("log", [])
+        history = " ".join(str(h) for h in state.get("history", []))
+        # War Path should NOT have executed (no rebel targets)
+        war_path_entries = [e for e in log if "WAR_PATH" in str(e)]
+        assert len(war_path_entries) == 0
+        # Trade should have executed
+        trade_entries = [e for e in log if "TRADE" in str(e)]
+        assert len(trade_entries) >= 1, "Trade should execute when War Path impossible"
