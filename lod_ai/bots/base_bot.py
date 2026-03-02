@@ -170,12 +170,13 @@ class BaseBot:
     #  REPLACE the placeholder method with this full version
     def _choose_event_vs_flowchart(self, state: Dict, card: Dict) -> bool:
         """Return True if the bot executes the Event, else False."""
-        # 1. Sword icon → auto-ignore
-        if card.get("sword"):
+        # 1. Sword icon → auto-ignore (per-faction, not global)
+        faction_icons = card.get("faction_icons", {})
+        if faction_icons.get(self.faction) == "SWORD":
             return False
 
-        # 2. Musket icon → consult special instruction sheet
-        if card.get("musket"):
+        # 2. Musket icon → consult special instruction sheet (per-faction)
+        if faction_icons.get(self.faction) == "MUSKET":
             directive = self._event_directive(card["id"])
             if directive == "ignore":
                 return False
