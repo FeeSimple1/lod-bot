@@ -1034,7 +1034,7 @@ class BritishBot(BaseBot):
         # B39 Gage: free first Reward Loyalty shift
         rl_free_first = self._is_gage(state) and reward_levels > 0
 
-        did_something = muster.execute(
+        muster.execute(
             state,
             C.BRITISH,
             {},
@@ -1046,12 +1046,6 @@ class BritishBot(BaseBot):
             fort_space=fort_space,
             rl_free_first=rl_free_first,
         )
-
-        if not did_something:
-            if not tried_march:
-                self._reset_command_trace(state)
-                return self._march(state, tried_muster=True)
-            return False
 
         # Execute SA (skip if already done during Garrison fallback, or limited/no-SA slot)
         if (not state.get("_sa_done_this_turn")
