@@ -644,7 +644,8 @@ def test_force_unshaded_executes_unshaded():
     original = CARD_HANDLERS.get(71)
     CARD_HANDLERS[71] = fake_handler
     try:
-        card = {"id": 71, "musket": True, "dual": True}
+        card = {"id": 71, "musket": True, "dual": True,
+                "faction_icons": {"BRITISH": "SWORD", "INDIANS": "SWORD", "PATRIOTS": "MUSKET"}}
         state = {
             "spaces": {},
             "resources": {C.PATRIOTS: 5, C.BRITISH: 5, C.FRENCH: 5, C.INDIANS: 5},
@@ -668,7 +669,8 @@ def test_force_if_french_not_human_skips_when_french_human():
     """Card 8: If French is a human player, bot should skip event (Command & SA)."""
     bot = PatriotBot()
 
-    card = {"id": 8, "musket": True, "dual": True}
+    card = {"id": 8, "musket": True, "dual": True,
+            "faction_icons": {"PATRIOTS": "MUSKET"}}
     state = {
         "spaces": {},
         "resources": {C.PATRIOTS: 5, C.BRITISH: 5, C.FRENCH: 5, C.INDIANS: 5},
@@ -697,7 +699,8 @@ def test_force_if_french_not_human_plays_when_french_bot():
     original = CARD_HANDLERS.get(8)
     CARD_HANDLERS[8] = fake_handler
     try:
-        card = {"id": 8, "musket": True, "dual": True}
+        card = {"id": 8, "musket": True, "dual": True,
+                "faction_icons": {"PATRIOTS": "MUSKET"}}
         state = {
             "spaces": {},
             "resources": {C.PATRIOTS: 5, C.BRITISH: 5, C.FRENCH: 5, C.INDIANS: 5},
@@ -720,7 +723,8 @@ def test_force_if_french_not_human_plays_when_french_bot():
 def test_force_if_eligible_enemy_skips_when_none_eligible():
     """Cards 18, 44: If no eligible enemy Faction, bot should skip event."""
     bot = PatriotBot()
-    card = {"id": 18, "musket": True, "dual": True}
+    card = {"id": 18, "musket": True, "dual": True,
+            "faction_icons": {"BRITISH": "MUSKET", "FRENCH": "SWORD", "INDIANS": "MUSKET", "PATRIOTS": "MUSKET"}}
     state = {
         "spaces": {},
         "resources": {C.PATRIOTS: 5, C.BRITISH: 5, C.FRENCH: 5, C.INDIANS: 5},
@@ -747,7 +751,8 @@ def test_force_if_eligible_enemy_plays_when_enemy_eligible():
     original = CARD_HANDLERS.get(18)
     CARD_HANDLERS[18] = fake_handler
     try:
-        card = {"id": 18, "musket": True, "dual": True}
+        card = {"id": 18, "musket": True, "dual": True,
+            "faction_icons": {"BRITISH": "MUSKET", "FRENCH": "SWORD", "INDIANS": "MUSKET", "PATRIOTS": "MUSKET"}}
         state = {
             "spaces": {},
             "resources": {C.PATRIOTS: 5, C.BRITISH: 5, C.FRENCH: 5, C.INDIANS: 5},
