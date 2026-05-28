@@ -421,6 +421,7 @@ class IndianBot(BaseBot):
             return False
 
         raid.execute(state, C.INDIANS, {}, validated_selected, move_plan=validated_plan)
+        self._follow_leaders_after_move(state)
         return True
 
     # ------------------------------------------------------------------
@@ -742,6 +743,7 @@ class IndianBot(BaseBot):
             bulk_place=bulk_place if bulk_place else None,
             move_plan=move_plan_list if move_plan_list else None,
         )
+        self._follow_leaders_after_move(state)
         return True
 
     # ------------------------------------------------------------------
@@ -1021,6 +1023,7 @@ class IndianBot(BaseBot):
             return False
 
         march.execute(state, C.INDIANS, {}, [], [], plan=validated_plan)
+        self._follow_leaders_after_move(state)
         return True
 
     # ------------------------------------------------------------------
@@ -1150,6 +1153,7 @@ class IndianBot(BaseBot):
             n_warparties=n_wp, n_regulars=n_regs, n_tories=n_tories,
             skirmish=do_skirmish, skirmish_option=skirmish_opt,
         )
+        self._follow_leaders_after_move(state)
         return True
 
     # ------------------------------------------------------------------
@@ -1193,6 +1197,53 @@ class IndianBot(BaseBot):
             return False
 
     # ==================================================================
+    #  IN-TURN LEADER MOVEMENT  (OPS: Leader Movement during Campaigns)
+    # ==================================================================
+    def _follow_leaders_after_move(self, state: Dict) -> None:
+        """Apply OPS leader-movement rule after any Indian move command.
+
+        OPS reference: "Royalist Leaders accompany the largest group of
+        units from their Faction that moves from (or stays in) their
+        origin spaces."  Indians have three leaders: Brant, Cornplanter,
+        Dragging Canoe.
+
+        Uses the existing ops_leader_movement() which inspects post-move
+        board state — call this helper AFTER march/scout/gather/raid
+        execute so the WP counts at adjacent spaces reflect what just
+        happened.
+        """
+        leaders_state = state.get("leaders")
+        leader_locs = state.get("leader_locs")
+        for leader in ("LEADER_BRANT", "LEADER_CORNPLANTER", "LEADER_DRAGGING_CANOE"):
+            current_loc = leader_location(state, leader)
+            if not current_loc:
+                continue
+            new_loc = self.ops_leader_movement(state, leader)
+            if not new_loc or new_loc == current_loc:
+                continue
+            # Update whichever leader-location structure is in use.
+            updated = False
+            if isinstance(leaders_state, dict):
+                if leader in leaders_state and isinstance(leaders_state.get(leader), (str, type(None))):
+                    leaders_state[leader] = new_loc
+                    updated = True
+                else:
+                    keys_to_remove = [k for k, v in leaders_state.items() if v == leader]
+                    if keys_to_remove:
+                        for k in keys_to_remove:
+                            leaders_state.pop(k, None)
+                        leaders_state[new_loc] = leader
+                        updated = True
+            if isinstance(leader_locs, dict) and leader in leader_locs:
+                leader_locs[leader] = new_loc
+                updated = True
+            if updated:
+                push_history(
+                    state,
+                    f"{leader} follows largest WP group: {current_loc} -> {new_loc}"
+                )
+
+        # ==================================================================
     #  OPS SUMMARY METHODS  (year-end / operational helpers)
     # ==================================================================
     def ops_supply_priority(self, state: Dict, spaces: List[str]) -> List[str]:

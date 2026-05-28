@@ -605,6 +605,11 @@ class BritishBot(BaseBot):
             displace_city=displace_city,
             displace_target=displace_target,
         )
+
+        # OPS reference: "Royalist Leaders follow largest group of own
+        # units that moves from (or stays in) their spaces."  Same rule
+        # as after a March — apply it for Garrison too.
+        self._follow_leaders_after_garrison(state, move_map)
         return True
 
     # -------------------------------------------------------------------
@@ -1608,6 +1613,40 @@ class BritishBot(BaseBot):
     # =======================================================================
     #  OPS Summary methods (year-end and during-turn bot decisions)
     # =======================================================================
+
+    def _follow_leaders_after_garrison(self, state: Dict, move_map: Dict[str, Dict[str, int]]) -> None:
+        """Apply OPS leader-movement rule after a British Garrison.
+
+        Garrison's move_map is structured {origin: {dest_city: count}}.
+        For each British leader, the per-leader spaces_with_moves dict
+        is simply move_map.get(leader_loc, {}) — destinations the
+        leader's space sent Regulars to, with counts.  Then delegate
+        to bot_leader_movement and update state["leaders"] if the
+        leader should follow.
+        """
+        leaders_state = state.get("leaders")
+        if not isinstance(leaders_state, dict):
+            return
+        for leader in ("LEADER_GAGE", "LEADER_HOWE", "LEADER_CLINTON"):
+            leader_loc = leader_location(state, leader)
+            if not leader_loc:
+                continue
+            spaces_with_moves = dict(move_map.get(leader_loc, {}))
+            if not spaces_with_moves:
+                continue
+            new_loc = BritishBot.bot_leader_movement(state, leader, spaces_with_moves)
+            if new_loc and new_loc != leader_loc:
+                if leader in leaders_state and isinstance(leaders_state.get(leader), (str, type(None))):
+                    leaders_state[leader] = new_loc
+                else:
+                    keys_to_remove = [k for k, v in leaders_state.items() if v == leader]
+                    for k in keys_to_remove:
+                        leaders_state.pop(k, None)
+                    leaders_state[new_loc] = leader
+                push_history(
+                    state,
+                    f"{leader} follows largest Garrison group: {leader_loc} -> {new_loc}"
+                )
 
     def _follow_leaders_after_march(self, state: Dict, plan: list) -> None:
         """Apply OPS leader-movement rule after a British March.
