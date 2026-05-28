@@ -37,6 +37,7 @@ from lod_ai.util.adjacency import is_adjacent
 from lod_ai.map.adjacency    import space_type as _space_type
 from lod_ai.board.pieces      import add_piece, remove_piece
 from lod_ai.economy.resources import spend, can_afford
+from lod_ai.leaders          import leader_location
 
 COMMAND_NAME = "GATHER"      # auto-registered by commands/__init__.py
 
@@ -141,18 +142,25 @@ def execute(
 
         # Action dispatch -------------------------------------------------------
         if prov in build_village:
-            if _wp_total(sp) < 2:
-                raise ValueError(f"{prov}: need 2 WP to build a Village.")
+            # Cornplanter capability (leader_capabilities.txt):
+            # "Gather builds Villages for 1 War Party in the space."
+            # Default cost is 2 WP; Cornplanter-in-space reduces to 1.
+            village_cost = 1 if leader_location(state, "LEADER_CORNPLANTER") == prov else 2
+
+            if _wp_total(sp) < village_cost:
+                raise ValueError(
+                    f"{prov}: need {village_cost} WP to build a Village."
+                )
 
             base_total = sp.get(VILLAGE, 0) + sp.get(FORT_BRI, 0) + sp.get(FORT_PAT, 0)
             if base_total >= 2:
                 raise ValueError(f"{prov}: stacking limit reached for bases.")
 
-            # Remove 2 War-Parties (Underground preferred)
-            take_u = min(2, sp.get(WARPARTY_U, 0))
+            # Remove village_cost War-Parties (Underground preferred)
+            take_u = min(village_cost, sp.get(WARPARTY_U, 0))
             if take_u:
                 remove_piece(state, WARPARTY_U, prov, take_u)
-            take_a = 2 - take_u
+            take_a = village_cost - take_u
             if take_a:
                 remove_piece(state, WARPARTY_A, prov, take_a)
 

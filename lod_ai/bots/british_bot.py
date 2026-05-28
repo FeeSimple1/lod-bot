@@ -976,7 +976,7 @@ class BritishBot(BaseBot):
                 )
                 _current_sup = self._support_level(state, best_rl)
                 _max_shift = C.ACTIVE_SUPPORT - _current_sup  # levels to reach Active Support
-                _rl_gage = 1 if self._is_gage(state) else 0
+                _rl_gage = 1 if leader_location(state, "LEADER_GAGE") == best_rl else 0
                 # Muster cost: 1 per selected space (RL space may add 1 more)
                 _muster_count = len(all_selected) + (0 if best_rl in all_selected else 1)
                 # RL cost = markers + shift_levels - gage_discount
@@ -1049,8 +1049,16 @@ class BritishBot(BaseBot):
                 return self._march(state, tried_muster=True)
             return False
 
-        # B39 Gage: free first Reward Loyalty shift
-        rl_free_first = self._is_gage(state) and reward_levels > 0
+        # B39 Gage capability (leader_capabilities.txt):
+        # "First Loyalty shift: Reward Loyalty is free in the space."
+        # Gage must be IN the chosen RL space for the discount to apply
+        # (was previously a global "is Gage the British leader?" check
+        # which gave a discount even when Gage was elsewhere on the map).
+        rl_free_first = (
+            chosen_rl_space is not None
+            and leader_location(state, "LEADER_GAGE") == chosen_rl_space
+            and reward_levels > 0
+        )
 
         muster.execute(
             state,

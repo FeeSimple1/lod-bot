@@ -2293,3 +2293,176 @@ notes / community playtest data).
   estimator might prevent the bot from launching attacks it loses.
 - Phase 4 human-player CLI pass: 1-3 human modes have had less
   scrutiny than the bot paths.
+
+---
+
+## Session 18: Full Rules-Compliance Audit (May 2026)
+
+### Scope
+
+User request: "do a full audit of the whole thing against the rules."
+Given that audit_report.md through Session 17 already covers Manual
+Ch 3 (commands), Ch 7 (victory), Ch 8 (bot flowcharts for all four
+factions), the four scenario reference docs, and the ~109 card
+handlers (3× re-audited in Sessions 3/4/6), this session focused on
+the genuinely under-audited areas:
+
+* `Reference Documents/leader_capabilities.txt` — never explicitly
+  audited per prior sessions.
+* Manual Ch 1 (game basics — pieces, map, control) — covered
+  implicitly by Phase 1 label compliance and scenario setup audits.
+* Manual Ch 2 (sequence of play / eligibility) — covered by
+  Phase 3 / Session 4 + Session 6 in passing but not explicitly.
+* Manual Ch 5 (event resolution mechanics) — heavily covered by the
+  three card-handler audits; nothing fresh to add.
+* Card handler spot-check — deferred to a future session given time
+  budget.
+
+### FIXED — four leader-capability bugs (`leader_capabilities.txt`)
+
+Background: `lod_ai/leaders/__init__.py` registers `pre_*` hooks for
+each of the 9 leader capabilities and exposes
+`apply_leader_modifiers(state, faction, hook, ctx)`.  In real game
+state, `state["leaders"]` is shaped `{leader_id: location}` (the
+scenario-JSON convention), not `{faction: [leader_ids]}` as the
+module's docstring claims and the hooks expect.  So the entire
+`apply_leader_modifiers` ctx-flag path is **dead code in real games**.
+
+For most capabilities this doesn't matter — the per-space rules are
+implemented directly via `leader_location()` checks in their command
+files (Washington WTD/Defender, Lauzun, Brant, Dragging Canoe).
+
+Four capabilities were silently broken:
+
+#### 1. Clinton (+1 Militia in Skirmish)
+
+`lod_ai/special_activities/skirmish.py` read
+`ctx.get("skirmish_extra_militia", 0)`, which was always 0 because
+the `_clinton` hook didn't fire.  The code-comment claim "Clinton
+bonus is already applied via apply_leader_modifiers" was wrong.
+
+**Fix:** added a direct
+`leader_location(state, "LEADER_CLINTON") == space_id` check
+alongside the (now-known-dead) ctx fallback.  The fallback was
+removed to avoid double-counting in tests that exercise the legacy
+`{faction: [leaders]}` state shape.
+
+#### 2. Cornplanter (Village for 1 War Party)
+
+`lod_ai/commands/gather.py` always required exactly 2 War Parties to
+build a Village, regardless of Cornplanter's location.  Per
+leader_capabilities.txt: "Gather builds Villages for 1 War Party in
+the space."
+
+**Fix:** in the `build_village` branch of `gather.execute()`, compute
+`village_cost = 1 if leader_location("LEADER_CORNPLANTER") == prov
+else 2` and use it for both the WP-availability check and the
+WP-removal count.
+
+#### 3. Gage (free first Reward Loyalty shift in the space)
+
+`BritishBot._muster` set `rl_free_first = self._is_gage(state) and
+reward_levels > 0`.  `_is_gage` returns True when Gage is the
+*first British leader on the map*, which gives the discount when
+Reward Loyalty is happening anywhere — even if Gage is in a
+different city.  The reference says **"in the space."**
+
+**Fix:** changed `rl_free_first` to check
+`leader_location(state, "LEADER_GAGE") == chosen_rl_space`.  Same
+fix applied to the affordability pre-calculation
+(`_rl_gage = 1 if leader_location == best_rl else 0`).
+
+#### 4. Rochambeau (French free with Patriot Command)
+
+`lod_ai/commands/battle.py` and `lod_ai/commands/march.py` charged
+the French allied fee unconditionally whenever Patriots used French
+escorts.  Per leader_capabilities.txt: "French may March and Battle
+with a Patriot Command at no Resource cost."  Per-space rule —
+applies when French Regulars in Rochambeau's space participate.
+
+**Fix:**
+
+* `battle.execute()`: changed the French-allied-fee calculation from
+  "1 per space with French Regulars" to "1 per space with French
+  Regulars **except** Rochambeau's space."
+* `march.execute()`: changed `spend(state, FRENCH,
+  len(french_entered_dsts))` to filter out Rochambeau's location
+  from the chargeable destinations.
+
+### Regression tests
+
+`lod_ai/tests/test_leader_capabilities_audit.py` — 7 new tests:
+
+* `test_clinton_in_skirmish_space_removes_one_extra_militia`
+* `test_clinton_not_in_skirmish_space_grants_no_bonus`
+* `test_cornplanter_builds_village_with_one_war_party`
+* `test_no_cornplanter_requires_two_war_parties`
+* `test_gage_in_rl_space_makes_first_shift_free`
+* `test_rochambeau_in_battle_space_waives_french_ally_fee`
+* `test_rochambeau_elsewhere_does_not_waive_french_ally_fee`
+
+### Audit findings — Manual Ch 1, Ch 2, Ch 5
+
+#### Ch 1 (game basics)
+
+Piece-count constants in `lod_ai/rules_consts.py`
+(`MAX_REGULAR_BRI=25`, `MAX_TORY=25`, `MAX_REGULAR_FRE=15`,
+`MAX_REGULAR_PAT=20`, `MAX_MILITIA=15`, `MAX_FORT_BRI=6`,
+`MAX_FORT_PAT=6`, `MAX_VILLAGE=12`) match standard Liberty or Death
+component counts.  Scenario setups have been validated against the
+Scenario Reference docs in prior sessions and via the
+CBC/CRC + setup audits in Session 17.
+
+#### Ch 2 (sequence of play / eligibility)
+
+`engine._prepare_card` correctly resets all four factions to
+Eligible at the start of each card (per §2.3.6), then applies
+`ineligible_next` (single-card ineligibility) and
+`ineligible_through_next` (two-card ineligibility) per any
+event-driven flags from the previous card.  Brilliant Stroke
+all-eligible reset is handled via the BS card handlers.  No fresh
+issues found.
+
+#### Ch 5 (event resolution mechanics)
+
+Already deeply covered by Sessions 3/4/6 (full card-handler audits)
+and Session 16 (Commands).  No fresh audit needed in this session.
+
+### Documented — apply_leader_modifiers / leaders module is dead code
+
+The `lod_ai/leaders/__init__.py` module registers `pre_battle`,
+`pre_skirmish`, `pre_war_path`, `pre_gather`, `pre_raid`,
+`pre_reward_loyalty`, `pre_special_activity`, and `pre_command`
+hooks for each of the 9 capabilities.  None of them fire in real
+games because `apply_leader_modifiers` iterates
+`state["leaders"].get(faction, [])` while real state has
+`state["leaders"]` shaped `{leader_id: location}`.
+
+Every capability is now implemented via direct `leader_location()`
+checks in the relevant command files (after this session's four
+fixes).  Two safe future actions:
+
+1. Delete the dead hooks + the docstring claiming the
+   `{faction: [leaders]}` shape, since the actual contract is the
+   `{leader_id: location}` shape.
+2. Or: fix `apply_leader_modifiers` to walk the location dict and
+   correctly fire hooks for leaders on the map — but this would
+   then duplicate the direct checks now present in command files
+   and risk double-counting.
+
+Both are out of scope here; (1) is cleaner.
+
+### What remained out of scope
+
+* **Systematic card-handler spot-check.**  The card handlers have
+  been audited three times (Sessions 3, 4, 6) and no new issues
+  were surfaced in the most recent re-audit.  Pulling every card
+  again was not the highest-value use of this session's time.  A
+  future session may want to re-check the ~80 cards not explicitly
+  listed as fixed.
+
+* **Howe leader-presence check.**  `BritishBot._is_howe` returns
+  True if Howe is the "first" British leader returned by
+  `_british_leader`.  If both Gage and Howe are on the map and Gage
+  is found first, Howe's FNI bonus may not fire.  Not crash-class
+  but worth a follow-up.

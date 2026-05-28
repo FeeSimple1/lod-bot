@@ -98,7 +98,16 @@ def execute(
     # pieces are involved, NOT per piece.  Cap fee at what the ally can
     # afford to prevent resource-underflow errors.
     if faction == PATRIOTS:
-        fee = sum(1 for s in spaces if state["spaces"][s].get(REGULAR_FRE, 0) > 0)
+        # Rochambeau capability (leader_capabilities.txt):
+        # "French may March and Battle with a Patriot Command at no
+        # Resource cost."  Waive the French allied fee for any space
+        # where Rochambeau is present alongside French Regulars.
+        chargeable_spaces = [
+            s for s in spaces
+            if state["spaces"][s].get(REGULAR_FRE, 0) > 0
+            and leader_location(state, "LEADER_ROCHAMBEAU") != s
+        ]
+        fee = len(chargeable_spaces)
         if fee:
             fee = min(fee, state["resources"].get(FRENCH, 0))
             if fee > 0:

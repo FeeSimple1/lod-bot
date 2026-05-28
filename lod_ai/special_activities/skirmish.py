@@ -147,9 +147,17 @@ def execute(
         remove_piece(state, enemy_fort_side_tag, space_id, 1, to="casualties")
         remove_piece(state, own_tag,           space_id, 1, to="casualties")
 
-    # Clinton bonus is already applied via apply_leader_modifiers → _clinton
-    # which sets ctx["skirmish_extra_militia"] = 1.  Do NOT add a second +1 here.
-    extra_militia = (ctx.get("skirmish_extra_militia", 0) if faction == BRITISH else 0)
+    # Clinton capability (leader_capabilities.txt):
+    # "Skirmish removes 1 additional Militia in the space."
+    # Direct per-space check.  We don't add the ctx flag (which the
+    # _clinton leader-hook sets) on top because in tests that exercise
+    # the hook path the same +1 would be double-counted; in production
+    # the hook path is dead code anyway (state["leaders"] is
+    # {leader: location}, not {faction: [leaders]} as the hook
+    # expects).
+    extra_militia = 0
+    if faction == BRITISH and leader_location(state, "LEADER_CLINTON") == space_id:
+        extra_militia += 1
 
     removed_bonus = 0
     while extra_militia and (sp.get(MILITIA_A, 0) or sp.get(MILITIA_U, 0)):

@@ -38,7 +38,7 @@ from lod_ai.util.history     import push_history
 from lod_ai.util.caps        import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency   import is_adjacent
 from lod_ai.map import adjacency as map_adj
-from lod_ai.leaders          import apply_leader_modifiers
+from lod_ai.leaders          import apply_leader_modifiers, leader_location
 from lod_ai.board.pieces      import remove_piece, add_piece, move_piece
 from lod_ai.economy.resources import spend, can_afford               # NEW
 
@@ -318,8 +318,14 @@ def execute(
 
     # §3.3.2: Patriot March — French also pay 1 Resource per destination
     # that French Regulars enter.
+    # Rochambeau capability (leader_capabilities.txt): "French may March
+    # and Battle with a Patriot Command at no Resource cost."  Waive the
+    # French fee for any destination where Rochambeau is present.
     if faction == PATRIOTS and french_entered_dsts and not free:
-        spend(state, FRENCH, len(french_entered_dsts))
+        rochambeau_loc = leader_location(state, "LEADER_ROCHAMBEAU")
+        chargeable = [d for d in french_entered_dsts if d != rochambeau_loc]
+        if chargeable:
+            spend(state, FRENCH, len(chargeable))
 
     # ── Post-move activation effects ─────────────────────────────────────
     # NOTE: Flipping pieces between Active/Underground uses direct dict
