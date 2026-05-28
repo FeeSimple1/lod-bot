@@ -240,7 +240,10 @@ def _supply_phase(state, *, bots=None, human_factions=None):
     # West Indies battle + garrison payment
     wi = state["spaces"][WEST_INDIES_ID]
     if wi.get(REGULAR_FRE) and wi.get(REGULAR_BRI) and state.get("toa_played", False):
-        battle_execute(state, FRENCH, {}, [WEST_INDIES_ID])
+        # Manual §6.2.2: "French must conduct a *free* Battle in the West
+        # Indies."  Without free=True, battle.execute() charges 1 Resource
+        # and crashes the game whenever French Resources == 0.
+        battle_execute(state, FRENCH, {}, [WEST_INDIES_ID], free=True)
         push_history(state, "Free Battle in West Indies (6.2.2)")
     def _wi_cleanup(pid, faction):
         cnt = wi.get(pid, 0)
