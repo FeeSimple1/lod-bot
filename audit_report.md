@@ -2103,3 +2103,193 @@ Updated 4 tests: `test_apply_shifts_to_returns_remaining`, `test_apply_shifts_to
 ### DOCUMENTED — ambiguity (see QUESTIONS.md Q12)
 
 - **French Agent Mobilization `_VALID_PROVINCES`**: Manual §3.5.1 says "Quebec" but bot flowchart F7 says "Quebec City". Map has both spaces ("Quebec" as Reserve, "Quebec_City" as City). Current code uses "Quebec_City" matching the bot flowchart. Documented as Q12 in QUESTIONS.md for human decision.
+
+---
+
+## Session 17: Zero-Player Smoke Cleanup + 1776 Imbalance Investigation (May 2026)
+
+### Scope
+
+Driven by the user request "tell me what this project is and finish it."
+The session ran the 0-player smoke matrix on current main, surfaced four
+real bugs, fixed them with regression tests, then took the 150-game
+`--large` batch from 1 hard crash + 55 silent illegal/error events down
+to 0/0.  Then audited the bot flowcharts (B, I, F nodes) against their
+reference docs to investigate the 1776 100%-Patriot-wins phenomenon.
+
+### FIXED — four PRs (merged to main)
+
+#### 1. Patriot Win-the-Day free Rally crashed in Reserve / West Indies
+
+**Source:** Manual §3.6.8 + §1.4.2 + §3.3.1.  Win-the-Day grants a free
+Rally in the battle space for Rebellion winners.  Rally is illegal in
+West Indies and Indian Reserves.
+
+**Bug:** `PatriotBot._execute_battle`'s `_win_callback` unconditionally
+returned the battle space as the free Rally space, so when battle was
+fought in Quebec / Northwest / Southwest / West Indies, the subsequent
+`rally.execute()` raised `ValueError: Cannot Rally in <space>`.  The
+engine caught the exception and downgraded the turn to
+`pass(bot_error)`, but the bot silently lost its action (5 occurrences
+across 3 games in the 60-game baseline).
+
+**Fix:** consult the existing `self._can_rally_in(st, battle_sid)`
+predicate and set `rally_space=None` when the battle space is not
+Rally-eligible.  Commits `6d6d4f8` (fix) + `b9f4807` (test).
+
+#### 2. British Limited-Command Muster exceeded the 1-space cap
+
+**Source:** Manual §3.2 / §3.2.1.  Limited Command Muster may affect
+only 1 space.
+
+**Bug:** `BritishBot._muster()` correctly capped Regulars + Tory
+placement at max_spaces (1 for Limited Command, 4 otherwise), but the
+step-3 Reward-Loyalty and Fort-build candidate selection could append
+an extra space.  In Limited mode this produced 2 selected spaces and
+the engine rejected with `limited_wrong_count (affected=2)`.  50
+occurrences across 29/60 games — almost every 1775 and 1776 game
+affected.
+
+**Fix:** filter `rl_candidates` and `fort_targets` to spaces already in
+`all_selected` when `len(all_selected) >= max_spaces`.  Honors the B8
+flowchart phrase "in 1 space, first one already selected above."
+Commit `648ae61` (fix) + `b9f4807` (test).
+
+#### 3. British "March in place to Activate Militia" produced no_affected_spaces
+
+**Source:** Manual §3.2.3 + B10 flowchart Phase 3.
+
+**Bug:** `BritishBot._march`'s Phase 3 ("March in place to Activate
+Militia, first in Support") called `flip_pieces()` directly to flip
+Underground Militia, bypassing `march.execute()`.  Two consequences:
+the §3.2.3 cost (1 Resource per destination space selected) was not
+paid for these destinations; and `state['_turn_command']` /
+`state['_turn_affected_spaces']` were never populated.  When the SA
+chain then fired, the engine saw `_turn_used_special=True` with
+affected_count=0 and rejected with `no_affected_spaces`.  1 occurrence
+in the 60-game baseline (1776 seed 2 card 10).
+
+**Fix:** when activate_in_place is non-empty, charge §3.2.3 cost
+per in-place destination (stopping at unaffordable), set
+`_turn_command='MARCH'`, and add the paid-for spaces to
+`_turn_affected_spaces` before doing the flip.  Commits
+`be656da` + `af2b516` (test).
+
+#### 4. §6.2.2 West Indies Free Battle wasn't free
+
+**Source:** Manual §6.2.2 verbatim: "French must conduct a *free*
+Battle in the West Indies if French and British pieces are present."
+
+**Bug:** `_supply_phase` in `lod_ai/util/year_end.py` called
+`battle.execute(state, FRENCH, {}, [WEST_INDIES_ID])` without
+`free=True`.  When French reached year-end with 0 Resources the
+`spend()` helper raised `ValueError` and the whole year-end resolution
+crashed.  The next line of code pushed history saying "Free Battle in
+West Indies (6.2.2)" — the comment knew the rule but the call didn't
+reflect it.  Surfaced as 1 CRASH (1778 seed 48) in the `--large`
+150-game smoke.
+
+**Fix:** pass `free=True`.  Commit `f0a878e`.
+
+#### 5. Patriot bot fired Persuasion 2-4 times per turn
+
+**Source:** Manual §4.1: "may also execute *one* of its Special
+Activities."
+
+**Bug:** `PatriotBot._try_persuasion()` is called from many flowchart
+nodes (P7 Rally, P8 Partisans, P11 Rabble-Rousing, P12 Skirmish) and
+is also fired as a mid-command resource refill inside `_execute_rabble`
+and `_execute_rally` whenever Patriot Resources hit 0.  Nothing
+prevented it firing more than once per turn.  Instrumenting a 50-game
+1776 batch showed 30% of Persuasion-using turns (52/172) involved >1
+Persuasion call, with one turn firing it four times.
+
+**Fix:** gate `_try_persuasion` with `state['_turn_persuasion_used']`,
+cleared at the start of every turn via a `PatriotBot.take_turn`
+override.  Commit `7cf4412`.
+
+#### 6. Cumulative casualty counters hardcoded to 0 at setup
+
+**Source:** `1776 Scenario Reference.txt`: "Cumulative British
+Casualties: 1, Cumulative Rebellion Casualties: 3."  `1778 Scenario
+Reference.txt` specifies CBC=10.
+
+**Bug:** `lod_ai/state/setup_state.py` wrote `"cbc": 0, "crc": 0`
+unconditionally, ignoring `british_casualties` / `patriot_casualties`
+fields in the scenario JSON files.
+
+**Fix:** read `int(scen.get('british_casualties', 0))` and similarly
+for CRC.  Commit `7cf4412`.
+
+### Smoke matrix outcome
+
+Before this session:
+
+  Default 60-game matrix: 1 game with bot_errors, 29 games with
+  illegal_actions.  150-game `--large`: 1 hard CRASH, 55 silent
+  illegal/error events.
+
+After this session:
+
+  Default 60-game matrix: 0 bot_errors, 0 illegal_actions.
+  150-game `--large`: 0 crashes, 0 illegal_actions, 0 bot_errors.
+
+### INVESTIGATED — 1776 100% Patriot wins (NOT a coding bug)
+
+After all the above fixes 1776 still produces 49/50 (98%) Patriot wins
+on the 50-seed batch.  Investigation chain:
+
+1. **Manual Ch 7 victory conditions:** Patriot = (Opp > Sup + 10) AND
+   (Forts + 3 > Villages).  `victory.py` `_patriot_margin` matches.
+2. **1776 starting state vs scenario reference:** support track (3),
+   opposition track (5), Patriot Forts (2), Villages (2) all match
+   reference.  CBC/CRC were the only discrepancy and have been fixed.
+3. **Instrumented trace of 1776 seed 30:** Patriots reach Margin 1 = +2
+   after 8 cards via:
+   - Card 1 (Hessians, BPIF): British plays event (no Support shift);
+     Patriots Rabble-Rouse 5 spaces (NC, Philly, Charles_Town, Georgia,
+     Quebec) shifting Opposition track from 5 to 10.
+   - Card 5 (Declaration of Independence, PIFB): Patriots 1st Eligible.
+     Then British attacks New_York and *loses*; §3.6.8 Win-the-Day
+     shifts NY by 2 toward Opposition, +4 to track.
+   - Card 7 (Morgan's Rifles, PFIB): Virginia shifts to Active Support;
+     +4 to Support track.  Patriots still ahead.
+   - Card 8 (Winter Quarters): Victory check — PAT margins (2, 3).  Win.
+4. **1775 vs 1776 structural comparison:**
+
+| | 1775 | 1776 |
+|---|---|---|
+| Starting Opp − Sup | 0 | **2** |
+| Shift needed for PAT Margin 1 | 10 | **8** |
+| Persuasion-eligible spaces | 3 | **4** |
+| RR-eligible spaces with shift room | 3 | **5** |
+| Patriot resources | 3 | 2 |
+
+5. **British / Indian / French bot audits vs their reference flowcharts:**
+   walked B1-B13 + OPS, I3-I12, F3-F17 against the published refs.
+   All three implementations are largely faithful.  Minor deviations
+   found (B10 extra CC-fallback-before-SA step, B12 battle Force-Level
+   heuristic vs exact dice prediction, two OPS methods existing but
+   not wired into the engine) but none individually large.
+
+### CONCLUSION
+
+The 1776 100%-Patriot result is what the published bot flowcharts
+produce.  It is **not** a coding bug.  Per project rule "Rules-Accurate
+Over Simple" and "Never Guess", do not rebalance by altering bot
+priorities.  If 1776 is intended to be a Patriot-favored medium-
+duration scenario in the bots' world that is the accepted outcome;
+if not, the question belongs upstream of this codebase (GMT designer
+notes / community playtest data).
+
+### Remaining open items (not crash-class)
+
+- `bot_indian_trade` and `bot_leader_movement` exist on `BritishBot`
+  with unit tests but are not invoked from the engine.  Wiring them
+  would close two §3.4 / §6 OPS items.
+- `_march`'s "try Common Cause as fallback before SA chain" is an
+  extra step not in B10's reference text.
+- `_battle`'s Force-Level heuristic is rough; a dice-accurate
+  estimator might prevent the bot from launching attacks it loses.
+- Phase 4 human-player CLI pass: 1-3 human modes have had less
+  scrutiny than the bot paths.

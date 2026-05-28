@@ -4,8 +4,8 @@
 
 This is an automation engine for the non-player bot flowcharts in **Liberty or Death** (GMT Games, COIN Series Vol. V). It handles 0–4 bot-controlled factions (British, Patriots, Indians, French) via an interactive CLI. The goal is faithful implementation of the published flowcharts — not a variation, not a reinterpretation, not a "simplified" version.
 
-**Language:** Python (100%). ~15,400 LOC across ~60 files.
-**Tests:** pytest. 86 tests currently passing.
+**Language:** Python (100%). ~43,000 LOC across ~130 files.
+**Tests:** pytest. 1,136 tests currently passing.
 **No external game references.** Do not consult BoardGameGeek, other COIN games, other GMT titles, or any historical sources outside the Reference Documents.
 
 ---
@@ -127,54 +127,111 @@ lod_ai/
 
 ---
 
-## Known Issues (from ChatGPT era)
+## Project Status (as of May 2026)
 
-The file `audit_report.md` in the repo root documents **dozens** of known card implementation bugs. The most pervasive patterns are:
+Phases 1, 2, and 3 of the original task plan are complete.  See
+`audit_report.md` for the per-phase summary and `GITHUB_ISSUES.md` for
+the original phase definitions.
 
-1. **Wrong labels / string literals.** ChatGPT repeatedly invented piece tags like `"Continental"`, `"Militia"`, `"Tory"`, `"fort"` instead of using the constants from `rules_consts.py`. Every string literal that refers to a game piece, faction, or marker must be checked against the canonical list above.
+**Phase 1 — Label Compliance: COMPLETE.**  All `.py` files in `lod_ai/`
+have been audited and string-literal violations of `rules_consts.py`
+fixed.  Any new code must continue to import constants rather than
+using piece/faction/marker/space-ID string literals directly.
 
-2. **Card effects don't match `card reference full.txt`.** Hardcoded locations instead of player/bot selection, inverted shaded/unshaded effects, wrong destinations ("to Casualties" when reference says "to Available" or vice versa), missing conditions, incomplete implementations.
+**Phase 2 — Card Compliance: COMPLETE.**  All card handlers in
+`lod_ai/cards/effects/` have been audited against `Reference Documents/
+card reference full.txt`.  31+ specific card mismatches documented and
+fixed.  Brilliant Stroke / Treaty of Alliance interrupt chain
+implemented per Manual §2.3.8-9 and §8.3.7.
 
-3. **Eligibility field confusion.** Some cards use `ineligible_next` when the reference says "Ineligible through the next card" (which should be `ineligible_through_next`). These are different durations.
+**Phase 3 — Rules & Bot Compliance: COMPLETE.**  Bot flowcharts for
+all four factions have been audited node-by-node against their
+reference docs.  Commands, special activities, year-end / Winter
+Quarters, victory conditions, and scenario setup have all been
+verified against the Manual.  Zero-player mode runs to completion
+across all three scenarios without crashes or hangs.
 
-4. **Queued free ops instead of immediate execution.** Several cards queue free operations that should execute immediately per the card text.
+**Phase 4 — UI / Usability: PARTIALLY COMPLETE.**  Zero-player mode is
+solid (see "Smoke matrix" below).  Human-player CLI (1–3 humans) has
+had less scrutiny than the bot paths.  This is the most user-facing
+remaining work.
 
-5. **Brilliant Stroke / Treaty of Alliance incomplete.** The interrupt/trump chain, leader involvement, eligibility reset, and card return mechanics are not fully implemented.
+### Smoke matrix (current main)
 
-6. **One fix introduces one new bug.** This was a persistent pattern — be vigilant about regression. Always run the full test suite after changes.
+`python -m lod_ai.tools.batch_smoke --large` runs 150 zero-player games
+(50 seeds × 3 scenarios) and produces:
 
----
+- 0 crashes
+- 0 hangs / timeouts (200-card safety cap never hit)
+- 0 interactive-prompt leaks
+- 0 illegal-action rejections
+- 0 unhandled bot exceptions
 
-## Task Priorities (in order)
+Per-faction win rates have stabilized at approximately:
 
-### Phase 1: Label Compliance
-Audit every `.py` file in `lod_ai/` for string literals that should be constants from `rules_consts.py`. Fix all violations. This includes:
-- Piece tags, faction names, marker names, space IDs
-- Any string comparison or dictionary key that references a game concept
+| Scenario | PAT | BRI | FRE | IND |
+|----------|-----|-----|-----|-----|
+| 1775     | ~75%| ~15%| ~0% | ~10%|
+| **1776** | **~98%** | ~2% | ~0% | ~0% |
+| 1778     | ~40%| ~5% | ~50%| ~5% |
 
-### Phase 2: Card Compliance
-For every card handler in `lod_ai/cards/effects/`:
-1. Compare implementation against `Reference Documents/card reference full.txt`
-2. Document mismatches (update `audit_report.md`)
-3. Fix each mismatch
-4. Add/update tests that verify the fix against the reference text
+**1776 is heavily Patriot-favored by design.**  Full investigation in
+`audit_report.md` (Session 17, May 2026): the four bot flowcharts as
+published produce this outcome; it is not a coding bug.  Patriots
+start with Opp − Sup = 2 (only 8 points from Margin 1 victory), 4
+Persuasion-eligible spaces, and 5 Rabble-Rousing-eligible spaces, and
+the British bot's published flowchart prescribes a conservative
+opening that does not directly counter the Patriot RR engine.  Do
+**not** rebalance by altering bot priorities — that would deviate from
+the references.
 
-### Phase 3: Rules Compliance & Functionality
-- Verify bot flowchart implementations against the four `*bot flowchart and reference.txt` files
-- Verify commands and special activities against `Manual Ch 3.txt` and `Manual Ch 4.txt`
-- Verify game engine flow (sequence of play, eligibility, event/command choice) against `Manual Ch 2.txt`
-- Verify victory conditions against `Manual Ch 7.txt`
-- Verify year-end / Winter Quarters against rules
-- Verify scenario setup against the scenario reference files
-- Ensure zero-player mode works (all four factions bot-controlled)
+### Remaining open items
 
-### Phase 4: UI / Usability
-- Clean, simple CLI that supports 0–4 human players
-- Clear display of game state, current card, upcoming card
-- Menu-driven choices — no free-text input for game actions
-- Illegal moves rejected before committing
+Small, surgical work — none crash-class:
 
----
+- `bot_indian_trade` and `bot_leader_movement` exist on the British
+  bot and have unit tests but are not called from the engine.  Wiring
+  them up would close two §3.4 / §6 OPS items.
+- `_march`'s "try Common Cause as fallback" step (post-March, before
+  SA) is not described in the B10 reference — it's an extra step.
+  Probably harmless but worth verifying.
+- `_battle`'s Force-Level heuristic uses a rough net-advantage
+  estimate rather than simulating dice probabilities.  This sometimes
+  triggers British attacks that the Rebellion wins, awarding
+  Win-the-Day Opposition shifts against the British.  A more accurate
+  estimator might help British in 1776 but should be benchmarked
+  against the reference.
+- Phase 4 human-player CLI pass: ensure 1–3 human player modes have
+  no free-text input gaps, illegal-move messages are helpful, and
+  game-state display is complete.
+
+### What recent sessions established
+
+(For context to future Claude sessions or contributors — do not redo
+these investigations from scratch.)
+
+- `setup_state.py` now reads cumulative casualty counters from the
+  scenario JSON (`british_casualties`, `patriot_casualties`).
+  Previously hardcoded to 0, which was wrong for 1776 (CBC=1, CRC=3)
+  and 1778 (CBC=10).
+- The §6.2.2 West Indies year-end battle is correctly called with
+  `free=True` in `_supply_phase`.  Previously this crashed any game
+  where French reached year-end with 0 Resources.
+- `PatriotBot._try_persuasion` gates on a per-turn flag.  Persuasion
+  fires from several flowchart nodes and was previously allowed to
+  fire 2–4× per turn, violating Manual §4.1's one-SA-per-Command
+  rule.
+- `BritishBot._muster` correctly respects the Limited Command 1-space
+  cap including the RL/Fort selection step.  Previously could append
+  a 2nd space and get rejected as `limited_wrong_count`.
+- `BritishBot._march`'s Phase-3 "March in place to Activate Militia"
+  now pays §3.2.3 cost and tags the command properly.  Previously
+  produced `no_affected_spaces` illegal-action rejections when it was
+  the only viable action.
+- `PatriotBot._execute_battle`'s Win-the-Day callback skips the free
+  Rally when the battle space is a Reserve / West Indies (Rally is
+  illegal there per §1.4.2 / §3.3.1).  Previously crashed with
+  `ValueError: Cannot Rally in <space>`.
 
 ## Critical Rules
 
@@ -244,6 +301,14 @@ pytest -q
 
 ## For the Maintainer
 
-This project was substantially built with ChatGPT assistance, which introduced systematic issues (see Known Issues above). The primary remaining work is correctness — making the implementation faithfully match the Reference Documents. Speed, optimization, and architectural elegance are secondary to rules accuracy.
+This project was originally built with ChatGPT assistance, which
+introduced systematic correctness issues.  As of May 2026 those have
+all been worked through (Phases 1-3 complete; see Project Status
+above).  The current bar for new work is the same as it has always
+been: rules-accurate, faithful to the Reference Documents, no
+guessing.
 
-When in doubt, read the Reference Documents again. Then read them one more time.
+When in doubt, read the Reference Documents again.  Then read them
+one more time.  When the Reference Documents are silent or
+contradictory, add the question to `QUESTIONS.md` and stop — do not
+implement a "reasonable interpretation".

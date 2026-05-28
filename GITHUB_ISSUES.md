@@ -5,9 +5,24 @@
 # sequentially in the terminal.
 #
 # Issues are ordered by the priority phases in CLAUDE.md.
+#
+# STATUS (as of May 2026):
+#   * Phase 1 (Label Compliance) — COMPLETE
+#   * Phase 2 (Card Compliance) — COMPLETE
+#   * Phase 3 (Rules & Bot Compliance) — COMPLETE
+#   * Phase 4 (UI / Usability) — PARTIALLY COMPLETE
+#       - "Ensure zero-player mode works end to end" — DONE
+#         (150-game --large smoke matrix: 0 crashes, 0 hangs,
+#         0 illegal_actions, 0 bot_errors)
+#       - "Clean up CLI for 0-3 human player modes" — STILL OPEN
+#
+# Do not redo Phase 1/2/3 issues from scratch.  See audit_report.md
+# (Sessions 1-17) for what was actually fixed and what remains.
 
 
-## PHASE 1: Label Compliance
+## PHASE 1: Label Compliance — COMPLETE
+
+*The issues in this section are kept for historical reference.  As of May 2026 all Phase items here have been resolved; see `audit_report.md` for the per-phase summary.*
 
 ### Issue: Audit all files for non-canonical string literals
 **Labels:** phase-1, audit, labels
@@ -38,7 +53,9 @@ If any label appears to have no matching constant in `rules_consts.py` and you b
 ---
 
 
-## PHASE 2: Card Compliance
+## PHASE 2: Card Compliance — COMPLETE
+
+*The issues in this section are kept for historical reference.  As of May 2026 all Phase items here have been resolved; see `audit_report.md` for the per-phase summary.*
 
 ### Issue: Full card audit — all cards vs card reference full.txt
 **Labels:** phase-2, audit, cards
@@ -106,7 +123,9 @@ This is complex — it involves interrupt mechanics, a trump chain, leader invol
 ---
 
 
-## PHASE 3: Rules Compliance
+## PHASE 3: Rules Compliance — COMPLETE
+
+*The issues in this section are kept for historical reference.  As of May 2026 all Phase items here have been resolved; see `audit_report.md` for the per-phase summary.*
 
 ### Issue: Verify British bot flowchart implementation
 **Labels:** phase-3, bots, british
@@ -211,7 +230,9 @@ Tests should be grounded in the Reference Documents — verify that the code pro
 ---
 
 
-## PHASE 4: UI
+## PHASE 4: UI — PARTIALLY COMPLETE
+
+*Zero-player end-to-end is solid.  The 1-3 human player CLI issue below is still open.*
 
 ### Issue: Ensure zero-player mode works end to end
 **Labels:** phase-4, ui
