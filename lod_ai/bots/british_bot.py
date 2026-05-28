@@ -952,6 +952,14 @@ class BritishBot(BaseBot):
                 and sp.get(C.REGULAR_BRI, 0) >= 1
                 and sp.get(C.TORY, 0) >= 1
             ]
+            # §3.2 / §3.2.1: Muster (Limited Command) affects only 1 space.
+            # When we've already filled the per-Muster space cap, the
+            # Reward-Loyalty step must reuse an already-selected space per
+            # the B8 flowchart ("in 1 space, first one already selected
+            # above").  Filter out any RL candidate that would push us
+            # over max_spaces.
+            if len(all_selected) >= max_spaces:
+                rl_candidates = [s for s in rl_candidates if s in all_selected]
             if rl_candidates:
                 best_rl = min(rl_candidates, key=_rl_key)
                 # §3.2.1: "There is no limit to the number of levels shifted
@@ -989,6 +997,11 @@ class BritishBot(BaseBot):
                 and (sp.get(C.FORT_PAT, 0) + sp.get(C.VILLAGE, 0) + sp.get(C.FORT_BRI, 0)) < 2
                 and (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)) >= 5
             ]
+            # See note above on B8 "first one already selected above".  When
+            # at the per-Muster space cap, restrict to already-selected
+            # spaces so we don't violate the Limited Command 1-space rule.
+            if len(all_selected) >= max_spaces:
+                fort_targets = [s for s in fort_targets if s in all_selected]
             fort_targets.sort(key=lambda n: (0 if n in all_selected else 1))
             if fort_targets:
                 fort_space = fort_targets[0]
