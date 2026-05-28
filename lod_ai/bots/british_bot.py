@@ -25,7 +25,7 @@ from lod_ai.commands import garrison, muster, march, battle
 from lod_ai.special_activities import naval_pressure, skirmish, common_cause
 from lod_ai.util.history import push_history
 from lod_ai.leaders import leader_location, apply_leader_modifiers
-from lod_ai.economy.resources import can_afford
+from lod_ai.economy.resources import can_afford, spend
 from lod_ai.map import adjacency as map_adj
 
 # ---------------------------------------------------------------------------
@@ -1367,15 +1367,39 @@ class BritishBot(BaseBot):
                 limited=False,
             )
 
-        # Activate Underground Militia in march-in-place spaces
+        # Activate Underground Militia in march-in-place spaces.
+        # §3.2.3: "Pay one Resource per destination space selected" —
+        # march-in-place destinations are selected destinations and
+        # cost 1 Resource each.  The march.execute() call above only
+        # paid for spaces in move_plan, so charge the in-place spaces
+        # here.  Also mark them as a MARCH command so the engine's
+        # _is_action_legal() check sees the turn produced effects;
+        # otherwise a turn that does only march-in-place + SA fails
+        # with illegal_reason='no_affected_spaces'.
         if activate_in_place:
             from lod_ai.board.pieces import flip_pieces
+            affordable_in_place: List[str] = []
             for sid in activate_in_place:
-                sp = state["spaces"][sid]
-                mu = sp.get(C.MILITIA_U, 0)
-                if mu > 0:
-                    flip_pieces(state, C.MILITIA_U, C.MILITIA_A, sid, mu)
-                    push_history(state, f"BRITISH March in place: Activate {mu} Militia in {sid}")
+                if can_afford(state, C.BRITISH, 1):
+                    spend(state, C.BRITISH, 1)
+                    affordable_in_place.append(sid)
+                else:
+                    break
+            if affordable_in_place:
+                state["_turn_command"] = "MARCH"
+                state.setdefault("_turn_affected_spaces", set()).update(
+                    affordable_in_place
+                )
+                for sid in affordable_in_place:
+                    sp = state["spaces"][sid]
+                    mu = sp.get(C.MILITIA_U, 0)
+                    if mu > 0:
+                        flip_pieces(state, C.MILITIA_U, C.MILITIA_A, sid, mu)
+                        push_history(
+                            state,
+                            f"BRITISH March in place: Activate {mu} "
+                            f"Militia in {sid}"
+                        )
 
         # If CC was not used during planning, try it post-March (fallback),
         # otherwise skip to SA chain.  Skip all SAs in limited/no-SA slot.
