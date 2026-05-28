@@ -1156,8 +1156,10 @@ class IndianBot(BaseBot):
     # TRADE  (Special Activity)  ---------------------------------------
     def _trade(self, state: Dict) -> bool:
         """I11: Trade (Max 1).
-        First request Resources from British.  If no Resources given,
-        Trade in the Village space with most Underground War Parties.
+        First request Resources from British (per OPS reference, the
+        British bot decides whether and how much to offer based on its
+        own resource state and a 1D6 roll).  Then Trade in the Village
+        space with most Underground War Parties.
         """
         spaces = [
             (sp.get(C.WARPARTY_U, 0), sid)
@@ -1170,15 +1172,19 @@ class IndianBot(BaseBot):
         spaces.sort(reverse=True)
         target = spaces[0][1]
 
-        # I11: "first request Resources from the British"
-        transfer = 0
-        brit_res = state.get("resources", {}).get(C.BRITISH, 0)
-        if brit_res > 0:
-            roll = state["rng"].randint(1, 6)
-            state.setdefault("rng_log", []).append(("Indian Trade D6", roll))
-            if roll < brit_res:
-                transfer = -(-roll // 2)  # ceil(roll / 2)
-                push_history(state, f"Indian Trade: British offer {transfer} (rolled {roll})")
+        # I11: "first request Resources from the British".  Per the
+        # British bot OPS reference: if Indian Resources >= British
+        # Resources, British offers 0.  Otherwise roll 1D6 and offer
+        # half (round up) if the roll < British Resources.  This
+        # delegation also fixes the previous inline implementation
+        # which was missing the Indian < British gate.
+        from lod_ai.bots.british_bot import BritishBot
+        transfer = BritishBot.bot_indian_trade(state)
+        if transfer > 0:
+            push_history(
+                state,
+                f"Indian Trade: British offer {transfer} Resources"
+            )
 
         try:
             trade.execute(state, C.INDIANS, {}, target, transfer=transfer)

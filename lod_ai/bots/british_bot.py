@@ -1367,6 +1367,15 @@ class BritishBot(BaseBot):
                 limited=False,
             )
 
+            # OPS reference: "Royalist Leaders follow largest group of
+            # own units that moves from (or stays in) their spaces."
+            # For each British leader on the map, build the per-leader
+            # spaces_with_moves dict (destinations reached from that
+            # leader's space + counts of British units that moved
+            # there) and let bot_leader_movement decide where they
+            # belong post-march.  Skip if no plan or no British leaders.
+            self._follow_leaders_after_march(state, move_plan[:4])
+
         # Activate Underground Militia in march-in-place spaces.
         # §3.2.3: "Pay one Resource per destination space selected" —
         # march-in-place destinations are selected destinations and
@@ -1600,6 +1609,54 @@ class BritishBot(BaseBot):
     #  OPS Summary methods (year-end and during-turn bot decisions)
     # =======================================================================
 
+    def _follow_leaders_after_march(self, state: Dict, plan: list) -> None:
+        """Apply OPS leader-movement rule after a British March.
+
+        For each British leader currently on the map, compute the
+        per-leader spaces_with_moves dict from *plan* (filtered to
+        moves originating in the leader's current space) and update
+        state["leaders"][leader] if bot_leader_movement chooses a
+        new location.
+        """
+        leaders_state = state.get("leaders")
+        if not isinstance(leaders_state, dict):
+            return
+        for leader in ("LEADER_GAGE", "LEADER_HOWE", "LEADER_CLINTON"):
+            leader_loc = leader_location(state, leader)
+            if not leader_loc:
+                continue
+            spaces_with_moves: Dict[str, int] = {}
+            for mv in plan:
+                if mv.get("src") != leader_loc:
+                    continue
+                pieces = mv.get("pieces", {})
+                count = int(pieces.get(C.REGULAR_BRI, 0)) + int(pieces.get(C.TORY, 0))
+                if count <= 0:
+                    continue
+                dst = mv.get("dst")
+                if dst:
+                    spaces_with_moves[dst] = spaces_with_moves.get(dst, 0) + count
+            if not spaces_with_moves:
+                continue  # nothing left leader_loc → leader stays
+            new_loc = BritishBot.bot_leader_movement(state, leader, spaces_with_moves)
+            if new_loc and new_loc != leader_loc:
+                # Mutate the leaders map in-place — leader_location()
+                # supports both `state['leaders']` and reverse-mapping.
+                # Find the existing key (could be leader-name or space-name).
+                if leader in leaders_state and isinstance(leaders_state.get(leader), (str, type(None))):
+                    leaders_state[leader] = new_loc
+                else:
+                    # reverse mapping: state['leaders'][space] = leader
+                    # Find and remove old, add new
+                    keys_to_remove = [k for k, v in leaders_state.items() if v == leader]
+                    for k in keys_to_remove:
+                        leaders_state.pop(k, None)
+                    leaders_state[new_loc] = leader
+                push_history(
+                    state,
+                    f"{leader} follows largest group: {leader_loc} -> {new_loc}"
+                )
+
     def bot_supply_priority(self, state: Dict) -> List[str]:
         """British Supply: Pay only in spaces where removing British would
         prevent Reward Loyalty or allow Committees of Correspondance,
@@ -1710,11 +1767,19 @@ class BritishBot(BaseBot):
 
         return removals
 
-    def bot_indian_trade(self, state: Dict) -> int:
-        """Indian Trade: If Indian Resources < British Resources, roll 1D6.
-        If roll < British Resources, offer half (round up) the number rolled.
+    @staticmethod
+    def bot_indian_trade(state: Dict) -> int:
+        """Compute the British offer for an Indian Trade request per the
+        OPS reference: "If Indians request Trade and Indian Resources <
+        British Resources, roll 1D6: if the roll < British Resources,
+        offer to transfer Resources equal to half (round up) the number
+        rolled to Indian Resources."
 
-        Returns the amount to transfer (0 if trade not possible/favorable).
+        Wired into IndianBot._trade so the Indian bot can ask British
+        for an offer instead of computing it inline (and missing the
+        Indian < British gate).
+
+        Returns the amount to transfer (0 if no offer).
         """
         indian_res = state.get("resources", {}).get(C.INDIANS, 0)
         british_res = state.get("resources", {}).get(C.BRITISH, 0)
@@ -1727,18 +1792,36 @@ class BritishBot(BaseBot):
         offer = (die + 1) // 2  # half rounded up
         return offer
 
-    def bot_leader_movement(self, state: Dict, leader: str, spaces_with_moves: Dict[str, int]) -> str | None:
-        """Leader Movement: Royalist Leaders follow largest group of own units
-        that moves from (or stays in) their spaces.
+    @staticmethod
+    def bot_leader_movement(state: Dict, leader: str, spaces_with_moves: Dict[str, int]) -> str | None:
+        """OPS reference: "Royalist Leaders follow largest group of own
+        units that moves from (or stays in) their spaces."
 
-        *spaces_with_moves* maps space_id -> total British pieces moving from/staying.
-        Returns the space ID the leader should be in.
+        Wired into BritishBot._march so each British leader follows the
+        largest group originating in (or remaining at) their current
+        space after a March.
+
+        Parameters
+        ----------
+        leader : str
+            British leader identifier (LEADER_GAGE / LEADER_HOWE /
+            LEADER_CLINTON).
+        spaces_with_moves : Dict[str, int]
+            Destinations the leader's space sent units to, mapped to the
+            count of British units (Regulars + Tories) that moved there.
+
+        Returns the space ID the leader should now occupy.  Returns
+        None if the leader is not currently on the map.
         """
         leader_loc = leader_location(state, leader)
         if not leader_loc:
             return None
 
-        # Find the largest group of British units moving from or staying in the leader's space
+        # Largest group: the group that stayed at leader_loc, or the
+        # group that moved to each destination in spaces_with_moves.
+        # If staying tie-breaks against any moving group, the leader
+        # stays put (best_dest defaults to leader_loc, only changes if
+        # a destination strictly exceeds the staying count).
         best_dest = leader_loc
         best_count = 0
         sp = state["spaces"].get(leader_loc, {})
