@@ -406,8 +406,14 @@ class PatriotBot(BaseBot):
             battle space.  Rally uses P7 priorities; Blockade moves to
             the City with most Support (excluding the battle city itself).
             """
-            # §3.6.8: Win-the-Day free Rally is in the battle space
-            rally_space = battle_sid
+            # §3.6.8: Win-the-Day free Rally is in the battle space.
+            # However, Rally is illegal in West Indies and Indian Reserves
+            # (Quebec / Northwest / Southwest) per §3.3.1 and §1.4.2.  If the
+            # battle was fought in such a space, skip the free Rally.
+            if self._can_rally_in(st, battle_sid):
+                rally_space = battle_sid
+            else:
+                rally_space = None
             rally_kwargs = {}
             if rally_space:
                 sp_r = st["spaces"].get(rally_space, {})
