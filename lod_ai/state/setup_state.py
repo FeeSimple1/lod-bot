@@ -403,9 +403,13 @@ def build_state(
             # add further marker families here
         },
         # ---------------------------------------------------------------
-        # §1.6.4 Cumulative casualty counters (game-long, never decrement)
-        "cbc":       0,   # Cumulative British Casualties
-        "crc":       0,   # Cumulative Rebellion Casualties
+        # §1.6.4 Cumulative casualty counters (game-long, never decrement).
+        # Read from the scenario JSON when present so 1776 starts at the
+        # specified track values (CBC=1, CRC=3 per 1776 Scenario Reference)
+        # instead of resetting to 0.  These tracks feed British/French
+        # Margin 2 (§7.2) and French Preparations (§2.3.9).
+        "cbc":       int(scen.get("british_casualties", 0)),   # CBC
+        "crc":       int(scen.get("patriot_casualties", 0)),   # CRC
         "rng":       random.Random(seed),
         "rng_log":   [],
         "history":   [],

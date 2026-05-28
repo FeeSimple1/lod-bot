@@ -211,6 +211,17 @@ class PatriotBot(BaseBot):
         return None
 
     # ===================================================================
+    #  TURN RESET HOOKS
+    # ===================================================================
+    def take_turn(self, state, card, allowed=None):
+        # Clear per-turn flags so single-fire SA gates reset at every turn.
+        # Manual §4.1: a Faction may execute *one* Special Activity per
+        # Command turn.  Persuasion in particular is callable from many
+        # nodes (P7, P8, P11, P12) so we need a turn-scoped guard.
+        state.pop("_turn_persuasion_used", None)
+        return super().take_turn(state, card, allowed=allowed)
+
+    # ===================================================================
     #  FLOW-CHART DRIVER
     # ===================================================================
     def _follow_flowchart(self, state: Dict) -> None:
@@ -1242,6 +1253,13 @@ class PatriotBot(BaseBot):
         return False
 
     def _try_persuasion(self, state: Dict) -> bool:
+        # Manual §4.1: a Faction may execute one Special Activity per
+        # Command turn.  Persuasion fires from several Patriot flowchart
+        # nodes (P7 Rally, P8 Partisans, P11 Rabble-Rousing, P12 Skirmish);
+        # only the first call per turn is legal.  Gate with a turn-scoped
+        # flag (cleared in take_turn).
+        if state.get("_turn_persuasion_used"):
+            return False
         refresh_control(state)
         ctrl = state.get("control", {})
         spaces = [
@@ -1257,6 +1275,7 @@ class PatriotBot(BaseBot):
         ))
         try:
             persuasion.execute(state, self.faction, {}, spaces=spaces[:3])
+            state["_turn_persuasion_used"] = True
             return True
         except (ValueError, KeyError):
             return False
