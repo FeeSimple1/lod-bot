@@ -44,7 +44,7 @@ from lod_ai.rules_consts import (
     # Factions
     BRITISH, PATRIOTS, FRENCH, INDIANS,
 )
-from lod_ai.leaders        import apply_leader_modifiers, leader_location
+from lod_ai.leaders        import leader_location
 from lod_ai.util.piece_kinds import is_cube, loss_value
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
@@ -119,7 +119,6 @@ def execute(
             if fee > 0:
                 spend(state, PATRIOTS, fee)
 
-    ctx = apply_leader_modifiers(state, faction, "pre_battle", ctx)
     push_history(state, f"{faction} BATTLE in {', '.join(spaces)}")
 
     attacker_bonus = (choices or {}).get("force_bonus", 0)

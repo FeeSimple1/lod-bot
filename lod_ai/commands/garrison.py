@@ -46,7 +46,6 @@ from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent
 from lod_ai.map            import adjacency as map_adj
-from lod_ai.leaders        import apply_leader_modifiers
 from lod_ai.board.pieces      import remove_piece, add_piece, flip_pieces
 from lod_ai.economy.resources import spend, can_afford
 
@@ -132,7 +131,6 @@ def execute(
     spend(state, BRITISH, 2)
 
     # Leader hooks (none today, keep pattern) -----------------------
-    ctx = apply_leader_modifiers(state, faction, "pre_garrison", ctx)
 
     state["_turn_command"] = COMMAND_NAME
     dest_set = {dst for inner in move_map.values() for dst in inner}

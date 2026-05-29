@@ -36,7 +36,7 @@ from lod_ai.rules_consts import (
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import enforce_global_caps, refresh_control
 from lod_ai.board.pieces      import remove_piece, add_piece
-from lod_ai.leaders          import apply_leader_modifiers, leader_location
+from lod_ai.leaders          import leader_location
 
 SA_NAME = "SKIRMISH"          # auto-registered by special_activities/__init__.py
 
@@ -74,7 +74,6 @@ def execute(
         raise ValueError("option must be 1, 2, or 3.")
 
     state["_turn_used_special"] = True
-    ctx = apply_leader_modifiers(state, faction, "pre_skirmish", ctx)
     sp = state["spaces"][space_id]
 
     # Determine own and enemy tags per faction

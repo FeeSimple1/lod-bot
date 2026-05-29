@@ -38,7 +38,7 @@ from lod_ai.util.history     import push_history
 from lod_ai.util.caps        import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency   import is_adjacent
 from lod_ai.map import adjacency as map_adj
-from lod_ai.leaders          import apply_leader_modifiers, leader_location
+from lod_ai.leaders          import leader_location
 from lod_ai.board.pieces      import remove_piece, add_piece, move_piece
 from lod_ai.economy.resources import spend, can_afford               # NEW
 
@@ -281,7 +281,6 @@ def execute(
     # (see post-move section below)
 
     # Leader hooks (placeholder for future modifiers)
-    ctx = apply_leader_modifiers(state, faction, "pre_march", ctx)
 
     push_history(
         state,

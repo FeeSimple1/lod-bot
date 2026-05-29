@@ -1,159 +1,94 @@
 """
 lod_ai.leaders
 ==============
-Implements the nine Leader Capabilities on Reference Card #110
-(card #110 is a reference, not an Event).  Each capability is
-registered to run at a specific **hook** such as "pre_battle",
-"pre_skirmish", etc.
+Lookup helper for the location of each leader piece on the board.
 
-The engine (or a command resolver) should call
-    apply_leader_modifiers(state, faction, hook, ctx)
-right before executing the gameplay step for that hook.
+Background
+----------
+This module used to register `pre_*` hooks for each of the 9 leader
+capabilities on Reference Card #110 (Washington, Rochambeau, Lauzun,
+Gage, Howe, Clinton, Brant, Cornplanter, Dragging Canoe) and exposed
+`apply_leader_modifiers(state, faction, hook, ctx)` that command and
+SA files were supposed to call before each rule application.
 
-state["leaders"] must be structured as:
+The hook system was dead code in real games:
+  * `apply_leader_modifiers` iterated `state["leaders"].get(faction, [])`
+    which returned [] because real game state stores leaders as
+    `{leader_id: space_id}` (the scenario-JSON convention), not
+    `{faction: [leader_id, ...]}` as the hooks expected.
+  * Most capabilities were redundantly implemented via direct
+    `leader_location()` checks in their command/SA files, which DO
+    work against the real state shape.
+  * Four capabilities (Clinton, Cornplanter, Gage, Rochambeau) had
+    only the dead-hook path and were silently broken; Session 18
+    surfaced and fixed them with direct `leader_location()` checks.
+
+This module was therefore simplified: only the working primitive,
+`leader_location()`, remains.  All command/SA leader-capability
+rules now live next to the rule they affect, checked per-space via
+`leader_location()`.
+
+State shape (canonical)
+-----------------------
+`state["leaders"]` is a mapping from leader identifier to current
+space ID, with None meaning the leader is off the map::
+
     {
-        "BRITISH":  ["LEADER_HOWE", "LEADER_CLINTON"],
-        "PATRIOTS": ["LEADER_WASHINGTON"],
-        "INDIANS":  ["LEADER_BRANT"],
-        "FRENCH":   ["LEADER_ROCHAMBEAU"]
+        "LEADER_GAGE":           None,
+        "LEADER_HOWE":           "New_York_City",
+        "LEADER_CLINTON":        None,
+        "LEADER_WASHINGTON":     "New_York",
+        "LEADER_ROCHAMBEAU":     None,
+        "LEADER_LAUZUN":         None,
+        "LEADER_BRANT":          "New_York",
+        "LEADER_CORNPLANTER":    None,
+        "LEADER_DRAGGING_CANOE": None,
     }
+
+`leader_location()` also tolerates two legacy shapes for
+backwards-compatibility with older tests:
+
+  * `state["leader_locs"][leader_id] == space_id`
+  * `state["leaders"][space_id] == leader_id` (reverse mapping)
 """
 
-from typing import Dict, Callable, Any
+from typing import Dict, Any
 
 from lod_ai.map import adjacency as map_adj
 
-# ---------------------------------------------------------------------------
-# Type aliases
-# ---------------------------------------------------------------------------
-State   = Dict[str, Any]
-Context = Dict[str, Any]
-Modifier = Callable[[State, Context], None]
-
-# ---------------------------------------------------------------------------
-# Registry helper
-# ---------------------------------------------------------------------------
-_LEADER_REGISTRY: Dict[str, Dict[str, Modifier]] = {}
+State = Dict[str, Any]
 
 
-def _register(name: str, hook: str) -> Callable[[Modifier], Modifier]:
-    """Decorator registering *func* as a modifier for *name* at *hook*."""
-    def decorator(func: Modifier) -> Modifier:
-        _LEADER_REGISTRY.setdefault(name, {})[hook] = func
-        return func
-    return decorator
-
-
-# ---------------------------------------------------------------------------
-#  PATRIOTS
-# ---------------------------------------------------------------------------
-@_register("LEADER_WASHINGTON", "pre_battle")
-def _washington(state: State, ctx: Context) -> None:
-    """Double Win-the-Day shift; –1 Defender Loss when Rebellion defends."""
-    ctx["washington_double_win"] = True
-    ctx["defender_loss_mod"] = ctx.get("defender_loss_mod", 0) - 1
-
-
-# ---------------------------------------------------------------------------
-#  FRENCH
-# ---------------------------------------------------------------------------
-@_register("LEADER_ROCHAMBEAU", "pre_command")
-def _rochambeau(state: State, ctx: Context) -> None:
-    """French may March/Battle with Patriot Command at 0 cost."""
-    ctx["rochambeau_free_with_pats"] = True
-
-
-@_register("LEADER_LAUZUN", "pre_battle")
-def _lauzun(state: State, ctx: Context) -> None:
-    """+1 Defender Loss when French are attacking."""
-    ctx["attacker_defender_loss_bonus"] = ctx.get("attacker_defender_loss_bonus", 0) + 1
-
-
-# ---------------------------------------------------------------------------
-#  BRITISH
-# ---------------------------------------------------------------------------
-@_register("LEADER_GAGE", "pre_reward_loyalty")
-def _gage(state: State, ctx: Context) -> None:
-    """First shift of Reward Loyalty in the space is free."""
-    ctx["reward_loyalty_free"] = True
-
-
-@_register("LEADER_HOWE", "pre_special_activity")
-def _howe(state: State, ctx: Context) -> None:
-    """Lower FNI by 1 before executing any British SA."""
-    fni = state.get("fni_level", 0)
-    if fni > 0:
-        state["fni_level"] = fni - 1
-        ctx["howe_lowered_fni"] = True
-
-
-@_register("LEADER_CLINTON", "pre_skirmish")
-def _clinton(state: State, ctx: Context) -> None:
-    """Skirmish removes one extra Militia in the space."""
-    ctx["skirmish_extra_militia"] = ctx.get("skirmish_extra_militia", 0) + 1
-
-
-# ---------------------------------------------------------------------------
-#  INDIANS
-# ---------------------------------------------------------------------------
-@_register("LEADER_BRANT", "pre_war_path")
-def _brant(state: State, ctx: Context) -> None:
-    """War Path removes one extra Militia in the space."""
-    ctx["war_path_extra_militia"] = ctx.get("war_path_extra_militia", 0) + 1
-
-
-@_register("LEADER_CORNPLANTER", "pre_gather")
-def _cornplanter(state: State, ctx: Context) -> None:
-    """Gather builds a Village for only 1 War Party in the space."""
-    ctx["village_cost_war_parties"] = 1
-
-
-@_register("LEADER_DRAGGING_CANOE", "pre_raid")
-def _dragging_canoe(state: State, ctx: Context) -> None:
-    """Raid may move 1 extra space if it originated here."""
-    ctx["raid_extra_range"] = 1
-
-
-# ---------------------------------------------------------------------------
-#  Public helper
-# ---------------------------------------------------------------------------
-def apply_leader_modifiers(state: State, faction: str, hook: str, ctx: Context) -> Context:
-    """
-    Run all leader modifiers for *faction* at *hook* and return the mutated ctx.
-    The engine decides which hook to call based on the action being executed.
-    """
-    for leader in state.get("leaders", {}).get(faction, []):
-        modifier = _LEADER_REGISTRY.get(leader, {}).get(hook)
-        if modifier:
-            modifier(state, ctx)
-    return ctx
 def _leader_keys(leader_id: str) -> set[str]:
     return {leader_id}
 
 
 def leader_location(state: State, leader_id: str) -> str | None:
-    """
-    Best-effort lookup for the current location of *leader_id*.
-    Supports either state['leader_locs'] or state['leaders'] storing locations.
-    Also supports reverse mapping where state['leaders'] maps space -> leader.
+    """Return the current space ID of *leader_id*, or None if off-map.
+
+    Tolerates three state shapes for the leaders data, in this order
+    of preference:
+
+      1. ``state["leader_locs"][leader_id] == space_id``
+      2. ``state["leaders"][leader_id] == space_id``
+      3. ``state["leaders"][space_id] == leader_id`` (reverse map)
+
+    Falls back to scanning ``state["spaces"]`` for a leader token if
+    none of the above match.
     """
     valid_spaces = set(map_adj.all_space_ids())
     for key in _leader_keys(leader_id):
-        # explicit location map
         loc = state.get("leader_locs", {}).get(key)
         if isinstance(loc, str) and loc in valid_spaces:
             return loc
-        # scenario-style leaders dict mapping leader -> location
         loc = state.get("leaders", {}).get(key)
         if isinstance(loc, str) and loc in valid_spaces:
             return loc
-    # Check reverse mapping: state["leaders"] = {space_id: leader_id}
     leaders_dict = state.get("leaders", {})
     for key in _leader_keys(leader_id):
         for space_key, val in leaders_dict.items():
             if val == key and space_key in valid_spaces:
                 return space_key
-    # fall back to scanning spaces for leader token
     for key in _leader_keys(leader_id):
         for sid, sp in state.get("spaces", {}).items():
             if sp.get(key, 0):

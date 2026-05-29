@@ -31,7 +31,6 @@ from lod_ai.util.history   import push_history
 from lod_ai.board.control  import refresh_control
 from lod_ai.util.caps      import enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent
-from lod_ai.leaders        import apply_leader_modifiers
 from lod_ai.rules_consts import (
     # pieces
     REGULAR_BRI, REGULAR_FRE, TORY, FORT_BRI, FORT_PAT, VILLAGE,
@@ -215,7 +214,6 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).update(selected)
     # Leader hooks – none defined yet, keep pattern
-    ctx = apply_leader_modifiers(state, faction, "pre_muster", ctx)
 
     push_history(state, f"{faction} MUSTER starts in {selected}")
 

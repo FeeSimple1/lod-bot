@@ -24,7 +24,7 @@ from lod_ai.board.control import refresh_control
 from lod_ai.commands import garrison, muster, march, battle
 from lod_ai.special_activities import naval_pressure, skirmish, common_cause
 from lod_ai.util.history import push_history
-from lod_ai.leaders import leader_location, apply_leader_modifiers
+from lod_ai.leaders import leader_location
 from lod_ai.economy.resources import can_afford, spend
 from lod_ai.map import adjacency as map_adj
 
@@ -443,7 +443,7 @@ class BritishBot(BaseBot):
             try:
                 skirmish.execute(state, C.BRITISH, {}, sid, option=opt)
                 # Clinton bonus is handled inside skirmish.execute via the
-                # leader modifier system (apply_leader_modifiers → _clinton).
+                # leader_location() check in skirmish.execute().
                 return True
             except Exception:
                 continue
