@@ -1143,10 +1143,27 @@ def _choose_humans() -> List[str]:
 
 
 def _choose_seed() -> int:
+    """Prompt the user for an RNG seed.
+
+    Per the README, a menu of 1-5 plus a Random option is shown.
+    Earlier the function silently auto-generated, which prevented
+    reproducible games for testing or sharing scenarios.
+    """
     import random
-    seed = random.randint(1, 10_000)
-    print(f"  RNG seed: {seed}")
-    return seed
+    options = [
+        ("1", 1),
+        ("2", 2),
+        ("3", 3),
+        ("4", 4),
+        ("5", 5),
+        ("Random (based on time)", None),
+    ]
+    choice = choose_one("Select RNG seed:", options)
+    if choice is None:
+        seed = random.randint(1, 10_000)
+        print(f"  Random seed: {seed}")
+        return seed
+    return choice
 
 
 # ---------------------------------------------------------------------------
@@ -1360,8 +1377,8 @@ def main() -> None:
             return
 
     scenario, deck_method = _choose_scenario()
-    human_factions = _choose_humans()
     seed = _choose_seed()
+    human_factions = _choose_humans()
 
     # Setup confirmation loop
     while True:
@@ -1370,8 +1387,8 @@ def main() -> None:
         if confirm:
             break
         scenario, deck_method = _choose_scenario()
-        human_factions = _choose_humans()
         seed = _choose_seed()
+        human_factions = _choose_humans()
 
     deck_display = choose_one("Deck info display:", [
         ("Exact — show exact cards until Winter Quarters", "exact"),
