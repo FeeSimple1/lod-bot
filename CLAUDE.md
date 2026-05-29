@@ -187,23 +187,58 @@ the references.
 
 ### Remaining open items
 
-Small, surgical work — none crash-class:
+Small, surgical work — none crash-class.  Most of the originally-
+listed items have been closed; see `audit_report.md` Sessions 17-19.
 
-- `bot_indian_trade` and `bot_leader_movement` exist on the British
-  bot and have unit tests but are not called from the engine.  Wiring
-  them up would close two §3.4 / §6 OPS items.
-- `_march`'s "try Common Cause as fallback" step (post-March, before
-  SA) is not described in the B10 reference — it's an extra step.
-  Probably harmless but worth verifying.
 - `_battle`'s Force-Level heuristic uses a rough net-advantage
   estimate rather than simulating dice probabilities.  This sometimes
   triggers British attacks that the Rebellion wins, awarding
-  Win-the-Day Opposition shifts against the British.  A more accurate
-  estimator might help British in 1776 but should be benchmarked
-  against the reference.
-- Phase 4 human-player CLI pass: ensure 1–3 human player modes have
-  no free-text input gaps, illegal-move messages are helpful, and
-  game-state display is complete.
+  Win-the-Day Opposition shifts against the British.  Improving this
+  would require running sandboxed Battle simulations per candidate
+  space, and risks deviating from the B12 reference (which is
+  written in terms of Force Level + modifiers, not expected losses).
+  Worth a focused multi-seed benchmark if attempted.
+
+- During a British March that uses Common Cause, Indian War Parties
+  participate as Tory-equivalents and can move from an Indian
+  leader's space to the British destination.  Per OPS the Indian
+  leader (Brant / Cornplanter / Dragging Canoe) should follow
+  per "Royalist Leaders follow largest group of own units that
+  moves from (or stays in) their spaces."  Currently
+  `_follow_leaders_after_move` only fires on Indian commands, not on
+  CC-driven WP movement during a British command.  Cross-faction
+  edge case; minor.
+
+- Phase 4 human-player CLI pass beyond the setup flow: actually play
+  multiple full human games to surface deeper UX issues (load/save
+  round-trip, undo during Winter Quarters specifically, multi-human
+  games with cross-faction interactions, French pre-Treaty flow,
+  Brilliant Stroke interrupt path from a human's perspective, meta-
+  command behavior mid-wizard).  Best done as actual playtest
+  sessions rather than scripted-input runs.
+
+### Items previously listed here that have been closed
+
+(See `audit_report.md` for the commit and PR per item.)
+
+- `bot_indian_trade` and `bot_leader_movement` wired into the engine
+  (commit 9155880).
+- Garrison-induced British leader movement + Indian leader movement
+  after March/Scout/Gather/Raid wired (commit e6036ef).
+- Four silently-broken leader capabilities fixed: Clinton, Cornplanter,
+  Gage, Rochambeau (commit 83aff7a).
+- CLI RNG seed menu restored + setup order matches README
+  (commit f66d490).
+- Dead `apply_leader_modifiers` hook system deleted (commit db4c17e).
+- `_is_howe` / `_try_naval_pressure` multi-leader presence checks
+  fixed, `_is_gage` / `_british_leader` deleted, `_march` extra
+  Common-Cause post-March fallback removed (commit 9bf4f99).
+- "Battle-induced leader movement" was an over-cautious item in the
+  May 2026 audit: Battle does not move faction units between spaces
+  (only to Casualties / Available), so the leader-movement rule
+  ("follow largest group of own units that moves from") has no
+  trigger.  Verified by inspecting `battle.py` — no `move_piece`
+  calls, only `remove_piece` to `casualties`/`available`.
 
 ### What recent sessions established
 

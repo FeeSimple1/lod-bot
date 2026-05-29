@@ -2466,3 +2466,113 @@ Both are out of scope here; (1) is cleaner.
   `_british_leader`.  If both Gage and Howe are on the map and Gage
   is found first, Howe's FNI bonus may not fire.  Not crash-class
   but worth a follow-up.
+
+---
+
+## Session 19: Misc British-bot follow-ups + Item 4 clarification (May 2026)
+
+### Scope
+
+Three items from CLAUDE.md's "Remaining open items" list:
+
+  1. `_is_howe` / Naval-Pressure leader checks missed leaders when
+     multiple British leaders were on the map (the `_british_leader`
+     scan returned the *first* leader in a fixed order).
+  2. `_march` had an extra post-March "try Common Cause again"
+     fallback before the SA chain, which isn't in the B10 reference.
+  3. Battle-induced leader movement (originally noted as a gap).
+
+### FIXED
+
+#### 1. Multi-leader presence checks
+
+`BritishBot._is_howe` and the Gage-or-Clinton gate in
+`_try_naval_pressure` both consulted `_british_leader`, which
+returned the first British leader found in the scan order
+LEADER_GAGE -> LEADER_HOWE -> LEADER_CLINTON.  When multiple British
+leaders were on the map the wrong leader was selected.  Concretely,
+Howe's FNI bonus (Reference Card #110: "Before executing a British
+Special Activity, first lower FNI by 1 level") was missed whenever
+Gage was also present.
+
+**Fix:** rewrote `_is_howe` as a direct
+`leader_location(state, "LEADER_HOWE") is not None` presence check;
+the Naval Pressure gate uses two analogous direct checks for Gage
+and Clinton.  `_is_gage` and `_british_leader` deleted — every
+caller now resolves leaders independently per the
+leader_capabilities reference's "in the space" / "is on the map"
+semantics.
+
+Commit `9bf4f99`.
+
+#### 2. `_march` extra Common-Cause post-March fallback
+
+B10 reference: "If no Common Cause used, execute a Special
+Activity."  The code had an extra `_try_common_cause(state, mode="MARCH")`
+call after march.execute returned but before the SA chain.  Per the
+flowchart there is no second CC attempt — the bot proceeds directly
+to Skirmish/Naval Pressure.
+
+**Fix:** removed the extra CC attempt.  If CC wasn't used during
+March planning, the bot now goes straight to `_apply_howe_fni` +
+`_skirmish_then_naval`.
+
+Commit `9bf4f99`.
+
+### CLARIFIED — "Battle-induced leader movement" was not actually a gap
+
+The May 2026 audit listed Battle-induced leader movement as a
+remaining item with the note "Battle can shift pieces (overflow)."
+That sentence conflated two different things:
+
+  * Battle DOES shift Support/Opposition levels (including overflow
+    to adjacent spaces per §3.6.8) — but Support levels are not
+    pieces.
+  * Battle DOES NOT move faction units between spaces.  Inspection
+    of `lod_ai/commands/battle.py` confirms that every `remove_piece`
+    call sends the piece to "casualties" or "available" (i.e., off
+    the map); there are no `move_piece` calls.  The Win-the-Day
+    free Rally places militia in the battle space from Available
+    (no inter-space movement).  The Win-the-Day free Blockade move
+    moves a Blockade *marker*, not a faction's units.
+
+The leader-movement rule from leader_capabilities.txt is "follow
+largest group of own units that **moves from** (or stays in) their
+spaces."  After a Battle no units move from anywhere, and units that
+weren't removed naturally stay.  The existing `bot_leader_movement`
+logic correctly handles this case (best_dest defaults to leader_loc
+when nothing moves, so leaders stay put).
+
+**No code change required.**  The item is closed by documentation:
+this audit entry plus an updated CLAUDE.md "Remaining open items"
+section that explains the misunderstanding.
+
+### Noted — minor cross-faction CC follow-up
+
+A genuine but minor edge case surfaced while investigating Item 4:
+during a British March that uses Common Cause, Indian War Parties
+participate as Tory-equivalents and can move with the British
+march from their origin (which may be an Indian leader's space) to
+the British destination.  Per OPS the Indian leader (Brant /
+Cornplanter / Dragging Canoe) should then follow.
+
+The current wiring fires `_follow_leaders_after_move` only after
+Indian commands (March/Scout/Gather/Raid), not after British
+commands.  So CC-driven WP movement during a British March doesn't
+trigger Indian leader following.
+
+This is a cross-faction edge case, quite minor in practice (CC
+requires WPs in the British origin space, and the bot needs to be
+in a position where the move shifts Brant/Cornplanter/DC's largest
+group).  Documented in CLAUDE.md "Remaining open items" for a
+future session.
+
+### Item left out: Battle Force-Level heuristic
+
+Same status as last session — open-ended scope (would require
+sandboxed Battle simulations), risks deviating from the B12
+reference (which uses Force Level + modifiers, not expected
+losses), and any change must be benchmarked against many seeds.
+
+Remains in CLAUDE.md "Remaining open items" as the only
+non-trivial follow-up.
