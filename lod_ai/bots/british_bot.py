@@ -54,32 +54,17 @@ class BritishBot(BaseBot):
     # -------------------------------------------------------------------
     #  Leader helpers
     # -------------------------------------------------------------------
-    def _british_leader(self, state: Dict) -> str | None:
-        """Return the current British leader ID, or None."""
-        # Check explicit british_leader key
-        bl = state.get("british_leader")
-        if bl and bl.startswith("LEADER_"):
-            return bl
-        # Check leaders dict (faction -> leader or faction -> [leaders])
-        leaders = state.get("leaders", {})
-        brit_leaders = leaders.get(C.BRITISH)
-        if isinstance(brit_leaders, str) and brit_leaders.startswith("LEADER_"):
-            return brit_leaders
-        if isinstance(brit_leaders, list):
-            for lid in brit_leaders:
-                if isinstance(lid, str) and lid.startswith("LEADER_"):
-                    return lid
-        # Scan leader_locs for any British leader on the map
-        for lid in ("LEADER_GAGE", "LEADER_HOWE", "LEADER_CLINTON"):
-            if leader_location(state, lid):
-                return lid
-        return None
-
     def _is_howe(self, state: Dict) -> bool:
-        return self._british_leader(state) == "LEADER_HOWE"
+        """Howe capability (leader_capabilities.txt):
+        "Before executing a British Special Activity, first lower FNI
+        by 1 level."  This is a global effect (no "in the space"
+        qualifier), so the predicate is simply "is Howe on the map?".
 
-    def _is_gage(self, state: Dict) -> bool:
-        return self._british_leader(state) == "LEADER_GAGE"
+        Previously delegated to _british_leader which returned the
+        *first* British leader on the map; when both Gage and Howe were
+        present, Gage was found first and Howe's FNI bonus was
+        missed."""
+        return leader_location(state, "LEADER_HOWE") is not None
 
     def _apply_howe_fni(self, state: Dict) -> None:
         """B38: If Howe is British Leader, lower FNI by 1 before SAs."""
@@ -461,9 +446,17 @@ class BritishBot(BaseBot):
         Falls back to Skirmish if nothing happens.
         """
         fni = state.get("fni_level", 0)
-        # Check Gage/Clinton leader requirement for blockade removal
-        brit_leader = self._british_leader(state)
-        is_gage_clinton = brit_leader in ("LEADER_GAGE", "LEADER_CLINTON")
+        # Check Gage/Clinton leader requirement for blockade removal.
+        # Per B7 reference: "If FNI > 0 and Gage or Clinton is British
+        # Leader, remove 1 Blockade..." — we read this as "is on the
+        # map as a British leader" since LoD allows multiple British
+        # leaders simultaneously.  Previously used _british_leader
+        # which returned the *first* leader, missing Clinton when Gage
+        # or Howe was also on the map (and vice versa).
+        is_gage_clinton = (
+            leader_location(state, "LEADER_GAGE") is not None
+            or leader_location(state, "LEADER_CLINTON") is not None
+        )
 
         if fni > 0 and is_gage_clinton:
             # Pick blockade removal city per priority:
@@ -1423,12 +1416,14 @@ class BritishBot(BaseBot):
                             f"Militia in {sid}"
                         )
 
-        # If CC was not used during planning, try it post-March (fallback),
-        # otherwise skip to SA chain.  Skip all SAs in limited/no-SA slot.
+        # B10 reference: "If no Common Cause used, execute a Special
+        # Activity."  Per the flowchart there is no second post-March
+        # Common-Cause attempt — if CC wasn't used during planning,
+        # the bot proceeds directly to Skirmish/Naval Pressure.
+        # Skip all SAs in limited/no-SA slot.
         if not used_cc and not no_sa:
-            if not self._try_common_cause(state, mode="MARCH"):
-                self._apply_howe_fni(state)
-                self._skirmish_then_naval(state)
+            self._apply_howe_fni(state)
+            self._skirmish_then_naval(state)
         return True
 
     # =======================================================================
