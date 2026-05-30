@@ -51,6 +51,22 @@ All files are plain text (except `map_base.csv`). No PDFs, no images.
 
 ---
 
+## Supplementary strategic reference (not a source of truth)
+
+`strategy.md` in the repo root is a faction-by-faction, scenario-by-
+scenario strategy guide for human (or LLM) gameplay decisions.  It is
+**not** part of the runtime, **not** authoritative for rules questions,
+and **not** a substitute for the bot flowchart references in
+`Reference Documents/`.  Bot implementations must follow the published
+flowcharts, not strategic intuitions from this guide.
+
+Use it when you need to understand *why* a faction prefers one play
+over another — for example, to author better commit messages, investigate
+bot-flowchart anomalies, or write human-side CLI prompts.  See the file's
+own "What this file is and is NOT" section.
+
+---
+
 ## Project Structure
 
 ```
