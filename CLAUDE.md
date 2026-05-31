@@ -51,6 +51,17 @@ All files are plain text (except `map_base.csv`). No PDFs, no images.
 
 ---
 
+## Lessons learned (for future COIN-bot projects)
+
+`coin-implementation-lessons.md` in the repo root distills ~40+ bugs
+encountered in this project into 11 anti-pattern families, with
+architecture/testing/process recommendations.  Audience is future
+projects implementing other COIN-series games (or any tabletop
+simulation with bot AI).  Not part of the runtime; not a code
+reference; safe to ignore unless you're starting a similar project.
+
+---
+
 ## Supplementary strategic reference (not a source of truth)
 
 `strategy.md` in the repo root is a faction-by-faction, scenario-by-
