@@ -18,6 +18,7 @@ from lod_ai.board.pieces import (
 )
 from lod_ai.rules_consts import MAX_FNI, MIN_RESOURCES, MAX_RESOURCES, BRITISH, PATRIOTS, FRENCH, INDIANS
 from lod_ai.util.loss_mod import queue_loss_mod
+from lod_ai.map import adjacency as _madj
 from lod_ai.util.free_ops import queue_free_op
 from lod_ai.economy import resources
 
@@ -65,6 +66,10 @@ def shift_support(state, space_id: str, delta: int) -> None:
 
     Result is clamped to [-2, +2].
     """
+    # §1.6.1: spaces with 0 Population (the four Indian Reserves and the West
+    # Indies) are always Neutral and never hold Support/Opposition markers.
+    if _madj.space_type(space_id) in ("Reserve", "Special"):
+        return
     cur0 = state.get("support", {}).get(space_id, 0)
     new = max(MIN_SUPPORT, min(MAX_SUPPORT, cur0 + delta))
     if new != cur0:
