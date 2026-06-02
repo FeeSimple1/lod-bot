@@ -180,6 +180,29 @@ class TestBritishMarchEscorts:
         )
         assert state["spaces"]["Massachusetts"].get(C.TORY, 0) == 1
 
+    def test_march_with_escorts_no_explicit_plan(self):
+        """British March with escorts but no caller-supplied plan must not crash.
+
+        Regression: the auto-plan branch (taken when no move_plan/plan is
+        passed) called dict.get(TORY, 0, 0) with three args, raising
+        TypeError. Reachable from the interactive CLI / source-based callers.
+        """
+        from lod_ai.commands import march
+
+        state = _base_state()
+        state["spaces"] = {
+            "Boston": _city(**{C.REGULAR_BRI: 3, C.TORY: 2}),
+            "Massachusetts": _space(**{}),
+        }
+        refresh_control(state)
+
+        # No move_plan / plan kwarg -> exercises the auto-plan builder.
+        march.execute(
+            state, C.BRITISH, {},
+            ["Boston"], ["Massachusetts"],
+            bring_escorts=True,
+        )
+
 
 # ============================================================================
 # Error #2+#4: British Muster Reward Loyalty stale state

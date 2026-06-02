@@ -245,7 +245,7 @@ def execute(
                 if bring_escorts:
                     base_pieces[TORY] = min(base_pieces[REGULAR_BRI], sp_src.get(TORY, 0))
                     cc_avail = ctx.get("common_cause", {}).get(src, 0)
-                    base_pieces[WARPARTY_A] = min(base_pieces[REGULAR_BRI] - base_pieces.get(TORY, 0, 0), cc_avail)
+                    base_pieces[WARPARTY_A] = min(base_pieces[REGULAR_BRI] - base_pieces.get(TORY, 0), cc_avail)
             elif faction == PATRIOTS:
                 # §3.3.2: Patriot March moves Militia, Continentals and
                 # French Regulars.  War Parties are NOT part of Patriot March.
