@@ -346,3 +346,43 @@ def test_win_callback_blockade_moves_per_space(monkeypatch):
     on_map = state["markers"][C.BLOCKADE]["on_map"]
     assert "Boston" not in on_map
     assert "New_York" in on_map
+
+
+def test_french_battle_charges_for_patriot_militia_space(monkeypatch):
+    """§3.5.5: Patriot pieces include Militia.  A French Battle in a space with
+    Patriot Active Militia (no Continentals) must charge the Patriots 1 Resource
+    to involve them - previously this help was free."""
+    monkeypatch.setattr(battle, "refresh_control", lambda s: None)
+    monkeypatch.setattr(battle, "enforce_global_caps", lambda s: None)
+    state = {
+        "spaces": {
+            "Boston": {C.REGULAR_FRE: 3, C.MILITIA_A: 2, C.REGULAR_BRI: 1},
+        },
+        "resources": {C.BRITISH: 0, C.PATRIOTS: 5, C.FRENCH: 5, C.INDIANS: 0},
+        "available": {}, "casualties": {}, "history": [], "leader_locs": {},
+        "rng": __import__('random').Random(42),
+        "toa_played": True,
+    }
+    battle.execute(state, C.FRENCH, {}, ["Boston"])
+    assert state["resources"][C.FRENCH] == 4    # French pay 1 for the space
+    assert state["resources"][C.PATRIOTS] == 4  # Patriots pay 1 to involve Militia
+
+
+def test_french_battle_excludes_unpaid_patriots(monkeypatch):
+    """§3.5.5/§3.6.1: if the Patriots have no Resources their pieces cannot be
+    involved in a French Battle (no charge, no participation, no error)."""
+    monkeypatch.setattr(battle, "refresh_control", lambda s: None)
+    monkeypatch.setattr(battle, "enforce_global_caps", lambda s: None)
+    state = {
+        "spaces": {
+            "Boston": {C.REGULAR_FRE: 3, C.MILITIA_A: 2,
+                       C.REGULAR_PAT: 2, C.REGULAR_BRI: 1},
+        },
+        "resources": {C.BRITISH: 0, C.PATRIOTS: 0, C.FRENCH: 5, C.INDIANS: 0},
+        "available": {}, "casualties": {}, "history": [], "leader_locs": {},
+        "rng": __import__('random').Random(42),
+        "toa_played": True,
+    }
+    battle.execute(state, C.FRENCH, {}, ["Boston"])
+    assert state["resources"][C.PATRIOTS] == 0  # not charged
+    assert state["resources"][C.FRENCH] == 4    # French still pay their own 1

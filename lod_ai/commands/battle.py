@@ -94,30 +94,42 @@ def execute(
     if not free:
         spend(state, faction, len(spaces))
 
-    # §3.3.3 / §3.5.5: Allied fee is 1 Resource per space where the ally's
-    # pieces are involved, NOT per piece.  Cap fee at what the ally can
-    # afford to prevent resource-underflow errors.
+    # §3.3.3 / §3.5.5: Involving the ally is OPTIONAL and costs the ally 1
+    # Resource per space its pieces are involved; only possible if the ally has
+    # Resources.  Where the ally cannot be paid, its pieces do NOT participate
+    # in that space (enforced in _resolve_space via ally_involved).  The fee is
+    # per-space-involved, not per-piece.
+    ally_involved = {s: True for s in spaces}
     if faction == PATRIOTS:
-        # Rochambeau capability (leader_capabilities.txt):
-        # "French may March and Battle with a Patriot Command at no
-        # Resource cost."  Waive the French allied fee for any space
-        # where Rochambeau is present alongside French Regulars.
-        chargeable_spaces = [
-            s for s in spaces
-            if state["spaces"][s].get(REGULAR_FRE, 0) > 0
-            and leader_location(state, "LEADER_ROCHAMBEAU") != s
-        ]
-        fee = len(chargeable_spaces)
-        if fee:
-            fee = min(fee, state["resources"].get(FRENCH, 0))
-            if fee > 0:
-                spend(state, FRENCH, fee)
+        # French help = French Regulars present.  Rochambeau (leader_capabilities)
+        # waives the French Resource fee in his space (still involved, for free).
+        roch = leader_location(state, "LEADER_ROCHAMBEAU")
+        free_spaces = [s for s in spaces
+                       if state["spaces"][s].get(REGULAR_FRE, 0) > 0 and s == roch]
+        paid_spaces = [s for s in spaces
+                       if state["spaces"][s].get(REGULAR_FRE, 0) > 0 and s != roch]
+        pay = min(len(paid_spaces), state["resources"].get(FRENCH, 0))
+        for s in free_spaces:
+            ally_involved[s] = True
+        for s in paid_spaces[:pay]:
+            ally_involved[s] = True
+        for s in paid_spaces[pay:]:
+            ally_involved[s] = False
+        if pay > 0:
+            spend(state, FRENCH, pay)
     elif faction == FRENCH:
-        fee = sum(1 for s in spaces if state["spaces"][s].get(REGULAR_PAT, 0) > 0)
-        if fee:
-            fee = min(fee, state["resources"].get(PATRIOTS, 0))
-            if fee > 0:
-                spend(state, PATRIOTS, fee)
+        # Patriot help = any Patriot combat piece (Continentals OR Active Militia)
+        def _has_pat(s):
+            spx = state["spaces"][s]
+            return spx.get(REGULAR_PAT, 0) > 0 or spx.get(MILITIA_A, 0) > 0
+        involvable = [s for s in spaces if _has_pat(s)]
+        pay = min(len(involvable), state["resources"].get(PATRIOTS, 0))
+        for s in involvable[:pay]:
+            ally_involved[s] = True
+        for s in involvable[pay:]:
+            ally_involved[s] = False
+        if pay > 0:
+            spend(state, PATRIOTS, pay)
 
     push_history(state, f"{faction} BATTLE in {', '.join(spaces)}")
 
@@ -125,7 +137,10 @@ def execute(
 
     rebellion_won_in: list[str] = []
     for sid in spaces:
-        winner = _resolve_space(state, ctx, faction, sid, attacker_bonus)
+        winner = _resolve_space(
+            state, ctx, faction, sid, attacker_bonus,
+            ally_involved=ally_involved.get(sid, True),
+        )
         if winner == "REBELLION":
             rebellion_won_in.append(sid)
 
@@ -198,6 +213,24 @@ def execute(
     return ctx
 
 
+# Rebellion leaders by Faction (3.6.1: an ally's Leader counts only if that
+# ally is paid/involved in the Battle).
+_PATRIOT_LEADERS = ("LEADER_WASHINGTON",)
+_FRENCH_LEADERS = ("LEADER_ROCHAMBEAU", "LEADER_LAUZUN")
+
+
+def _rebellion_attacker_leader_present(state, sid, attacker_faction, ally_involved):
+    """True if a usable Rebellion Leader is in *sid* for an attacking
+    Rebellion side, honouring 3.6.1 (an ally Leader counts only if the ally
+    is involved/paid)."""
+    if attacker_faction == FRENCH:
+        own, ally = _FRENCH_LEADERS, _PATRIOT_LEADERS
+    else:  # PATRIOTS
+        own, ally = _PATRIOT_LEADERS, _FRENCH_LEADERS
+    usable = list(own) + (list(ally) if ally_involved else [])
+    return any(leader_location(state, lid) == sid for lid in usable)
+
+
 # -------- Internal helpers --------
 def _roll_d3(state: Dict) -> int:
     val = state["rng"].randint(1, 3)
@@ -219,6 +252,7 @@ def _side_has_leader(state: Dict, sid: str, side: str) -> bool:
 def _defender_loss_mods(
     state: Dict, sp: Dict, sid: str,
     att_side: str, def_side: str, cc_wp: int,
+    attacker_faction: str = None, ally_involved: bool = True,
 ) -> int:
     """Compute modifiers applied to the attacker's roll to determine
     how many losses the *defender* takes."""
@@ -230,9 +264,16 @@ def _defender_loss_mods(
         att_cubes = att_regs + sp.get(TORY, 0) + cc_wp
     else:
         # Glossary 1.4: Continentals are NOT Regulars; only French Regulars
-        # count as Regulars. Rebellion cubes = Continentals + French Regulars.
-        att_regs = sp.get(REGULAR_FRE, 0)
-        att_cubes = sp.get(REGULAR_PAT, 0) + sp.get(REGULAR_FRE, 0)
+        # count as Regulars. §3.6.1: an ally's cubes count only if involved.
+        if attacker_faction == FRENCH and not ally_involved:
+            att_regs = sp.get(REGULAR_FRE, 0)
+            att_cubes = sp.get(REGULAR_FRE, 0)            # Continentals excluded
+        elif attacker_faction == PATRIOTS and not ally_involved:
+            att_regs = 0                                  # French excluded
+            att_cubes = sp.get(REGULAR_PAT, 0)
+        else:
+            att_regs = sp.get(REGULAR_FRE, 0)
+            att_cubes = sp.get(REGULAR_PAT, 0) + sp.get(REGULAR_FRE, 0)
     if att_cubes > 0 and att_regs * 2 >= att_cubes:
         mods += 1
 
@@ -241,15 +282,26 @@ def _defender_loss_mods(
         if sp.get(WARPARTY_U, 0) > 0:
             mods += 1
     else:
-        if sp.get(MILITIA_U, 0) > 0:
+        mil_u = sp.get(MILITIA_U, 0)
+        # Patriot Militia are not involved in a French attack unless paid.
+        if attacker_faction == FRENCH and not ally_involved:
+            mil_u = 0
+        if mil_u > 0:
             mods += 1
 
-    # +1 if at least one Attacking Leader
-    if _side_has_leader(state, sid, att_side):
-        mods += 1
+    # +1 if at least one Attacking Leader (ally Leader only if involved, 3.6.1)
+    if att_side == "ROYALIST":
+        if _side_has_leader(state, sid, "ROYALIST"):
+            mods += 1
+    else:
+        if _rebellion_attacker_leader_present(state, sid, attacker_faction, ally_involved):
+            mods += 1
 
-    # +1 if Attacking includes French with Lauzun
-    if att_side == "REBELLION" and sp.get(REGULAR_FRE, 0) > 0:
+    # +1 if Attacking includes French with Lauzun (French must be participating)
+    # French participate unless the attacker is the Patriots who did not pay
+    # the French ally (None attacker_faction = unit-test/legacy: assume involved).
+    _french_participating = not (attacker_faction == PATRIOTS and not ally_involved)
+    if att_side == "REBELLION" and _french_participating and sp.get(REGULAR_FRE, 0) > 0:
         if leader_location(state, "LEADER_LAUZUN") == sid:
             mods += 1
 
@@ -353,6 +405,7 @@ def _resolve_space(
     attacker_faction: str,
     sid: str,
     attacker_bonus: int,
+    ally_involved: bool = True,
 ) -> str | None:
     sp = state["spaces"][sid]
 
@@ -385,15 +438,23 @@ def _resolve_space(
         else:
             # §3.6.3: "If Rebellion Attack, if that Faction paid, add French
             # Regulars or Continentals up to the number of own Faction's cubes."
+            # §3.6.1: an ally's pieces participate only if that ally is paid.
             pat_cubes = sp.get(REGULAR_PAT, 0)
             fre_cubes = sp.get(REGULAR_FRE, 0)
+            active_mil = sp.get(MILITIA_A, 0)
             if not is_defending:
                 if attacker_faction == PATRIOTS:
-                    fre_cubes = min(fre_cubes, pat_cubes)
+                    if ally_involved:
+                        fre_cubes = min(fre_cubes, pat_cubes)
+                    else:
+                        fre_cubes = 0  # French not paid -> not involved
                 elif attacker_faction == FRENCH:
-                    pat_cubes = min(pat_cubes, fre_cubes)
+                    if ally_involved:
+                        pat_cubes = min(pat_cubes, fre_cubes)
+                    else:
+                        pat_cubes = 0       # Patriots not paid -> not involved
+                        active_mil = 0      # ...nor their Militia
             regs = pat_cubes + fre_cubes
-            active_mil = sp.get(MILITIA_A, 0)
             cubes = regs + _half(active_mil)
         if is_defending:
             forts = sp.get(FORT_BRI if side == "ROYALIST" else FORT_PAT, 0)
@@ -410,7 +471,10 @@ def _resolve_space(
 
     # S3.6.5 Defender Loss Level = attacker roll + defender loss modifiers
     def_loss_roll = _base_roll(att_force)
-    def_loss_mods = _defender_loss_mods(state, sp, sid, att_side, def_side, cc_wp)
+    def_loss_mods = _defender_loss_mods(
+        state, sp, sid, att_side, def_side, cc_wp,
+        attacker_faction=attacker_faction, ally_involved=ally_involved,
+    )
     defender_loss = max(0, def_loss_roll + def_loss_mods)
 
     # S3.6.6 Attacker Loss Level = defender roll + attacker loss modifiers

@@ -729,7 +729,9 @@ class FrenchBot(BaseBot):
         pat_fee_count = 0
         capped_targets = []
         for pop, sid in targets:
-            has_pat = state["spaces"].get(sid, {}).get(C.REGULAR_PAT, 0) > 0
+            _spt = state["spaces"].get(sid, {})
+            # §3.5.5: Patriot pieces = Continentals OR Active Militia
+            has_pat = _spt.get(C.REGULAR_PAT, 0) > 0 or _spt.get(C.MILITIA_A, 0) > 0
             if has_pat:
                 if pat_fee_count >= pat_res:
                     continue  # skip — Patriots can't afford another allied fee
