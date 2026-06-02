@@ -357,8 +357,10 @@ class PatriotBot(BaseBot):
 
             # §3.6.5: Attacker (Rebellion) modifiers on Defender Loss
             att_mod = 0
-            att_regs = pat_cubes + fre_cubes
-            att_cubes = att_regs + active_mil  # all Rebellion cubes incl Militia
+            # Glossary 1.4: only French Regulars are Regulars (not Continentals);
+            # Militia/War Parties are not cubes. Cubes = Continentals + French Regs.
+            att_regs = fre_cubes
+            att_cubes = pat_cubes + fre_cubes
             if att_cubes > 0 and att_regs * 2 >= att_cubes:
                 att_mod += 1  # half regs
             if sp.get(C.MILITIA_U, 0) > 0:

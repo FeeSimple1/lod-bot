@@ -229,8 +229,10 @@ def _defender_loss_mods(
         att_regs = sp.get(REGULAR_BRI, 0)
         att_cubes = att_regs + sp.get(TORY, 0) + cc_wp
     else:
-        att_regs = sp.get(REGULAR_PAT, 0) + sp.get(REGULAR_FRE, 0)
-        att_cubes = att_regs  # all Rebellion cubes are Regulars/Continentals
+        # Glossary 1.4: Continentals are NOT Regulars; only French Regulars
+        # count as Regulars. Rebellion cubes = Continentals + French Regulars.
+        att_regs = sp.get(REGULAR_FRE, 0)
+        att_cubes = sp.get(REGULAR_PAT, 0) + sp.get(REGULAR_FRE, 0)
     if att_cubes > 0 and att_regs * 2 >= att_cubes:
         mods += 1
 
@@ -290,8 +292,10 @@ def _attacker_loss_mods(
         def_regs = sp.get(REGULAR_BRI, 0)
         def_cubes = def_regs + sp.get(TORY, 0) + cc_wp
     else:
-        def_regs = sp.get(REGULAR_PAT, 0) + sp.get(REGULAR_FRE, 0)
-        def_cubes = def_regs
+        # Glossary 1.4: Continentals are NOT Regulars; only French Regulars
+        # count as Regulars. Rebellion cubes = Continentals + French Regulars.
+        def_regs = sp.get(REGULAR_FRE, 0)
+        def_cubes = sp.get(REGULAR_PAT, 0) + sp.get(REGULAR_FRE, 0)
     if def_cubes > 0 and def_regs * 2 >= def_cubes:
         mods += 1
 

@@ -50,11 +50,15 @@ class TestDefenderLossMods:
         mods = _defender_loss_mods(state, sp, "Virginia", "ROYALIST", "REBELLION", 0)
         assert mods == 0
 
-    def test_half_regulars_rebellion_always(self):
-        """+1 for Rebellion: all cubes are Regulars/Continentals."""
+    def test_half_regulars_rebellion(self):
+        """Continentals are NOT Regulars (Glossary 1.4); only French Regulars count."""
         state = _base_state()
+        # 2 Continentals + 1 French Regular = 1 Regular / 3 cubes < half -> no +1
         sp = {C.REGULAR_PAT: 2, C.REGULAR_FRE: 1}
-        # 3/3 = 100% >= 50% -> +1
+        mods = _defender_loss_mods(state, sp, "Virginia", "REBELLION", "ROYALIST", 0)
+        assert mods == 0
+        # 2 French Regulars + 1 Continental = 2 Regulars / 3 cubes >= half -> +1
+        sp = {C.REGULAR_PAT: 1, C.REGULAR_FRE: 2}
         mods = _defender_loss_mods(state, sp, "Virginia", "REBELLION", "ROYALIST", 0)
         assert mods == 1
 
@@ -77,9 +81,9 @@ class TestDefenderLossMods:
         """+1 if at least one Underground Militia on attacking REBELLION side."""
         state = _base_state()
         sp = {C.REGULAR_PAT: 2, C.MILITIA_U: 1}
-        # +1 half regs, +1 underground
+        # No French Regulars -> no half-regs +1; +1 underground only
         mods = _defender_loss_mods(state, sp, "Virginia", "REBELLION", "ROYALIST", 0)
-        assert mods == 2
+        assert mods == 1
 
     def test_attacking_leader(self):
         """+1 if at least one Attacking Leader in space."""
@@ -95,9 +99,10 @@ class TestDefenderLossMods:
         state = _base_state()
         state["leader_locs"] = {"LEADER_LAUZUN": "New_York_City"}
         sp = {C.REGULAR_PAT: 2, C.REGULAR_FRE: 1}
-        # +1 half regs, +1 attacking leader (Lauzun), +1 French with Lauzun
+        # 1 French Reg / 3 cubes < half -> no half-regs +1.
+        # +1 attacking leader (Lauzun), +1 French with Lauzun
         mods = _defender_loss_mods(state, sp, "New_York_City", "REBELLION", "ROYALIST", 0)
-        assert mods == 3
+        assert mods == 2
 
     def test_blockaded_city_royalist_attacking(self):
         """-1 if British Attacking in Blockaded City."""
@@ -130,10 +135,10 @@ class TestDefenderLossMods:
         """-1 if Indians Defending in Indian Reserve."""
         state = _base_state()
         sp = {C.REGULAR_PAT: 3, C.WARPARTY_A: 2}
-        # REBELLION attacks in Reserve, ROYALIST defends with War Parties
-        # +1 half regs (rebellion all regs), -1 Indians in reserve
+        # REBELLION attacks in Reserve, ROYALIST defends with War Parties.
+        # No French Regulars -> no half-regs +1; only -1 Indians in reserve.
         mods = _defender_loss_mods(state, sp, "Northwest", "REBELLION", "ROYALIST", 0)
-        assert mods == 0  # +1 -1 = 0
+        assert mods == -1
 
     def test_washington_defending(self):
         """-1 if Patriots/French Defending with Washington."""
@@ -162,8 +167,12 @@ class TestAttackerLossMods:
     def test_half_regulars_defending(self):
         """+1 if at least half Defending Cubes are Regulars."""
         state = _base_state()
+        # Rebellion defends with 3 Continentals (no French) -> 0 Regulars -> no +1
         sp = {C.REGULAR_PAT: 3, C.REGULAR_BRI: 1}
-        # Rebellion defends, 3 regs / 3 cubes -> +1
+        mods = _attacker_loss_mods(state, sp, "Virginia", "ROYALIST", "REBELLION", 0)
+        assert mods == 0
+        # Rebellion defends 2 French Regulars + 1 Continental -> 2/3 Regs -> +1
+        sp = {C.REGULAR_FRE: 2, C.REGULAR_PAT: 1, C.REGULAR_BRI: 1}
         mods = _attacker_loss_mods(state, sp, "Virginia", "ROYALIST", "REBELLION", 0)
         assert mods == 1
 
@@ -171,19 +180,19 @@ class TestAttackerLossMods:
         """+1 if at least one Defending side piece Underground."""
         state = _base_state()
         sp = {C.REGULAR_PAT: 2, C.MILITIA_U: 3, C.REGULAR_BRI: 1}
-        # Rebellion defends with underground Militia
-        # +1 half regs, +1 underground
+        # Rebellion defends with underground Militia; no French Regs -> no half-regs.
+        # +1 underground only
         mods = _attacker_loss_mods(state, sp, "Virginia", "ROYALIST", "REBELLION", 0)
-        assert mods == 2
+        assert mods == 1
 
     def test_defending_leader(self):
         """+1 if at least one Defending Leader."""
         state = _base_state()
         state["leader_locs"] = {"LEADER_WASHINGTON": "Virginia"}
         sp = {C.REGULAR_PAT: 2, C.REGULAR_BRI: 1}
-        # +1 half regs, +1 leader
+        # No French Regs -> no half-regs +1; +1 defending leader only
         mods = _attacker_loss_mods(state, sp, "Virginia", "ROYALIST", "REBELLION", 0)
-        assert mods == 2
+        assert mods == 1
 
     def test_british_defending_blockaded_city(self):
         """-1 if British Defending in Blockaded City."""
@@ -199,10 +208,9 @@ class TestAttackerLossMods:
         """+1 per Defending Fort in S3.6.6."""
         state = _base_state()
         sp = {C.REGULAR_PAT: 2, C.FORT_PAT: 2, C.REGULAR_BRI: 1}
-        # Rebellion defends with 2 Forts
-        # +1 half regs, +2 forts
+        # No French Regs -> no half-regs +1; +2 defending forts only
         mods = _attacker_loss_mods(state, sp, "Virginia", "ROYALIST", "REBELLION", 0)
-        assert mods == 3
+        assert mods == 2
 
     def test_no_lauzun_or_washington_in_attacker_mods(self):
         """S3.6.6 has no Lauzun/Washington modifiers (those are S3.6.5 only)."""
