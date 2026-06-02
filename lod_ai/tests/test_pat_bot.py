@@ -1809,7 +1809,7 @@ def test_p4_battle_modifiers_underground_militia_helps():
                 C.REGULAR_PAT: 2, C.REGULAR_FRE: 0,
                 C.MILITIA_A: 2, C.MILITIA_U: 1,
                 C.FORT_PAT: 0,
-                C.REGULAR_BRI: 2, C.TORY: 1,
+                C.REGULAR_BRI: 2, C.TORY: 0,
                 C.WARPARTY_A: 0, C.WARPARTY_U: 0,
                 C.FORT_BRI: 0,
             },
@@ -1823,11 +1823,11 @@ def test_p4_battle_modifiers_underground_militia_helps():
         "casualties": {},
         "leader_locs": {},
     }
-    # Raw FL: rebel=2+0+1=3, brit=2+1+0+0=3. 3>3 = False
-    # With modifiers:
-    # att_mod: +1 (all cubes regs) + 1 (underground militia) = +2
-    # def_mod: +1 (2 regs / 3 cubes, 2*2=4>=3) = +1
-    # net = (3+2) - (3+1) = 1 > 0 → battle
+    # Continentals are NOT Regulars (Glossary 1.4), so no attacker half-regs +1.
+    # Raw FL: rebel=2+(2//2)=3, brit=2. att_mod: +1 underground militia only.
+    # def_mod: +1 (British 2 regs / 2 cubes). net = (3+1) - (2+1) = 1 > 0 → battle.
+    # Without the underground Militia att_mod would be 0 and net 0 (no battle),
+    # so the underground bonus is the deciding factor.
     assert bot._execute_battle(state) is True
 
 
@@ -1837,10 +1837,10 @@ def test_p4_battle_modifiers_leader_bonus():
     state = {
         "spaces": {
             "Boston": {
-                C.REGULAR_PAT: 2, C.REGULAR_FRE: 0,
+                C.REGULAR_PAT: 3, C.REGULAR_FRE: 0,
                 C.MILITIA_A: 0, C.MILITIA_U: 0,
                 C.FORT_PAT: 0,
-                C.REGULAR_BRI: 2, C.TORY: 0,
+                C.REGULAR_BRI: 1, C.TORY: 2,
                 C.WARPARTY_A: 0, C.WARPARTY_U: 0,
                 C.FORT_BRI: 0,
             },
@@ -1854,11 +1854,11 @@ def test_p4_battle_modifiers_leader_bonus():
         "casualties": {},
         "leader_locs": {"LEADER_WASHINGTON": "Boston"},
     }
-    # Raw FL: rebel=2, brit=2. Tie → no battle without modifiers
-    # With modifiers:
-    # att_mod: +1 half regs + 1 leader = +2
-    # def_mod: +1 half regs = +1
-    # net = (2+2) - (2+1) = 1 > 0 → battle
+    # Continentals are NOT Regulars (Glossary 1.4): no attacker half-regs +1.
+    # British 1 Reg / 3 cubes (<half) -> no defender half-regs +1 either.
+    # Raw FL: rebel=3, brit=3 (tie). att_mod: +1 Washington leader only.
+    # def_mod: 0. net = (3+1) - (3+0) = 1 > 0 → battle. Without Washington the
+    # net is 0 (no battle), so the leader bonus is the deciding factor.
     assert bot._execute_battle(state) is True
 
 

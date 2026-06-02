@@ -31,6 +31,8 @@ from lod_ai.util.history   import push_history
 from lod_ai.board.control  import refresh_control
 from lod_ai.util.caps      import enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent
+from lod_ai.map import adjacency as _madj
+from lod_ai.util.naval import has_blockade
 from lod_ai.rules_consts import (
     # pieces
     REGULAR_BRI, REGULAR_FRE, TORY, FORT_BRI, FORT_PAT, VILLAGE,
@@ -178,6 +180,21 @@ def _french_cost(state: Dict):
 # Adjacency helper
 # ---------------------------------------------------------------------------
 
+def _is_legal_regular_dest(state: Dict, dest: str) -> bool:
+    """3.2.1: British Regulars may be placed only in a non-Blockaded City,
+    a Colony adjacent to such a City, or the West Indies."""
+    if dest == WEST_INDIES_ID:
+        return True
+    if _madj.is_city(dest):
+        return not has_blockade(state, dest)
+    if _madj.space_type(dest) == "Colony":
+        return any(
+            _madj.is_city(nbr) and not has_blockade(state, nbr)
+            for nbr in _madj.adjacent_spaces(dest)
+        )
+    return False
+
+
 def _is_adjacent_to_brit_power(state: Dict, space_id: str) -> bool:
     """Return True if *space_id* either contains or is adjacent to British Regulars/Forts."""
     sp = state["spaces"][space_id]
@@ -230,6 +247,11 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
         dest = regular_plan["space"]
         if dest not in selected:
             raise ValueError("Regular placement space must be among selected.")
+        if not _is_legal_regular_dest(state, dest):
+            raise ValueError(
+                f"British Regulars cannot be placed in {dest}: must be a "
+                "non-Blockaded City, an adjacent Colony, or the West Indies."
+            )
         n_reg = min(regular_plan.get("n", 0), 6)
         n_reg = _draw_from_pool(state, REGULAR_BRI, n_reg)
         add_piece(state, REGULAR_BRI, dest, n_reg)

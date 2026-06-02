@@ -34,9 +34,21 @@ def test_march_deducts_resources_and_calls_caps(monkeypatch):
 
 
 def test_march_invalid_adjacency():
+    # Southwest is a Reserve bordering no City, so it is reachable from Boston
+    # neither by adjacency nor by the City-network (3.2.3) -> illegal.
     state = simple_state()
     with pytest.raises(ValueError):
-        march.execute(state, C.BRITISH, {}, ["Boston"], ["New_York"])
+        march.execute(state, C.BRITISH, {}, ["Boston"], ["Southwest"])
+
+
+def test_british_city_network_march():
+    # 3.2.3: British Regulars in a City (Boston) may March via the City network
+    # to a Province (New_York) adjacent to another non-Blockaded City
+    # (New_York_City), even though Boston and New_York are not adjacent.
+    state = simple_state()
+    march.execute(state, C.BRITISH, {}, ["Boston"], ["New_York"])
+    assert state["spaces"]["New_York"].get(C.REGULAR_BRI, 0) == 2
+    assert state["spaces"]["Boston"].get(C.REGULAR_BRI, 0) == 0
 
 
 def test_limited_march_allows_multiple_origins_with_plan(monkeypatch):

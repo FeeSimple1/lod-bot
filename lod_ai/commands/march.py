@@ -41,6 +41,7 @@ from lod_ai.map import adjacency as map_adj
 from lod_ai.leaders          import leader_location
 from lod_ai.board.pieces      import remove_piece, add_piece, move_piece
 from lod_ai.economy.resources import spend, can_afford               # NEW
+from lod_ai.util.naval        import has_blockade
 
 COMMAND_NAME = "MARCH"            # auto-registered by commands/__init__.py
 
@@ -68,6 +69,34 @@ def _move(state: Dict,
 
 def _is_city(space_id: str) -> bool:
     return map_adj.space_type(space_id) == "City"
+
+
+def _city_network_legal(state: Dict, faction: str, src: str, dst: str) -> bool:
+    """3.2.3 / 3.5.4: British or French Regulars in or adjacent to a
+    qualifying City (not Blockaded; Rebellion-Controlled for the French) may
+    March to another such City, or to a Province adjacent to one.
+    (British/French strategic "naval" movement between Cities.)"""
+    if faction not in (BRITISH, FRENCH):
+        return False
+
+    def _qual_city(c: str) -> bool:
+        if not _is_city(c) or has_blockade(state, c):
+            return False
+        if faction == FRENCH and state.get("control", {}).get(c) != "REBELLION":
+            return False
+        return True
+
+    src_ok = _qual_city(src) or any(
+        _qual_city(n) for n in map_adj.adjacent_spaces(src)
+    )
+    if not src_ok:
+        return False
+    if _qual_city(dst):
+        return True
+    # a Province (Colony or Reserve) adjacent to a qualifying City
+    if map_adj.space_type(dst) in ("Colony", "Reserve"):
+        return any(_qual_city(n) for n in map_adj.adjacent_spaces(dst))
+    return False
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -135,8 +164,13 @@ def execute(
 
     def _apply_move(src: str, dst: str, pieces: Dict[str, int]) -> Dict:
         """Move pieces src→dst.  Returns tracking dict for post-move effects."""
-        if not is_adjacent(src, dst):
-            raise ValueError(f"{src} is not adjacent to {dst}.")
+        if not is_adjacent(src, dst) and not _city_network_legal(
+            state, faction, src, dst
+        ):
+            raise ValueError(
+                f"{src} to {dst} is not a legal March move "
+                "(not adjacent and no City-network route)."
+            )
         sp_src = state["spaces"][src]
         sp_dst = state["spaces"][dst]
 
