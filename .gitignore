@@ -4,3 +4,5 @@ __pycache__/
 data/map_template.csv
 .venv/
 .pytest_cache/
+.coverage
+saves/
