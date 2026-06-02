@@ -307,6 +307,30 @@ def execute(
 
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).update(destinations_set)
+
+    # §3.3.2 / §3.5.4: Escorts (French Regulars accompanying a Patriot March,
+    # or Continentals accompanying a French March) are optional and require the
+    # ally to pay 1 Resource per destination entered. Validate affordability
+    # BEFORE any pieces move so an escort can never happen for free and so the
+    # command never mutates state and then fails.
+    if not free:
+        if faction == FRENCH:
+            cont_dsts = {p["dst"] for p in plan
+                         if p["pieces"].get(REGULAR_PAT, 0) > 0}
+            if cont_dsts and not can_afford(state, PATRIOTS, len(cont_dsts)):
+                raise ValueError(
+                    "Patriots cannot pay the Continental escort fee "
+                    f"({len(cont_dsts)} Resource(s) required)."
+                )
+        elif faction == PATRIOTS:
+            _roch = leader_location(state, "LEADER_ROCHAMBEAU")
+            fre_dsts = {p["dst"] for p in plan
+                        if p["pieces"].get(REGULAR_FRE, 0) > 0 and p["dst"] != _roch}
+            if fre_dsts and not can_afford(state, FRENCH, len(fre_dsts)):
+                raise ValueError(
+                    "French cannot pay the escort fee "
+                    f"({len(fre_dsts)} Resource(s) required)."
+                )
     # Resource payment
     first_free = (faction == INDIANS) and ctx.get("all_reserve_origin", False)
     _pay_cost(state, faction, len(destinations_set), first_free=first_free, free=free)
@@ -345,9 +369,8 @@ def execute(
     # §3.5.4: French March — Patriots also pay 1 Resource per destination
     # that Continental escorts enter.
     if faction == FRENCH and continental_entered_dsts and not free:
-        fee = len(continental_entered_dsts)
-        if can_afford(state, PATRIOTS, fee):
-            spend(state, PATRIOTS, fee)
+        # Affordability pre-validated above; escorts never move for free.
+        spend(state, PATRIOTS, len(continental_entered_dsts))
 
     # §3.3.2: Patriot March — French also pay 1 Resource per destination
     # that French Regulars enter.

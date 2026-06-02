@@ -239,3 +239,29 @@ def test_indian_march_wp_not_activated_by_default(monkeypatch):
     # Not a Rebellion-Controlled Colony → War Parties stay Underground
     assert state["spaces"]["Province_B"].get(C.WARPARTY_U, 0) == 2
     assert state["spaces"]["Province_B"].get(C.WARPARTY_A, 0) == 0
+
+
+def test_french_march_escort_requires_patriot_payment():
+    import random
+    state = {
+        "spaces": {
+            "Boston": {C.REGULAR_FRE: 2, C.REGULAR_PAT: 2},
+            "Massachusetts": {},
+        },
+        "resources": {C.FRENCH: 5, C.PATRIOTS: 0, C.BRITISH: 0, C.INDIANS: 0},
+        "available": {},
+        "control": {},
+        "support": {},
+        "rng": random.Random(1),
+        "history": [],
+        "leader_locs": {},
+        "toa_played": True,
+    }
+    # French brings Continental escorts but Patriots cannot pay the escort fee
+    # (3.5.4) -> must raise atomically with nothing moved or paid.
+    with pytest.raises(ValueError, match="escort fee"):
+        march.execute(state, C.FRENCH, {}, ["Boston"], ["Massachusetts"],
+                      bring_escorts=True)
+    assert state["spaces"]["Boston"].get(C.REGULAR_FRE, 0) == 2
+    assert state["spaces"]["Boston"].get(C.REGULAR_PAT, 0) == 2
+    assert state["resources"][C.FRENCH] == 5  # march cost not charged either
