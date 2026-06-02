@@ -386,3 +386,33 @@ def test_french_battle_excludes_unpaid_patriots(monkeypatch):
     battle.execute(state, C.FRENCH, {}, ["Boston"])
     assert state["resources"][C.PATRIOTS] == 0  # not charged
     assert state["resources"][C.FRENCH] == 4    # French still pay their own 1
+
+
+def test_attacker_underground_activation_raises_force(monkeypatch):
+    """§3.6.3: the attacker may Activate its own Underground Militia to add half
+    of them to its Force Level (more dice).  6 Underground Militia contribute 0
+    while Underground, but 3 (=6//2) once Activated, crossing the 3-Force dice
+    threshold and producing an extra attacker die."""
+    monkeypatch.setattr(battle, "refresh_control", lambda s: None)
+    monkeypatch.setattr(battle, "enforce_global_caps", lambda s: None)
+
+    def mk():
+        return {
+            "spaces": {"Boston": {C.MILITIA_U: 6, C.REGULAR_BRI: 4}},
+            "resources": {C.PATRIOTS: 5, C.BRITISH: 0, C.FRENCH: 0, C.INDIANS: 0},
+            "available": {}, "casualties": {}, "history": [], "leader_locs": {},
+            "rng": __import__('random').Random(7),
+        }
+
+    def _d3_count(st):
+        return sum(1 for e in st.get("rng_log", []) if e[0] == "D3")
+
+    s_no = mk()
+    battle.execute(s_no, C.PATRIOTS, {}, ["Boston"])
+    # attacker Force = 0 -> 0 attacker dice; defender Force 4 -> 1 die => 1 total
+    assert _d3_count(s_no) == 1
+
+    s_act = mk()
+    battle.execute(s_act, C.PATRIOTS, {}, ["Boston"], activate={"Boston": 6})
+    # attacker Force = 6//2 = 3 -> 1 attacker die; + 1 defender die => 2 total
+    assert _d3_count(s_act) == 2

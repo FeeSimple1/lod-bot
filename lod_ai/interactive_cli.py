@@ -299,7 +299,35 @@ def _battle_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
         min_sel=1,
         max_sel=1 if limited else None,
     )
-    return lambda s, c: battle.execute(s, faction, c, spaces=spaces, free=False)
+
+    # §3.6.3: the attacker may Activate its own Underground units (Militia for
+    # the Patriots/French, War Parties for the British) to add half of them to
+    # its Force Level.  Underground units add nothing while hidden but grant a
+    # +1 loss bonus; Activating risks them as losses and forfeits that +1 once
+    # none remain.  Offer the human the choice per Battle space.
+    own_ug = {
+        RC.PATRIOTS: (RC.MILITIA_U, "Militia"),
+        RC.FRENCH: (RC.MILITIA_U, "Militia"),
+        RC.BRITISH: (RC.WARPARTY_U, "War Parties"),
+    }.get(faction)
+    activate: Dict[str, int] = {}
+    if own_ug:
+        ug_tag, ug_name = own_ug
+        for sid in spaces:
+            n = engine.state.get("spaces", {}).get(sid, {}).get(ug_tag, 0)
+            if n > 0:
+                cnt = choose_count(
+                    f"Activate how many Underground {ug_name} in {sid} for "
+                    f"the Battle? (adds half to your Force Level)",
+                    min_val=0, max_val=n, default=0,
+                )
+                if cnt > 0:
+                    activate[sid] = cnt
+
+    return lambda s, c: battle.execute(
+        s, faction, c, spaces=spaces, free=False,
+        activate=activate or None,
+    )
 
 
 def _rally_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:

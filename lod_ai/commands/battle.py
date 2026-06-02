@@ -79,6 +79,7 @@ def execute(
     win_rally_kwargs: Dict | None = None,
     win_blockade_dest: str | None = None,
     win_callback=None,
+    activate: Dict | None = None,
 ) -> Dict:
     faction = faction.upper()
     if faction not in (BRITISH, PATRIOTS, FRENCH):
@@ -140,6 +141,7 @@ def execute(
         winner = _resolve_space(
             state, ctx, faction, sid, attacker_bonus,
             ally_involved=ally_involved.get(sid, True),
+            attacker_activate=(activate or {}).get(sid, 0),
         )
         if winner == "REBELLION":
             rebellion_won_in.append(sid)
@@ -406,6 +408,7 @@ def _resolve_space(
     sid: str,
     attacker_bonus: int,
     ally_involved: bool = True,
+    attacker_activate: int = 0,
 ) -> str | None:
     sp = state["spaces"][sid]
 
@@ -425,6 +428,24 @@ def _resolve_space(
                     sp[WARPARTY_U] -= activate_n
                     sp[WARPARTY_A] = sp.get(WARPARTY_A, 0) + activate_n
             # else: Activate no Underground WP (leave them as-is)
+
+    # §3.6.3: the attacking side may Activate its own Underground units to add
+    # half of them to its Force Level.  Caller-chosen (humans via the CLI; the
+    # bots follow their flowcharts and pass nothing).
+    if attacker_activate > 0:
+        if attacker_faction in (PATRIOTS, FRENCH):
+            # Militia may be Activated only "if Patriots paid": always for a
+            # Patriot Battle; for a French Battle only where Patriots are paid.
+            if attacker_faction == PATRIOTS or ally_involved:
+                _flip = min(attacker_activate, sp.get(MILITIA_U, 0))
+                if _flip > 0:
+                    sp[MILITIA_U] -= _flip
+                    sp[MILITIA_A] = sp.get(MILITIA_A, 0) + _flip
+        elif attacker_faction == BRITISH:
+            _flip = min(attacker_activate, sp.get(WARPARTY_U, 0))
+            if _flip > 0:
+                sp[WARPARTY_U] -= _flip
+                sp[WARPARTY_A] = sp.get(WARPARTY_A, 0) + _flip
 
     def _force(side: str, is_defending: bool) -> int:
         """S3.6.2-3.6.3: cubes + half Active guerrillas + Forts if Defending."""
