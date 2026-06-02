@@ -233,6 +233,50 @@ def _rebellion_attacker_leader_present(state, sid, attacker_faction, ally_involv
     return any(leader_location(state, lid) == sid for lid in usable)
 
 
+# §3.6.3 defender Underground-activation hook.  The interactive CLI registers a
+# function so a HUMAN defending side can choose how many of its own Underground
+# units to Activate; bot-only games (and tests) leave it None and use the
+# flowchart heuristics below.
+_DEFENDER_ACTIVATION_HOOK = None
+
+
+def set_defender_activation_hook(fn) -> None:
+    """Register (or clear with None) the human defender-activation prompt."""
+    global _DEFENDER_ACTIVATION_HOOK
+    _DEFENDER_ACTIVATION_HOOK = fn
+
+
+def _resolve_defender_activation(state, sp, sid, def_side) -> None:
+    """§3.6.3: the DEFENDING side may Activate its own Underground units to add
+    half of them to its defending Force Level.  Royalist defenders' Underground
+    units are War Parties (the Indians' decision, §8.7.9); Rebellion defenders'
+    are Militia (the Patriots' decision, §3.6.1)."""
+    if def_side == "ROYALIST":
+        ug_tag, act_tag, owner = WARPARTY_U, WARPARTY_A, INDIANS
+    else:
+        ug_tag, act_tag, owner = MILITIA_U, MILITIA_A, PATRIOTS
+    n_ug = sp.get(ug_tag, 0)
+    if n_ug <= 0:
+        return
+
+    humans = state.get("human_factions", set())
+    if owner in humans and _DEFENDER_ACTIVATION_HOOK is not None:
+        count = _DEFENDER_ACTIVATION_HOOK(state, sid, def_side, owner, n_ug, ug_tag)
+        count = max(0, min(int(count or 0), n_ug))
+    elif def_side == "ROYALIST" and owner not in humans:
+        # §8.7.9 Indian bot: Activate all but 1 Underground WP if a Village is
+        # present, otherwise none.
+        count = (n_ug - 1) if sp.get(VILLAGE, 0) > 0 else 0
+    else:
+        # Patriot/French bot flowcharts do not Activate Militia when defending;
+        # a human owner with no registered hook makes no change.
+        count = 0
+
+    if count > 0:
+        sp[ug_tag] = sp.get(ug_tag, 0) - count
+        sp[act_tag] = sp.get(act_tag, 0) + count
+
+
 # -------- Internal helpers --------
 def _roll_d3(state: Dict) -> int:
     val = state["rng"].randint(1, 3)
@@ -417,17 +461,9 @@ def _resolve_space(
 
     cc_wp = ctx.get("common_cause", {}).get(sid, 0)
 
-    # §8.7.9 Indian bot defending activation:
-    # If Village in Battle space, Activate all but 1 Underground WP.
-    # Otherwise, Activate no Underground WP.
-    if def_side == "ROYALIST" and sp.get(WARPARTY_U, 0) > 0:
-        if INDIANS not in state.get("human_factions", set()):
-            if sp.get(VILLAGE, 0) > 0:
-                activate_n = sp.get(WARPARTY_U, 0) - 1
-                if activate_n > 0:
-                    sp[WARPARTY_U] -= activate_n
-                    sp[WARPARTY_A] = sp.get(WARPARTY_A, 0) + activate_n
-            # else: Activate no Underground WP (leave them as-is)
+    # §3.6.3: the DEFENDING side first chooses whether to Activate its own
+    # Underground units (humans via the CLI hook; bots per flowchart).
+    _resolve_defender_activation(state, sp, sid, def_side)
 
     # §3.6.3: the attacking side may Activate its own Underground units to add
     # half of them to its Force Level.  Caller-chosen (humans via the CLI; the

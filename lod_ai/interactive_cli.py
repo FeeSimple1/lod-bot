@@ -287,6 +287,17 @@ def _march_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
     )
 
 
+def _cli_defender_activation(state, sid, def_side, owner, n_ug, ug_tag):
+    """§3.6.3 prompt: ask a human defending side how many of its own Underground
+    units to Activate (adds half to its defending Force Level)."""
+    name = "Militia" if ug_tag == RC.MILITIA_U else "War Parties"
+    return choose_count(
+        f"Defending in {sid}: Activate how many Underground {name}? "
+        f"(adds half to your defending Force Level)",
+        min_val=0, max_val=n_ug, default=0,
+    )
+
+
 def _battle_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
     candidates = _battle_candidates(engine.state, faction)
     if not candidates:
@@ -1373,6 +1384,9 @@ def main() -> None:
 
     print("Liberty or Death -- Interactive CLI")
     print("Type 'help' or '?' at any prompt for available commands\n")
+
+    # §3.6.3: let human defending sides choose Underground activation in Battle.
+    battle.set_defender_activation_hook(_cli_defender_activation)
 
     # Check for existing saves
     saves = list_saves()

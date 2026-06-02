@@ -416,3 +416,45 @@ def test_attacker_underground_activation_raises_force(monkeypatch):
     battle.execute(s_act, C.PATRIOTS, {}, ["Boston"], activate={"Boston": 6})
     # attacker Force = 6//2 = 3 -> 1 attacker die; + 1 defender die => 2 total
     assert _d3_count(s_act) == 2
+
+
+def test_human_defender_underground_activation_hook(monkeypatch):
+    """§3.6.3: a HUMAN defending side is asked (via the registered hook) how many
+    of its own Underground units to Activate, raising its defending Force."""
+    monkeypatch.setattr(battle, "refresh_control", lambda s: None)
+    monkeypatch.setattr(battle, "enforce_global_caps", lambda s: None)
+
+    seen = {}
+
+    def hook(state, sid, def_side, owner, n_ug, ug_tag):
+        seen.update(sid=sid, def_side=def_side, owner=owner, n_ug=n_ug)
+        return n_ug  # Activate all
+
+    def mk():
+        return {
+            "spaces": {"Boston": {C.MILITIA_U: 6, C.REGULAR_BRI: 4}},
+            "resources": {C.PATRIOTS: 5, C.BRITISH: 5, C.FRENCH: 0, C.INDIANS: 0},
+            "available": {}, "casualties": {}, "history": [], "leader_locs": {},
+            "human_factions": {C.PATRIOTS},
+            "rng": __import__('random').Random(7),
+        }
+
+    def _d3(st):
+        return sum(1 for e in st.get("rng_log", []) if e[0] == "D3")
+
+    # Hook registered -> Patriots (human) Activate all 6 Militia: defending Force
+    # 6//2 = 3 -> 1 defender die in addition to the attacker's die.
+    battle.set_defender_activation_hook(hook)
+    try:
+        s_on = mk()
+        battle.execute(s_on, C.BRITISH, {}, ["Boston"])
+        assert seen == {"sid": "Boston", "def_side": "REBELLION",
+                        "owner": C.PATRIOTS, "n_ug": 6}
+        assert _d3(s_on) == 2
+    finally:
+        battle.set_defender_activation_hook(None)
+
+    # No hook -> Patriot bot/human without prompt does not Activate: 0 def dice.
+    s_off = mk()
+    battle.execute(s_off, C.BRITISH, {}, ["Boston"])
+    assert _d3(s_off) == 1
