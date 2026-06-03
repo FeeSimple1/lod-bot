@@ -24,6 +24,42 @@ _game_state = None
 _engine_ref = None  # optional Engine reference for bug reports
 _undo_checkpoint = None
 
+# ---------------------------------------------------------------------------
+# Pluggable input provider (lets a non-stdin driver -- e.g. an LLM harness --
+# answer the menu prompts).  Default behaviour is unchanged: read from stdin.
+# ---------------------------------------------------------------------------
+_last_menu = None  # structured description of the most recently shown prompt
+
+
+class StdinInputProvider:
+    """Default provider: read a line from standard input."""
+
+    def prompt(self, label: str, menu) -> str:  # noqa: D401
+        return input(label)
+
+
+_input_provider = StdinInputProvider()
+
+
+def set_input_provider(provider) -> None:
+    """Install a custom input provider, or restore stdin with None.
+
+    A provider must expose ``prompt(label: str, menu: dict | None) -> str`` and
+    return the raw text a human would have typed (e.g. ``"3"`` to pick option 3,
+    or a number for a count prompt).  ``menu`` carries structured context about
+    the choice being made (see ``_last_menu``)."""
+    global _input_provider
+    _input_provider = provider if provider is not None else StdinInputProvider()
+
+
+def get_input_provider():
+    return _input_provider
+
+
+def get_last_menu():
+    return _last_menu
+
+
 
 def set_game_state(state, engine=None) -> None:
     """Register the live game state so meta-commands can access it."""
@@ -218,9 +254,9 @@ def _handle_meta_command(raw: str) -> bool:
 
 
 def _prompt_input(label: str = "Select: ") -> str:
-    """Read input, handling meta-commands transparently."""
+    """Read input via the active provider, handling meta-commands transparently."""
     while True:
-        raw = input(label).strip()
+        raw = _input_provider.prompt(label, _last_menu).strip()
         if _handle_meta_command(raw):
             continue
         return raw
@@ -228,11 +264,21 @@ def _prompt_input(label: str = "Select: ") -> str:
 
 def _print_menu(prompt: str, options: List[Tuple[str, T]], *, allow_back: bool,
                  back_label: str = "Back") -> None:
+    global _last_menu
     print(prompt)
+    labels = []
     for idx, (label, _) in enumerate(options, 1):
         print(f"  {idx}. {label}")
+        labels.append(str(label))
     if allow_back:
         print(f"  0. {back_label}")
+    _last_menu = {
+        "kind": "select",
+        "prompt": prompt,
+        "options": labels,
+        "allow_back": allow_back,
+        "back_label": back_label,
+    }
 
 
 def choose_one(prompt: str, options: Iterable[Tuple[str, T]], *, allow_back: bool = False) -> T | None:
@@ -304,9 +350,17 @@ def choose_multiple(
 
 
 def choose_count(prompt: str, *, min_val: int = 0, max_val: int = 10, default: int | None = None) -> int:
+    global _last_menu
     default_hint = f" (default {default})" if default is not None else ""
     while True:
         print(f"{prompt}{default_hint} [{min_val}-{max_val}]")
+        _last_menu = {
+            "kind": "count",
+            "prompt": prompt,
+            "min": min_val,
+            "max": max_val,
+            "default": default,
+        }
         raw = _prompt_input()
         if raw == "" and default is not None:
             return default
