@@ -31,6 +31,10 @@ class LLMInputProvider:
         self.current_faction = faction
         self._last_sig = None
         self._repeat = 0
+        # Let stateful policies reset per-turn bookkeeping (optional hook).
+        hook = getattr(self.policy, "begin_turn", None)
+        if callable(hook):
+            hook(faction, card, allowed)
 
     def prompt(self, label: str, menu) -> str:
         # Track repeated identical prompts (means the last answer was rejected).

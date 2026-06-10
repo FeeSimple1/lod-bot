@@ -547,9 +547,14 @@ def _muster_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
             min_sel=1,
             max_sel=1 if limited else None,
         )
-        reg_space = choose_one_or_back("Place Regulars in which space?", [(s, s) for s in selected])
         available_regs = engine.state["available"].get(RC.REGULAR_BRI, 0)
-        reg_num = choose_count("How many British Regulars to place? (max 6)", min_val=1, max_val=min(6, available_regs))
+        if available_regs > 0:
+            reg_space = choose_one_or_back("Place Regulars in which space?", [(s, s) for s in selected])
+            reg_num = choose_count("How many British Regulars to place? (max 6)", min_val=1, max_val=min(6, available_regs))
+            regular_plan = {"space": reg_space, "n": reg_num}
+        else:
+            print("(No British Regulars available to place.)")
+            regular_plan = None
         tory_plan: Dict[str, int] = {}
         for sp in selected:
             max_tory = 2
@@ -571,7 +576,7 @@ def _muster_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
             faction,
             c,
             selected,
-            regular_plan={"space": reg_space, "n": reg_num},
+            regular_plan=regular_plan,
             tory_plan=tory_plan or None,
             build_fort=build_fort,
             reward_levels=reward_levels,

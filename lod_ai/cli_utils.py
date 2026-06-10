@@ -351,6 +351,12 @@ def choose_multiple(
 
 def choose_count(prompt: str, *, min_val: int = 0, max_val: int = 10, default: int | None = None) -> int:
     global _last_menu
+    if max_val < min_val:
+        # Impossible range (e.g. a wizard asking for >=1 of a piece that has 0
+        # available) would otherwise loop forever on any input.
+        val = max(0, max_val)
+        print(f"{prompt} [{min_val}-{max_val}] -> no valid quantity; using {val}.")
+        return val
     default_hint = f" (default {default})" if default is not None else ""
     while True:
         print(f"{prompt}{default_hint} [{min_val}-{max_val}]")

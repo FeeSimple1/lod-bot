@@ -38,6 +38,14 @@ The harness drives the same legality-checked CLI wizards a human would use, so t
 model can only ever pick legal moves. See `lod_ai/llm/` for the Policy interface
 (`random`, `first`, `anthropic`, or scripted) and `run_game()` for programmatic use.
 
+### Heuristic self-play
+`lod_ai/llm/heuristic.py` ships strategy profiles (two per faction) that answer the
+same menus without a model, for fast batch experiments:
+```bash
+python -m lod_ai.tools.heuristic_selfplay --scenario 1778 --seeds 1-20 --out results.jsonl
+```
+Findings from these batches are written up in `selfplay-strategy-notes.md`.
+
 ## Running tests
 ```bash
 pytest

@@ -7,3 +7,5 @@ data/map_template.csv
 .coverage
 saves/
 lod_ai/tools/batch_results*.json
+selfplay_results*.jsonl
+*.jsonl

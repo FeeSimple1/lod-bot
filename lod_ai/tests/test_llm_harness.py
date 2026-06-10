@@ -137,3 +137,40 @@ def test_detect_winner_parses_explicit_winner_message():
 
     st = {"history": [{"msg": "Winner: PATRIOTS (Rule 7.3)"}]}
     assert _detect_winner(st) == "PATRIOTS"
+
+
+# --------------------------------------------------------------------------- #
+# Heuristic policies
+# --------------------------------------------------------------------------- #
+def test_choose_count_impossible_range_does_not_prompt():
+    """max < min (e.g. 'place >=1' with 0 available) must not loop forever."""
+    class _Boom:
+        def prompt(self, label, menu):
+            raise AssertionError("prompt should not be called for empty range")
+    U.set_input_provider(_Boom())
+    try:
+        assert U.choose_count("Place how many?", min_val=1, max_val=0) == 0
+    finally:
+        U.set_input_provider(None)
+
+
+def test_heuristic_profiles_play_games():
+    from lod_ai.llm.heuristic import HeuristicPolicy, PROFILES
+
+    for name in ("P-AGIT", "B-CITY", "F-PREP", "I-VILLAGE"):
+        prof = PROFILES[name]
+        r = run_game("1778", seed=1, llm_factions=[prof["faction"]],
+                     policy=HeuristicPolicy(prof), max_cards=3)
+        assert r["cards_played"] >= 1
+        assert r["decisions"] >= 0
+
+
+def test_heuristic_parse_board_roundtrip():
+    from lod_ai.llm.heuristic import parse_board
+
+    st = build_state("1775", seed=1)
+    text = serialize_state(st, C.PATRIOTS)
+    board = parse_board(text)
+    assert board, "parser should find occupied spaces"
+    sample = next(iter(board.values()))
+    assert {"support", "control", "pieces", "rebel", "crown"} <= set(sample)
