@@ -25,6 +25,19 @@ Setup wizard:
 
 During play the CLI always shows the current and upcoming card. Each faction’s turn presents only the actions that are legal for that slot (Pass, Event, Command/Special). Commands, spaces, and piece counts are chosen from numbered menus—no free typing. Illegal choices are rejected before they commit.
 
+## LLM harness (play a seat with a language model)
+Let an LLM (or an offline test policy) occupy one or more human seats against the bots:
+```bash
+# Offline smoke test: random legal moves, no API key needed
+python -m lod_ai.llm --scenario 1778 --factions PATRIOTS --policy random
+
+# Real LLM play (requires ANTHROPIC_API_KEY and `pip install anthropic`)
+python -m lod_ai.llm --scenario 1775 --factions PATRIOTS --policy anthropic --verbose
+```
+The harness drives the same legality-checked CLI wizards a human would use, so the
+model can only ever pick legal moves. See `lod_ai/llm/` for the Policy interface
+(`random`, `first`, `anthropic`, or scripted) and `run_game()` for programmatic use.
+
 ## Running tests
 ```bash
 pytest

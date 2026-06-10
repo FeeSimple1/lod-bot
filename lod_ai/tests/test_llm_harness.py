@@ -113,3 +113,27 @@ def test_random_policy_is_seed_deterministic():
     assert a["winner"] == b["winner"]
     assert a["cards_played"] == b["cards_played"]
     assert a["decisions"] == b["decisions"]
+
+
+# --------------------------------------------------------------------------- #
+# Winner detection
+# --------------------------------------------------------------------------- #
+def test_detect_winner_resolves_wq_victory_to_faction():
+    """A mid-game Winter-Quarters victory (6.1) logs no faction name; the
+    harness must recompute the winner from victory margins, not return the
+    raw history message."""
+    from lod_ai.llm.harness import _detect_winner
+
+    st = build_state("1778", seed=1)
+    st.setdefault("history", []).append(
+        {"msg": "Victory achieved at Winter-Quarters (6.1)"})
+    w = _detect_winner(st)
+    assert w in (C.BRITISH, C.PATRIOTS, C.FRENCH, C.INDIANS, "UNKNOWN")
+    assert "Victory achieved" not in (w or "")
+
+
+def test_detect_winner_parses_explicit_winner_message():
+    from lod_ai.llm.harness import _detect_winner
+
+    st = {"history": [{"msg": "Winner: PATRIOTS (Rule 7.3)"}]}
+    assert _detect_winner(st) == "PATRIOTS"

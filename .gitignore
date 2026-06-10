@@ -6,3 +6,4 @@ data/map_template.csv
 .pytest_cache/
 .coverage
 saves/
+lod_ai/tools/batch_results*.json

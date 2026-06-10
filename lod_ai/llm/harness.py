@@ -24,7 +24,13 @@ def _detect_winner(state: dict) -> Optional[str]:
             after = msg.split("Winner:", 1)[1].strip()
             return after.split()[0] if after else "unknown"
         if "Victory achieved" in msg:
-            return msg
+            # Mid-game Winter-Quarters victory (6.1) doesn't name the faction;
+            # recompute it from the victory margins (same logic as batch_smoke).
+            try:
+                from lod_ai.tools.batch_smoke import _determine_winner_from_margins
+                return _determine_winner_from_margins(state)
+            except Exception:
+                return msg
     return None
 
 
