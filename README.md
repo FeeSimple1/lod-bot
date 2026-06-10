@@ -46,6 +46,15 @@ python -m lod_ai.tools.heuristic_selfplay --scenario 1778 --seeds 1-20 --out res
 ```
 Findings from these batches are written up in `selfplay-strategy-notes.md`.
 
+### Balance-drift guardrail
+Bot-only game outcomes on fixed seeds are tracked in `lod_ai/tools/balance_baseline.json`.
+After any rules or bot change, check (or intentionally refresh) the balance:
+```bash
+python -m lod_ai.tools.balance_smoke            # fails if faction win rates drifted
+python -m lod_ai.tools.balance_smoke --update   # rebaseline after an intended change
+```
+A fast 9-game canary runs as part of `pytest`.
+
 ## Running tests
 ```bash
 pytest
