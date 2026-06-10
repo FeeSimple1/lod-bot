@@ -93,18 +93,26 @@ def _supply_phase(state, *, bots=None, human_factions=None):
             continue
         brit_unsupplied.append(sid)
 
+    brit_pay_set = None
     if bots and BRITISH in bots and BRITISH not in human:
         bot = bots[BRITISH]
         priority = bot.bot_supply_priority(state)
         priority_index = {s: i for i, s in enumerate(priority)}
         brit_unsupplied.sort(key=lambda s: priority_index.get(s, 999))
+        # Bot reference: "Pay only in spaces where removing British would
+        # prevent Reward Loyalty or allow Committees of Correspondance,
+        # first with Resources in highest Pop, then with shifts in highest
+        # Pop."  Everywhere else the bot removes its cubes (6.2.1) instead
+        # of bleeding Support with a shift.
+        brit_pay_set = set(priority)
 
     for sid in brit_unsupplied:
         sp = state["spaces"][sid]
-        if _pay(BRITISH, sid, "British Supply"):
+        worth_keeping = brit_pay_set is None or sid in brit_pay_set
+        if worth_keeping and _pay(BRITISH, sid, "British Supply"):
             continue
         cur_support = state.get("support", {}).get(sid, 0)
-        if cur_support > ACTIVE_OPPOSITION:
+        if worth_keeping and cur_support > ACTIVE_OPPOSITION:
             shift_support(state, sid, -1)
             continue
         if sp.get(REGULAR_BRI, 0):

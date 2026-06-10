@@ -100,3 +100,40 @@ Implemented:
 **Decision:** Use `"Quebec"` (Reserve) per Manual §3.5.1 command definition. The bot flowchart's "Quebec City" is treated as an informal reference to the same location; the command definition in the manual is authoritative for what spaces the command can target.
 
 **Implementation:** Changed `_VALID_PROVINCES` in both `french_agent_mobilization.py` and `bots/french.py` from `"Quebec_City"` to `"Quebec"`. Updated 3 tests.
+
+---
+
+## Q13: British bot Supply — fate of non-qualifying spaces (6.2.1) — RESOLVED
+
+**Context:** The bot reference says: *"British Supply / West Indies: Pay only in
+spaces where removing British would prevent Reward Loyalty or allow Committees of
+Correspondance, first with Resources in highest Pop, then with shifts in highest Pop."*
+
+Previously the engine ignored the "pay only" clause for the bot: it paid in every
+unsupplied space while Resources lasted, then **shifted toward Opposition** wherever
+it went broke. Measured effect in 1776 bot-only games: about −5 Support per game from
+Supply alone (as large as the Patriots' entire Committees program), which was a major
+contributor to Patriots winning ~95% of bot-only 1776 games.
+
+**Implemented reading (literal):** spaces failing the qualifying test (would not
+prevent RL: needs Control + ≥1 Regular + ≥1 Tory + below Active Support; would not
+allow Committees: no Rebel pieces present) are now **removed to Available** per
+6.2.1, never paid and never shifted. Qualifying spaces pay first (highest Pop), then
+shift when broke.
+
+**Effect on bot-only balance (20 seeds/scenario):**
+- 1775: Patriots 16/British 3/Indians 1  →  Indians 9/British 7/Patriots 4
+- 1776: Patriots 19/British 1            →  Patriots 18/British 1/Indians 1
+- 1778: French 12/Patriots 7/British 1   →  Patriots 9/French 7/British 2/Indians 2
+
+**The ambiguity:** the literal reading also removes large Tory-less Regular armies
+(3–7 cubes) standing in Colonies with no Rebels present, even when the British could
+afford the 1 Resource. An alternative reading is that the sentence only orders
+*spending priority*, with removal merely the implied fallback once Resources run out
+— under that reading a rich British bot would still pay for field armies in
+non-qualifying spaces. The reference text does not say which is intended, and the
+balance consequences are large (see Indians 9/20 in 1775 above, driven by Support
+staying high).
+
+**Decision (owner, 2026-06-09):** keep the literal reading. Non-qualifying spaces
+are removed to Available — never paid, never shifted.

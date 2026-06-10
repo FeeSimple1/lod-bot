@@ -599,3 +599,37 @@ def test_reward_loyalty_skips_space_if_only_markers_removed(monkeypatch):
     # Markers should still be present
     assert "SpaceA" in state["markers"][C.RAID]["on_map"]
     assert "SpaceA" in state["markers"][C.PROPAGANDA]["on_map"]
+
+
+def test_british_bot_supply_pay_only_in_qualifying_spaces():
+    """Bot reference: 'Pay only in spaces where removing British would prevent
+    Reward Loyalty or allow Committees' -- non-qualifying spaces are removed,
+    not paid and never shifted toward Opposition (Q13 literal reading)."""
+    from lod_ai.util import year_end
+    from lod_ai import rules_consts as C
+
+    class _FakeBot:
+        def __init__(self, pay):
+            self._pay = pay
+        def bot_supply_priority(self, state):
+            return list(self._pay)
+
+    from lod_ai.state.setup_state import build_state
+    state = build_state("1776", seed=1)
+    # Arrange: two unsupplied spaces -- one qualifying, one junk Tory outpost.
+    for sid in ("Virginia", "Pennsylvania"):
+        state["spaces"][sid] = {k: 0 for k in state["spaces"][sid]}
+    state["spaces"]["Virginia"][C.TORY] = 2          # junk: no rebels, no RL
+    state["spaces"]["Pennsylvania"][C.REGULAR_BRI] = 2
+    state["spaces"]["Pennsylvania"][C.MILITIA_U] = 1  # rebels -> qualifying
+    state["resources"][C.BRITISH] = 5
+    sup_before = dict(state.get("support", {}))
+
+    year_end._supply_phase(state, bots={C.BRITISH: _FakeBot(["Pennsylvania"])},
+                           human_factions=set())
+
+    # Junk outpost removed, no support shift, no payment for it.
+    assert state["spaces"]["Virginia"].get(C.TORY, 0) == 0
+    assert state.get("support", {}).get("Virginia", 0) == sup_before.get("Virginia", 0)
+    # Qualifying space paid and kept.
+    assert state["spaces"]["Pennsylvania"].get(C.REGULAR_BRI, 0) == 2

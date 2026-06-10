@@ -121,3 +121,49 @@ Profiles encode hypotheses from the repo's `strategy.md` plus published play adv
 [The Players' Aid COIN Workshop — Indian faction](https://theplayersaid.com/2023/01/17/coin-workshop-liberty-or-death-the-american-insurrection-from-gmt-games-indians-faction/),
 [The Players' Aid review](https://theplayersaid.com/2017/03/01/turning-the-wargaming-world-upside-down-a-review-of-liberty-or-death-the-american-insurrection-by-gmt-games/),
 and [Board Game Meeple Lady's overview](https://www.boardgamemeeplelady.com/2017/07/04/liberty-or-death-the-american-insurrection/).
+
+---
+
+## Addendum (same day): the 1776 lead, chased
+
+Finding 7 prompted an audit. The 1776 setup matches the scenario reference exactly;
+the skew was dynamic, and instrumentation across bot games localized it to the
+Winter-Quarters Supply Phase: the engine ignored the British bot reference's "pay
+only in spaces where removing British would prevent Reward Loyalty or allow
+Committees" rule, paying everywhere while cash lasted and then *shifting toward
+Opposition* wherever the British went broke. Measured cost: about −5 Support per
+game from Supply alone — the size of the Patriots' entire Committees program,
+compounding every Winter Quarters.
+
+The fix (per the reference's literal text, confirmed by the owner as Q13 in
+QUESTIONS.md) removes cubes in non-qualifying spaces instead. Balance impact,
+bot-only, 20 seeds per scenario — before → after:
+
+| Scenario | Before | After |
+|---|---|---|
+| 1775 | Patriots 16, British 3, Indians 1 | Indians 9, British 7, Patriots 4 |
+| 1776 | Patriots 19, British 1 | Patriots 18, British 1, Indians 1 |
+| 1778 | French 12, Patriots 7, British 1 | Patriots 9, French 7, British 2, Indians 2 |
+
+Consequences for the findings above — all win-rate *numbers* in this document were
+measured pre-fix and are stale; the qualitative results fare differently:
+
+- **Finding 1/2 (Patriot militarization gifts the British)** survives: post-fix,
+  P-MIL still hands the British 9 of 10 games in 1775 while P-AGIT hands them zero.
+  But agitation no longer *wins* 1775 from the human seat (0/10 post-fix — the
+  Indians now take those games), so the Patriot question becomes how to beat the
+  strengthened Crown coalition, not just which engine to run.
+- **Finding 7 (1776 Patriot skew)** was, as suspected, substantially this bug: the
+  human Patriot seat's free 80% win rate collapsed to 10–20% post-fix, with the
+  British bot winning most of those games instead. Bot-vs-bot 1776 remains
+  Patriot-dominated (18/20) — the Patriot bot is still the strongest bot — but the
+  "anything wins from the Patriot chair" effect is gone.
+- **Finding 6 (Indians as pure kingmakers)** needs revision: under the resolved
+  Q13 reading, Support stays high enough in 1775 that the Indian victory condition
+  is live — they win 9/20 bot-only 1775 games and swept the post-fix P-AGIT runs.
+- The British human seat remains 0-for-everything; that finding stands.
+
+A note on method: this bug was invisible to the test suite (1,189 tests pass on
+both sides of the fix) and to casual play, but obvious in aggregate self-play
+statistics. Win-rate-by-seat tables are a cheap, sensitive instrument for finding
+rules-implementation drift.
