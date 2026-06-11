@@ -350,7 +350,19 @@ formerly failing seeds and asserts cleanliness. Balance baseline refreshed
 (headline: 1778 French 30% -> 50% once their 18 crashed turns stopped
 becoming passes). Band comparison made float-tolerant per the audit note.
 
-Remaining from the audit, deliberately not done now: removing set/dict
-iteration-order sensitivity so outcomes are deterministic from the scenario
-seed alone (PYTHONHASHSEED pinning still required); and wiring the
-zero-bot-error sweep into CI beyond the in-suite seed gate.
+Follow-up commit closed the two remaining audit recommendations:
+
+7 (determinism): outcomes are now invariant across PYTHONHASHSEED. Two
+sites fixed -- map_adj.adjacent_spaces returns a sorted tuple instead of a
+set (bot planners and BFS tie-break by first-seen), and the British
+Garrison displacement target loop no longer re-wrapped adjacency in a set.
+Verified: the full 60-game matrix produces identical winners and lengths
+under hash seeds 0, 1, and 7; an in-suite subprocess canary replays the
+formerly hash-sensitive game (1778 seed 4) under two hash seeds. The
+canonical ordering shifted some individual pinned outcomes (within band);
+baseline refreshed once more.
+
+6 (CI): .github/workflows/ci.yml runs three jobs on every push/PR -- the
+full pytest suite, lod_ai.tools.clean_sweep_gate --seeds 1-20 (zero
+trapped bot errors / illegal actions across all 60 bot-only games), and
+balance_smoke --seeds 1-20 against the committed baseline.

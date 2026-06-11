@@ -83,3 +83,29 @@ def test_formerly_failing_games_produce_zero_trapped_errors():
         bad = [h for h in st.get("history", [])
                if "illegal" in str(h).lower()]
         assert not bad, f"{scenario} seed {seed}: illegal actions: {bad[:2]}"
+
+
+def test_outcomes_invariant_across_hash_seeds():
+    """Game outcomes must be deterministic from the scenario seed alone --
+    not Python's per-process hash seed (audit recommendation 7). Plays the
+    once hash-sensitive game (1778 seed 4) under two different
+    PYTHONHASHSEED values in subprocesses and compares winner + length."""
+    import subprocess, sys, os, json
+
+    code = (
+        "import json;"
+        "from lod_ai.tools.balance_smoke import play_bot_game;"
+        "r = play_bot_game('1778', 4);"
+        "print(json.dumps([r['winner'], r['cards']]))"
+    )
+    results = []
+    for hs in ("0", "31337"):
+        env = dict(os.environ, PYTHONHASHSEED=hs)
+        out = subprocess.run([sys.executable, "-c", code],
+                             capture_output=True, text=True, timeout=180,
+                             env=env, cwd=os.path.dirname(os.path.dirname(
+                                 os.path.dirname(os.path.abspath(__file__)))))
+        assert out.returncode == 0, out.stderr[-400:]
+        results.append(json.loads(out.stdout.strip().splitlines()[-1]))
+    assert results[0] == results[1], \
+        f"hash-seed-dependent outcome: {results}"

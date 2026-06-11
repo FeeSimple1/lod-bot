@@ -760,7 +760,10 @@ class BritishBot(BaseBot):
 
         # Pick Colony/Province target: must be ADJACENT to the city.
         # Priority: most Opposition, least Support, lowest Pop.
-        adj_spaces = set(_adjacent(best_city))
+        # Deterministic iteration order: _adjacent returns a sorted tuple;
+        # do NOT re-wrap in a set (set order is hash-seed-dependent and this
+        # loop breaks ties by first-seen).
+        adj_spaces = _adjacent(best_city)
         best_province = None
         best_key = None
         for sid in adj_spaces:

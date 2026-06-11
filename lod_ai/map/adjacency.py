@@ -40,14 +40,20 @@ def is_adjacent(a: str, b: str) -> bool:
     return b in _ADJ.get(a, set()) or a in _ADJ.get(b, set())
 
 
-def adjacent_spaces(space_id: str) -> Set[str]:
-    """Return the set of spaces adjacent to *space_id* (bidirectional)."""
+def adjacent_spaces(space_id: str) -> tuple:
+    """Return the spaces adjacent to *space_id* (bidirectional).
+
+    Returned as a SORTED tuple: bot planners and BFS routines iterate this
+    collection when breaking ties, so its order must not depend on Python's
+    per-process hash seed (set iteration order did, making game outcomes
+    PYTHONHASHSEED-sensitive -- external audit recommendation 7).
+    """
     result = set(_ADJ.get(space_id, set()))
     # Include reverse edges from other spaces that list this one
     for sid, adj_set in _ADJ.items():
         if space_id in adj_set:
             result.add(sid)
-    return result
+    return tuple(sorted(result))
 
 
 def space_type(space_id: str) -> str | None:
