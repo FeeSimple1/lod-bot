@@ -366,3 +366,43 @@ baseline refreshed once more.
 full pytest suite, lod_ai.tools.clean_sweep_gate --seeds 1-20 (zero
 trapped bot errors / illegal actions across all 60 bot-only games), and
 balance_smoke --seeds 1-20 against the committed baseline.
+
+
+---
+
+## Free-operation audit (external, June 2026) — four confirmed findings fixed
+
+Card-granted FREE operations handed to bots were dispatched raw (space=None,
+no plan) and without the free-cost waiver. Engine._drain_free_ops now builds
+an actual bot plan (§8.3.1: free Commands use the Faction's priorities;
+8.1.2 pieces / 8.2 random spaces where not applicable) and waives cost via
+bs_free. Fixed and tested in test_bot_free_ops.py (real dispatch, no mocks):
+
+1. Locationless free ops (cards 48/51/52/67): a free Battle/March/Rally/
+   Muster with no queued location now selects a legal space (Battle/March
+   target the most enemy force) instead of forfeiting.
+2. 'Free March to X' (cards 1/15/21/66): X is routed as the DESTINATION,
+   with bot-selected adjacent source pieces -- previously X was treated as
+   the source and the op forfeited.
+3. Free-cost waiver: free Gather/Rally/Muster/March no longer deduct
+   Resources on the bot path (incl. the Treaty of Alliance free French
+   Muster). Verified with the audit's own reproduction scripts.
+4. Card 94 (Herkimer): the free Tory Muster now places Tories at no cost
+   (was charging a Resource and placing nothing).
+
+Effect: bot-only free-op execution skips fell ~64 -> 5 over the 60-game
+matrix; balance baseline refreshed (free ops now actually fire). The
+clean-sweep gate now surfaces free-op skips (non-failing) alongside its
+hard bot-error / illegal-action gate.
+
+### Remaining free-op work (logged, not fixed)
+
+- Free Special Activities (War Path, Partisans, Scout, etc.) have no bot
+  planner: their option/target selection is a real faction-flowchart
+  decision (e.g. War Path's three options) that must not be guessed
+  (agents.md). The drain DECLINES these cleanly ('no bot planner for this
+  free Special Activity') rather than mis-executing.
+- ~5 residual March/Rally free ops per 60-game matrix still skip at
+  execution: the generic planner's space choice can miss faction-specific
+  Command prerequisites (e.g. French Rally legality). Driving these to 0
+  needs the per-faction free-Command planners from the bot flowcharts.

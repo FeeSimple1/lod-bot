@@ -262,6 +262,180 @@ class Engine:
                 normalize_state(target_state)
         return True
 
+
+    # ----- Bot free-op planning (§8.3.1: free Commands use the Faction's
+    # priorities; where not applicable, pieces per 8.1.2 and spaces randomly
+    # per 8.2). The raw dispatcher cannot invent a plan from space=None, and
+    # a card's "March TO X" queues X as the DESTINATION -- both previously
+    # made bots forfeit granted operations (external free-op audit). -------
+    _CROWN_SIDE = (C.REGULAR_BRI, C.TORY, C.FORT_BRI,
+                   C.WARPARTY_A, C.WARPARTY_U, C.VILLAGE)
+    _REBEL_SIDE = (C.REGULAR_PAT, C.MILITIA_A, C.MILITIA_U,
+                   C.FORT_PAT, C.REGULAR_FRE)
+    _OWN_MOBILE = {
+        C.BRITISH: (C.REGULAR_BRI, C.TORY),
+        C.PATRIOTS: (C.REGULAR_PAT, C.MILITIA_A, C.MILITIA_U),
+        C.FRENCH: (C.REGULAR_FRE,),
+        C.INDIANS: (C.WARPARTY_A, C.WARPARTY_U),
+    }
+
+    def _enemy_tags_for(self, faction):
+        return (self._REBEL_SIDE if faction in (C.BRITISH, C.INDIANS)
+                else self._CROWN_SIDE)
+
+    def _own_force_in(self, st, sid, faction):
+        sp = st["spaces"].get(sid, {})
+        return sum(sp.get(t, 0) for t in self._OWN_MOBILE.get(faction, ()))
+
+    def _enemy_force_in(self, st, sid, faction):
+        sp = st["spaces"].get(sid, {})
+        return sum(sp.get(t, 0) for t in self._enemy_tags_for(faction))
+
+    def _free_op_sources_toward(self, st, faction, dest):
+        """Adjacent spaces holding the Faction's mobile pieces (8.1.2:
+        move the most pieces; the cards pair 'March to X' with a Battle
+        there, so mass force toward the destination)."""
+        from lod_ai.map import adjacency as map_adj
+        out = []
+        for nbr in map_adj.adjacent_spaces(dest):
+            if self._own_force_in(st, nbr, faction) > 0:
+                out.append(nbr)
+        return out
+
+    def _plan_bot_free_op(self, st, faction, op, loc):
+        """Return dispatcher kwargs for a queued bot free op, or None when
+        no legal plan exists (a genuine decline)."""
+        rng = st.get("rng")
+        spaces = st.get("spaces", {})
+
+        def _rand_tiebreak(cands, key):
+            best = max(cands, key=lambda s: (key(s),))
+            ties = [s for s in cands if key(s) == key(best)]
+            if len(ties) > 1 and rng is not None:
+                return ties[rng.randrange(len(ties))]
+            return sorted(ties)[0]
+
+        if op in ("battle", "battle_plus2"):
+            cands = [sid for sid in spaces
+                     if self._own_force_in(st, sid, faction) > 0
+                     and self._enemy_force_in(st, sid, faction) > 0]
+            if loc:
+                cands = [sid for sid in cands if sid == loc]
+            if not cands:
+                return None
+            # 8.4.1: affect the most enemy pieces.
+            pick = _rand_tiebreak(
+                cands, lambda s: self._enemy_force_in(st, s, faction))
+            return {"space": pick}
+
+        if op == "march":
+            dest = loc
+            if dest is None:
+                # "March to one space (and may Battle there)": pick the
+                # destination where massed adjacent force meets the most
+                # enemy pieces; else the space gathering the most own
+                # pieces (8.2 random among ties).
+                cands = []
+                for sid in spaces:
+                    srcs = self._free_op_sources_toward(st, faction, sid)
+                    if not srcs:
+                        continue
+                    force = sum(self._own_force_in(st, x, faction)
+                                for x in srcs)
+                    cands.append((sid, force,
+                                  self._enemy_force_in(st, sid, faction)))
+                if not cands:
+                    return None
+                with_enemy = [c for c in cands if c[2] > 0]
+                pool = with_enemy or cands
+                names = [c[0] for c in pool]
+                score = {c[0]: (c[2], c[1]) for c in pool}
+                dest = _rand_tiebreak(names, lambda s: score[s])
+            sources = self._free_op_sources_toward(st, faction, dest)
+            if not sources:
+                return None
+            return {"space": None, "sources": sources,
+                    "destinations": [dest]}
+
+        if op == "muster" and faction in (C.BRITISH, C.FRENCH):
+            dest = loc
+            if dest is None:
+                from lod_ai.commands.muster import _is_legal_regular_dest
+                legal = [sid for sid in spaces
+                         if _is_legal_regular_dest(st, sid)]
+                if not legal:
+                    return None
+                dest = _rand_tiebreak(
+                    legal, lambda s: self._own_force_in(st, s, faction))
+            kwargs = {"space": None, "selected": [dest]}
+            if faction == C.BRITISH:
+                avail_regs = st.get("available", {}).get(C.REGULAR_BRI, 0)
+                from lod_ai.commands.muster import _is_legal_regular_dest
+                if avail_regs > 0 and _is_legal_regular_dest(st, dest):
+                    kwargs["regular_plan"] = {"space": dest,
+                                              "n": min(6, avail_regs)}
+                avail_tory = st.get("available", {}).get(C.TORY, 0)
+                if avail_tory > 0:
+                    kwargs["tory_plan"] = {dest: min(2, avail_tory)}
+            return kwargs
+
+        if op == "rally" and faction in (C.PATRIOTS, C.FRENCH):
+            from lod_ai.commands.rally import (_support_value,
+                                               _is_indian_reserve,
+                                               _is_west_indies)
+            from lod_ai.rules_consts import ACTIVE_SUPPORT as _AS
+
+            def _rally_legal(sid):
+                return (_support_value(st, sid) != _AS
+                        and not _is_indian_reserve(sid)
+                        and not _is_west_indies(sid)
+                        and self._own_force_in(st, sid, faction) > 0)
+
+            if loc is not None:
+                return ({"space": None, "selected": [loc], "place_one": {loc}}
+                        if _rally_legal(loc) else None)
+            cands = [sid for sid in spaces if _rally_legal(sid)]
+            if not cands:
+                return None
+            dest = _rand_tiebreak(
+                cands, lambda s: self._own_force_in(st, s, faction))
+            return {"space": None, "selected": [dest], "place_one": {dest}}
+
+        if op == "gather" and faction == C.INDIANS:
+            from lod_ai.commands.gather import SUPPORT_OK
+            from lod_ai.map import adjacency as map_adj
+
+            def _gather_legal(sid):
+                if sid == C.WEST_INDIES_ID:
+                    return False
+                if st.get("support", {}).get(sid, C.NEUTRAL) not in SUPPORT_OK:
+                    return False
+                if self._own_force_in(st, sid, faction) > 0:
+                    return True
+                return any(self._own_force_in(st, nbr, faction) > 0
+                           for nbr in map_adj.adjacent_spaces(sid))
+
+            if loc is not None:
+                return {"space": loc} if _gather_legal(loc) else None
+            cands = [sid for sid in spaces if _gather_legal(sid)]
+            if not cands:
+                return None
+            dest = _rand_tiebreak(
+                cands, lambda s: self._own_force_in(st, s, faction))
+            return {"space": dest}
+
+        # Free Special Activities and any op without a faithful bot planner
+        # (e.g. War Path / Partisans option selection, which is a real
+        # flowchart decision -- not guessed here). Signal a clean DECLINE so
+        # the drain logs it distinctly from an execution skip.
+        if op in ("war_path", "partisans", "scout", "skirmish",
+                  "naval_pressure", "trade", "preparer", "persuasion",
+                  "common_cause"):
+            return "DECLINE_NO_PLANNER"
+
+        # Default: pass the queued location straight through.
+        return {"space": loc}
+
     def _drain_free_ops(self, target_state: dict) -> None:
         """Execute ALL queued free ops immediately (FIFO, all factions).
 
@@ -282,13 +456,40 @@ class Engine:
                         and self._interactive_input()):
                     if self._run_human_free_op(target_state, _fac, _op):
                         continue
+                # Bot seats: build an actual plan (8.3.1) instead of raw
+                # dispatch, and waive costs -- the card grants a FREE op.
+                kwargs = None
+                if _fac not in self.human_factions:
+                    kwargs = self._plan_bot_free_op(target_state, _fac,
+                                                    _op, _loc)
+                    if kwargs == "DECLINE_NO_PLANNER":
+                        push_history(target_state,
+                                     f"FREE {_op.upper()} by {_fac} — "
+                                     f"declined (no bot planner for this "
+                                     f"free Special Activity)")
+                        continue
+                    if kwargs is None:
+                        push_history(target_state,
+                                     f"FREE {_op.upper()} by {_fac} — "
+                                     f"declined (no legal plan)")
+                        continue
+                if kwargs is None:
+                    kwargs = {"space": _loc}
+                target_state["bs_free"] = True
                 try:
-                    self.dispatcher.execute(_op, faction=_fac, space=_loc, free=True)
-                    push_history(target_state, f"FREE {_op.upper()} by {_fac} in {_loc or 'chosen space'}")
+                    space = kwargs.pop("space", _loc)
+                    self.dispatcher.execute(_op, faction=_fac, space=space,
+                                            free=True, **kwargs)
+                    _where = space or (kwargs.get("destinations") or
+                                       kwargs.get("selected") or
+                                       ["chosen space"])[0]
+                    push_history(target_state, f"FREE {_op.upper()} by {_fac} in {_where}")
                     normalize_state(target_state)
                 except Exception:
                     # If the command fails (e.g. no valid targets), log and continue
                     push_history(target_state, f"FREE {_op.upper()} by {_fac} — skipped (no valid target)")
+                finally:
+                    target_state.pop("bs_free", None)
         finally:
             self.state = old_state
 

@@ -40,9 +40,15 @@ def play(scenario: str, seed: int):
             eng.play_card(card)
             n += 1
     errs = eng.state.get("_bot_error_log", []) or []
-    illegal = [h for h in eng.state.get("history", [])
-               if "illegal" in str(h).lower()]
-    return errs, illegal, n
+    hist = [str(h.get("msg", "") if isinstance(h, dict) else h)
+            for h in eng.state.get("history", [])]
+    illegal = [h for h in hist if "illegal" in h.lower()]
+    # Free-op fidelity: a card-granted free op should run, not be silently
+    # skipped for lack of a target. A planner that genuinely declines logs
+    # "declined (no legal plan)" instead, which is allowed.
+    free_skips = [h for h in hist
+                  if "FREE " in h and "skipped (no valid target)" in h]
+    return errs, illegal, free_skips, n
 
 
 def main(argv=None) -> int:
@@ -52,9 +58,10 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     lo, _, hi = args.seeds.partition("-")
     dirty = 0
+    skip_games = 0
     for scen in [s for s in args.scenarios.split(",") if s]:
         for seed in range(int(lo), int(hi or lo) + 1):
-            errs, illegal, cards = play(scen, seed)
+            errs, illegal, free_skips, cards = play(scen, seed)
             tag = f"[{scen} seed={seed:2d}] {cards} cards"
             if errs or illegal:
                 dirty += 1
@@ -64,12 +71,27 @@ def main(argv=None) -> int:
                     print(f"    bot_error: {str(e.get('error'))[:100]}")
                 for h in illegal[:3]:
                     print(f"    illegal: {str(h)[:100]}")
+            elif free_skips:
+                skip_games += 1
+                print(f"{tag}  FREE-OP SKIPS: {len(free_skips)}")
+                for h in free_skips[:3]:
+                    print(f"    {h[:100]}")
             else:
                 print(f"{tag}  clean")
     if dirty:
         print(f"\nFAIL: {dirty} game(s) trapped bot errors or illegal actions.")
         return 1
-    print("\nOK: every game clean (zero trapped bot errors, zero illegal actions).")
+    if skip_games:
+        # Non-failing: forfeited free ops are optional and some are genuine
+        # "no legal target" declines. Surfaced for tracking; the hard gate
+        # is bot errors + illegal actions above. Goal: drive this to 0 as
+        # the remaining faction free-op planners are completed (see
+        # GITHUB_ISSUES.md).
+        print(f"\nOK (with warnings): {skip_games} game(s) had free-op "
+              f"'no valid target' skips. No bot errors or illegal actions.")
+        return 0
+    print("\nOK: every game clean (zero bot errors, illegal actions, "
+          "free-op skips).")
     return 0
 
 
