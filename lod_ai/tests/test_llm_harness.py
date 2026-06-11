@@ -11,7 +11,7 @@ from lod_ai import rules_consts as C
 from lod_ai.state.setup_state import build_state
 from lod_ai.llm import run_game, serialize_state
 from lod_ai.llm.policy import (
-    RandomPolicy, ScriptedPolicy, FirstChoicePolicy, _valid_choices,
+    Policy, RandomPolicy, ScriptedPolicy, FirstChoicePolicy, _valid_choices,
 )
 from lod_ai.llm.provider import LLMInputProvider
 
@@ -307,3 +307,74 @@ def test_human_bs_plan_built_and_executed_via_prompts():
     assert "Brilliant Stroke resolved" in hist
     assert eng.state.get("bs_plan", {}).get(C.PATRIOTS), \
         "plan should have been recorded for the human seat"
+
+
+def test_bs_declaration_prompt_routes_to_declaring_factions_policy():
+    """With per-faction policies, the BS declaration prompt must reach the
+    DECLARING faction's policy, not whichever seat acted last."""
+    from lod_ai.engine import Engine
+    from lod_ai.llm.provider import LLMInputProvider
+
+    st = build_state("1775", seed=1)
+    st["available"][C.REGULAR_FRE] = 14
+    st["cbc"] = 5
+    eng = Engine(initial_state=st)
+    eng.set_human_factions({C.FRENCH, C.PATRIOTS})
+
+    seen = []
+
+    class _Tagged(Policy):
+        def __init__(self, tag):
+            self.tag = tag
+        def choose(self, obs, label, menu, faction):
+            seen.append((self.tag, faction))
+            opts = (menu or {}).get("options", [])
+            for i, o in enumerate(opts, 1):       # decline cleanly
+                if "No declaration" in o:
+                    return str(i)
+            return "1"
+
+    provider = LLMInputProvider(
+        _Tagged("shared"), eng, {C.FRENCH, C.PATRIOTS},
+        policies={C.FRENCH: _Tagged("F"), C.PATRIOTS: _Tagged("P")})
+    # Simulate a stale binding from a previous turn:
+    provider.begin_turn(C.PATRIOTS, {}, {})
+    U.set_input_provider(provider)
+    try:
+        eng._resolve_brilliant_stroke_interrupt(
+            {"id": 997, "title": "dummy", "winter_quarters": False})
+    finally:
+        U.set_input_provider(None)
+    # The French declaration prompt must have reached the French policy.
+    assert ("F", C.FRENCH) in seen
+    assert all(tag == "F" for tag, fac in seen if fac == C.FRENCH)
+
+
+def test_toa_free_french_muster_executes_for_human_seat():
+    """The ToA-granted free French Muster must run through the Muster wizard
+    for a human French seat instead of being skipped (no valid target)."""
+    from lod_ai.engine import Engine
+    from lod_ai.util.free_ops import queue_free_op
+
+    st = build_state("1775", seed=1)
+    st["toa_played"] = True
+    st["available"][C.REGULAR_FRE] = 6
+    eng = Engine(initial_state=st)
+    eng.set_human_factions({C.FRENCH})
+
+    class _FirstOption:
+        def prompt(self, label, menu):
+            m = menu or {}
+            if m.get("kind") == "count":
+                return str(m.get("max", m.get("min", 0)))
+            return "1"
+    U.set_input_provider(_FirstOption())
+    try:
+        queue_free_op(eng.state, C.FRENCH, "muster", None)
+        eng._drain_free_ops(eng.state)
+    finally:
+        U.set_input_provider(None)
+    hist = " | ".join(h.get("msg", "") if isinstance(h, dict) else str(h)
+                      for h in eng.state["history"][-8:])
+    assert "skipped (no valid target)" not in hist
+    assert "FREE MUSTER by FRENCH (planned)" in hist

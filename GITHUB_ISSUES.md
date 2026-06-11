@@ -282,3 +282,23 @@ Remaining (logged, not blocking):
   actions (~7 meaningful in 62 cards) to bank Preparations > 15, so ToA
   rarely fires in heuristic-vs-heuristic games even though the human
   declaration/execution path is proven by tests. Tuning lead, not plumbing.
+
+
+---
+
+## Round-2 external playtest (strong four-human policies, post-fix archive)
+
+The second ChatGPT run completed a full 1775 game with zero rejected actions
+across 757 decisions, the Treaty of Alliance firing naturally on card 16, and
+a competitive finish (British 4, Patriots 3). Its three findings, addressed:
+
+1. FIXED — BS declaration prompts now bind the input provider to the
+   declaring faction (engine._bind_provider_faction) before prompting, so
+   per-faction policies receive their own declarations (regression test).
+2. FIXED — the ToA-granted free French Muster (and any human free op with no
+   preset location) now routes through the matching CLI wizard with costs
+   waived via bs_free, instead of being skipped (regression test).
+3. OPEN — the ordinary human BS plan builder remains less expressive than
+   normal command wizards (single space + label per step; no multi-space
+   plans, escorts, or sub-options). Acceptable for now; revisit if BS play
+   quality matters to an experiment.

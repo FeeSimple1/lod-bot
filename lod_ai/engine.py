@@ -275,6 +275,13 @@ class Engine:
         self.state = target_state
         try:
             for _fac, _op, _loc in ops:
+                # Human seats with no preset location plan their free op via
+                # the normal CLI wizard (e.g. the ToA-granted free French
+                # Muster), with costs waived through the bs_free flag.
+                if (_loc is None and _fac in self.human_factions
+                        and self._interactive_input()):
+                    if self._run_human_free_op(target_state, _fac, _op):
+                        continue
                 try:
                     self.dispatcher.execute(_op, faction=_fac, space=_loc, free=True)
                     push_history(target_state, f"FREE {_op.upper()} by {_fac} in {_loc or 'chosen space'}")
@@ -284,6 +291,32 @@ class Engine:
                     push_history(target_state, f"FREE {_op.upper()} by {_fac} — skipped (no valid target)")
         finally:
             self.state = old_state
+
+    def _run_human_free_op(self, target_state: dict, faction: str,
+                           op: str) -> bool:
+        """Let a human seat plan a card-granted free op through the matching
+        CLI wizard. Returns True when the op executed (or was knowingly
+        declined); False to fall through to the default path."""
+        from lod_ai import interactive_cli as _cli
+        wizard = getattr(_cli, f"_{op}_wizard", None)
+        if wizard is None:
+            return False
+        self._bind_provider_faction(faction)
+        print(f"\n{faction}: plan your FREE {op.upper()} (granted by the event).")
+        target_state["bs_free"] = True
+        try:
+            runner = wizard(self, faction, False)
+            runner(target_state, {})
+            push_history(target_state, f"FREE {op.upper()} by {faction} (planned)")
+            normalize_state(target_state)
+            return True
+        except Exception as exc:
+            push_history(target_state,
+                         f"FREE {op.upper()} by {faction} — wizard failed "
+                         f"({type(exc).__name__}), falling back")
+            return False
+        finally:
+            target_state.pop("bs_free", None)
 
     def _base_order(self, card: dict) -> List[str]:
         if isinstance(card.get("order"), (list, tuple)) and card["order"]:
@@ -511,6 +544,17 @@ class Engine:
         return bs.bs_available(self.state, fac)
 
     @staticmethod
+    def _bind_provider_faction(faction: str) -> None:
+        """Tell a seat-aware input provider (e.g. the LLM harness's) which
+        faction the next prompts belong to, so per-faction policies route
+        correctly outside the normal turn flow (BS declarations, free ops)."""
+        from lod_ai.cli_utils import get_input_provider
+        provider = get_input_provider()
+        hook = getattr(provider, "begin_turn", None)
+        if callable(hook):
+            hook(faction, {}, {})
+
+    @staticmethod
     def _interactive_input() -> bool:
         """True when a human can actually answer prompts: a custom input
         provider is installed (harness/LLM), or stdin is interactive.
@@ -546,6 +590,8 @@ class Engine:
         Returns False (BS aborts, card returns to owner) if the faction's
         Leader is not on the map or the player backs out."""
         from lod_ai.cli_utils import choose_one
+
+        self._bind_provider_faction(faction)
 
         leader_space = None
         for lid, loc in self.state.get("leaders", {}).items():
@@ -631,6 +677,7 @@ class Engine:
         for fac in (C.BRITISH, C.PATRIOTS, C.INDIANS, C.FRENCH):
             if fac not in self.human_factions:
                 continue
+            self._bind_provider_faction(fac)
             options = []
             if fac == C.FRENCH:
                 toa_info = self._bs_decl_info(bs.TOA_KEY)
