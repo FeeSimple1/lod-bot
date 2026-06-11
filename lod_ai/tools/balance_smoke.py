@@ -122,7 +122,7 @@ def main(argv=None) -> int:
         for f in FACTIONS:
             delta = cur_r[f] - base_r[f]
             flag = ""
-            if abs(delta) > args.band:
+            if abs(delta) > args.band + 1e-9:   # float-tolerant band edge
                 flag = f"  <-- DRIFT beyond ±{args.band:.0%}"
                 drift_fail = True
             if base_r[f] or cur_r[f]:

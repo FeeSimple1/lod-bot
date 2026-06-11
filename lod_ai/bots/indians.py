@@ -684,7 +684,7 @@ class IndianBot(BaseBot):
                     best_moves = moves
             if best_dst and best_moves:
                 if best_dst not in selected:
-                    if len(selected) < 4:
+                    if len(selected) < gather_max:
                         selected.append(best_dst)
                     else:
                         best_dst = None

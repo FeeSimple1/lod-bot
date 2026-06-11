@@ -324,3 +324,33 @@ through the wizard (validating both round-2 fixes end-to-end), Britain wins
    involved in at least one Limited Command" (card returns to owner on
    violation). HeuristicPolicy defaults: declare ToA when offered, decline
    ordinary BS.
+
+
+---
+
+## Bot-combination audit (external, June 2026) — all three defects fixed
+
+The audit root-caused the long-standing trapped bot_error/illegal_action
+passes (visible since the first batch diagnostics) to three planner/executor
+divergences, all fixed with regression tests (test_bot_planner_audit.py):
+
+1. French March planned Continental escorts the Patriots could not pay for
+   (3.5.4 fee enforced by the executor; 18 forfeited French turns across the
+   1778 sweep). Planner now caps escort-bearing destinations by Patriot
+   Resources and marches escort-less beyond that.
+2. British Muster planner used a broad City/Colony filter where the executor
+   enforces 3.2.1 (non-Blockaded City, ADJACENT Colony, or West Indies).
+   Planner now calls the executor's _is_legal_regular_dest.
+3. Indian Limited Gather's Bullet-4 movement step used a hard-coded 4-space
+   cap instead of gather_max (1 when Limited).
+
+Post-fix: PYTHONHASHSEED=0 batch_smoke full sweep (60 games) has ZERO
+trapped bot errors and ZERO illegal actions; a gate test now replays the
+formerly failing seeds and asserts cleanliness. Balance baseline refreshed
+(headline: 1778 French 30% -> 50% once their 18 crashed turns stopped
+becoming passes). Band comparison made float-tolerant per the audit note.
+
+Remaining from the audit, deliberately not done now: removing set/dict
+iteration-order sensitivity so outcomes are deterministic from the scenario
+seed alone (PYTHONHASHSEED pinning still required); and wiring the
+zero-bot-error sweep into CI beyond the in-suite seed gate.

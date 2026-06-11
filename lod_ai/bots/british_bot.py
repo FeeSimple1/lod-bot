@@ -811,12 +811,19 @@ class BritishBot(BaseBot):
         max_spaces = 1 if state.get("_limited") else 4
 
         # ----- step 1: choose spaces for Regular placement (sorted) --------
+        from lod_ai.commands.muster import _is_legal_regular_dest
         reg_candidates: List[Tuple[tuple, str]] = []
         for sid, sp in state["spaces"].items():
             if sid == WEST_INDIES:
                 continue
             stype = _MAP_DATA.get(sid, {}).get("type", "")
             if stype not in ("City", "Colony"):
+                continue
+            # Planner must agree with the executor: Regulars may only be
+            # placed in a non-Blockaded City, an adjacent Colony, or the
+            # West Indies (3.2.1). Divergence here turned into bot_error
+            # passes (external audit, defect 2).
+            if not _is_legal_regular_dest(state, sid):
                 continue
             sup = self._support_level(state, sid)
             is_neutral_or_passive = sup in (

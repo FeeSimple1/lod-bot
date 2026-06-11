@@ -609,6 +609,24 @@ class FrenchBot(BaseBot):
                 dst_set = set(all_dsts)
                 move_plans = [p for p in move_plans if p["dst"] in dst_set]
                 all_srcs = list(dict.fromkeys(p["src"] for p in move_plans))
+            # Continental escorts cost the PATRIOTS 1 Resource per
+            # destination entered (3.5.4; enforced by march.execute).
+            # Keep escorts only for as many destinations (in priority
+            # order) as the Patriots can pay for; March the French
+            # Regulars escort-less beyond that (external audit, defect 1).
+            pat_res = state["resources"].get(C.PATRIOTS, 0)
+            escort_dsts = list(dict.fromkeys(
+                p["dst"] for p in move_plans
+                if p["pieces"].get(C.REGULAR_PAT, 0) > 0))
+            if len(escort_dsts) > pat_res:
+                allowed = set(escort_dsts[:max(pat_res, 0)])
+                for p in move_plans:
+                    if (p["pieces"].get(C.REGULAR_PAT, 0) > 0
+                            and p["dst"] not in allowed):
+                        p["pieces"].pop(C.REGULAR_PAT, None)
+                move_plans = [p for p in move_plans if p["pieces"]]
+                all_srcs = list(dict.fromkeys(p["src"] for p in move_plans))
+                all_dsts = list(dict.fromkeys(p["dst"] for p in move_plans))
             if not move_plans:
                 pass  # fall through to Step 3
             else:
