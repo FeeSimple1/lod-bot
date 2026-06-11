@@ -310,6 +310,13 @@ class Engine:
             push_history(target_state, f"FREE {op.upper()} by {faction} (planned)")
             normalize_state(target_state)
             return True
+        except ValueError as exc:
+            # Wizard found no legal targets (its normal empty-menu signal):
+            # record a clean skip; nothing to fall back to.
+            push_history(target_state,
+                         f"FREE {op.upper()} by {faction} — skipped "
+                         f"(no legal target: {exc})")
+            return True
         except Exception as exc:
             push_history(target_state,
                          f"FREE {op.upper()} by {faction} — wizard failed "
@@ -582,16 +589,21 @@ class Engine:
         C.INDIANS: ("war_path", "trade", "plunder"),
     }
 
-    def _build_human_bs_plan(self, faction: str) -> bool:
-        """Prompt a human seat to build its Brilliant Stroke plan (two
-        Limited Commands + one Special Activity, any order; Leader in at
-        least one Limited Command). Writes state['bs_plan'][faction].
+    def _execute_human_bs_interactive(self, faction: str) -> bool:
+        """Execute an ordinary Brilliant Stroke for a human seat using the
+        FULL command/SA wizards (card text: "Execute two free Limited
+        Commands and one Special Activity in any order. Leader must be
+        involved in at least one of the Limited Commands.").
 
-        Returns False (BS aborts, card returns to owner) if the faction's
-        Leader is not on the map or the player backs out."""
-        from lod_ai.cli_utils import choose_one
-
-        self._bind_provider_faction(faction)
+        Each step is built by the normal CLI wizard, dry-run in a sandbox,
+        then committed. A whole-sequence checkpoint enforces the Leader
+        requirement: if no executed Limited Command involved the Leader's
+        space, the entire BS is rolled back and the card returns to its
+        owner. Returns True if the BS executed.
+        """
+        from copy import deepcopy
+        from lod_ai import interactive_cli as cli
+        from lod_ai.cli_utils import choose_one, BackException
 
         leader_space = None
         for lid, loc in self.state.get("leaders", {}).items():
@@ -604,59 +616,88 @@ class Engine:
                          f"{faction} BS aborted — no Leader on the map")
             return False
 
-        cmds = [c for c in self._BS_HUMAN_COMMANDS.get(faction, ())
-                if c in self.dispatcher._cmd]
-        sas = [a for a in self._BS_HUMAN_SAS.get(faction, ())
-               if a in self.dispatcher._sa]
-        spaces = sorted(self.state.get("spaces", {}).keys())
-
-        plan: list = []
+        self._bind_provider_faction(faction)
+        checkpoint = deepcopy(self.state)
+        checkpoint_ctx = deepcopy(self.ctx)
         remaining = ["command", "command", "special"]
         leader_used = False
-        while remaining:
-            step_opts = []
-            if "command" in remaining:
-                step_opts.append(("Limited Command", "command"))
-            if "special" in remaining and sas:
-                step_opts.append(("Special Activity", "special"))
-            step_opts.append(("Skip remaining steps", None))
-            kind = choose_one(
-                f"{faction} Brilliant Stroke — choose next step "
-                f"({len(plan)} done):", step_opts)
-            if kind is None:
-                break
-            remaining.remove(kind)
-            if kind == "command":
-                label = choose_one("Limited Command:", [(c, c) for c in cmds])
-                must_lead = (not leader_used
-                             and "command" not in remaining)
-                if must_lead:
-                    space = leader_space
-                    print(f"(Leader must be involved — space locked to "
-                          f"{leader_space}.)")
-                else:
-                    space = choose_one(
-                        "In which space?",
-                        [(f"{sid}{' (Leader)' if sid == leader_space else ''}",
-                          sid) for sid in spaces])
-                if space == leader_space:
-                    leader_used = True
-                plan.append({"type": "command", "label": label,
-                             "kwargs": {"space": space}})
-            else:
-                label = choose_one("Special Activity:", [(a, a) for a in sas])
-                space = choose_one(
-                    "SA space (if applicable):",
-                    [("(none)", None)] + [(sid, sid) for sid in spaces])
-                kwargs = {"space": space} if space else {}
-                plan.append({"type": "special", "label": label,
-                             "kwargs": kwargs})
-        if not any(st["type"] == "command" for st in plan):
+        commands_done = 0
+
+        def _wrapped(runner):
+            def _run(s, c):
+                s["bs_free"] = True
+                try:
+                    return runner(s, c)
+                finally:
+                    s.pop("bs_free", None)
+            return _run
+
+        # bs_free on the live state too, so wizard-time affordability
+        # prefilters (Hortelez, Raid, ...) don't block free BS commands.
+        self.state["bs_free"] = True
+        try:
+            while remaining:
+                opts = []
+                if "command" in remaining:
+                    opts.append((f"Limited Command "
+                                 f"(Leader at {leader_space}"
+                                 f"{'' if leader_used else ' — must be involved in at least one'})",
+                                 "command"))
+                if "special" in remaining:
+                    opts.append(("Special Activity", "special"))
+                opts.append(("Skip remaining steps", None))
+                kind = choose_one(
+                    f"{faction} Brilliant Stroke — choose next step:", opts)
+                if kind is None:
+                    break
+                remaining.remove(kind)
+
+                for _attempt in range(2):
+                    try:
+                        if kind == "command":
+                            runner = cli._command_runner_for(faction, self, True)
+                        else:
+                            runner = cli._special_wizard(self.state, faction)
+                            if runner is None:
+                                break
+                    except (ValueError, BackException):
+                        break
+                    try:
+                        result, _legal, sb_state, sb_ctx = self._simulate_action(
+                            faction, {}, {}, _wrapped(runner))
+                    except Exception as exc:
+                        print(f"(Step failed: {exc}; choose again.)")
+                        continue
+                    if kind == "command":
+                        affected = sb_state.get("_turn_affected_spaces") or set()
+                        if (not leader_used and "command" not in remaining
+                                and leader_space not in affected):
+                            print(f"(The Leader at {leader_space} must be "
+                                  f"involved in at least one Limited Command "
+                                  f"— include that space.)")
+                            continue
+                        if leader_space in affected:
+                            leader_used = True
+                        commands_done += 1
+                    sb_state.pop("bs_free", None)
+                    self._commit_state(sb_state, sb_ctx)
+                    self.state["bs_free"] = True
+                    break
+
+            if commands_done == 0 or not leader_used:
+                self.state.clear()
+                self.state.update(checkpoint)
+                self.ctx = checkpoint_ctx
+                push_history(self.state,
+                             f"{faction} BS aborted — Leader was not involved "
+                             f"in any executed Limited Command")
+                return False
             push_history(self.state,
-                         f"{faction} BS aborted — no Limited Command chosen")
-            return False
-        self.state.setdefault("bs_plan", {})[faction] = plan
-        return True
+                         f"{faction} Brilliant Stroke executed (human plan)")
+            return True
+        finally:
+            self.state.pop("bs_free", None)
+
 
     # ---- Collect human BS declarations -------------------------------
     def _collect_human_bs_declarations(self, first_eligible: str | None) -> list:
@@ -905,11 +946,18 @@ class Engine:
             )
             if not has_plan and winner in self.human_factions \
                     and self._interactive_input():
-                # Ask the human to build the plan (two LimComs + SA).
-                has_plan = self._build_human_bs_plan(winner)
-                if not has_plan:
+                # Human seat plans and executes via the full command wizards.
+                if not self._execute_human_bs_interactive(winner):
                     bs.mark_bs_played(self.state, current["key"], False)
                     return False
+                # Executed interactively; skip the plan/bot paths below.
+                self.state["eligible"] = {fac: True for fac in (C.BRITISH, C.PATRIOTS, C.FRENCH, C.INDIANS)}
+                self.state.pop("eligible_next", None)
+                self.state.pop("ineligible_next", None)
+                self.state.pop("remain_eligible", None)
+                self.state.pop("ineligible_through_next", None)
+                push_history(self.state, "Brilliant Stroke resolved — all factions Eligible")
+                return True
             if has_plan:
                 # Use the pre-set plan (human player or test fixture)
                 try:

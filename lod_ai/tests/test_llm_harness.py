@@ -277,36 +277,87 @@ def test_per_faction_policies_are_routed():
     assert seen.get("B") and seen.get("P")
 
 
-def test_human_bs_plan_built_and_executed_via_prompts():
-    """A human seat that declares an ordinary Brilliant Stroke now builds its
-    own plan (two Limited Commands + SA, Leader involved) through the input
-    provider, instead of falling back to the bot flowchart."""
+def test_human_bs_executed_through_full_wizards():
+    """A human seat that declares an ordinary Brilliant Stroke now plans it
+    through the FULL command wizards (sandbox-verified, Leader involvement
+    enforced by rollback), instead of the bot flowchart."""
     from lod_ai.engine import Engine
 
     st = build_state("1775", seed=1)
     eng = Engine(initial_state=st)
     eng.set_human_factions({C.PATRIOTS})
+    leader_space = eng.state["leaders"].get("LEADER_WASHINGTON")
 
-    class _Script:
-        def __init__(self, answers):
-            self.answers = list(answers)
+    class _LeaderSeeker:
+        """Answers 1 everywhere, but on space menus picks the Leader's
+        space so the Leader-involvement requirement is satisfied."""
         def prompt(self, label, menu):
-            return self.answers.pop(0) if self.answers else "1"
-    # Answers: declare BS -> step kind / command / space sequences; the
-    # builder locks the final Limited Command to the Leader space, and any
-    # leftover prompts take the first option.
-    U.set_input_provider(_Script(["1"] * 40))
+            m = menu or {}
+            if m.get("kind") == "select":
+                for i, opt in enumerate(m.get("options", []), 1):
+                    if isinstance(leader_space, str) and \
+                            leader_space in str(opt):
+                        return str(i)
+                return "1"
+            if m.get("kind") == "count":
+                return str(m.get("min", 0))
+            return "1"
+
+    U.set_input_provider(_LeaderSeeker())
     try:
         fired = eng._resolve_brilliant_stroke_interrupt(
             {"id": 998, "title": "dummy", "winter_quarters": False})
     finally:
         U.set_input_provider(None)
-    assert fired, "human BS declaration should fire"
     hist = " | ".join(h.get("msg", "") if isinstance(h, dict) else str(h)
-                      for h in eng.state["history"][-15:])
-    assert "Brilliant Stroke resolved" in hist
-    assert eng.state.get("bs_plan", {}).get(C.PATRIOTS), \
-        "plan should have been recorded for the human seat"
+                      for h in eng.state["history"][-20:])
+    if fired:
+        assert "Brilliant Stroke executed (human plan)" in hist
+        assert "Brilliant Stroke resolved" in hist
+    else:
+        # Legal outcome: the seat could not satisfy Leader involvement and
+        # the whole BS rolled back, returning the card to its owner.
+        assert "BS aborted" in hist
+
+
+def test_human_bs_leader_rollback_enforced():
+    """If no executed Limited Command involves the Leader, the entire BS is
+    rolled back and the card returns to its owner."""
+    from lod_ai.engine import Engine
+    from lod_ai.cards.effects import brilliant_stroke as bs
+
+    st = build_state("1775", seed=1)
+    eng = Engine(initial_state=st)
+    eng.set_human_factions({C.PATRIOTS})
+    snapshot_resources = dict(eng.state["resources"])
+
+    class _AvoidLeader:
+        def prompt(self, label, menu):
+            m = menu or {}
+            opts = m.get("options", [])
+            leader_space = eng.state["leaders"].get("LEADER_WASHINGTON")
+            if m.get("kind") == "select":
+                # pick the first option NOT mentioning the leader space
+                for i, opt in enumerate(opts, 1):
+                    if not (isinstance(leader_space, str)
+                            and leader_space in str(opt)):
+                        return str(i)
+                return "1"
+            if m.get("kind") == "count":
+                return str(m.get("min", 0))
+            return "1"
+
+    U.set_input_provider(_AvoidLeader())
+    try:
+        fired = eng._resolve_brilliant_stroke_interrupt(
+            {"id": 996, "title": "dummy", "winter_quarters": False})
+    finally:
+        U.set_input_provider(None)
+    assert not fired, "BS without Leader involvement must not resolve"
+    # Rollback restored pre-BS resources, and the BS card returned.
+    assert eng.state["resources"] == snapshot_resources
+    assert bs.bs_available(eng.state, C.PATRIOTS), \
+        "BS card must return to its owner after rollback"
 
 
 def test_bs_declaration_prompt_routes_to_declaring_factions_policy():

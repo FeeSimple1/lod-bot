@@ -307,6 +307,19 @@ class HeuristicPolicy(Policy):
         options = menu.get("options", [])
         valid = _valid_choices(menu)
 
+        # Brilliant Stroke declaration: declare the Treaty of Alliance
+        # whenever it is offered (it is the French win condition's gate and
+        # cannot be trumped); decline ordinary Brilliant Strokes -- the
+        # profiles have no BS plan logic, and failed plans roll back anyway.
+        if "declare a Brilliant Stroke" in prompt:
+            for i, opt in enumerate(options, 1):
+                if "Treaty of Alliance" in opt:
+                    return str(i)
+            for i, opt in enumerate(options, 1):
+                if "No declaration" in opt:
+                    return str(i)
+            return valid[0]
+
         # Top-level turn menu: reset per-turn pick counters.  Seeing it again
         # within the same turn means our last plan was rejected -- degrade
         # gracefully instead of replaying the identical failing answers.

@@ -659,6 +659,12 @@ def _scout_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
 
 def _raid_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
     state = engine.state
+    # §3.4.4: pay one Resource per Province -- gate and cap on affordability
+    # (free actions, e.g. during a Brilliant Stroke, bypass via bs_free).
+    _res = state.get("resources", {}).get(faction, 0)
+    if _res < 1 and not state.get("bs_free"):
+        _log_empty_menu(state, faction, "Raid")
+        raise ValueError("Raid requires at least 1 Resource (1 per Province).")
     support_ok = {RC.ACTIVE_OPPOSITION, RC.PASSIVE_OPPOSITION}
     remaining_underground = {
         sid: sp.get(RC.WARPARTY_U, 0)
@@ -702,11 +708,14 @@ def _raid_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict,
         _log_empty_menu(state, faction, "Raid")
         raise ValueError("No legal Provinces for Raid.")
 
+    _cap = 1 if limited else 3
+    if not state.get("bs_free"):
+        _cap = min(_cap, _res)
     selected = choose_multiple(
         "Select Raid Provinces:",
         valid_options,
         min_sel=1,
-        max_sel=1 if limited else 3,
+        max_sel=_cap,
     )
 
     move_plan: List[tuple[str, str]] = []

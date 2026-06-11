@@ -302,3 +302,25 @@ a competitive finish (British 4, Patriots 3). Its three findings, addressed:
    normal command wizards (single space + label per step; no multi-space
    plans, escorts, or sub-options). Acceptable for now; revisit if BS play
    quality matters to an experiment.
+
+
+---
+
+## Round-3 external playtest (cleanest run yet)
+
+Third ChatGPT run: 1,007 decisions, 0 rejections, 0 illegal actions, ToA
+declared and resolved naturally on card 34 INCLUDING the free French Muster
+through the wizard (validating both round-2 fixes end-to-end), Britain wins
+8-8 on the 7.3 tie-break. Its three notes, addressed:
+
+1. FIXED - human free ops whose wizard finds no legal target now log one
+   clean "skipped (no legal target)" line instead of wizard-failed +
+   fallback noise.
+2. FIXED - Raid wizard gates on affordability (3.4.4: 1 Resource/Province;
+   selection capped by Resources; bs_free bypasses for free actions).
+3. FIXED (the structural one) - ordinary human Brilliant Strokes now plan
+   through the FULL command/SA wizards: each step is sandbox-simulated then
+   committed, with a whole-sequence rollback enforcing "Leader must be
+   involved in at least one Limited Command" (card returns to owner on
+   violation). HeuristicPolicy defaults: declare ToA when offered, decline
+   ordinary BS.
