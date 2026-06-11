@@ -250,3 +250,26 @@ Tests should be grounded in the Reference Documents — verify that the code pro
 - Game state display is clear and complete after each action
 - Illegal moves are rejected with helpful messages
 - No free-text input required for game actions — everything is menu-driven
+
+---
+
+## From the external four-human-seat playtest (ChatGPT report, June 2026)
+
+Fixed in commit (see test_llm_harness.py regressions): human Brilliant Stroke
+declaration prompts (ToA can now enter play in all-human games), side-aware
+Battle candidates (no more British "battles" against allied Indian Villages),
+Garrison destination filtering (§3.2.2 non-Blockaded Cities only), Tory-only
+British Muster (§3.2.1 "up to six" includes zero), Préparer la Guerre REGULARS
+rejected when no French Regulars are Unavailable, Hortelez gated on having a
+Resource, and per-faction `policies={...}` routing in `run_game`.
+
+Remaining smaller prefilter items from the report (menus that can still offer
+predictably illegal choices; all recoverable via wizard retry, none can hang):
+
+- Indian Scout offered without a mandatory British Regular available to move.
+- Gather sub-selections can become impossible after earlier selections consume
+  the relevant pieces; recalculate remaining legal options between picks.
+- Raid can be offered when no legal Province remains.
+- Human Brilliant Stroke EXECUTION still resolves via the bot §8.3.7 routine
+  (LimCom+SA+LimCom from the flowchart); a human plan hook for choosing the
+  Limited Commands/SA remains to be designed.

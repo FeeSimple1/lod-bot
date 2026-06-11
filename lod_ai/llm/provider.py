@@ -16,8 +16,9 @@ class LLMInputProvider:
     """
 
     def __init__(self, policy, engine, llm_factions, *, verbose: bool = False,
-                 max_retries: int = 12):
+                 max_retries: int = 12, policies: Optional[dict] = None):
         self.policy = policy
+        self.policies = {k.upper(): v for k, v in (policies or {}).items()}
         self.engine = engine
         self.llm_factions = set(llm_factions)
         self.verbose = verbose
@@ -26,6 +27,12 @@ class LLMInputProvider:
         self._last_sig = None
         self._repeat = 0
         self.decisions = 0
+
+    def policy_for(self, faction: Optional[str]):
+        """Per-faction policy when a mapping was provided, else the shared one."""
+        if faction and self.policies:
+            return self.policies.get(faction.upper(), self.policy)
+        return self.policy
 
     def begin_turn(self, faction: str, card: dict, allowed: dict) -> None:
         self.current_faction = faction
@@ -49,8 +56,9 @@ class LLMInputProvider:
             return choices[0] if choices else ""
 
         obs = serialize_state(self.engine.state, self.current_faction)
+        pol = self.policy_for(self.current_faction)
         try:
-            ans = self.policy.choose(obs, label, menu, self.current_faction)
+            ans = pol.choose(obs, label, menu, self.current_faction)
         except Exception as exc:  # pragma: no cover
             if self.verbose:
                 print(f"[LLMInputProvider] policy error: {exc}")

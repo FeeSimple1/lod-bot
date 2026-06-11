@@ -505,6 +505,53 @@ class Engine:
             return bs.toa_available(self.state) and bs.preparations_total(self.state) > 15
         return bs.bs_available(self.state, fac)
 
+    # ---- Collect human BS declarations -------------------------------
+    def _collect_human_bs_declarations(self, first_eligible: str | None) -> list:
+        """Ask each human-controlled faction holding a legal Brilliant
+        Stroke whether it declares, before the 1st Eligible acts (§2.3.8).
+
+        Prompts run through cli_utils' pluggable input provider, so the
+        same hook serves the interactive CLI and the LLM harness. ToA is
+        offered to a human French seat when legal (and preferred over the
+        ordinary French BS, which it would trump anyway).
+        """
+        import sys
+        from lod_ai.cli_utils import choose_one, get_input_provider, \
+            StdinInputProvider
+
+        # Only prompt when a human can actually answer: a custom input
+        # provider is installed (harness/LLM), or stdin is interactive.
+        # Headless callers with human seats and no provider are treated as
+        # "no declaration" instead of hanging on input().
+        provider = get_input_provider()
+        interactive = not isinstance(provider, StdinInputProvider) or (
+            hasattr(sys.stdin, "isatty") and sys.stdin.isatty())
+        if not interactive:
+            return []
+
+        decls: list = []
+        for fac in (C.BRITISH, C.PATRIOTS, C.INDIANS, C.FRENCH):
+            if fac not in self.human_factions:
+                continue
+            options = []
+            if fac == C.FRENCH:
+                toa_info = self._bs_decl_info(bs.TOA_KEY)
+                if toa_info and self._bs_is_legal(toa_info):
+                    options.append(("Declare Treaty of Alliance", bs.TOA_KEY))
+            info = self._bs_decl_info(fac)
+            if info and self._bs_is_legal(info):
+                options.append((f"Declare Brilliant Stroke", fac))
+            if not options:
+                continue
+            choice = choose_one(
+                f"\n{fac}: declare a Brilliant Stroke before the 1st "
+                f"Eligible acts?",
+                options + [("No declaration", None)],
+            )
+            if choice is not None:
+                decls.append(choice)
+        return decls
+
     # ---- Collect bot BS declarations (§8.3.7) ------------------------
     def _collect_bot_bs_declarations(self, first_eligible: str | None) -> list:
         """Evaluate every bot faction's trigger conditions and return a list
@@ -662,9 +709,11 @@ class Engine:
         # ---- 1. Collect declarations -----------------------------------
         # Manual declarations (from human UI or tests)
         manual_decls = self.state.pop("bs_declarations", []) or []
+        # Ask human seats (interactive CLI / harness input provider)
+        human_decls = self._collect_human_bs_declarations(first_eligible)
         # Auto-check bot conditions
         bot_decls = self._collect_bot_bs_declarations(first_eligible)
-        all_decls = list(manual_decls) + bot_decls
+        all_decls = list(manual_decls) + human_decls + bot_decls
 
         if not all_decls:
             return False

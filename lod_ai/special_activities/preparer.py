@@ -84,6 +84,8 @@ def execute(
 
     elif choice == "REGULARS":
         # Move 3 Regulars from Unavailable → Available
+        if state.get("unavailable", {}).get(REGULAR_FRE, 0) <= 0:
+            raise ValueError("No French Regulars in Unavailable to move.")
         remove_piece(state, REGULAR_FRE, "unavailable", 3)
 
     else:  # RESOURCES

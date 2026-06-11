@@ -179,12 +179,26 @@ def _friendly_tags(faction: str) -> set[str]:
     }.get(faction, set())
 
 
+_CROWN_TAGS = {RC.REGULAR_BRI, RC.TORY, RC.FORT_BRI,
+               RC.WARPARTY_A, RC.WARPARTY_U, RC.VILLAGE}
+_REBEL_TAGS = {RC.REGULAR_PAT, RC.MILITIA_A, RC.MILITIA_U,
+               RC.FORT_PAT, RC.REGULAR_FRE}
+
+
+def _enemy_tags(faction: str) -> set[str]:
+    """Side-aware enemy piece tags: Crown factions (British, Indians)
+    fight Rebellion pieces and vice versa -- an allied Indian Village must
+    not make a space look like a British Battle target."""
+    return _REBEL_TAGS if faction in (RC.BRITISH, RC.INDIANS) else _CROWN_TAGS
+
+
 def _battle_candidates(state: Dict[str, Any], faction: str) -> List[str]:
     friendly = _friendly_tags(faction)
+    enemy = _enemy_tags(faction)
     candidates = []
     for sid, sp in state.get("spaces", {}).items():
         friendly_count = sum(v for k, v in sp.items() if k in friendly)
-        enemy_count = sum(v for k, v in sp.items() if k not in friendly and isinstance(v, int) and v > 0)
+        enemy_count = sum(v for k, v in sp.items() if k in enemy)
         if friendly_count > 0 and enemy_count > 0:
             candidates.append(sid)
     return sorted(candidates)
@@ -722,8 +736,17 @@ def _garrison_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[d
     max_moves = 1 if limited else 3
     num_moves = choose_count("Number of Garrison moves:", min_val=1, max_val=max_moves)
     for idx in range(num_moves):
-        src = choose_one_or_back(f"Garrison move {idx+1} - Source City:", src_options)
-        dst = choose_one_or_back(f"Garrison move {idx+1} - Destination City:", _space_options(engine.state))
+        src = choose_one_or_back(f"Garrison move {idx+1} - Source space:", src_options)
+        # §3.2.2: destinations are Cities that are not Blockaded.
+        blockaded = engine.state.get("markers", {}).get(RC.BLOCKADE, {})
+        blockaded_on = blockaded.get("on_map", set()) if isinstance(blockaded, dict) else set()
+        dst_options = _space_options(
+            engine.state,
+            lambda sid, _sp: map_adj.space_type(sid) == "City"
+            and sid not in blockaded_on)
+        if not dst_options:
+            raise ValueError("No un-Blockaded destination City for Garrison.")
+        dst = choose_one_or_back(f"Garrison move {idx+1} - Destination City:", dst_options)
         max_reg = engine.state["spaces"][src].get(RC.REGULAR_BRI, 0)
         qty = choose_count(f"Regulars to move from {src} to {dst}:", min_val=1, max_val=max_reg)
         moves.setdefault(src, {})[dst] = qty
@@ -775,8 +798,11 @@ def _agent_mobilization_wizard(engine: Engine, faction: str, limited: bool) -> C
 
 
 def _hortelez_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
-    max_pay = max(1, engine.state["resources"].get(faction, 0))
-    pay = choose_count("Resources to pay (>=1):", min_val=1, max_val=max_pay)
+    available = engine.state["resources"].get(faction, 0)
+    if available < 1:
+        _log_empty_menu(engine.state, faction, "Hortelez")
+        raise ValueError("Hortelez requires at least 1 Resource to pay.")
+    pay = choose_count("Resources to pay (>=1):", min_val=1, max_val=available)
     return lambda s, c: hortelez.execute(s, faction, c, pay)
 
 

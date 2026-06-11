@@ -50,6 +50,7 @@ def run_game(
     deck_method: str = "standard",
     llm_factions: Iterable[str] = ("PATRIOTS",),
     policy=None,
+    policies: Optional[dict] = None,
     max_cards: Optional[int] = None,
     verbose: bool = False,
     quiet: bool = True,
@@ -68,6 +69,7 @@ def run_game(
     from .policy import RandomPolicy
 
     policy = policy or RandomPolicy()
+    policies = {k.upper(): v for k, v in (policies or {}).items()}
     llm_factions = set(f.upper() for f in llm_factions)
 
     state = build_state(scenario, seed=seed, setup_method=deck_method)
@@ -80,7 +82,8 @@ def run_game(
     engine.set_human_factions(llm_factions)
     set_game_state(engine.state, engine=engine)
 
-    provider = LLMInputProvider(policy, engine, llm_factions, verbose=verbose)
+    provider = LLMInputProvider(policy, engine, llm_factions, verbose=verbose,
+                                policies=policies)
     set_input_provider(provider)
 
     # Let the LLM also choose §3.6.3 Underground activation when DEFENDING during
@@ -96,7 +99,8 @@ def run_game(
         }
         try:
             obs = serialize_state(st, owner)
-            return int(policy.choose(obs, "Activate count:", menu, owner) or 0)
+            pol = policies.get(owner.upper(), policy) if policies else policy
+            return int(pol.choose(obs, "Activate count:", menu, owner) or 0)
         except Exception:
             return 0
 

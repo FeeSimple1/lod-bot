@@ -241,20 +241,22 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
         # Pay cost (1 Resource per selected space)
         _brit_cost(state, len(selected))
 
-        # 1) Regular placement (in exactly ONE City/Colony/WI)
-        if not regular_plan:
-            raise ValueError("regular_plan required for British Muster.")
-        dest = regular_plan["space"]
-        if dest not in selected:
-            raise ValueError("Regular placement space must be among selected.")
-        if not _is_legal_regular_dest(state, dest):
-            raise ValueError(
-                f"British Regulars cannot be placed in {dest}: must be a "
-                "non-Blockaded City, an adjacent Colony, or the West Indies."
-            )
-        n_reg = min(regular_plan.get("n", 0), 6)
-        n_reg = _draw_from_pool(state, REGULAR_BRI, n_reg)
-        add_piece(state, REGULAR_BRI, dest, n_reg)
+        # 1) Regular placement (in exactly ONE City/Colony/WI).
+        # §3.2.1: "place UP TO six Regulars" -- zero is legal, so a
+        # Tory-only Muster (regular_plan=None, e.g. when no Regulars are
+        # Available) proceeds straight to the Tory step.
+        if regular_plan:
+            dest = regular_plan["space"]
+            if dest not in selected:
+                raise ValueError("Regular placement space must be among selected.")
+            if not _is_legal_regular_dest(state, dest):
+                raise ValueError(
+                    f"British Regulars cannot be placed in {dest}: must be a "
+                    "non-Blockaded City, an adjacent Colony, or the West Indies."
+                )
+            n_reg = min(regular_plan.get("n", 0), 6)
+            n_reg = _draw_from_pool(state, REGULAR_BRI, n_reg)
+            add_piece(state, REGULAR_BRI, dest, n_reg)
 
         # 2) Tory placement – loop over tory_plan dict
         if tory_plan:

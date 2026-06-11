@@ -174,3 +174,104 @@ def test_heuristic_parse_board_roundtrip():
     assert board, "parser should find occupied spaces"
     sample = next(iter(board.values()))
     assert {"support", "control", "pieces", "rebel", "crown"} <= set(sample)
+
+
+# --------------------------------------------------------------------------- #
+# Fixes from the four-human-seat external playtest report
+# --------------------------------------------------------------------------- #
+def test_human_french_can_declare_treaty_of_alliance():
+    """An all-human game must be able to bring ToA into play: the engine now
+    prompts human seats for Brilliant Stroke declarations (via the input
+    provider) before the 1st Eligible acts."""
+    from lod_ai.engine import Engine
+    from lod_ai.cards.effects import brilliant_stroke as bs
+
+    st = build_state("1775", seed=1)
+    # Make ToA legal: Preparations > 15 (Available French Regulars + naval
+    # + CBC) and eligibility.
+    st["available"][C.REGULAR_FRE] = 14
+    st["cbc"] = 5
+    eng = Engine(initial_state=st)
+    eng.set_human_factions({C.FRENCH})
+    assert bs.preparations_total(eng.state) > 15
+
+    class _DeclareFirst:
+        def prompt(self, label, menu):
+            return "1"          # first option = Declare Treaty of Alliance
+    U.set_input_provider(_DeclareFirst())
+    try:
+        fired = eng._resolve_brilliant_stroke_interrupt(
+            {"id": 999, "title": "dummy", "winter_quarters": False})
+    finally:
+        U.set_input_provider(None)
+    assert fired, "ToA declaration should fire the BS interrupt"
+    assert eng.state.get("toa_played"), "Treaty of Alliance must be in play"
+
+
+def test_battle_candidates_are_side_aware():
+    """An allied Indian Village must not make a space a British Battle
+    target (previously caused committed 0-0 battles)."""
+    from lod_ai.interactive_cli import _battle_candidates
+
+    st = build_state("1775", seed=1)
+    for sp in st["spaces"].values():        # clear the board
+        for k in list(sp):
+            if isinstance(sp[k], int):
+                sp[k] = 0
+    st["spaces"]["Quebec"][C.REGULAR_BRI] = 2
+    st["spaces"]["Quebec"][C.VILLAGE] = 1   # allied Crown piece only
+    assert "Quebec" not in _battle_candidates(st, C.BRITISH)
+    st["spaces"]["Quebec"][C.MILITIA_U] = 1  # now a real Rebel target
+    assert "Quebec" in _battle_candidates(st, C.BRITISH)
+    # And the mirror: Patriots don't see French Regulars as targets.
+    st["spaces"]["Boston"][C.MILITIA_U] = 1
+    st["spaces"]["Boston"][C.REGULAR_FRE] = 2
+    assert "Boston" not in _battle_candidates(st, C.PATRIOTS)
+
+
+def test_tory_only_muster_is_legal():
+    """§3.2.1 'place up to six Regulars' includes zero: British Muster with
+    regular_plan=None (no Regulars Available) must execute the Tory step."""
+    from lod_ai.commands import muster
+
+    st = build_state("1775", seed=1)
+    st["resources"][C.BRITISH] = 5
+    sid = "New_York_City"
+    st["spaces"].setdefault(sid, {})[C.REGULAR_BRI] = \
+        st["spaces"][sid].get(C.REGULAR_BRI, 0) + 1
+    before = st["spaces"][sid].get(C.TORY, 0)
+    muster.execute(st, C.BRITISH, {}, [sid], regular_plan=None,
+                   tory_plan={sid: 1})
+    assert st["spaces"][sid].get(C.TORY, 0) == before + 1
+
+
+def test_preparer_regulars_rejected_when_pool_empty():
+    from lod_ai.special_activities import preparer
+    import pytest as _pytest
+
+    st = build_state("1775", seed=1)
+    st["unavailable"][C.REGULAR_FRE] = 0
+    with _pytest.raises(ValueError):
+        preparer.execute(st, C.FRENCH, {}, choice="REGULARS")
+
+
+def test_per_faction_policies_are_routed():
+    """run_game(policies={...}) must dispatch each faction's prompts to its
+    own policy object."""
+    seen = {}
+
+    class _Tagged(RandomPolicy):
+        def __init__(self, tag):
+            super().__init__(seed=1)
+            self.tag = tag
+        def choose(self, obs, label, menu, faction):
+            seen.setdefault(self.tag, set()).add(faction)
+            return super().choose(obs, label, menu, faction)
+
+    run_game("1778", seed=1,
+             llm_factions=["BRITISH", "PATRIOTS"],
+             policies={"BRITISH": _Tagged("B"), "PATRIOTS": _Tagged("P")},
+             max_cards=6)
+    assert seen.get("B", set()) <= {C.BRITISH}
+    assert seen.get("P", set()) <= {C.PATRIOTS}
+    assert seen.get("B") and seen.get("P")
