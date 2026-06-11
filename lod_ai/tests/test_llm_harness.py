@@ -275,3 +275,35 @@ def test_per_faction_policies_are_routed():
     assert seen.get("B", set()) <= {C.BRITISH}
     assert seen.get("P", set()) <= {C.PATRIOTS}
     assert seen.get("B") and seen.get("P")
+
+
+def test_human_bs_plan_built_and_executed_via_prompts():
+    """A human seat that declares an ordinary Brilliant Stroke now builds its
+    own plan (two Limited Commands + SA, Leader involved) through the input
+    provider, instead of falling back to the bot flowchart."""
+    from lod_ai.engine import Engine
+
+    st = build_state("1775", seed=1)
+    eng = Engine(initial_state=st)
+    eng.set_human_factions({C.PATRIOTS})
+
+    class _Script:
+        def __init__(self, answers):
+            self.answers = list(answers)
+        def prompt(self, label, menu):
+            return self.answers.pop(0) if self.answers else "1"
+    # Answers: declare BS -> step kind / command / space sequences; the
+    # builder locks the final Limited Command to the Leader space, and any
+    # leftover prompts take the first option.
+    U.set_input_provider(_Script(["1"] * 40))
+    try:
+        fired = eng._resolve_brilliant_stroke_interrupt(
+            {"id": 998, "title": "dummy", "winter_quarters": False})
+    finally:
+        U.set_input_provider(None)
+    assert fired, "human BS declaration should fire"
+    hist = " | ".join(h.get("msg", "") if isinstance(h, dict) else str(h)
+                      for h in eng.state["history"][-15:])
+    assert "Brilliant Stroke resolved" in hist
+    assert eng.state.get("bs_plan", {}).get(C.PATRIOTS), \
+        "plan should have been recorded for the human seat"

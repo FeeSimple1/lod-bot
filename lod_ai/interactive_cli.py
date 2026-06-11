@@ -458,7 +458,8 @@ def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
     remaining_available_wp = avail_wp
     remaining_available_villages = avail_villages
 
-    for prov in selected:
+    skipped: List[str] = []
+    for prov in list(selected):
         sp = state["spaces"][prov]
         base_total = sp.get(RC.VILLAGE, 0) + sp.get(RC.FORT_BRI, 0) + sp.get(RC.FORT_PAT, 0)
         wp_total = sp.get(RC.WARPARTY_U, 0) + sp.get(RC.WARPARTY_A, 0)
@@ -479,7 +480,11 @@ def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
             choices.append(("Move War Parties in", ("move_plan", adj_sources)))
 
         if not choices:
-            raise ValueError(f"No legal Gather actions remain for {prov}.")
+            # Earlier selections consumed the relevant pieces; drop this
+            # Province from the Command (it is not paid for) and continue.
+            print(f"(No legal Gather actions remain for {prov}; skipping it.)")
+            skipped.append(prov)
+            continue
 
         choice = choose_one_or_back(f"Choose Gather action for {prov}:", choices)
 
@@ -519,11 +524,15 @@ def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
         else:
             raise ValueError("Unknown Gather choice.")
 
+    final_selected = [p_ for p_ in selected if p_ not in skipped]
+    if not final_selected:
+        raise ValueError("All selected Gather Provinces became illegal.")
+
     return lambda s, c: gather.execute(
         s,
         faction,
         c,
-        selected,
+        final_selected,
         place_one=place_one or None,
         build_village=build_village or None,
         bulk_place=bulk_place or None,
@@ -612,19 +621,28 @@ def _muster_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
 
 
 def _scout_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
-    options = _space_options(engine.state, lambda sid, sp: sp.get(RC.WARPARTY_U, 0) + sp.get(RC.WARPARTY_A, 0) > 0)
+    # §3.4.3: at least one British Regular MUST move with the War Parties,
+    # so a Scout source needs both; the destination is an adjacent Province
+    # (not City), and Tories move only up to the number of Regulars.
+    options = _space_options(
+        engine.state,
+        lambda sid, sp: (sp.get(RC.WARPARTY_U, 0) + sp.get(RC.WARPARTY_A, 0) > 0
+                         and sp.get(RC.REGULAR_BRI, 0) > 0))
     if not options:
         _log_empty_menu(engine.state, faction, "Scout")
-        raise ValueError("No War Parties available for Scout.")
+        raise ValueError("Scout needs a Province with War Parties AND a British Regular (3.4.3).")
     src = choose_one_or_back("Select Scout source:", options)
-    dest_options = _space_options(engine.state, lambda sid, _sp: map_adj.is_adjacent(src, sid))
+    dest_options = _space_options(
+        engine.state,
+        lambda sid, _sp: map_adj.is_adjacent(src, sid)
+        and map_adj.space_type(sid) != "City")
     if not dest_options:
-        raise ValueError("No adjacent destinations for Scout.")
+        raise ValueError("No adjacent Province destinations for Scout.")
     dst = choose_one_or_back("Select Scout destination:", dest_options)
     wp_avail = engine.state["spaces"][src].get(RC.WARPARTY_U, 0) + engine.state["spaces"][src].get(RC.WARPARTY_A, 0)
     n_wp = choose_count("War Parties to move:", min_val=1, max_val=wp_avail)
-    n_reg = choose_count("British Regulars to move:", min_val=0, max_val=engine.state["spaces"][src].get(RC.REGULAR_BRI, 0))
-    n_tory = choose_count("Tories to move:", min_val=0, max_val=engine.state["spaces"][src].get(RC.TORY, 0))
+    n_reg = choose_count("British Regulars to move:", min_val=1, max_val=engine.state["spaces"][src].get(RC.REGULAR_BRI, 0))
+    n_tory = choose_count("Tories to move:", min_val=0, max_val=min(n_reg, engine.state["spaces"][src].get(RC.TORY, 0)))
     use_skirmish = choose_one("Skirmish after Scout?", [("No", False), ("Yes", True)])
     return lambda s, c: scout.execute(
         s,

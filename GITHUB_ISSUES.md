@@ -263,13 +263,22 @@ British Muster (§3.2.1 "up to six" includes zero), Préparer la Guerre REGULARS
 rejected when no French Regulars are Unavailable, Hortelez gated on having a
 Resource, and per-faction `policies={...}` routing in `run_game`.
 
-Remaining smaller prefilter items from the report (menus that can still offer
-predictably illegal choices; all recoverable via wizard retry, none can hang):
+Follow-up commit closed the remaining items: Scout prefilter now enforces
+3.4.3 (source needs WPs AND a Regular; >=1 Regular must move; Tories <=
+Regulars; destination is an adjacent Province, not a City); Gather skips
+(and does not charge for) a selected Province whose actions were consumed
+by earlier picks instead of restarting the turn; human Brilliant Stroke
+EXECUTION is now player-driven (two Limited Commands + one SA in any order,
+Leader-involvement enforced by locking the last Limited Command to the
+Leader's space) via state['bs_plan'] and the existing plan executor. The
+exercise also flushed out three latent dispatcher SA wrappers (partisans,
+common_cause, trade) that crashed on first real use.
 
-- Indian Scout offered without a mandatory British Regular available to move.
-- Gather sub-selections can become impossible after earlier selections consume
-  the relevant pieces; recalculate remaining legal options between picks.
-- Raid can be offered when no legal Province remains.
-- Human Brilliant Stroke EXECUTION still resolves via the bot §8.3.7 routine
-  (LimCom+SA+LimCom from the flowchart); a human plan hook for choosing the
-  Limited Commands/SA remains to be designed.
+Remaining (logged, not blocking):
+
+- Raid command can still be offered at the top menu when the wizard will
+  find no legal Province (it raises cleanly; recoverable).
+- F-PREP profile play-quality: the French heuristic seat takes too few
+  actions (~7 meaningful in 62 cards) to bank Preparations > 15, so ToA
+  rarely fires in heuristic-vs-heuristic games even though the human
+  declaration/execution path is proven by tests. Tuning lead, not plumbing.

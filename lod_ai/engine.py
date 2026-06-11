@@ -95,19 +95,24 @@ class Engine:
         self.dispatcher.register_sa(
             "partisans",
             lambda faction, space_id=None, **k: partisans.execute(
-                self.state, faction, self.ctx, space_id=space_id, free=True
+                self.state, faction, self.ctx, space_id,
+                option=k.get("option", 1)
             )
         )
         self.dispatcher.register_sa(
             "common_cause",
             lambda faction, space_id=None, **k: common_cause.execute(
-                self.state, faction, self.ctx, space_id=space_id, free=True
+                self.state, faction, self.ctx,
+                k.get("spaces") or ([space_id] if space_id else []),
+                mode=k.get("mode", "MARCH"),
+                destinations=k.get("destinations")
             )
         )
         self.dispatcher.register_sa(
             "trade",
             lambda faction, space_id=None, **k: trade.execute(
-                self.state, faction, self.ctx, space_id=space_id, **k
+                self.state, faction, self.ctx, space_id=space_id,
+                **{kk: vv for kk, vv in k.items() if kk != "free"}
             )
         )
 
@@ -505,6 +510,108 @@ class Engine:
             return bs.toa_available(self.state) and bs.preparations_total(self.state) > 15
         return bs.bs_available(self.state, fac)
 
+    @staticmethod
+    def _interactive_input() -> bool:
+        """True when a human can actually answer prompts: a custom input
+        provider is installed (harness/LLM), or stdin is interactive.
+        Headless callers are never blocked on input()."""
+        import sys
+        from lod_ai.cli_utils import get_input_provider, StdinInputProvider
+        provider = get_input_provider()
+        return not isinstance(provider, StdinInputProvider) or (
+            hasattr(sys.stdin, "isatty") and sys.stdin.isatty())
+
+    # ---- Human BS plan builder (§2.3.8 card text) ---------------------
+    # "Execute two free Limited Commands and one Special Activity in any
+    #  order. Leader must be involved in at least one of the Limited
+    #  Commands."
+    _BS_HUMAN_COMMANDS = {
+        C.BRITISH: ("muster", "march", "battle"),
+        C.PATRIOTS: ("rally", "march", "battle", "raid"),
+        C.FRENCH: ("march", "battle", "muster", "rally"),
+        C.INDIANS: ("gather", "march", "raid", "scout", "battle"),
+    }
+    _BS_HUMAN_SAS = {
+        C.BRITISH: ("common_cause", "skirmish"),
+        C.PATRIOTS: ("partisans", "persuasion"),
+        C.FRENCH: ("naval_pressure", "skirmish", "preparer"),
+        C.INDIANS: ("war_path", "trade", "plunder"),
+    }
+
+    def _build_human_bs_plan(self, faction: str) -> bool:
+        """Prompt a human seat to build its Brilliant Stroke plan (two
+        Limited Commands + one Special Activity, any order; Leader in at
+        least one Limited Command). Writes state['bs_plan'][faction].
+
+        Returns False (BS aborts, card returns to owner) if the faction's
+        Leader is not on the map or the player backs out."""
+        from lod_ai.cli_utils import choose_one
+
+        leader_space = None
+        for lid, loc in self.state.get("leaders", {}).items():
+            if lid in bs.FACTION_LEADERS.get(faction, set()) and \
+                    isinstance(loc, str):
+                leader_space = loc
+                break
+        if leader_space is None:
+            push_history(self.state,
+                         f"{faction} BS aborted — no Leader on the map")
+            return False
+
+        cmds = [c for c in self._BS_HUMAN_COMMANDS.get(faction, ())
+                if c in self.dispatcher._cmd]
+        sas = [a for a in self._BS_HUMAN_SAS.get(faction, ())
+               if a in self.dispatcher._sa]
+        spaces = sorted(self.state.get("spaces", {}).keys())
+
+        plan: list = []
+        remaining = ["command", "command", "special"]
+        leader_used = False
+        while remaining:
+            step_opts = []
+            if "command" in remaining:
+                step_opts.append(("Limited Command", "command"))
+            if "special" in remaining and sas:
+                step_opts.append(("Special Activity", "special"))
+            step_opts.append(("Skip remaining steps", None))
+            kind = choose_one(
+                f"{faction} Brilliant Stroke — choose next step "
+                f"({len(plan)} done):", step_opts)
+            if kind is None:
+                break
+            remaining.remove(kind)
+            if kind == "command":
+                label = choose_one("Limited Command:", [(c, c) for c in cmds])
+                must_lead = (not leader_used
+                             and "command" not in remaining)
+                if must_lead:
+                    space = leader_space
+                    print(f"(Leader must be involved — space locked to "
+                          f"{leader_space}.)")
+                else:
+                    space = choose_one(
+                        "In which space?",
+                        [(f"{sid}{' (Leader)' if sid == leader_space else ''}",
+                          sid) for sid in spaces])
+                if space == leader_space:
+                    leader_used = True
+                plan.append({"type": "command", "label": label,
+                             "kwargs": {"space": space}})
+            else:
+                label = choose_one("Special Activity:", [(a, a) for a in sas])
+                space = choose_one(
+                    "SA space (if applicable):",
+                    [("(none)", None)] + [(sid, sid) for sid in spaces])
+                kwargs = {"space": space} if space else {}
+                plan.append({"type": "special", "label": label,
+                             "kwargs": kwargs})
+        if not any(st["type"] == "command" for st in plan):
+            push_history(self.state,
+                         f"{faction} BS aborted — no Limited Command chosen")
+            return False
+        self.state.setdefault("bs_plan", {})[faction] = plan
+        return True
+
     # ---- Collect human BS declarations -------------------------------
     def _collect_human_bs_declarations(self, first_eligible: str | None) -> list:
         """Ask each human-controlled faction holding a legal Brilliant
@@ -515,18 +622,9 @@ class Engine:
         offered to a human French seat when legal (and preferred over the
         ordinary French BS, which it would trump anyway).
         """
-        import sys
-        from lod_ai.cli_utils import choose_one, get_input_provider, \
-            StdinInputProvider
+        from lod_ai.cli_utils import choose_one
 
-        # Only prompt when a human can actually answer: a custom input
-        # provider is installed (harness/LLM), or stdin is interactive.
-        # Headless callers with human seats and no provider are treated as
-        # "no declaration" instead of hanging on input().
-        provider = get_input_provider()
-        interactive = not isinstance(provider, StdinInputProvider) or (
-            hasattr(sys.stdin, "isatty") and sys.stdin.isatty())
-        if not interactive:
+        if not self._interactive_input():
             return []
 
         decls: list = []
@@ -758,6 +856,13 @@ class Engine:
             has_plan = isinstance(
                 self.state.get("bs_plan", {}).get(winner), list
             )
+            if not has_plan and winner in self.human_factions \
+                    and self._interactive_input():
+                # Ask the human to build the plan (two LimComs + SA).
+                has_plan = self._build_human_bs_plan(winner)
+                if not has_plan:
+                    bs.mark_bs_played(self.state, current["key"], False)
+                    return False
             if has_plan:
                 # Use the pre-set plan (human player or test fixture)
                 try:
