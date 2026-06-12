@@ -650,14 +650,22 @@ def evt_067_de_grasse(state, shaded=False):
     """
     from lod_ai.util.free_ops import queue_free_op
     if shaded:
-        # "French or Patriots" — player choice regardless of TOA
+        # "French or Patriots free Rally or Muster in one space."
+        # Rally is a Patriot Command (3.3) and Muster here is a French
+        # Command that requires the Treaty of Alliance (3.5.2), so the
+        # faction choice determines the legal op (a French "rally" can
+        # never execute). 8.3.5: when there is a choice of who gets
+        # Event benefits, select the executing Faction first, then the
+        # other friendly Faction.
         fac = state.get("card67_faction", "").upper()
         if fac not in (FRENCH, PATRIOTS):
-            fac = FRENCH  # default
-        # "free Rally or Muster in one space" — bot/player chooses
-        op = state.get("card67_op", "rally")
-        if op not in ("rally", "muster"):
-            op = "rally"
+            active = str(state.get("active", "")).upper()
+            fac = active if active in (FRENCH, PATRIOTS) else FRENCH
+        if fac == FRENCH and not state.get("toa_played"):
+            # French cannot Muster before the Treaty (3.5.2) and may
+            # never Rally (3.3): the benefit passes to the Patriots.
+            fac = PATRIOTS
+        op = "muster" if fac == FRENCH else "rally"
         queue_free_op(state, fac, op)
         # "remain or become Eligible"
         state.setdefault("remain_eligible", set()).add(fac)

@@ -138,7 +138,8 @@ def test_card67_unshaded_lowers_fni_and_removes_fre():
 
 
 def test_card67_shaded_queues_rally_and_remain_eligible():
-    """Card 67 shaded: Queue free Rally, faction remains Eligible."""
+    """Card 67 shaded (post-ToA default): the French take the benefit as
+    a free Muster (Rally is Patriot-only, 3.3) and remain Eligible."""
     state = _base_state()
     state["spaces"] = {"Virginia": {}}
     state["toa_played"] = True

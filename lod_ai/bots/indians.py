@@ -780,7 +780,9 @@ class IndianBot(BaseBot):
                 continue
             fort = 1 if sp.get(C.FORT_PAT, 0) else 0
             # "within that first in a Province with 1+ Villages"
-            is_prov = 1 if _MAP_DATA.get(sid, {}).get("type") == "Province" else 0
+            # ("Province" = Colony or Reserve; map.json has no "Province"
+            # type, so the previous == "Province" check never matched)
+            is_prov = 1 if _MAP_DATA.get(sid, {}).get("type") in ("Colony", "Reserve") else 0
             has_village = 1 if sp.get(C.VILLAGE, 0) >= 1 else 0
             prov_vill = is_prov * has_village
             choices.append((fort, enemy, prov_vill, state["rng"].random(), sid))

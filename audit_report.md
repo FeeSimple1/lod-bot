@@ -2576,3 +2576,49 @@ losses), and any change must be benchmarked against many seeds.
 
 Remains in CLAUDE.md "Remaining open items" as the only
 non-trivial follow-up.
+
+## Session 20: Per-faction free-Command planners + free-SA planners (June 2026)
+
+Closed the two deliberately-deferred free-operation items from the
+free-op audit (see GITHUB_ISSUES.md "Remaining free-op work — CLOSED").
+
+New module `lod_ai/bots/free_op_planner.py` — planning for card-granted
+free Commands/SAs per Manual 8.3.5 ("use the Faction's priorities;
+pieces per 8.1.2, spaces randomly per 8.2 where not applicable"):
+
+- **March**: per-faction movement restrictions and destination
+  priorities transcribed from flowchart nodes B10/P5/F14/I10 (Manual
+  8.4.3/8.5.4/8.6.5/8.7.3), mirroring the audited bot implementations,
+  reduced to the single destination a card grants. Escort legality per
+  3.2.3/3.3.2/3.5.4 (the old generic planner counted Tory-only spaces
+  as March sources, producing zero-piece plans the executor rejected —
+  the 4 residual British March skips). No Common Cause on a free March
+  (CC is a Special Activity the card does not grant). Indians never
+  target a City (3.4.2).
+- **Rally**: Patriot-only (3.3); 8.5.2 space priorities (Fort build at
+  4+ units and room, bulk Militia at Forts up to Fort+Pop, no own-piece
+  requirement per 3.3.1).
+- **War Path**: Indian node I8 target priorities + 4.4.2 option
+  requirements. **Partisans**: Patriot node P8 + 4.3.2. Both were
+  previously clean declines ("no bot planner"); over the 60-game matrix
+  they now execute where legal (other free SAs still decline cleanly;
+  no card queues them for bots).
+- **Card 67 (De Grasse) fix**: handler defaulted to a FRENCH free
+  "rally", which can never execute (Rally is Patriot-only). Now pairs
+  the faction with its legal Command per 8.3.5: French → Muster
+  (post-ToA), otherwise the benefit passes to the Patriots → Rally.
+  This was the 1 residual French Rally skip.
+- **indians.py I8 fix found during transcription**: the "Province with
+  1+ Villages" tiebreak compared against a "Province" map type that
+  does not exist in map.json (types are City/Colony/Reserve/Special);
+  now matches Colony or Reserve.
+
+Verification: full suite 1219 passed; clean-sweep gate (60 games,
+PYTHONHASHSEED=0) reports zero bot errors, zero illegal actions and
+zero free-op execution skips — and the gate now HARD-FAILS on execution
+skips (a planner-approved free op must execute; genuine no-target
+outcomes log as "declined (no legal plan)" and were spot-verified
+against the space states). Balance baseline refreshed: 19/60 pinned
+winners shifted (free SAs now fire; March follows faction priorities);
+per-scenario aggregates moved within band and 1776 remains
+Patriot-favored as documented in Session 17.

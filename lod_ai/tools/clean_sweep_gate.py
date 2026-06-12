@@ -82,14 +82,14 @@ def main(argv=None) -> int:
         print(f"\nFAIL: {dirty} game(s) trapped bot errors or illegal actions.")
         return 1
     if skip_games:
-        # Non-failing: forfeited free ops are optional and some are genuine
-        # "no legal target" declines. Surfaced for tracking; the hard gate
-        # is bot errors + illegal actions above. Goal: drive this to 0 as
-        # the remaining faction free-op planners are completed (see
-        # GITHUB_ISSUES.md).
-        print(f"\nOK (with warnings): {skip_games} game(s) had free-op "
-              f"'no valid target' skips. No bot errors or illegal actions.")
-        return 0
+        # HARD gate since the per-faction free-Command and free-SA
+        # planners landed: a planner-approved free op must execute.
+        # Genuine "no legal target" outcomes log as "declined (no legal
+        # plan)" in the planner and are allowed; an execution-time skip
+        # means the planner and an executor disagree about legality.
+        print(f"\nFAIL: {skip_games} game(s) had free-op execution skips "
+              f"(planner/executor divergence).")
+        return 1
     print("\nOK: every game clean (zero bot errors, illegal actions, "
           "free-op skips).")
     return 0

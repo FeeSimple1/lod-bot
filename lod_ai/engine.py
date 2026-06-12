@@ -291,17 +291,6 @@ class Engine:
         sp = st["spaces"].get(sid, {})
         return sum(sp.get(t, 0) for t in self._enemy_tags_for(faction))
 
-    def _free_op_sources_toward(self, st, faction, dest):
-        """Adjacent spaces holding the Faction's mobile pieces (8.1.2:
-        move the most pieces; the cards pair 'March to X' with a Battle
-        there, so mass force toward the destination)."""
-        from lod_ai.map import adjacency as map_adj
-        out = []
-        for nbr in map_adj.adjacent_spaces(dest):
-            if self._own_force_in(st, nbr, faction) > 0:
-                out.append(nbr)
-        return out
-
     def _plan_bot_free_op(self, st, faction, op, loc):
         """Return dispatcher kwargs for a queued bot free op, or None when
         no legal plan exists (a genuine decline)."""
@@ -329,33 +318,13 @@ class Engine:
             return {"space": pick}
 
         if op == "march":
-            dest = loc
-            if dest is None:
-                # "March to one space (and may Battle there)": pick the
-                # destination where massed adjacent force meets the most
-                # enemy pieces; else the space gathering the most own
-                # pieces (8.2 random among ties).
-                cands = []
-                for sid in spaces:
-                    srcs = self._free_op_sources_toward(st, faction, sid)
-                    if not srcs:
-                        continue
-                    force = sum(self._own_force_in(st, x, faction)
-                                for x in srcs)
-                    cands.append((sid, force,
-                                  self._enemy_force_in(st, sid, faction)))
-                if not cands:
-                    return None
-                with_enemy = [c for c in cands if c[2] > 0]
-                pool = with_enemy or cands
-                names = [c[0] for c in pool]
-                score = {c[0]: (c[2], c[1]) for c in pool}
-                dest = _rand_tiebreak(names, lambda s: score[s])
-            sources = self._free_op_sources_toward(st, faction, dest)
-            if not sources:
-                return None
-            return {"space": None, "sources": sources,
-                    "destinations": [dest]}
+            # Per-faction free March planner transcribed from the bot
+            # flowcharts (B10/P5/F14/I10; Manual 8.4.3/8.5.4/8.6.5/8.7.3):
+            # faction movement restrictions, escort legality (3.2.3/
+            # 3.3.2/3.5.4), Indian City exclusion (3.4.2), and faction
+            # destination priorities when the card does not pin one.
+            from lod_ai.bots.free_op_planner import plan_free_march
+            return plan_free_march(st, faction, loc)
 
         if op == "muster" and faction in (C.BRITISH, C.FRENCH):
             dest = loc
@@ -379,27 +348,11 @@ class Engine:
                     kwargs["tory_plan"] = {dest: min(2, avail_tory)}
             return kwargs
 
-        if op == "rally" and faction in (C.PATRIOTS, C.FRENCH):
-            from lod_ai.commands.rally import (_support_value,
-                                               _is_indian_reserve,
-                                               _is_west_indies)
-            from lod_ai.rules_consts import ACTIVE_SUPPORT as _AS
-
-            def _rally_legal(sid):
-                return (_support_value(st, sid) != _AS
-                        and not _is_indian_reserve(sid)
-                        and not _is_west_indies(sid)
-                        and self._own_force_in(st, sid, faction) > 0)
-
-            if loc is not None:
-                return ({"space": None, "selected": [loc], "place_one": {loc}}
-                        if _rally_legal(loc) else None)
-            cands = [sid for sid in spaces if _rally_legal(sid)]
-            if not cands:
-                return None
-            dest = _rand_tiebreak(
-                cands, lambda s: self._own_force_in(st, s, faction))
-            return {"space": None, "selected": [dest], "place_one": {dest}}
+        if op == "rally":
+            # Rally is a Patriot Command (3.3/3.3.1); space priorities
+            # per 8.5.2. Any other faction is a genuine decline.
+            from lod_ai.bots.free_op_planner import plan_free_rally
+            return plan_free_rally(st, faction, loc)
 
         if op == "gather" and faction == C.INDIANS:
             from lod_ai.commands.gather import SUPPORT_OK
@@ -424,14 +377,19 @@ class Engine:
                 cands, lambda s: self._own_force_in(st, s, faction))
             return {"space": dest}
 
-        # Free Special Activities and any op without a faithful bot planner
-        # (e.g. War Path / Partisans option selection, which is a real
-        # flowchart decision -- not guessed here). Signal a clean DECLINE so
-        # the drain logs it distinctly from an execution skip.
+        # Free Special Activities. War Path and Partisans have planners
+        # transcribed from the flowcharts (I8 + 4.4.2, P8 + 4.3.2); the
+        # rest still signal a clean DECLINE so the drain logs them
+        # distinctly from an execution skip (no card currently queues
+        # them for a bot seat).
         if op in ("war_path", "partisans", "scout", "skirmish",
                   "naval_pressure", "trade", "preparer", "persuasion",
                   "common_cause"):
-            return "DECLINE_NO_PLANNER"
+            from lod_ai.bots.free_op_planner import plan_free_special_activity
+            planned = plan_free_special_activity(st, faction, op, loc)
+            if planned == "NO_PLANNER":
+                return "DECLINE_NO_PLANNER"
+            return planned
 
         # Default: pass the queued location straight through.
         return {"space": loc}

@@ -395,14 +395,36 @@ matrix; balance baseline refreshed (free ops now actually fire). The
 clean-sweep gate now surfaces free-op skips (non-failing) alongside its
 hard bot-error / illegal-action gate.
 
-### Remaining free-op work (logged, not fixed)
+### Remaining free-op work — CLOSED (June 2026 follow-up)
 
-- Free Special Activities (War Path, Partisans, Scout, etc.) have no bot
-  planner: their option/target selection is a real faction-flowchart
-  decision (e.g. War Path's three options) that must not be guessed
-  (agents.md). The drain DECLINES these cleanly ('no bot planner for this
-  free Special Activity') rather than mis-executing.
-- ~5 residual March/Rally free ops per 60-game matrix still skip at
-  execution: the generic planner's space choice can miss faction-specific
-  Command prerequisites (e.g. French Rally legality). Driving these to 0
-  needs the per-faction free-Command planners from the bot flowcharts.
+Both deferred items were completed as transcription-against-source work
+(lod_ai/bots/free_op_planner.py; regression tests in test_bot_free_ops.py):
+
+- Free War Path and Partisans now have bot planners transcribed from the
+  flowcharts (Indian node I8 + 4.4.2 option requirements; Patriot node
+  P8 + 4.3.2), reusing the same target/option logic the bots' own turns
+  were audited against. The other free SAs (Scout, Skirmish, Trade, ...)
+  still decline cleanly -- no card currently queues them for a bot seat.
+- The residual March/Rally execution skips are at ZERO across the
+  60-game matrix. Root causes fixed: (a) the generic March planner
+  counted Tories/escort-only pieces as a marching force, handing the
+  executor zero-piece plans (3.2.3: Tories only accompany Regulars
+  1-for-1) -- replaced with per-faction March planners transcribed from
+  B10/P5/F14/I10 and Manual 8.4.3/8.5.4/8.6.5/8.7.3, including movement
+  restrictions, escort caps, the Indian City exclusion, and faction
+  destination priorities for unpinned destinations; (b) card 67
+  defaulted to a FRENCH free "rally", which can never execute (Rally is
+  Patriot-only, 3.3) -- the handler now pairs the faction with its legal
+  Command per 8.3.5 (French Muster post-ToA, else Patriot Rally).
+- Free Rally now follows 8.5.2 (Fort build at 4+ units, bulk placement
+  at Forts, no own-piece requirement per 3.3.1) instead of requiring
+  own pieces in the space; transcription also surfaced and fixed a
+  dormant I8 tiebreak in indians.py ("Province" type never matched --
+  map.json uses Colony/Reserve).
+- The clean-sweep gate now FAILS on free-op execution skips: with the
+  planners in place, an execution-time skip means planner/executor
+  divergence. Genuine no-legal-target outcomes log as "declined (no
+  legal plan)" and remain allowed.
+- Balance baseline refreshed (19/60 pinned winners shifted within band;
+  free War Path/Partisans now actually fire and March follows faction
+  priorities). 1776 remains Patriot-favored as documented.
