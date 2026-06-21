@@ -48,6 +48,65 @@ def _adjacent(space: str) -> List[str]:
     return list(map_adj.adjacent_spaces(space))
 
 
+def _ops_leader_destination(state: Dict, leader: str) -> str | None:
+    """OPS Leader Movement: the space holding the largest group of own War
+    Parties among the leader's origin (stays) and its neighbours (moved).
+    Returns a neighbour only if it strictly beats the origin, else None."""
+    loc = leader_location(state, leader)
+    if not loc:
+        return None
+    sp = state["spaces"].get(loc, {})
+    best_dst = None
+    best_wp = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
+    for nbr in _adjacent(loc):
+        nsp = state["spaces"].get(nbr, {})
+        nbr_wp = nsp.get(C.WARPARTY_U, 0) + nsp.get(C.WARPARTY_A, 0)
+        if nbr_wp > best_wp:
+            best_wp = nbr_wp
+            best_dst = nbr
+    return best_dst
+
+
+def follow_indian_leaders_after_move(state: Dict) -> None:
+    """OPS: each Indian Leader (Brant / Cornplanter / Dragging Canoe) follows
+    the largest group of War Parties that moves from (or stays in) its space.
+
+    Module-level so it can run after ANY command that moves War Parties --
+    including a *British* March that used Common Cause, where War Parties move
+    as Tory-equivalents out of an Indian Leader's space (the leader must
+    still follow per OPS). Operates purely on post-move board state.
+    """
+    leaders_state = state.get("leaders")
+    leader_locs = state.get("leader_locs")
+    for leader in ("LEADER_BRANT", "LEADER_CORNPLANTER", "LEADER_DRAGGING_CANOE"):
+        current_loc = leader_location(state, leader)
+        if not current_loc:
+            continue
+        new_loc = _ops_leader_destination(state, leader)
+        if not new_loc or new_loc == current_loc:
+            continue
+        updated = False
+        if isinstance(leaders_state, dict):
+            if leader in leaders_state and isinstance(leaders_state.get(leader), (str, type(None))):
+                leaders_state[leader] = new_loc
+                updated = True
+            else:
+                keys_to_remove = [k for k, v in leaders_state.items() if v == leader]
+                if keys_to_remove:
+                    for k in keys_to_remove:
+                        leaders_state.pop(k, None)
+                    leaders_state[new_loc] = leader
+                    updated = True
+        if isinstance(leader_locs, dict) and leader in leader_locs:
+            leader_locs[leader] = new_loc
+            updated = True
+        if updated:
+            push_history(
+                state,
+                f"{leader} follows largest WP group: {current_loc} -> {new_loc}"
+            )
+
+
 class IndianBot(BaseBot):
     faction = C.INDIANS
 
@@ -1214,36 +1273,7 @@ class IndianBot(BaseBot):
         execute so the WP counts at adjacent spaces reflect what just
         happened.
         """
-        leaders_state = state.get("leaders")
-        leader_locs = state.get("leader_locs")
-        for leader in ("LEADER_BRANT", "LEADER_CORNPLANTER", "LEADER_DRAGGING_CANOE"):
-            current_loc = leader_location(state, leader)
-            if not current_loc:
-                continue
-            new_loc = self.ops_leader_movement(state, leader)
-            if not new_loc or new_loc == current_loc:
-                continue
-            # Update whichever leader-location structure is in use.
-            updated = False
-            if isinstance(leaders_state, dict):
-                if leader in leaders_state and isinstance(leaders_state.get(leader), (str, type(None))):
-                    leaders_state[leader] = new_loc
-                    updated = True
-                else:
-                    keys_to_remove = [k for k, v in leaders_state.items() if v == leader]
-                    if keys_to_remove:
-                        for k in keys_to_remove:
-                            leaders_state.pop(k, None)
-                        leaders_state[new_loc] = leader
-                        updated = True
-            if isinstance(leader_locs, dict) and leader in leader_locs:
-                leader_locs[leader] = new_loc
-                updated = True
-            if updated:
-                push_history(
-                    state,
-                    f"{leader} follows largest WP group: {current_loc} -> {new_loc}"
-                )
+        follow_indian_leaders_after_move(state)
 
         # ==================================================================
     #  OPS SUMMARY METHODS  (year-end / operational helpers)

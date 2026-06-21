@@ -734,20 +734,9 @@ class Engine:
     # ---- Human BS plan builder (§2.3.8 card text) ---------------------
     # "Execute two free Limited Commands and one Special Activity in any
     #  order. Leader must be involved in at least one of the Limited
-    #  Commands."
-    _BS_HUMAN_COMMANDS = {
-        C.BRITISH: ("muster", "march", "battle"),
-        C.PATRIOTS: ("rally", "march", "battle", "raid"),
-        C.FRENCH: ("march", "battle", "muster", "rally"),
-        C.INDIANS: ("gather", "march", "raid", "scout", "battle"),
-    }
-    _BS_HUMAN_SAS = {
-        C.BRITISH: ("common_cause", "skirmish"),
-        C.PATRIOTS: ("partisans", "persuasion"),
-        C.FRENCH: ("naval_pressure", "skirmish", "preparer"),
-        C.INDIANS: ("war_path", "trade", "plunder"),
-    }
-
+    #  Commands."  The human seat uses the SAME full command/SA wizards as a
+    #  normal turn (no restricted command/SA subset), so a player's Brilliant
+    #  Stroke is exactly as expressive as their ordinary play.
     def _execute_human_bs_interactive(self, faction: str) -> bool:
         """Execute an ordinary Brilliant Stroke for a human seat using the
         FULL command/SA wizards (card text: "Execute two free Limited

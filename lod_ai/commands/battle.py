@@ -288,6 +288,68 @@ def _half(n: int) -> int:
     return n >> 1
 
 
+def force_level(sp: Dict, side: str, is_defending: bool, *, cc_wp: int = 0,
+                attacker_faction: str = None, ally_involved: bool = True) -> int:
+    """S3.6.2-3.6.3 Force Level for *side* in space dict *sp*.
+
+    Module-level so bot planners (e.g. the British B12 Battle selection) can
+    compute the *same* Force Level the resolver uses, instead of an
+    approximation. Cubes + half Active guerrillas (rounding down) + Forts if
+    Defending; ally cubes only if involved (3.6.1); British Tories capped at
+    Regulars when Attacking (3.6.3)."""
+    if side == "ROYALIST":
+        regs = sp.get(REGULAR_BRI, 0)
+        tories = sp.get(TORY, 0) + cc_wp
+        if not is_defending:
+            tories = min(tories, regs)
+        active_wp = max(0, sp.get(WARPARTY_A, 0) - cc_wp)
+        cubes = regs + tories + _half(active_wp)
+    else:
+        pat_cubes = sp.get(REGULAR_PAT, 0)
+        fre_cubes = sp.get(REGULAR_FRE, 0)
+        active_mil = sp.get(MILITIA_A, 0)
+        if not is_defending:
+            if attacker_faction == PATRIOTS:
+                if ally_involved:
+                    fre_cubes = min(fre_cubes, pat_cubes)
+                else:
+                    fre_cubes = 0
+            elif attacker_faction == FRENCH:
+                if ally_involved:
+                    pat_cubes = min(pat_cubes, fre_cubes)
+                else:
+                    pat_cubes = 0
+                    active_mil = 0
+        regs = pat_cubes + fre_cubes
+        cubes = regs + _half(active_mil)
+    if is_defending:
+        forts = sp.get(FORT_BRI if side == "ROYALIST" else FORT_PAT, 0)
+        return cubes + forts
+    return cubes
+
+
+def bot_battle_scores(state: Dict, sid: str, attacker_side: str = "ROYALIST",
+                      *, attacker_faction: str = None,
+                      ally_involved: bool = True) -> tuple:
+    """B12/P4 selection score: (attacker_score, defender_score) where each is
+    Force Level + the manual's Loss-Level modifiers (3.6.5/3.6.6), using the
+    exact functions the resolver uses. The attacker should select a space iff
+    attacker_score > defender_score ("Force Level + modifiers exceeds")."""
+    sp = state["spaces"][sid]
+    def_side = "REBELLION" if attacker_side == "ROYALIST" else "ROYALIST"
+    att_force = force_level(sp, attacker_side, False, attacker_faction=attacker_faction,
+                            ally_involved=ally_involved)
+    def_force = force_level(sp, def_side, True, attacker_faction=attacker_faction,
+                            ally_involved=ally_involved)
+    # Defender Loss modifiers (how hard the attacker hits) add to attacker score;
+    # Attacker Loss modifiers (how hard the defender hits) add to defender score.
+    att_score = att_force + _defender_loss_mods(
+        state, sp, sid, attacker_side, def_side, 0,
+        attacker_faction=attacker_faction, ally_involved=ally_involved)
+    def_score = def_force + _attacker_loss_mods(
+        state, sp, sid, attacker_side, def_side, 0)
+    return att_score, def_score
+
 def _side_has_leader(state: Dict, sid: str, side: str) -> bool:
     """Return True if any leader for *side* is in space *sid*."""
     leaders = _ROYALIST_LEADERS if side == "ROYALIST" else _REBELLION_LEADERS
@@ -484,39 +546,10 @@ def _resolve_space(
                 sp[WARPARTY_A] = sp.get(WARPARTY_A, 0) + _flip
 
     def _force(side: str, is_defending: bool) -> int:
-        """S3.6.2-3.6.3: cubes + half Active guerrillas + Forts if Defending."""
-        if side == "ROYALIST":
-            regs = sp.get(REGULAR_BRI, 0)
-            tories = sp.get(TORY, 0) + cc_wp
-            if not is_defending:
-                tories = min(tories, regs)
-            active_wp = max(0, sp.get(WARPARTY_A, 0) - cc_wp)
-            cubes = regs + tories + _half(active_wp)
-        else:
-            # §3.6.3: "If Rebellion Attack, if that Faction paid, add French
-            # Regulars or Continentals up to the number of own Faction's cubes."
-            # §3.6.1: an ally's pieces participate only if that ally is paid.
-            pat_cubes = sp.get(REGULAR_PAT, 0)
-            fre_cubes = sp.get(REGULAR_FRE, 0)
-            active_mil = sp.get(MILITIA_A, 0)
-            if not is_defending:
-                if attacker_faction == PATRIOTS:
-                    if ally_involved:
-                        fre_cubes = min(fre_cubes, pat_cubes)
-                    else:
-                        fre_cubes = 0  # French not paid -> not involved
-                elif attacker_faction == FRENCH:
-                    if ally_involved:
-                        pat_cubes = min(pat_cubes, fre_cubes)
-                    else:
-                        pat_cubes = 0       # Patriots not paid -> not involved
-                        active_mil = 0      # ...nor their Militia
-            regs = pat_cubes + fre_cubes
-            cubes = regs + _half(active_mil)
-        if is_defending:
-            forts = sp.get(FORT_BRI if side == "ROYALIST" else FORT_PAT, 0)
-            return cubes + forts
-        return cubes
+        """S3.6.2-3.6.3: delegate to the shared module-level force_level()."""
+        return force_level(sp, side, is_defending, cc_wp=cc_wp,
+                           attacker_faction=attacker_faction,
+                           ally_involved=ally_involved)
 
     att_force = _force(att_side, False) + attacker_bonus
     def_force = _force(def_side, True)

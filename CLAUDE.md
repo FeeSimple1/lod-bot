@@ -287,24 +287,28 @@ the references.
 Small, surgical work — none crash-class.  Most of the originally-
 listed items have been closed; see `audit_report.md` Sessions 17-19.
 
-- `_battle`'s Force-Level heuristic uses a rough net-advantage
-  estimate rather than simulating dice probabilities.  This sometimes
-  triggers British attacks that the Rebellion wins, awarding
-  Win-the-Day Opposition shifts against the British.  Improving this
-  would require running sandboxed Battle simulations per candidate
-  space, and risks deviating from the B12 reference (which is
-  written in terms of Force Level + modifiers, not expected losses).
-  Worth a focused multi-seed benchmark if attempted.
+- `_battle`'s B12 selection now uses the resolver's *exact* Force Level
+  (§3.6.2-3.6.3) and Loss-Level modifiers (§3.6.5-3.6.6) via the shared
+  `battle.bot_battle_scores` / `battle.force_level` helpers, instead of a
+  hand-rolled approximation (which had real modifier bugs, e.g. an
+  always-true "half defending cubes are Regulars" test). The
+  approximation is gone -- the compromise is closed. A sandboxed
+  benchmark (`lod_ai.tools.battle_benchmark`) measures the residual
+  outcome: faithful B12 is slightly *more* aggressive than the old
+  approximation, and ~13% of selected British battles are likely losses.
+  That residual is INHERENT to B12 -- its Force-Level comparison ignores
+  the Loss-Value asymmetry (Regulars count as two losses) and dice
+  variance -- and cannot be reduced without deviating from the reference.
+  Balance stayed within band (3 winner shifts/60 games; baseline
+  refreshed).
 
-- During a British March that uses Common Cause, Indian War Parties
-  participate as Tory-equivalents and can move from an Indian
-  leader's space to the British destination.  Per OPS the Indian
-  leader (Brant / Cornplanter / Dragging Canoe) should follow
-  per "Royalist Leaders follow largest group of own units that
-  moves from (or stays in) their spaces."  Currently
-  `_follow_leaders_after_move` only fires on Indian commands, not on
-  CC-driven WP movement during a British command.  Cross-faction
-  edge case; minor.
+- Common-Cause Indian-leader-follow: FIXED. When a British March uses
+  Common Cause, War Parties move (as Tory-equivalents) out of an Indian
+  Leader's space, and the Leader now follows the largest group per OPS.
+  The leader-follow logic was extracted to a module-level
+  `indians.follow_indian_leaders_after_move(state)` (operating purely on
+  post-move board state) and is invoked from `BritishBot._march` whenever
+  Common Cause was used, in addition to the Indian bot's own commands.
 
 - Phase 4 human-player CLI: the crash/invariant-class items (load/save
   round-trip, undo during Winter Quarters, multi-human cross-faction

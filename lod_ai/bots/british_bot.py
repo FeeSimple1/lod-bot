@@ -1392,6 +1392,14 @@ class BritishBot(BaseBot):
             # belong post-march.  Skip if no plan or no British leaders.
             self._follow_leaders_after_march(state, move_plan[:4])
 
+            # OPS: a Common-Cause March moves War Parties (as Tory-equivalents)
+            # out of their spaces, so any Indian Leader there must follow the
+            # largest group too -- not just the British leaders. Mirrors the
+            # Indian bot's own post-move leader-follow.
+            if used_cc:
+                from lod_ai.bots.indians import follow_indian_leaders_after_move
+                follow_indian_leaders_after_move(state)
+
         # Activate Underground Militia in march-in-place spaces.
         # §3.2.3: "Pay one Resource per destination space selected" —
         # march-in-place destinations are selected destinations and
@@ -1463,50 +1471,16 @@ class BritishBot(BaseBot):
             if rebel_cubes + total_militia + rebel_forts == 0:
                 continue
 
-            # Rebel Defense Force Level
-            rebel_force = rebel_cubes + (total_militia // 2) + rebel_forts
-
-            # Royalist Attack Force Level
-            regs = sp.get(C.REGULAR_BRI, 0)
-            tories = min(sp.get(C.TORY, 0), regs)
-            active_wp = sp.get(C.WARPARTY_A, 0)
-            royal_force = regs + tories + (active_wp // 2)
-
-            # --- Estimate net modifier advantage for the bot ---
-            # Attacker (British) modifiers on Defender Loss:
-            att_mod = 0
-            att_cubes = regs + sp.get(C.TORY, 0)
-            if att_cubes > 0 and regs * 2 >= att_cubes:
-                att_mod += 1  # half regs
-            if sp.get(C.WARPARTY_U, 0) > 0:
-                att_mod += 1  # underground piece
-            # British leader bonus
-            for lid in ("LEADER_GAGE", "LEADER_HOWE", "LEADER_CLINTON"):
-                if leader_location(state, lid) == sid:
-                    att_mod += 1
-                    break
-            # -1 per defending Fort
-            att_mod -= rebel_forts
-
-            # Defender (Rebel) modifiers on Attacker Loss:
-            def_mod = 0
-            def_regs = rebel_cubes
-            if def_regs > 0 and def_regs * 2 >= rebel_cubes:
-                def_mod += 1  # half regs
-            if sp.get(C.MILITIA_U, 0) > 0:
-                def_mod += 1  # underground
-            # Rebel leader bonus
-            for lid in ("LEADER_WASHINGTON", "LEADER_ROCHAMBEAU", "LEADER_LAUZUN"):
-                if leader_location(state, lid) == sid:
-                    def_mod += 1
-                    break
-            # +1 per defending fort (fort helps defender's attacker-loss roll)
-            def_mod += rebel_forts
-
-            # Net advantage: positive means British is stronger
-            net_advantage = (royal_force + att_mod) - (rebel_force + def_mod)
-            if net_advantage > 0:
-                british_count = regs + sp.get(C.TORY, 0)
+            # B12 "Royalist Force Level + modifiers exceeds Rebel Force
+            # Level + modifiers": use the resolver's exact Force Level
+            # (§3.6.2-3.6.3) and Loss-Level modifiers (§3.6.5-3.6.6) via the
+            # shared helper, so the bot's prediction matches what the Battle
+            # actually resolves (no more hand-rolled approximation that could
+            # over- or under-count modifiers and trigger losing attacks).
+            att_score, def_score = battle.bot_battle_scores(
+                state, sid, "ROYALIST")
+            if att_score > def_score:
+                british_count = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
                 targets.append((-british_count, sid))
 
         if not targets:
