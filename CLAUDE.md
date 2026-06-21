@@ -300,7 +300,12 @@ listed items have been closed; see `audit_report.md` Sessions 17-19.
   the Loss-Value asymmetry (Regulars count as two losses) and dice
   variance -- and cannot be reduced without deviating from the reference.
   Balance stayed within band (3 winner shifts/60 games; baseline
-  refreshed).
+  refreshed). B12's "Use Common Cause to increase British Force Level"
+  is also folded into the selection: each candidate space is scored with
+  the War Parties it would commit as Tory-equivalents (B13: Active first,
+  up to Regulars, keeping the last Underground), and `_try_common_cause`
+  now loans exactly that capped amount so prediction and resolution agree
+  (previously it over-loaned all War Parties). Zero balance drift.
 
 - Common-Cause Indian-leader-follow: FIXED. When a British March uses
   Common Cause, War Parties move (as Tory-equivalents) out of an Indian

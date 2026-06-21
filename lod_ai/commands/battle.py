@@ -330,24 +330,31 @@ def force_level(sp: Dict, side: str, is_defending: bool, *, cc_wp: int = 0,
 
 def bot_battle_scores(state: Dict, sid: str, attacker_side: str = "ROYALIST",
                       *, attacker_faction: str = None,
-                      ally_involved: bool = True) -> tuple:
+                      ally_involved: bool = True, cc_wp: int = 0) -> tuple:
     """B12/P4 selection score: (attacker_score, defender_score) where each is
     Force Level + the manual's Loss-Level modifiers (3.6.5/3.6.6), using the
     exact functions the resolver uses. The attacker should select a space iff
-    attacker_score > defender_score ("Force Level + modifiers exceeds")."""
+    attacker_score > defender_score ("Force Level + modifiers exceeds").
+
+    *cc_wp* is the number of British War Parties the attacker will commit as
+    Tory-equivalents via Common Cause (B12: "Use Common Cause to increase
+    British Force Level"); it feeds the same Force Level and modifier maths
+    the resolver applies, so the prediction matches the resolution."""
     sp = state["spaces"][sid]
     def_side = "REBELLION" if attacker_side == "ROYALIST" else "ROYALIST"
-    att_force = force_level(sp, attacker_side, False, attacker_faction=attacker_faction,
+    att_cc = cc_wp if attacker_side == "ROYALIST" else 0
+    att_force = force_level(sp, attacker_side, False, cc_wp=att_cc,
+                            attacker_faction=attacker_faction,
                             ally_involved=ally_involved)
     def_force = force_level(sp, def_side, True, attacker_faction=attacker_faction,
                             ally_involved=ally_involved)
     # Defender Loss modifiers (how hard the attacker hits) add to attacker score;
     # Attacker Loss modifiers (how hard the defender hits) add to defender score.
     att_score = att_force + _defender_loss_mods(
-        state, sp, sid, attacker_side, def_side, 0,
+        state, sp, sid, attacker_side, def_side, att_cc,
         attacker_faction=attacker_faction, ally_involved=ally_involved)
     def_score = def_force + _attacker_loss_mods(
-        state, sp, sid, attacker_side, def_side, 0)
+        state, sp, sid, attacker_side, def_side, att_cc)
     return att_score, def_score
 
 def _side_has_leader(state: Dict, sid: str, side: str) -> bool:

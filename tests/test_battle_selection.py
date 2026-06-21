@@ -54,3 +54,34 @@ def test_old_half_regs_bug_is_gone():
     mods = B._attacker_loss_mods(st, st["spaces"]["X"], "X",
                                  "ROYALIST", "REBELLION", 0)
     assert mods == 0, mods
+
+
+# --- Common Cause folded into B12 selection (B13 / 4.2.1) -----------------
+from lod_ai.bots.british_bot import BritishBot
+
+
+def test_cc_battle_wp_caps_at_regulars_minus_tories():
+    # 3 Regulars, 0 Tories, 4 Active WP -> loan capped at 3 (= Regulars).
+    assert BritishBot._cc_battle_wp({C.REGULAR_BRI: 3, C.WARPARTY_A: 4}) == 3
+    # 3 Regulars, 1 Tory, 1 Active + 2 Underground -> need 2; usable =
+    # 1 + (2-1) = 2 -> 2.
+    assert BritishBot._cc_battle_wp(
+        {C.REGULAR_BRI: 3, C.TORY: 1, C.WARPARTY_A: 1, C.WARPARTY_U: 2}) == 2
+    # Regulars <= Tories -> no Common Cause benefit.
+    assert BritishBot._cc_battle_wp({C.REGULAR_BRI: 2, C.TORY: 3, C.WARPARTY_A: 4}) == 0
+    # Sole Underground WP must be kept (B13 Battle) -> 0.
+    assert BritishBot._cc_battle_wp({C.REGULAR_BRI: 2, C.WARPARTY_U: 1}) == 0
+
+
+def test_common_cause_can_tip_selection_over_the_threshold():
+    # Without CC the British do not exceed; with CC (War Parties as Tories)
+    # they do -- exactly what B12 "Use Common Cause to increase British Force
+    # Level" intends.
+    sp = {C.REGULAR_BRI: 3, C.WARPARTY_A: 3, C.REGULAR_PAT: 3, C.FORT_PAT: 1}
+    st = _state(sp)
+    cc = BritishBot._cc_battle_wp(sp)
+    assert cc == 3
+    att0, dfn0 = B.bot_battle_scores(st, "X", "ROYALIST", cc_wp=0)
+    attc, dfnc = B.bot_battle_scores(st, "X", "ROYALIST", cc_wp=cc)
+    assert att0 <= dfn0, (att0, dfn0)      # declined without Common Cause
+    assert attc > dfnc, (attc, dfnc)       # selected with Common Cause

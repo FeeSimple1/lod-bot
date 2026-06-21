@@ -1462,6 +1462,10 @@ class BritishBot(BaseBot):
         """
         refresh_control(state)
         targets: List[Tuple[int, str]] = []
+        # B12: "Use Common Cause to increase British Force Level." Common
+        # Cause is a Special Activity, so it is only available outside a
+        # Limited / no-SA slot; otherwise the selection sees no CC boost.
+        sel_cc_available = not (state.get("_limited") or state.get("_no_special"))
 
         for sid, sp in state["spaces"].items():
             # B12: "spaces with Rebel Forts and/or Rebel cubes"
@@ -1477,8 +1481,9 @@ class BritishBot(BaseBot):
             # shared helper, so the bot's prediction matches what the Battle
             # actually resolves (no more hand-rolled approximation that could
             # over- or under-count modifiers and trigger losing attacks).
+            cc_wp = self._cc_battle_wp(sp) if sel_cc_available else 0
             att_score, def_score = battle.bot_battle_scores(
-                state, sid, "ROYALIST")
+                state, sid, "ROYALIST", cc_wp=cc_wp)
             if att_score > def_score:
                 british_count = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
                 targets.append((-british_count, sid))
@@ -1515,6 +1520,24 @@ class BritishBot(BaseBot):
         return True
 
     # -------------------------------------------------------------------
+    @staticmethod
+    def _cc_battle_wp(sp: Dict) -> int:
+        """B13 (§4.2.1): War Parties this space commits as Tory-equivalents in
+        a Battle. "If British Regulars > Tories, use War Parties (Active first)
+        as Tories up to the number of Regulars ... do NOT use the last
+        Underground War Party." So the count is capped at Regulars - Tories
+        (extra Tory-equivalents are wasted, §3.6.3 caps Tories at Regulars)
+        and by the usable pool (all Active plus all but one Underground)."""
+        regs = sp.get(C.REGULAR_BRI, 0)
+        tories = sp.get(C.TORY, 0)
+        if regs <= tories:
+            return 0
+        active = sp.get(C.WARPARTY_A, 0)
+        ug = sp.get(C.WARPARTY_U, 0)
+        usable = active + max(0, ug - 1)   # keep the last Underground WP
+        return max(0, min(regs - tories, usable))
+
+    # -------------------------------------------------------------------
     def _try_common_cause(self, state: Dict, *, mode: str = "BATTLE") -> bool:
         """B13: Common Cause — use War Parties (Active first) as Tories
         where British Regulars > Tories, up to the number of Regulars.
@@ -1527,20 +1550,29 @@ class BritishBot(BaseBot):
 
         Return True if Common Cause executed successfully.
         """
-        # Find spaces where British Regulars > Tories and War Parties exist
+        # Find spaces where British Regulars > Tories and War Parties exist.
         spaces = []
+        wp_counts: Dict[str, int] = {}
         for sid, sp in state["spaces"].items():
             regs = sp.get(C.REGULAR_BRI, 0)
             tories = sp.get(C.TORY, 0)
             wp_a = sp.get(C.WARPARTY_A, 0)
             wp_u = sp.get(C.WARPARTY_U, 0)
             if regs > tories and (wp_a + wp_u) > 0:
+                if mode == "BATTLE":
+                    # B13: loan only "up to the number of Regulars" -- the same
+                    # amount the B12 selection scored with, so prediction and
+                    # resolution agree (don't over-commit/expose War Parties).
+                    n = self._cc_battle_wp(sp)
+                    if n <= 0:
+                        continue
+                    wp_counts[sid] = n
                 spaces.append(sid)
         if not spaces:
             return False
         try:
             common_cause.execute(state, C.BRITISH, {}, spaces, mode=mode,
-                                 preserve_wp=True)
+                                 wp_counts=wp_counts or None, preserve_wp=True)
             return True
         except Exception:
             return False
