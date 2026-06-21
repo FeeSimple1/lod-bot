@@ -9,3 +9,6 @@ saves/
 lod_ai/tools/batch_results*.json
 selfplay_results*.jsonl
 *.jsonl
+
+# Crash-repro / invariant dumps (regenerated; not source)
+crash_dumps/

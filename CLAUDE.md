@@ -194,6 +194,31 @@ remaining work.
 - 0 illegal-action rejections
 - 0 unhandled bot exceptions
 
+### Invariant gate (per-card)
+
+`python -m lod_ai.tools.clean_sweep_gate --seeds 1-20` (the CI gate, 60
+games) asserts two invariants after **every card**, on top of the
+zero-bot-error / zero-illegal-action / zero-free-op-skip checks:
+
+1. **Canonical-schema validation** -- `validate_state()` must hold after
+   every card, not just where it was previously called.
+2. **Save/load round-trip** -- serializing the live state to the on-disk
+   JSON form and loading it back must reproduce the same canonical state
+   *and* the same RNG internal state. This catches silent state
+   corruption and fields that do not survive persistence -- the class of
+   bug that survives playtests.
+
+Implemented in `lod_ai/tools/invariants.py`. Any violation writes a
+crash-repro dump under `crash_dumps/` (scenario + seed + card number +
+traceback + full serialized state) and the gate fails. The same
+machinery wraps zero-player crashes in `batch_smoke`, so a crash also
+emits a dump. Every dump names the one command that reproduces it:
+
+    python -m lod_ai.tools.batch_smoke --repro <scenario>:<seed>
+
+`batch_smoke --invariants` runs the 60-game default matrix with the same
+per-card checks enabled.
+
 Per-faction win rates have stabilized at approximately:
 
 | Scenario | PAT | BRI | FRE | IND |

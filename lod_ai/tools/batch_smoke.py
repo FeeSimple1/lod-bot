@@ -505,7 +505,9 @@ def _determine_victory_detail(data: Dict, state: dict,
 # Game runner (supports both default and detailed modes)
 # ---------------------------------------------------------------------------
 
-def run_one_game(scenario: str, seed: int, *, detailed: bool = False) -> Dict[str, Any]:
+def run_one_game(scenario: str, seed: int, *, detailed: bool = False,
+                 check_invariants: bool = False,
+                 dump_dir: str = "crash_dumps") -> Dict[str, Any]:
     """Run a single zero-player game.
 
     If *detailed* is True, collects the comprehensive data for --large mode.
@@ -518,6 +520,7 @@ def run_one_game(scenario: str, seed: int, *, detailed: bool = False) -> Dict[st
         "cards_played": 0,
         "error": None,
         "traceback": None,
+        "repro_command": None,
     }
     diag = _empty_diagnostics()
     large_data = _empty_large_data() if detailed else None
@@ -546,6 +549,14 @@ def run_one_game(scenario: str, seed: int, *, detailed: bool = False) -> Dict[st
             engine.play_card(card, human_decider=None)
             cards_played += 1
             current_campaign_cards += 1
+
+            if check_invariants:
+                from lod_ai.tools import invariants
+                invariants.check_all(
+                    engine.state, scenario=scenario, seed=seed,
+                    card_number=cards_played, human_factions=set(),
+                    dump_dir=dump_dir,
+                )
 
             # Process turn log
             _process_card_turn_log(diag, engine.state)
@@ -599,9 +610,30 @@ def run_one_game(scenario: str, seed: int, *, detailed: bool = False) -> Dict[st
         result["error"] = "Engine tried to read interactive input in zero-player mode"
         result["traceback"] = traceback.format_exc()
     except Exception as exc:
-        result["end_reason"] = "CRASH"
+        from lod_ai.tools import invariants
+        is_invariant = isinstance(exc, invariants.InvariantError)
+        result["end_reason"] = "INVARIANT" if is_invariant else "CRASH"
         result["error"] = f"{type(exc).__name__}: {exc}"
         result["traceback"] = traceback.format_exc()
+        # Crash-repro dump: scenario + seed + card, reproducible in one command.
+        eng = locals().get("engine")
+        st = getattr(eng, "state", None) if eng is not None else None
+        card_no = locals().get("cards_played", 0)
+        if st is not None and not is_invariant:
+            try:
+                _, repro = invariants.dump_repro(
+                    st, scenario=scenario, seed=seed, card_number=card_no,
+                    kind="crash", detail=result["error"],
+                    traceback_str=result["traceback"], human_factions=set(),
+                    dump_dir=dump_dir,
+                )
+                result["repro_command"] = repro
+            except Exception:
+                pass
+        elif is_invariant:
+            result["repro_command"] = (
+                f"python -m lod_ai.tools.batch_smoke --repro {scenario}:{seed}"
+            )
 
     result["diagnostics"] = diag
     if detailed:
@@ -1301,9 +1333,45 @@ def _serialize_large_results(all_results: List[Dict]) -> List[Dict]:
 # Main
 # ===========================================================================
 
+def _parse_repro(argv) -> tuple[str, int] | None:
+    """Parse ``--repro SCEN:SEED`` from argv."""
+    for i, a in enumerate(argv):
+        if a == "--repro" and i + 1 < len(argv):
+            spec = argv[i + 1]
+        elif a.startswith("--repro="):
+            spec = a.split("=", 1)[1]
+        else:
+            continue
+        scen, _, seed = spec.partition(":")
+        return scen, int(seed or 1)
+    return None
+
+
 def main() -> None:
     single_mode = "--single" in sys.argv
     large_mode = "--large" in sys.argv
+    invariants_mode = "--invariants" in sys.argv
+
+    # ------------------------------------------------------------------
+    # Repro mode: replay one game with invariants on, dump on failure.
+    #   python -m lod_ai.tools.batch_smoke --repro 1778:7
+    # ------------------------------------------------------------------
+    repro = _parse_repro(sys.argv)
+    if repro is not None:
+        scen, seed = repro
+        print(f"Repro: scenario={scen}, seed={seed} (invariants ON) ...")
+        result = run_one_game(scen, seed, detailed=True, check_invariants=True)
+        print(f"  end_reason={result['end_reason']}, winner={result['winner']}, "
+              f"cards_played={result['cards_played']}")
+        if result["error"]:
+            print(f"  ERROR: {result['error']}")
+            if result.get("repro_command"):
+                print(f"  repro: {result['repro_command']}")
+            if result["traceback"]:
+                print(result["traceback"])
+            raise SystemExit(1)
+        print("  clean: no crash, no invariant violation.")
+        return
 
     # ------------------------------------------------------------------
     # Single mode
@@ -1410,7 +1478,7 @@ def main() -> None:
             sys.stdout.write(f"  {tag} ... ")
             sys.stdout.flush()
 
-            result = run_one_game(scenario, seed)
+            result = run_one_game(scenario, seed, check_invariants=invariants_mode)
             all_results.append(result)
             by_scenario[scenario].append(result)
 

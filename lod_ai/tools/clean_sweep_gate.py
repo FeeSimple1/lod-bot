@@ -1,8 +1,9 @@
 """CI gate: bot-only games must be CLEAN, not merely completed.
 
 Replays bot-only games across scenarios/seeds and fails (exit 1) if any
-game traps a bot error or logs an illegal action. Companion to
-balance_smoke (which guards WHO wins; this guards HOW the games run).
+game traps a bot error or logs an illegal action, or violates a per-card invariant (canonical-schema
+validation + save/load round-trip). Companion to balance_smoke (which
+guards WHO wins; this guards HOW the games run).
 
     python -m lod_ai.tools.clean_sweep_gate --seeds 1-20
 """
@@ -23,14 +24,16 @@ if os.environ.get("PYTHONHASHSEED") != "0" and __name__ == "__main__":
 
 from lod_ai.state.setup_state import build_state
 from lod_ai.engine import Engine
+from lod_ai.tools import invariants
 
 SCENARIOS = ("1775", "1776", "1778")
 
 
-def play(scenario: str, seed: int):
+def play(scenario: str, seed: int, *, check_invariants: bool = True):
     st = build_state(scenario, seed=seed)
     eng = Engine(initial_state=st)
     eng.set_human_factions(set())
+    invariant_failures = []
     with contextlib.redirect_stdout(io.StringIO()):
         n = 0
         while n < 200:
@@ -39,6 +42,15 @@ def play(scenario: str, seed: int):
                 break
             eng.play_card(card)
             n += 1
+            if check_invariants:
+                try:
+                    invariants.check_all(
+                        eng.state, scenario=scenario, seed=seed, card_number=n,
+                        human_factions=set(),
+                    )
+                except invariants.InvariantError as exc:
+                    invariant_failures.append(str(exc))
+                    break
     errs = eng.state.get("_bot_error_log", []) or []
     hist = [str(h.get("msg", "") if isinstance(h, dict) else h)
             for h in eng.state.get("history", [])]
@@ -48,7 +60,7 @@ def play(scenario: str, seed: int):
     # "declined (no legal plan)" instead, which is allowed.
     free_skips = [h for h in hist
                   if "FREE " in h and "skipped (no valid target)" in h]
-    return errs, illegal, free_skips, n
+    return errs, illegal, free_skips, invariant_failures, n
 
 
 def main(argv=None) -> int:
@@ -61,9 +73,14 @@ def main(argv=None) -> int:
     skip_games = 0
     for scen in [s for s in args.scenarios.split(",") if s]:
         for seed in range(int(lo), int(hi or lo) + 1):
-            errs, illegal, free_skips, cards = play(scen, seed)
+            errs, illegal, free_skips, inv_fail, cards = play(scen, seed)
             tag = f"[{scen} seed={seed:2d}] {cards} cards"
-            if errs or illegal:
+            if inv_fail:
+                dirty += 1
+                print(f"{tag}  DIRTY: {len(inv_fail)} invariant failure(s)")
+                for m in inv_fail[:2]:
+                    print(f"    invariant: {m.splitlines()[0][:140]}")
+            elif errs or illegal:
                 dirty += 1
                 print(f"{tag}  DIRTY: {len(errs)} bot error(s), "
                       f"{len(illegal)} illegal action(s)")
@@ -91,7 +108,7 @@ def main(argv=None) -> int:
               f"(planner/executor divergence).")
         return 1
     print("\nOK: every game clean (zero bot errors, illegal actions, "
-          "free-op skips).")
+          "free-op skips, invariant violations).")
     return 0
 
 
