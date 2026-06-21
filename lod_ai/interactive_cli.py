@@ -5,7 +5,8 @@ Menu-driven CLI for Liberty or Death.
 All selections are presented as numbered menus (spaces, actions, counts).
 Upgraded with board state display, bot summaries, card display, crash/bug
 reports, autosave, game stats tracking, legal move logging, and
-meta-commands (status/history/victory/bug/quit) at every input prompt.
+meta-commands (status/history/victory/deck/help/save/undo/bug/quit) at
+every input prompt, including pause points.
 """
 
 from __future__ import annotations
@@ -1310,7 +1311,14 @@ def _game_loop(engine: Engine, game_stats: Dict[str, Any]) -> None:
             display_wq_phase(1, "Victory Check")
             display_victory_margins(engine.state)
 
-            raw = pause_for_player()
+            try:
+                raw = pause_for_player()
+            except UndoException:
+                # Undo at the Winter Quarters pause: revert to the start of
+                # this card and replay it (state already restored).
+                engine.state.setdefault("deck", []).insert(0, card)
+                engine.state.pop("current_card", None)
+                continue
             if raw in ("status", "s"):
                 display_board_state(engine.state)
 
@@ -1345,7 +1353,14 @@ def _game_loop(engine: Engine, game_stats: Dict[str, Any]) -> None:
             print("\nWinter Quarters complete.")
             display_bot_summary("WINTER QUARTERS", engine.state, pre_snap)
 
-            raw = pause_for_player()
+            try:
+                raw = pause_for_player()
+            except UndoException:
+                # Undo after WQ resolution rewinds the whole Winter Quarters
+                # card to its start (checkpoint already restored).
+                engine.state.setdefault("deck", []).insert(0, card)
+                engine.state.pop("current_card", None)
+                continue
             if raw in ("status", "s"):
                 display_board_state(engine.state)
 

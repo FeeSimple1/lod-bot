@@ -179,9 +179,11 @@ verified against the Manual.  Zero-player mode runs to completion
 across all three scenarios without crashes or hangs.
 
 **Phase 4 — UI / Usability: PARTIALLY COMPLETE.**  Zero-player mode is
-solid (see "Smoke matrix" below).  Human-player CLI (1–3 humans) has
-had less scrutiny than the bot paths.  This is the most user-facing
-remaining work.
+solid (see "Smoke matrix" below).  The human-player CLI (1–3 humans) now
+has an automated QA harness (`lod_ai.tools.human_qa`, see below) that
+drives the real game loop and exercises the previously-untested paths;
+the last full cycle found zero defects.  Remaining human-mode work is
+best done as live playtests for feel/UX rather than crash-finding.
 
 ### Smoke matrix (current main)
 
@@ -238,6 +240,30 @@ coincides with a legal target the planner missed. The ~25 declines per
 60 games are all genuine: most are provinces pinned at full support
 (+/-2), where Gather is illegal.
 
+### Human-mode QA harness
+
+`python -m lod_ai.tools.human_qa --seeds 1-5` drives the *real* interactive
+game loop (`interactive_cli._game_loop`) with a scripted input provider in
+place of a person, across five seatings (incl. 1775 pre-Treaty French and
+a 1776 three-human game). It deliberately exercises the documented blind
+spots: meta-commands injected mid-wizard, **undo during Winter Quarters**,
+the Brilliant Stroke declaration prompt from a human seat, French
+pre-Treaty flow, and a full save -> reload-into-fresh-engine -> resume
+cycle. Any crash or post-game invariant violation writes a crash-repro
+dump (scenario + seed + seated factions + the scripted input log) and the
+run fails. Last full cycle: 25 games x (full play + resume), zero crashes,
+zero invariant violations, every game exercising a WQ undo.
+
+This harness surfaced (and the same commit fixed) a contract gap:
+`pause_for_player` only honored `status`, although the CLI advertises
+meta-commands "at every input prompt." It now routes through the meta
+handler, so save/status/history/victory/deck/help/undo/quit all work at
+pause points -- which is what makes the **undo-during-Winter-Quarters**
+path reachable (the WQ branch of `_game_loop` already had an
+`except UndoException` restart that nothing could previously trigger,
+because Winter Quarters resolution is fully automatic and never prompts a
+human).
+
 Per-faction win rates have stabilized at approximately:
 
 | Scenario | PAT | BRI | FRE | IND |
@@ -280,13 +306,13 @@ listed items have been closed; see `audit_report.md` Sessions 17-19.
   CC-driven WP movement during a British command.  Cross-faction
   edge case; minor.
 
-- Phase 4 human-player CLI pass beyond the setup flow: actually play
-  multiple full human games to surface deeper UX issues (load/save
-  round-trip, undo during Winter Quarters specifically, multi-human
-  games with cross-faction interactions, French pre-Treaty flow,
-  Brilliant Stroke interrupt path from a human's perspective, meta-
-  command behavior mid-wizard).  Best done as actual playtest
-  sessions rather than scripted-input runs.
+- Phase 4 human-player CLI: the crash/invariant-class items (load/save
+  round-trip, undo during Winter Quarters, multi-human cross-faction
+  games, French pre-Treaty flow, Brilliant Stroke declaration from a
+  human seat, meta-commands mid-wizard) are now covered by the
+  `lod_ai.tools.human_qa` harness and pass cleanly. What remains is
+  subjective UX/feel polish, which is best judged in live playtests
+  rather than scripted runs.
 
 ### Items previously listed here that have been closed
 

@@ -481,9 +481,23 @@ def display_bot_summary(faction: str, state: Dict[str, Any],
 
 
 def pause_for_player() -> str:
-    """Pause and wait for player to press Enter. Returns any typed command."""
-    raw = input("[Press Enter to continue, or type 'status'/'save'] ").strip().lower()
-    return raw
+    """Pause and wait for the player.
+
+    Meta-commands (status/history/victory/deck/help/save/undo/quit) typed
+    here are honored just like at any menu prompt -- consistent with the
+    CLI's documented contract that meta-commands work at every input
+    prompt. ``undo`` raises ``UndoException`` and ``quit`` exits, exactly as
+    elsewhere; anything else (including a bare Enter) is returned to the
+    caller.
+    """
+    from lod_ai.cli_utils import _handle_meta_command
+    while True:
+        raw = input("[Press Enter to continue, or type a command] ").strip().lower()
+        if not raw:
+            return raw
+        if _handle_meta_command(raw):  # may raise UndoException / SystemExit
+            continue
+        return raw
 
 
 # ---------------------------------------------------------------------------
