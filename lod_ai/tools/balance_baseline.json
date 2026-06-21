@@ -34,7 +34,7 @@
   },
   "1775:17": {
    "cards": 61,
-   "winner": "BRITISH"
+   "winner": "INDIANS"
   },
   "1775:18": {
    "cards": 65,
@@ -166,7 +166,7 @@
   },
   "1778:10": {
    "cards": 30,
-   "winner": "PATRIOTS"
+   "winner": "FRENCH"
   },
   "1778:11": {
    "cards": 28,
@@ -197,7 +197,7 @@
    "winner": "FRENCH"
   },
   "1778:18": {
-   "cards": 19,
+   "cards": 28,
    "winner": "PATRIOTS"
   },
   "1778:19": {
@@ -218,11 +218,11 @@
   },
   "1778:4": {
    "cards": 28,
-   "winner": "FRENCH"
+   "winner": "PATRIOTS"
   },
   "1778:5": {
    "cards": 32,
-   "winner": "FRENCH"
+   "winner": "PATRIOTS"
   },
   "1778:6": {
    "cards": 30,
@@ -234,11 +234,11 @@
   },
   "1778:8": {
    "cards": 31,
-   "winner": "BRITISH"
+   "winner": "INDIANS"
   },
   "1778:9": {
    "cards": 28,
-   "winner": "BRITISH"
+   "winner": "PATRIOTS"
   }
  }
 }

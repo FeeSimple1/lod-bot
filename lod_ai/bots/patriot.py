@@ -341,58 +341,20 @@ class PatriotBot(BaseBot):
         french_res = state["resources"].get(C.FRENCH, 0)
         targets = []
         for sid, sp in state["spaces"].items():
-            pat_cubes = sp.get(C.REGULAR_PAT, 0)
-            # §8.5.1: include French only if French Resources > 0
-            if french_res > 0:
-                fre_cubes = min(sp.get(C.REGULAR_FRE, 0), pat_cubes)
-            else:
-                fre_cubes = 0
-            active_mil = sp.get(C.MILITIA_A, 0)
-            rebel_force = pat_cubes + fre_cubes + (active_mil // 2)
-
+            # P4: "Rebel Force Level (if possible including French) +
+            # modifiers exceeds the British Force Level + modifiers." Use the
+            # resolver's exact Force Level / Loss-Level modifier maths
+            # (§3.6.2-3.6.6) via the shared helper -- same code the Battle
+            # actually resolves with -- instead of a hand-rolled approximation.
+            # §8.5.1: include the French ally only if French Resources > 0.
             regs = sp.get(C.REGULAR_BRI, 0)
             tories = sp.get(C.TORY, 0)
             active_wp = sp.get(C.WARPARTY_A, 0)
-            brit_force = regs + tories + (active_wp // 2) + sp.get(C.FORT_BRI, 0)
-
-            # §3.6.5: Attacker (Rebellion) modifiers on Defender Loss
-            att_mod = 0
-            # Glossary 1.4: only French Regulars are Regulars (not Continentals);
-            # Militia/War Parties are not cubes. Cubes = Continentals + French Regs.
-            att_regs = fre_cubes
-            att_cubes = pat_cubes + fre_cubes
-            if att_cubes > 0 and att_regs * 2 >= att_cubes:
-                att_mod += 1  # half regs
-            if sp.get(C.MILITIA_U, 0) > 0:
-                att_mod += 1  # underground piece
-            for ldr in ("LEADER_WASHINGTON", "LEADER_ROCHAMBEAU", "LEADER_LAUZUN"):
-                if leader_location(state, ldr) == sid:
-                    att_mod += 1
-                    break
-            # +1 if Attacking includes French with Lauzun
-            if fre_cubes > 0 and leader_location(state, "LEADER_LAUZUN") == sid:
-                att_mod += 1
-            # -1 per defending Fort
-            att_mod -= sp.get(C.FORT_BRI, 0)
-
-            # §3.6.6: Defender (Royalist) modifiers on Attacker Loss
-            def_mod = 0
-            def_cubes = regs + tories + active_wp  # all Crown cubes
-            if def_cubes > 0 and regs * 2 >= def_cubes:
-                def_mod += 1  # half regs
-            if sp.get(C.WARPARTY_U, 0) > 0:
-                def_mod += 1  # underground piece
-            for ldr in ("LEADER_GAGE", "LEADER_HOWE", "LEADER_CLINTON",
-                         "LEADER_BRANT", "LEADER_CORNPLANTER", "LEADER_DRAGGING_CANOE"):
-                if leader_location(state, ldr) == sid:
-                    def_mod += 1
-                    break
-            # +1 per defending Fort (helps defender on attacker-loss roll)
-            def_mod += sp.get(C.FORT_BRI, 0)
-
-            # Net advantage: positive means Rebellion is stronger
-            net = (rebel_force + att_mod) - (brit_force + def_mod)
-            if net > 0 and (regs + tories + active_wp) > 0:
+            ally = french_res > 0
+            att_score, def_score = battle.bot_battle_scores(
+                state, sid, "REBELLION",
+                attacker_faction=C.PATRIOTS, ally_involved=ally)
+            if att_score > def_score and (regs + tories + active_wp) > 0:
                 has_wash = 1 if leader_location(state, "LEADER_WASHINGTON") == sid else 0
                 pop = _MAP_DATA.get(sid, {}).get("population", 0)
                 villages = sp.get(C.VILLAGE, 0)

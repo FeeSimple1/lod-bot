@@ -307,6 +307,19 @@ listed items have been closed; see `audit_report.md` Sessions 17-19.
   now loans exactly that capped amount so prediction and resolution agree
   (previously it over-loaned all War Parties). Zero balance drift.
 
+- Patriot (P4) and French (F16) Battle selection now use the same shared
+  `battle.bot_battle_scores` / `battle.force_level` helpers as the British
+  B12 selection, so all three attacker factions score "Rebel/Royalist
+  Force Level + modifiers exceeds ..." with the resolver's exact maths.
+  This removed real bugs in the old hand-rolled versions -- the French
+  selection had added Patriot *Forts* to the *attacking* Force Level
+  (§3.6.2: Forts count only when Defending) and used un-halved Militia /
+  War Parties with no §3.6.5-6 modifiers; the Patriot version counted War
+  Parties as Royalist "cubes" for the half-Regulars test. Ally cubes are
+  included only when the ally is paid (§8.5.1 French Resources > 0 for a
+  Patriot Battle; Patriot Resources > 0 for a French Battle). Balance
+  within band (6 winner shifts/60, mostly 1778; baseline refreshed).
+
 - Common-Cause Indian-leader-follow: FIXED. When a British March uses
   Common Cause, War Parties move (as Tory-equivalents) out of an Indian
   Leader's space, and the Leader now follows the largest group per OPS.

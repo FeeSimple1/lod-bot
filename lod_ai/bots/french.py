@@ -701,37 +701,30 @@ class FrenchBot(BaseBot):
 
     # ----- Battle (F16) ----------------------------------------
     def _battle(self, state: Dict) -> bool:
-        """F16: Select spaces where Rebel Force > Royalist Force, highest Pop.
-        SA entry at F17 (Naval Pressure), not F12.
+        """F16: Select spaces with British where Rebel Force Level (incl.
+        Continentals if possible) + modifiers exceeds Royalist Force Level +
+        modifiers, first in highest Pop. SA entry at F17 (Naval Pressure).
         """
-        from lod_ai.leaders import leader_location
         refresh_control(state)
         targets = []
 
-        # Determine Rebel leader locations for force-level bonus
-        rebel_leaders = ["LEADER_WASHINGTON", "LEADER_ROCHAMBEAU", "LEADER_LAUZUN"]
-        leader_locs: Dict[str, int] = {}
-        for ldr in rebel_leaders:
-            loc = leader_location(state, ldr)
-            if loc:
-                leader_locs[loc] = leader_locs.get(loc, 0) + 1
-
         for sid, sp in state["spaces"].items():
-            # Rebel force: cubes + Forts + Active Militia (per §3.6 FL = cubes + Forts)
-            rebel_cubes = sp.get(C.REGULAR_FRE, 0) + sp.get(C.REGULAR_PAT, 0)
-            active_militia = sp.get(C.MILITIA_A, 0)
-            rebel_force = (rebel_cubes + active_militia
-                           + sp.get(C.FORT_PAT, 0)
-                           + leader_locs.get(sid, 0))
-
-            # Royalist force: British cubes + Forts + Active WP
+            # F16: "spaces with British where Rebel Force Level (incl.
+            # Continentals if possible) + modifiers exceeds Royalist Force
+            # Level + modifiers, within that first in highest Pop." Use the
+            # resolver's exact Force Level / modifier maths (§3.6.2-3.6.6) via
+            # the shared helper. The Patriot ally's Continentals/Militia are
+            # included only if Patriots can pay the §3.5.5 allied fee
+            # (Patriot Resources > 0); a French Battle needs French pieces
+            # present (§8.6.6) and a British piece to fight.
             british_pieces = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
                               + sp.get(C.FORT_BRI, 0))
-            crown_force = british_pieces + sp.get(C.WARPARTY_A, 0)
-
-            # §8.6.6: "spaces with both French and British pieces"
             french_here = sp.get(C.REGULAR_FRE, 0) > 0
-            if french_here and rebel_force > crown_force and british_pieces > 0:
+            ally = state["resources"].get(C.PATRIOTS, 0) > 0
+            att_score, def_score = battle.bot_battle_scores(
+                state, sid, "REBELLION",
+                attacker_faction=C.FRENCH, ally_involved=ally)
+            if french_here and british_pieces > 0 and att_score > def_score:
                 pop = _MAP_DATA.get(sid, {}).get("population", 0)
                 targets.append((pop, sid))
         if not targets:

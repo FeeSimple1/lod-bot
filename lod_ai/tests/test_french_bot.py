@@ -194,36 +194,16 @@ def test_f13_can_battle_includes_british_forts():
 # F16: _battle uses only Active Militia in force calculation
 # =========================================================================
 def test_f16_battle_active_militia_only():
-    """F16: Force level should use Active Militia only, not Underground."""
-    bot = FrenchBot()
-    # Space with 1 French Reg, 3 Active Militia, 0 Underground
-    # Rebel force = 1 + 3 = 4; British = 2+1 = 3 → 4 > 3 → battle
-    state = {
-        "spaces": {
-            "Boston": {
-                C.REGULAR_FRE: 1, C.REGULAR_PAT: 0,
-                C.REGULAR_BRI: 2, C.TORY: 1,
-                C.MILITIA_A: 3, C.MILITIA_U: 5,  # Underground should NOT count
-                C.WARPARTY_A: 0, C.FORT_BRI: 0,
-            },
-        },
-        "resources": {C.FRENCH: 5, C.PATRIOTS: 5, C.BRITISH: 5, C.INDIANS: 5},
-        "available": {C.REGULAR_FRE: 2},
-        "support": {"Boston": 0},
-        "control": {},
-        "leaders": {},
-        "rng": random.Random(42),
-        "history": [],
-        "toa_played": True,
-        "casualties": {},
-    }
-    # The battle method should include Active Militia but not Underground
-    # Old code: total_militia = 3+5 = 8, rebel_force = 1 + 8//2 = 5
-    # New code: rebel_force = 1 + 0 + 3 = 4, crown_force = 2+1+0+0 = 3
-    # 4 > 3 → still selects target
-    result = bot._battle(state)
-    # Should be True since 4 > 3
-    assert result is True
+    """F16/§3.6.2: a side's Force Level counts half its *Active* Militia
+    (rounding down) and ignores Underground Militia entirely."""
+    from lod_ai.commands import battle
+    # 1 French Regular + floor(3 Active Militia / 2) = 2; the 5 Underground
+    # Militia contribute nothing to the Force Level.
+    sp = {C.REGULAR_FRE: 1, C.REGULAR_PAT: 0, C.MILITIA_A: 3, C.MILITIA_U: 5}
+    assert battle.force_level(sp, "REBELLION", False, attacker_faction=C.FRENCH) == 2
+    sp_no_ug = dict(sp); sp_no_ug[C.MILITIA_U] = 0
+    assert battle.force_level(sp_no_ug, "REBELLION", False,
+                              attacker_faction=C.FRENCH) == 2
 
 
 # =========================================================================
@@ -1130,35 +1110,18 @@ def test_f6_hortalez_returns_bool():
     assert result2 is False
 
 
-def test_f16_battle_includes_patriot_forts_in_rebel_force():
-    """F16: Rebel Force Level should include Patriot Forts per section 3.6
-    (Force Level = cubes + Forts). A Patriot Fort should tip the balance."""
-    bot = FrenchBot()
-    state = _full_state(toa_played=True)
-    # Without Fort: rebel_force = 1 French + 1 Cont = 2, crown = 3 British → no battle
-    # With Fort:    rebel_force = 1 French + 1 Cont + 1 Fort = 3, crown = 3 → still no (not exceeding)
-    # With Fort+1:  rebel_force = 2 French + 1 Cont + 1 Fort = 4, crown = 3 → battle!
-    state["spaces"] = {
-        "Boston": {
-            C.REGULAR_FRE: 1, C.REGULAR_PAT: 1,
-            C.REGULAR_BRI: 3, C.TORY: 0,
-            C.MILITIA_A: 0, C.MILITIA_U: 0,
-            C.WARPARTY_A: 0, C.FORT_BRI: 0,
-            C.FORT_PAT: 1,
-        },
-    }
-    state["leaders"] = {}
-    state["support"] = {"Boston": 0}
-    state["control"] = {}
-
-    # rebel = 1+1+1 = 3, crown = 3 → not exceeding → no battle
-    result = bot._battle(state)
-    assert result is False
-
-    # Add 1 more French Regular: rebel = 2+1+1 = 4 > 3 → battle
-    state["spaces"]["Boston"][C.REGULAR_FRE] = 2
-    result = bot._battle(state)
-    assert result is True
+def test_f16_attacking_force_excludes_own_forts():
+    """§3.6.2: Forts count toward Force Level only when *Defending*. A
+    Patriot Fort must NOT inflate the Rebellion's *attacking* Force Level
+    (the old French selection wrongly added it)."""
+    from lod_ai.commands import battle
+    sp = {C.REGULAR_FRE: 1, C.REGULAR_PAT: 1, C.FORT_PAT: 1}
+    # Attacking: 1 French + min(1 Continental, 1 French) = 2; Fort adds nothing.
+    assert battle.force_level(sp, "REBELLION", False,
+                              attacker_faction=C.FRENCH) == 2
+    # The same Patriot Fort DOES count when the Rebellion is Defending.
+    assert battle.force_level(sp, "REBELLION", True,
+                              attacker_faction=C.FRENCH) == 3
 
 
 def test_f10_muster_fallback_includes_west_indies():

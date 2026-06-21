@@ -85,3 +85,39 @@ def test_common_cause_can_tip_selection_over_the_threshold():
     attc, dfnc = B.bot_battle_scores(st, "X", "ROYALIST", cc_wp=cc)
     assert att0 <= dfn0, (att0, dfn0)      # declined without Common Cause
     assert attc > dfnc, (attc, dfnc)       # selected with Common Cause
+
+
+# --- Patriot P4 / French F16 use the shared faithful helper --------------
+import inspect
+
+
+def test_patriot_and_french_battle_use_shared_scorer():
+    import lod_ai.bots.patriot as pat
+    import lod_ai.bots.french as fre
+    pat_src = inspect.getsource(pat.PatriotBot._execute_battle)
+    fre_src = inspect.getsource(fre.FrenchBot._battle)
+    assert "bot_battle_scores" in pat_src and 'REBELLION' in pat_src
+    assert "bot_battle_scores" in fre_src and 'REBELLION' in fre_src
+
+
+def test_rebellion_attack_force_level_respects_ally_payment():
+    # French Regular ally counts toward a PATRIOT attack only when involved
+    # (Patriots paid the §3.5.5 / §8.5.1 ally fee).
+    sp = {C.REGULAR_PAT: 2, C.REGULAR_FRE: 2, C.MILITIA_A: 0}
+    fl_paid = B.force_level(sp, "REBELLION", False,
+                            attacker_faction=C.PATRIOTS, ally_involved=True)
+    fl_unpaid = B.force_level(sp, "REBELLION", False,
+                              attacker_faction=C.PATRIOTS, ally_involved=False)
+    assert fl_paid == 4          # 2 Continentals + min(2 French, 2) = 4
+    assert fl_unpaid == 2        # French not paid -> excluded
+
+
+def test_french_attack_excludes_unpaid_patriot_militia():
+    # Patriot Active Militia help a FRENCH attack only if Patriots are paid.
+    sp = {C.REGULAR_FRE: 2, C.REGULAR_PAT: 0, C.MILITIA_A: 4}
+    fl_paid = B.force_level(sp, "REBELLION", False,
+                            attacker_faction=C.FRENCH, ally_involved=True)
+    fl_unpaid = B.force_level(sp, "REBELLION", False,
+                              attacker_faction=C.FRENCH, ally_involved=False)
+    assert fl_paid == 4          # 2 French + floor(4/2) Militia = 4
+    assert fl_unpaid == 2        # unpaid Patriot Militia excluded
