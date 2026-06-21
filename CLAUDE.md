@@ -219,6 +219,25 @@ emits a dump. Every dump names the one command that reproduces it:
 `batch_smoke --invariants` runs the 60-game default matrix with the same
 per-card checks enabled.
 
+### Soak + free-op decline audit
+
+`python -m lod_ai.tools.soak --games 1000 --out soak.jsonl` runs a broad
+zero-player soak across all scenarios with seed coverage beyond the gate
+(default base seed 1000), to flush rare-path crashes. It is resumable
+(re-run the same command; it continues from the JSONL) and supports a
+`--max-seconds` budget and `--invariants` for full per-card checking.
+Last run: 1000 crash-focused + 300 invariant-on games, zero crashes and
+zero invariant violations.
+
+`python -m lod_ai.tools.gather_decline_audit --seeds 1-20` verifies that
+every Indian free-Gather *decline* (planner returns "no legal plan") is
+grounded in the actual space state -- it independently reconstructs why
+no space was legal (West Indies / support outside the eligible band /
+no War Party or Village in or adjacent) and fails if any decline
+coincides with a legal target the planner missed. The ~25 declines per
+60 games are all genuine: most are provinces pinned at full support
+(+/-2), where Gather is illegal.
+
 Per-faction win rates have stabilized at approximately:
 
 | Scenario | PAT | BRI | FRE | IND |
