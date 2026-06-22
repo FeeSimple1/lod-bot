@@ -364,6 +364,15 @@ listed items have been closed; see `audit_report.md` Sessions 17-19.
 (For context to future Claude sessions or contributors — do not redo
 these investigations from scratch.)
 
+- `shared.adjust_fni` now enforces the §1.9 / §4.5.3 invariant "FNI may
+  never exceed the number of Blockades that are Available" on *raises*:
+  card effects that raise FNI (e.g. card 40 shaded, "FNI to 3") are capped
+  at `naval.fni_ceiling(state)` = West Indies pool + on-City Blockades
+  (markers in Unavailable don't count), so a card can no longer push FNI
+  above the markers in play. The French Naval Pressure SA already enforced
+  this; the card path didn't. Lowering FNI is unaffected; zero balance
+  drift. (A second, unused `naval.adjust_fni` still exists and does NOT
+  enforce this -- it has no importers; consolidate if touched.)
 - `setup_state.py` now reads cumulative casualty counters from the
   scenario JSON (`british_casualties`, `patriot_casualties`).
   Previously hardcoded to 0, which was wrong for 1776 (CBC=1, CRC=3)

@@ -92,7 +92,15 @@ def adjust_fni(state, delta: int) -> None:
         push_history(state, "FNI remains 0 (Treaty of Alliance not yet played)")
         return
 
-    state["fni_level"] = max(0, min(MAX_FNI, before + delta))
+    new = max(0, min(MAX_FNI, before + delta))
+    if delta > 0:
+        # §1.9 / §4.5.3: FNI may never exceed the number of Blockade markers
+        # Available (in play). A card that raises FNI (e.g. card 40 shaded,
+        # "FNI to 3") cannot push it above that ceiling. Lowering is always
+        # allowed; never force FNI below its current level here.
+        from lod_ai.util.naval import fni_ceiling
+        new = min(new, max(before, fni_ceiling(state)))
+    state["fni_level"] = new
     push_history(state, f"FNI {before} → {state['fni_level']}")
 
 def pick_cities(state, count: int = 1):

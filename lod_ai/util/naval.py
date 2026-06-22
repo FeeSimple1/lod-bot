@@ -37,6 +37,16 @@ def west_indies_blockades(state) -> int:
     return int(_blockade_markers(state).get("pool", 0) or 0)
 
 
+def fni_ceiling(state) -> int:
+    """§1.9 / §4.5.3: "FNI may never exceed the number of Blockades that are
+    Available." The available markers are those in play -- the West Indies
+    pool plus those already on Cities -- since markers still in Unavailable
+    cannot back an FNI level. Capped at MAX_FNI."""
+    bloc = _blockade_markers(state)
+    in_play = int(bloc.get("pool", 0) or 0) + len(bloc.get("on_map", set()))
+    return min(MAX_FNI, in_play)
+
+
 def unavailable_blockades(state) -> int:
     """Return the number of unused Squadron/Blockade counters in Unavailable."""
     return int(state.setdefault("unavailable", {}).get(BLOCKADE, 0) or 0)
