@@ -12,17 +12,30 @@ from lod_ai.rules_consts import BLOCKADE, MAX_FNI, MAX_WI_SQUADRONS, WEST_INDIES
 
 
 def adjust_fni(state, delta: int) -> None:
-    """
-    Move the French Navy Influence (FNI) marker <delta> boxes
-    toward peace (negative) or war (positive). Track is 0 ↔ MAX_FNI.
+    """Add *delta* (±) to the French Navy Index (FNI), clamped to 0..MAX_FNI.
 
-    Cards #55, year_end.resolve, and Naval Pressure SA will call this.
+    Single source of truth for FNI changes -- the card effects, the Naval
+    Pressure SA, and year-end resolution all route through here (the
+    `cards.effects.shared` module re-exports this function).
+
+    Rules enforced:
+      * §1.9: FNI stays 0 until the Treaty of Alliance is played.
+      * §1.9 / §4.5.3: on a *raise*, FNI may never exceed the number of
+        Blockade markers Available (in play) -- see `fni_ceiling`. Lowering
+        is always allowed, and FNI is never forced below its current level.
     """
     before = state.get("fni_level", 0)
-    state["fni_level"] = max(0, min(MAX_FNI, before + delta))
-    if delta:
-        direction = "up" if delta > 0 else "down"
-        push_history(state, f"FNI shifts {direction} to level {state['fni_level']}")
+
+    if not state.get("toa_played", False):
+        state["fni_level"] = 0
+        push_history(state, "FNI remains 0 (Treaty of Alliance not yet played)")
+        return
+
+    new = max(0, min(MAX_FNI, before + delta))
+    if delta > 0:
+        new = min(new, max(before, fni_ceiling(state)))
+    state["fni_level"] = new
+    push_history(state, f"FNI {before} → {state['fni_level']}")
 
 
 # ──────────────────────────────────────────────────────────────

@@ -79,29 +79,11 @@ def shift_support(state, space_id: str, delta: int) -> None:
 # --------------------------------------------------------------------------- #
 # French Navy Index clamp
 # --------------------------------------------------------------------------- #
-def adjust_fni(state, delta: int) -> None:
-    """
-    Add *delta* (±) to French Navy Index and clamp to 0-MAX_FNI.
-
-    Rule 1.9: Ignore any FNI change before Treaty of Alliance (FNI stays 0).
-    """
-    before = state.get("fni_level", 0)
-
-    if not state.get("toa_played", False):
-        state["fni_level"] = 0
-        push_history(state, "FNI remains 0 (Treaty of Alliance not yet played)")
-        return
-
-    new = max(0, min(MAX_FNI, before + delta))
-    if delta > 0:
-        # §1.9 / §4.5.3: FNI may never exceed the number of Blockade markers
-        # Available (in play). A card that raises FNI (e.g. card 40 shaded,
-        # "FNI to 3") cannot push it above that ceiling. Lowering is always
-        # allowed; never force FNI below its current level here.
-        from lod_ai.util.naval import fni_ceiling
-        new = min(new, max(before, fni_ceiling(state)))
-    state["fni_level"] = new
-    push_history(state, f"FNI {before} → {state['fni_level']}")
+# adjust_fni lives in lod_ai.util.naval (its natural home, alongside the
+# Blockade / FNI helpers and the §1.9 / §4.5.3 ceiling). Re-exported here so
+# the card-effect modules and the Naval Pressure SA that import it from this
+# module keep working through a single implementation.
+from lod_ai.util.naval import adjust_fni  # noqa: F401
 
 def pick_cities(state, count: int = 1):
     """Return up to *count* City IDs sorted alphabetically."""

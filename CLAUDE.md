@@ -371,8 +371,11 @@ these investigations from scratch.)
   (markers in Unavailable don't count), so a card can no longer push FNI
   above the markers in play. The French Naval Pressure SA already enforced
   this; the card path didn't. Lowering FNI is unaffected; zero balance
-  drift. (A second, unused `naval.adjust_fni` still exists and does NOT
-  enforce this -- it has no importers; consolidate if touched.)
+  drift. `adjust_fni` now has a single implementation in `lod_ai.util.naval`
+  (its natural home, beside `fni_ceiling`); `cards.effects.shared`
+  re-exports it, so every caller -- cards, the Naval Pressure SA, and
+  year-end -- routes through the one ceiling-aware function. (The previous
+  duplicate, non-enforcing `shared.adjust_fni` is gone.)
 - `setup_state.py` now reads cumulative casualty counters from the
   scenario JSON (`british_casualties`, `patriot_casualties`).
   Previously hardcoded to 0, which was wrong for 1776 (CBC=1, CRC=3)
