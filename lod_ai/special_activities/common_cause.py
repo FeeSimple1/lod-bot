@@ -86,14 +86,19 @@ def execute(
         if use > total_wp:
             raise ValueError(f"{s}: requested {use} WP, only {total_wp} present.")
 
-        # Flip Underground first (they become Active when used as Common Cause)
-        take_u = min(use, sp.get(WARPARTY_U, 0))
-        # With BATTLE preservation, don't take the last Underground
+        # B13: "use War Parties (Active first) as Tories." Spend the
+        # already-Active War Parties first; only flip Underground ones (they
+        # become Active when used as Common Cause) if `use` exceeds the
+        # Active pool -- which keeps the maximum number of War Parties hidden
+        # (and, in MARCH, keeps the retained WP Underground "if possible").
+        active = sp.get(WARPARTY_A, 0)
+        take_u = max(0, use - active)
+        # BATTLE: never flip the last Underground (the preserve cap already
+        # bounds `use`, so this is a defensive clamp).
         if preserve_wp and mode == "BATTLE" and sp.get(WARPARTY_U, 0) > 0:
             take_u = min(take_u, sp.get(WARPARTY_U, 0) - 1)
         sp[WARPARTY_U] = sp.get(WARPARTY_U, 0) - take_u
         sp[WARPARTY_A] = sp.get(WARPARTY_A, 0) + take_u
-        # any remainder already Active
 
         ctx["common_cause"][s] = use
 

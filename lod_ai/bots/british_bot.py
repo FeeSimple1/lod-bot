@@ -1508,8 +1508,9 @@ class BritishBot(BaseBot):
         # SA chain (skip in limited/no-SA slot)
         no_sa = state.get("_limited") or state.get("_no_special")
         if not no_sa:
-            # Common Cause before the battles
-            used_cc = self._try_common_cause(state)
+            # Common Cause before the battles -- only in the spaces actually
+            # being battled (§4.2.1 "during the same ... Battle").
+            used_cc = self._try_common_cause(state, spaces=chosen)
 
             # If no Common Cause, execute Skirmish/Naval loop first
             if not used_cc:
@@ -1538,11 +1539,16 @@ class BritishBot(BaseBot):
         return max(0, min(regs - tories, usable))
 
     # -------------------------------------------------------------------
-    def _try_common_cause(self, state: Dict, *, mode: str = "BATTLE") -> bool:
+    def _try_common_cause(self, state: Dict, *, mode: str = "BATTLE",
+                          spaces: List[str] | None = None) -> bool:
         """B13: Common Cause — use War Parties (Active first) as Tories
         where British Regulars > Tories, up to the number of Regulars.
 
         Reference constraints:
+        - §4.2.1: Common Cause applies "during the same March or Battle," so
+          when *spaces* is given (the spaces actually being battled) it is
+          restricted to those, rather than loaning War Parties in unrelated
+          spaces where it would only expose them for no benefit.
         - If Marching into adjacent Province, do NOT use last War Party
           (if possible Underground) in origin space.
         - If Battle, do NOT use last Underground War Party.
@@ -1551,9 +1557,12 @@ class BritishBot(BaseBot):
         Return True if Common Cause executed successfully.
         """
         # Find spaces where British Regulars > Tories and War Parties exist.
+        restrict = set(spaces) if spaces is not None else None
         spaces = []
         wp_counts: Dict[str, int] = {}
         for sid, sp in state["spaces"].items():
+            if restrict is not None and sid not in restrict:
+                continue
             regs = sp.get(C.REGULAR_BRI, 0)
             tories = sp.get(C.TORY, 0)
             wp_a = sp.get(C.WARPARTY_A, 0)
