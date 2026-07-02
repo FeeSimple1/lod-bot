@@ -65,11 +65,12 @@ def test_card2_common_sense_any_two_cities():
     assert "New_York_City" in state["markers"][PROPAGANDA]["on_map"]
 
 
-def test_card6_benedict_arnold_targets_fort_colony_and_removes_active_first():
+def test_card6_benedict_arnold_targets_fort_colony_underground_first():
     """§8.3.5: select the Colony where the most Forts then pieces are
-    removed (Virginia has nothing → never selected, despite alphabetical
-    order favouring it under the old placeholder when named e.g. Albany);
-    §8.1.2: remove Active before Underground Militia."""
+    removed (Virginia has nothing → never selected). §8.1.2 ENEMY bullet:
+    "target enemy Underground Militia or War Parties before Active ones" —
+    the Militia are enemy pieces to the British executor. (An earlier
+    revision wrongly applied the FRIENDLY-removal order, Active-first.)"""
     state = _base_state()
     state["spaces"] = {
         "Georgia": {"type": "Colony", FORT_PAT: 1, MILITIA_U: 1, MILITIA_A: 2},
@@ -80,10 +81,11 @@ def test_card6_benedict_arnold_targets_fort_colony_and_removes_active_first():
 
     assert state["casualties"].get(FORT_PAT) == 1
     assert FORT_PAT not in state["spaces"]["Georgia"]
-    # 2 Militia removed, Active first (§8.1.2)
-    assert state["available"].get(MILITIA_A) == 2
-    assert state["available"].get(MILITIA_U) is None
-    assert state["spaces"]["Georgia"].get(MILITIA_U) == 1
+    # 2 Militia removed, Underground first (§8.1.2 enemy bullet)
+    assert state["available"].get(MILITIA_U) == 1
+    assert state["available"].get(MILITIA_A) == 1
+    assert state["spaces"]["Georgia"].get(MILITIA_A) == 1
+    assert state["spaces"]["Georgia"].get(MILITIA_U) is None
 
 
 def test_card6_benedict_arnold_prefers_fort_over_more_militia():

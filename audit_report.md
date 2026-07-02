@@ -2845,3 +2845,42 @@ Patriots 1775 5→2. Direction is coherent (bots that previously wasted
 turns executing null events now take Commands; strong-Command factions
 gain). The 60-game pinned sample has wide variance — true rates to be
 characterized by the Piece 8 large-N run.
+
+## Session 27: T4 — §8.1.2 shared order helpers (July 2026)
+
+New `lod_ai/util/nonplayer_pieces.py` transcribes the six §8.1.2
+bullets as documented helpers (friendly place/remove orders, the move
+bullet with Unavailable-first `pull_to_map` and the return order, the
+enemy targeting bullet, side/cube-pair definitions: Royalist cubes =
+British Regulars + Tories, Rebellion cubes = French Regulars +
+Continentals).
+
+Reading the full section corrected two errors from THIS WEEK's fixes —
+the friendly-removal and enemy-removal bullets differ, and Sessions
+21/23 applied the friendly order to enemy removals on card 6:
+
+- Card 6 unshaded (British removing Patriot Fort+Militia): Session 21
+  changed Militia removal to Active-first citing §8.1.2 — but that is
+  the FRIENDLY order; the enemy bullet says "target enemy Underground
+  Militia or War Parties before Active ones." Reverted (the pre-
+  Session-21 code had been right by accident).
+- Card 6 shaded (Rebellion removing British Fort+cubes): Session 23's
+  local helper alternated from MOST and spared the last Tory — both
+  friendly-removal features. Enemy order alternates from FEWEST
+  (Regulars if even) with no sparing. Replaced with
+  `remove_enemy_cubes`.
+
+Migrations this session: card 6 (both sides), cards 32u/43u/46u pool
+pulls → `pull_to_map`. Remaining hand-rolled sites migrate with the
+Piece 3 card audit.
+
+Verification: both roots green (1,265 + 41; 9 helper tests +1 corrected
+card-6 test); gate clean seeds 1-20 invariants-on; balance checked over
+the FULL 60 pinned games — zero flips, no rebaseline (the ordering
+changes are within-space and did not alter any pinned outcome).
+
+Process note: this is the third instance of a misapplied or missed
+reference passage in one week (T2 grep, Q15 sheet location, now the
+friendly/enemy bullets). The pattern: acting on a partial reading.
+The traceability matrix exists precisely to force full-section reads;
+Piece 2 should extend it to Ch 1-7 before more Ch 1-7-dependent fixes.

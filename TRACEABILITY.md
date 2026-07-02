@@ -24,7 +24,7 @@ no citation exists.
 |---|------|--------|------|-------|-------|
 | 8.1 | Non-Player Sequence of Play | PARTIAL (T1 **FIXED**) | bots/free_op_planner.py, bots/french.py, bots/indians.py, bots/patriot.py, bots/random_spaces.py, cards/effects/early_war.py, cards/effects/shared.py, engine.py, tools/batch_smoke.py | tests/test_bot_free_ops.py, tests/test_early_war_cards.py, tests/test_pat_bot.py | T1 FIXED (Session 23): 'Commands Not Limited' — `engine._options_for_slot` (engine.py:554) applies `limited_only`/`special_allowed=False` to ALL seats; `base_bot.take_turn` propagates to `state['_limited']`/`_no_special` and engine.py:619-622 rejects >1 space / SA use. Per §8.1 a Non-player in a LimCom slot executes a FULL Command and SA. (Event-granted free LimComs ARE correctly capped at 1 space in the free-op path.) Other bullets: no-voluntary-removal OK by absence (no 1.4.1 voluntary-removal path exists for bots); sword-icon auto-ignore → T2; resource-cost fallthrough → T6; ToA BS numeric condition → T10; leader-follows-largest-group implemented (`indians.follow_indian_leaders_after_move`) but ties resolve to first neighbour in iteration order, not randomly, and 'moves from origin' is approximated post-hoc → T5. |
 | 8.1.1 | Events, Commands, SAs — guidelines | PARTIAL | cards/effects/early_war.py, cards/effects/shared.py | — | 'Max extent' is convention across bots/planners (not centrally tested); 'most Support/Opposition = level x Pop' now explicit in `select_support_shift_spaces` (§1.6.2 double-Active falls out of the ±2 encoding). No general test asserts max-extent behaviour → Piece 4 property candidate. |
-| 8.1.2 | Pieces and Resources | PARTIAL (T4, P1) | bots/free_op_planner.py, cards/effects/early_war.py, engine.py | tests/test_bot_free_ops.py, tests/test_early_war_cards.py | No shared placement/removal-order helper exists; each site hand-rolls. Removal alternation + spare-last-Tory implemented locally for card 6 only (Session 21). Placement order (Forts/Villages → Militia/WP → alternating cubes from fewest), removal order generally, move-Unavailable-first, remove-to-replace-even-without-replacements, March-Underground-first: all unaudited per site. Cited only in free_op_planner comments. |
+| 8.1.2 | Pieces and Resources | PARTIAL (helpers done, Session 27; migration in Piece 3) | bots/free_op_planner.py, cards/effects/early_war.py, engine.py | tests/test_bot_free_ops.py, tests/test_early_war_cards.py | No shared placement/removal-order helper exists; each site hand-rolls. Removal alternation + spare-last-Tory implemented locally for card 6 only (Session 21). Placement order (Forts/Villages → Militia/WP → alternating cubes from fewest), removal order generally, move-Unavailable-first, remove-to-replace-even-without-replacements, March-Underground-first: all unaudited per site. Cited only in free_op_planner comments. |
 | 8.1.3 | Selecting Spaces | OK | — | — | Priority-loop semantics implemented across bot command methods and free_op_planner; ties → §8.2 seeded (Session 21). No section-number citation in code (cite it when next touched). |
 | 8.2 | Random Spaces | OK | bots/free_op_planner.py, bots/random_spaces.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py, engine.py | tests/test_event_space_selection.py | `bots/random_spaces.py` — seeded from state['rng'], column-major arrow walk (fixed Session 21), top-space-first in two-space boxes, re-roll per extra space (`pick_random_spaces`). Equal-chance Play Note used by `free_op_planner._rand_choice` as sanctioned stand-in. Tested: test_event_space_selection.py. |
 | 8.3 | Non-Player Events | OK | bots/base_bot.py, bots/british_bot.py, bots/free_op_planner.py, bots/french.py, bots/indians.py, bots/patriot.py, bots/random_spaces.py, cards/effects/brilliant_stroke.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py, engine.py, util/year_end.py | tests/test_bot_free_ops.py, tests/test_early_war_cards.py, tests/test_event_space_selection.py | Intro only; no normative content beyond 8.3.x below. |
@@ -146,10 +146,22 @@ no citation despite likely implementations.
   changed many event decisions (27/60 baseline flips; Indians 1775
   11→14, French 1778 9→13 — bots stop burning turns on null events).
   Tests: `test_ineffective_friendly_removal.py` (6).
-- **T4 (P1)** §8.1.2 shared placement/removal helpers: build
-  `nonplayer_place_order` / `nonplayer_remove_order` utilities
-  implementing the full priority text; migrate card handlers and bot
-  code site-by-site (Piece 3 companion; card 6 already compliant locally).
+- **T4 — helpers DONE (Session 27); per-site migration continues in
+  Piece 3.** `lod_ai/util/nonplayer_pieces.py` transcribes all six
+  §8.1.2 bullets: friendly placement order, friendly removal (cubes
+  most-first alternation sparing the last Tory/Continental → Active
+  before Underground → Forts/Villages), the move bullet
+  (`pull_to_map` Unavailable-first + the Blockades/Forts/
+  Continentals-Tories/Regulars return order), and the ENEMY bullet
+  (Forts/Villages → Underground before Active → cubes fewest-first, no
+  last-cube protection). The friendly/enemy distinction corrected two
+  of this week's own fixes: Session 21 put card 6's enemy-Militia
+  removal Active-first (friendly order) — reverted to
+  Underground-first; Session 23's cube helper used most-first +
+  last-Tory sparing on an enemy removal — now fewest-first without
+  sparing. Cards 6/32u/43u/46u migrated; unit tests in
+  `test_nonplayer_pieces_812.py` (9). Balance: zero pinned flips
+  (checked over all 60, no rebaseline).
 - **T5 (P2)** §8.1 leader-follow: neighbour ties resolve
   first-in-iteration (should be random); 'largest group that moves from
   origin' approximated by post-move board state

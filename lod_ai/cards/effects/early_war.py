@@ -25,6 +25,9 @@ from lod_ai.rules_consts import (
 from lod_ai.util.naval import move_blockades_to_unavailable, move_blockades_to_west_indies
 from lod_ai.board.control import refresh_control
 from lod_ai.map.adjacency import space_meta
+from lod_ai.util.nonplayer_pieces import (
+    ROYALIST, remove_enemy_cubes, pull_to_map,
+)
 
 def _pick_spaces_with_militia(state, max_spaces=4):
     """Return up to *max_spaces* IDs that contain Patriot Militia."""
@@ -136,31 +139,6 @@ def evt_004_penobscot(state, shaded=False):
         if removed < 3:
             remove_piece(state, MILITIA_A, None, 3 - removed, to="available")
 
-def _remove_british_cubes_812(state, sid, qty):
-    """Remove *qty* British cubes from *sid* to Casualties per §8.1.2:
-    alternate Regulars and Tories beginning with whichever is most in the
-    space (Regulars if even), but if possible without removing the last
-    Tory in the space."""
-    sp = state["spaces"].get(sid, {})
-    take_regular = sp.get(REGULAR_BRI, 0) >= sp.get(TORY, 0)
-    removed = 0
-    while removed < qty:
-        regs, tories = sp.get(REGULAR_BRI, 0), sp.get(TORY, 0)
-        if regs == 0 and tories == 0:
-            break
-        want = REGULAR_BRI if take_regular else TORY
-        if want == TORY and tories == 1 and regs > 0:
-            want = REGULAR_BRI          # spare the last Tory if possible
-        if want == REGULAR_BRI and regs == 0:
-            want = TORY
-        elif want == TORY and tories == 0:
-            want = REGULAR_BRI
-        remove_piece(state, want, sid, 1, to="casualties")
-        removed += 1
-        take_regular = want != REGULAR_BRI   # alternate
-    return removed
-
-
 # 6  BENEDICT ARNOLD
 @register(6)                       # Benedict Arnold
 def evt_006_benedict_arnold(state, shaded=False):
@@ -193,9 +171,12 @@ def evt_006_benedict_arnold(state, shaded=False):
         if not target:
             return
         remove_piece(state, FORT_BRI, target, 1, to="casualties")
-        # §8.1.2 (via §8.3.5): alternate Regulars and Tories beginning with
-        # whichever is most (Regulars if even), sparing the last Tory.
-        _remove_british_cubes_812(state, target, 2)
+        # §8.1.2 ENEMY bullet (via §8.3.5): British pieces are enemy to the
+        # Rebellion executor — alternate cubes beginning with whichever is
+        # FEWEST (Regulars if even); the last-Tory protection applies only
+        # to friendly removal. (Corrects Session 23, which used the
+        # friendly-removal order here.)
+        remove_enemy_cubes(state, target, 2, ROYALIST, to="casualties")
         return
 
     target = _pick_removal_space(FORT_PAT, (MILITIA_A, MILITIA_U),
@@ -203,10 +184,13 @@ def evt_006_benedict_arnold(state, shaded=False):
     if not target:
         return
     remove_piece(state, FORT_PAT,     target, 1, to="casualties")
-    # §8.1.2: Active before Underground Militia.
-    removed = remove_piece(state, MILITIA_A, target, 2, to="available")
+    # §8.1.2 ENEMY bullet: "target enemy Underground Militia or War Parties
+    # before Active ones" — Patriot Militia are enemy to the British
+    # executor. (Corrects Session 21, which applied the FRIENDLY-removal
+    # order, Active-first, to an enemy removal.)
+    removed = remove_piece(state, MILITIA_U, target, 2, to="available")
     if removed < 2:
-        remove_piece(state, MILITIA_U, target, 2 - removed, to="available")
+        remove_piece(state, MILITIA_A, target, 2 - removed, to="available")
 
 # 10  BENJAMIN FRANKLIN TRAVELS TO FRANCE
 @register(10)   # Benjamin Franklin Travels to France
@@ -433,9 +417,8 @@ def evt_032_rule_britannia(state, shaded=False):
     """
     # ---- helper: reference says "from Unavailable or Available" — Unavailable first
     def _pull_from_pools(tag, qty):
-        moved = move_piece(state, tag, "unavailable", target, qty)
-        if moved < qty:
-            move_piece(state, tag, "available", target, qty - moved)
+        # §8.1.2 / §8.3.4 via shared helper: Unavailable first.
+        pull_to_map(state, tag, target, qty)
 
     if shaded:
         cities = pick_cities(state, len(state.get("spaces", {})))
@@ -573,9 +556,7 @@ def evt_043_russian_muskets(state, shaded=False):
         # Equal placement in every qualifying space → §8.2 for the selection;
         # §8.3.4: place from Unavailable first, then Available.
         for loc in pick_random_spaces(state, eligible, 3):
-            moved = move_piece(state, TORY, "unavailable", loc, 2)
-            if moved < 2:
-                move_piece(state, TORY, "available", loc, 2 - moved)
+            pull_to_map(state, TORY, loc, 2)
 
 
 # 46  EDMUND BURKE ON CONCILIATION
@@ -598,10 +579,8 @@ def evt_046_burke(state, shaded=False):
                       if sid != WEST_INDIES_ID]
         # One Tory in each of three spaces — equal priority → §8.2.
         for space in pick_random_spaces(state, candidates, 3):
-            # Reference says "from Unavailable or Available" — Unavailable first
-            moved = move_piece(state, TORY, "unavailable", space, 1)
-            if moved < 1:
-                move_piece(state, TORY, "available", space, 1 - moved)
+            # "from Unavailable or Available" — Unavailable first (§8.1.2).
+            pull_to_map(state, TORY, space, 1)
 
 
 # 49 CLAUDE LOUIS, COMTE de SAINT-GERMAIN
