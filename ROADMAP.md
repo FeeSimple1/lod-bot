@@ -68,12 +68,17 @@ report + targeted scenario tests (or bug fixes) for every never-fired
 branch. A branch that never fires in 1,000+ games is either a
 transcription error or untested in practice.
 
-## Piece 6 — Playbook goldens  [BLOCKED: needs source material]
+## Piece 6 — Playbook goldens  [UNBLOCKED]
 
 The Playbook's Non-Player Examples of Play are official oracle data:
 encode each documented setup and assert the bot makes the documented
-choice. BLOCKED until the Playbook text is added to Reference
-Documents (it is not currently in the folder). Owner action: Eric.
+choice. Source now in Reference Documents (`LOD_Playbook_Aug2016.pdf`
++ `Playbook Aug2016.txt`): five step-by-step Non-player walk-throughs
+(pp. 19-27), all set at the start of the 1776 Medium scenario with
+Patriots+French as the player. Also contains errata (blue text in the
+PDF), the Event Text and Background section (useful cross-check for
+the Piece 3 card audit), and Non-Player Designer's Notes. The Event
+Instructions sheet wording is NOT in it — T12 stays blocked on Q15.
 
 ## Piece 7 — Human-mode completeness
 
