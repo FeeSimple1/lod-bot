@@ -34,15 +34,18 @@ class TestEventInstructionTable:
     def test_indians_card_80_is_force_if_80(self):
         assert EI.INDIANS[80] == "force_if_80"
 
-    def test_indians_card_86_is_force(self):
-        assert EI.INDIANS[86] == "force"
+    def test_indians_card_86_not_in_indian_directives(self):
+        """Card 86 (Stockbridge Indians) is ICON: 'P – Musket' only in the
+        card reference — Indians have no §8.3.1 instructions for it and
+        follow their flowchart. (An old INDIANS entry was unreachable dead
+        data and was removed; see test_icon_data_matches_reference.py for
+        the general key↔icon consistency check.)"""
+        assert 86 not in EI.INDIANS
+        assert EI.PATRIOTS[86] == "force"
 
     def test_patriots_card_80_is_force_if_80(self):
         assert EI.PATRIOTS[80] == "force_if_80"
 
-    def test_indians_card_86_present_regression_guard(self):
-        """Card 86 must be present in the INDIANS dict (regression guard)."""
-        assert 86 in EI.INDIANS
 
 
 # =====================================================================

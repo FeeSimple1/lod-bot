@@ -28,7 +28,7 @@ no citation exists.
 | 8.1.3 | Selecting Spaces | OK | — | — | Priority-loop semantics implemented across bot command methods and free_op_planner; ties → §8.2 seeded (Session 21). No section-number citation in code (cite it when next touched). |
 | 8.2 | Random Spaces | OK | bots/free_op_planner.py, bots/random_spaces.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py, engine.py | tests/test_event_space_selection.py | `bots/random_spaces.py` — seeded from state['rng'], column-major arrow walk (fixed Session 21), top-space-first in two-space boxes, re-roll per extra space (`pick_random_spaces`). Equal-chance Play Note used by `free_op_planner._rand_choice` as sanctioned stand-in. Tested: test_event_space_selection.py. |
 | 8.3 | Non-Player Events | OK | bots/base_bot.py, bots/british_bot.py, bots/free_op_planner.py, bots/french.py, bots/indians.py, bots/patriot.py, bots/random_spaces.py, cards/effects/brilliant_stroke.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py, engine.py, util/year_end.py | tests/test_bot_free_ops.py, tests/test_early_war_cards.py, tests/test_event_space_selection.py | Intro only; no normative content beyond 8.3.x below. |
-| 8.3.1 | Event Instructions | PARTIAL (T2+T8, P1) | engine.py | — | `bots/event_instructions.py` implements musket directives, BUT non-British dicts are self-described 'pared-down' (Piece 3: transcribe full Brown Bess sheet). Second-faction instructions applying to granted free actions: NOT consulted by `engine._drain_free_ops` → T8. Sword auto-ignore: no icon data anywhere in code → T2. |
+| 8.3.1 | Event Instructions | PARTIAL (T2+T8, P1) | engine.py | — | `bots/event_instructions.py` implements musket directives, BUT non-British dicts are self-described 'pared-down' — but keys verified complete vs musket icons (Session 24); CONTENT audit blocked on Q15. Second-faction instructions applying to granted free actions: NOT consulted by `engine._drain_free_ops` → T8. Sword auto-ignore implemented + data-verified (T2 closed, Session 24). |
 | 8.3.2 | Dual-Use Events | OK | cards/effects/shared.py | — | `base_bot._execute_event` / `_is_ineffective_event`: shaded iff dual and faction in {PATRIOTS, FRENCH}; force_shaded/unshaded directives override. `select_support_shift_spaces` mirrors it for side inference. |
 | 8.3.3 | Ineffective Events | PARTIAL (T3, P1) | bots/base_bot.py, cards/effects/shared.py | tests/test_event_space_selection.py | No-effect simulation + net-shift-favors-enemy clause implemented (Session 21, `base_bot._is_ineffective_event`; tested). MISSING third clause: 'only effect would be to remove one or more friendly pieces without replacing them' → T3. |
 | 8.3.4 | Event Placement | PARTIAL | cards/effects/early_war.py | — | Unavailable-first fixed at cards 32u/43u/46u (Session 21); every other place/relocate site unaudited → fold into Piece 3 card audit. |
@@ -107,10 +107,24 @@ no citation despite likely implementations.
   all, RL silently executed (or was skipped) at the wrong space.
   Balance rebaselined: 33/60 pinned winners flipped — expected for a
   sequence-of-play-wide fix; 1776 remains Patriot-favoured (12/20).
-- **T2 (P1)** §8.1/§8.3.1 sword-icon auto-ignore: no icon data exists in
-  code (`grep -ri sword lod_ai` → nothing). Check every sword-underlined
-  faction symbol in `card reference full.txt` against the per-faction
-  event-condition tables; encode icon data and auto-ignore if not covered.
+- **T2 — CLOSED (Session 24), record corrected.** The Session 22 claim
+  "no icon data exists in code" was a FALSE POSITIVE (case-sensitive
+  grep): `base_bot._choose_event_vs_flowchart` implements the sword
+  auto-ignore and `lod_ai/cards/data.json` carries `faction_icons` that
+  match the reference ICON lines exactly on all 109 cards (verified).
+  The musket-directive dicts also key exactly the musket-icon cards per
+  faction — the "pared-down" comment was stale (one unreachable INDIANS
+  entry for card 86, P-Musket only, removed). Permanent drift test:
+  `test_icon_data_matches_reference.py`. Directive CONTENT remains
+  unauditable in-repo → see QUESTIONS.md Q15 (sheet text needed).
+- **T12 (P1, suspected defect — blocked on Q15 source text)**
+  `base_bot` `force_if_eligible_enemy` (cards 18/44) computes
+  `enemies = {BRITISH, INDIANS, FRENCH} − {self.faction}`: the British
+  bot counts its Indian ALLY as an enemy, and PATRIOTS are never
+  anyone's enemy. Structurally wrong under any reading, but the exact
+  intended condition is on the Event Instructions sheet, which is not in
+  Reference Documents. Confirm wording, then fix per side (Royalist
+  enemies = {PATRIOTS, FRENCH}; Rebellion enemies = {BRITISH, INDIANS}).
 - **T3 (P1)** §8.3.3 missing clause: "only effect would be to remove one
   or more friendly pieces without replacing them" — extend
   `_is_ineffective_event` (piece-delta bookkeeping per faction).

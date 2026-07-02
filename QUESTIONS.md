@@ -151,3 +151,21 @@ EQUAL priority only; §8.3.3 makes a no-effect (or enemy-favoring) Event
 Ineffective. A maxed-out City has zero gain and can never tie a City where
 the shift works, so the escalated dilemma cannot arise. Implemented in
 Session 21 (see audit_report.md) with no human ruling needed.
+
+---
+
+## Q15: Missing source texts — Event Instructions sheet + Playbook examples — OPEN (needs materials, not a ruling)
+
+Two official texts are absent from Reference Documents and block audits:
+
+1. **Event Instructions sheet** (reverse of the Random Spaces sheet,
+   §8.3.1). The `event_instructions.py` directive KEYS are verified
+   complete against the card ICON lines, but the directive CONTENT
+   (conditions like "target eligible enemy", "ignore if 4+ Militia")
+   cannot be checked against anything in-repo. It is also needed to
+   resolve T12 (the `force_if_eligible_enemy` enemy-set looks wrong:
+   British treat Indians as an enemy and nobody treats Patriots as one).
+2. **Playbook "Non-Player Examples of Play"** — needed for ROADMAP
+   Piece 6 (golden oracle tests).
+
+Action (Eric): add both texts to Reference Documents.

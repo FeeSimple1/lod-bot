@@ -2759,3 +2759,28 @@ flipped, the expected magnitude for a fix that changes every
 9/8/2/1 → 5/10/2/3 (PAT/FRE/IND/BRI). British recover share everywhere,
 consistent with previously-suppressed SAs; 1776 remains Patriot-favoured
 as documented in Session 17.
+
+## Session 24: T2 sword/musket icon audit — record correction (July 2026)
+
+T2's premise was wrong and is hereby corrected: Session 22 claimed "no
+sword icon data exists in code" based on a case-sensitive grep. In fact
+`base_bot._choose_event_vs_flowchart` has always checked
+`card["faction_icons"]` for SWORD (auto-ignore, §8.1) and MUSKET
+(directive consult, §8.3.1), and `lod_ai/cards/data.json` carries
+`faction_icons` for every card. This session verified the data instead:
+
+- data.json icons == reference ICON lines, all 109 cards, exact match.
+- event_instructions dict keys == musket-icon sets, all four factions
+  (the "pared-down" comment was stale). One unreachable extra removed:
+  INDIANS card 86 (reference: P-Musket only).
+- New permanent drift test `test_icon_data_matches_reference.py`
+  (4 tests): data.json vs reference, dict keys vs musket sets, no
+  sword/directive overlap, and end-to-end sword auto-ignore behaviour.
+
+Found in passing, NOT fixed (blocked on missing source text, QUESTIONS.md
+Q15): `force_if_eligible_enemy` computes enemies as
+{BRITISH, INDIANS, FRENCH} − {self}, so British count their Indian ally
+as an enemy and Patriots are never counted as anyone's enemy (T12).
+
+Lesson recorded: negative claims ("X does not exist in the code") must be
+verified case-insensitively and against data files, not just .py sources.

@@ -37,6 +37,11 @@ PATRIOTS = {
     90: "force_unshaded",             # "The World Turned Upside Down" — use unshaded text
 }
 
+# (Card 86 Stockbridge Indians previously had an INDIANS entry, but the
+# reference ICON line is "P – Musket" only — Indians have no 8.3.1
+# instructions there and follow their flowchart. The entry was unreachable
+# anyway: base_bot consults these dicts only when the faction's symbol
+# carries the Musket icon. Removed Session 24.)
 INDIANS = {
     4: "force_shaded",    # The Penobscot Expedition — "Use the shaded text." (conditional in IndianBot override)
     18: "force",   # "If it hadn't been so stormy…" (eligible-enemy condition in IndianBot override)
@@ -50,7 +55,6 @@ INDIANS = {
     72: "force",   # French Settlers Help (village condition in IndianBot override)
     80: "force_if_80",   # Confusion Allows Slaves to Escape — errata: Patriot Fort removable, else C&SA
     83: "force",   # Guy Carleton and Indians Negotiate (special handling in IndianBot override)
-    86: "force",   # Stockbridge Indians — "Select a Village space if possible."
     88: "force",   # "If it hadn't been so foggy…"
     89: "force",   # War Damages Colonies' Economy
     90: "force",   # "The World Turned Upside Down" (village condition in IndianBot override)
