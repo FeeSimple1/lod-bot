@@ -2696,3 +2696,23 @@ per-scenario faction aggregates moved ≤2/20 and 1776 is unchanged).
 Known remaining (not fixed here): other alphabetical/dict-order subset
 picks in `late_war.py` (lines ~155/167/205/795/1005) and possibly
 `middle_war.py` need the same card-by-card audit against §8.3.5/§8.2.
+
+## Session 22: Traceability matrix bootstrap — Manual Ch 8 (July 2026)
+
+Started ROADMAP.md Piece 1. `TRACEABILITY.md` now maps all 60 numbered
+Ch 8 sections to code/tests (mechanical citation scan + hand verification
+of §8.1–§8.3.8). Audit-only session — no behaviour changes.
+
+Headline finding — **T1 (P0)**: §8.1 "Commands Not Limited" is violated.
+`engine._options_for_slot` hands every 2nd-eligible-after-a-Command seat
+`limited_only=True, special_allowed=False`, including bot seats, and
+engine.py:619-622 enforces it. The manual: a Non-player told to execute a
+Limited Command "instead executes a full Command and Special Activity."
+Every bot 2nd-eligible turn after a 1st-eligible Command has been wrongly
+capped at one space with no SA. (Event-granted free LimComs are correctly
+limited in the free-op path.) Fix queued with full battery + rebaseline.
+
+Ten further backlog items T2–T11 recorded in TRACEABILITY.md, notably:
+sword-icon auto-ignore has no supporting data anywhere in the code (T2);
+§8.3.3's remove-friendly-without-replacement clause is unimplemented
+(T3); §8.1.2 has no shared placement/removal-order helpers (T4).
