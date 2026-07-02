@@ -194,9 +194,24 @@ class BaseBot:
                     return True
                 return False  # French is human → Command & SA instead
             if directive == "force_if_eligible_enemy":
-                enemies = {C.BRITISH, C.INDIANS, C.FRENCH} - {self.faction}
+                # Sheet (cards 18/44): "Target an Eligible enemy Faction.
+                # If none, choose Command & Special Activity instead."
+                # Enemy = the other SIDE (Glossary / 1.5.2), so Royalist
+                # bots target Rebellion factions and vice versa.
                 eligible = state.get("eligible", {})
-                if any(eligible.get(e, False) for e in enemies):
+                elig_enemies = [e for e in self._enemy_factions()
+                                if eligible.get(e, False)]
+                if elig_enemies:
+                    # §8.3.5: harmful choice → random enemy, player first.
+                    humans = state.get("human_factions", set()) or set()
+                    pool = ([e for e in elig_enemies if e in humans]
+                            or elig_enemies)
+                    rng = state.get("rng")
+                    if rng is not None and len(pool) > 1:
+                        target = pool[rng.randrange(len(pool))]
+                    else:
+                        target = sorted(pool)[0]
+                    state[f"card{card['id']}_target_faction"] = target
                     self._execute_event(card, state)
                     return True
                 return False  # No eligible enemy → Command & SA instead
@@ -277,6 +292,13 @@ class BaseBot:
         return False          # subclass will override
 
     # optional
+    def _enemy_factions(self) -> tuple:
+        """Factions of the other Side (Glossary "Enemy"; 1.5.2):
+        Royalist = British + Indians, Rebellion = Patriots + French."""
+        if self.faction in (C.BRITISH, C.INDIANS):
+            return (C.PATRIOTS, C.FRENCH)
+        return (C.BRITISH, C.INDIANS)
+
     def _is_ineffective_event(self, card: Dict, state: Dict) -> bool:
         """Return True if executing *card* would be Ineffective per §8.3.3:
         it would have no effect at all, or it would shift the difference

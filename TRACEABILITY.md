@@ -28,7 +28,7 @@ no citation exists.
 | 8.1.3 | Selecting Spaces | OK | — | — | Priority-loop semantics implemented across bot command methods and free_op_planner; ties → §8.2 seeded (Session 21). No section-number citation in code (cite it when next touched). |
 | 8.2 | Random Spaces | OK | bots/free_op_planner.py, bots/random_spaces.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py, engine.py | tests/test_event_space_selection.py | `bots/random_spaces.py` — seeded from state['rng'], column-major arrow walk (fixed Session 21), top-space-first in two-space boxes, re-roll per extra space (`pick_random_spaces`). Equal-chance Play Note used by `free_op_planner._rand_choice` as sanctioned stand-in. Tested: test_event_space_selection.py. |
 | 8.3 | Non-Player Events | OK | bots/base_bot.py, bots/british_bot.py, bots/free_op_planner.py, bots/french.py, bots/indians.py, bots/patriot.py, bots/random_spaces.py, cards/effects/brilliant_stroke.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py, engine.py, util/year_end.py | tests/test_bot_free_ops.py, tests/test_early_war_cards.py, tests/test_event_space_selection.py | Intro only; no normative content beyond 8.3.x below. |
-| 8.3.1 | Event Instructions | PARTIAL (T2+T8, P1) | engine.py | — | `bots/event_instructions.py` implements musket directives, BUT non-British dicts are self-described 'pared-down' — but keys verified complete vs musket icons (Session 24); CONTENT audit blocked on Q15. Second-faction instructions applying to granted free actions: NOT consulted by `engine._drain_free_ops` → T8. Sword auto-ignore implemented + data-verified (T2 closed, Session 24). |
+| 8.3.1 | Event Instructions | PARTIAL (T2+T8, P1) | engine.py | — | `bots/event_instructions.py` implements musket directives, BUT non-British dicts are self-described 'pared-down' — but keys verified complete vs musket icons (Session 24); CONTENT audit unblocked: sheet text = the per-faction Special Instructions sections in the flowchart reference files (Piece 3). Second-faction instructions applying to granted free actions: NOT consulted by `engine._drain_free_ops` → T8. Sword auto-ignore implemented + data-verified (T2 closed, Session 24). |
 | 8.3.2 | Dual-Use Events | OK | cards/effects/shared.py | — | `base_bot._execute_event` / `_is_ineffective_event`: shaded iff dual and faction in {PATRIOTS, FRENCH}; force_shaded/unshaded directives override. `select_support_shift_spaces` mirrors it for side inference. |
 | 8.3.3 | Ineffective Events | PARTIAL (T3, P1) | bots/base_bot.py, cards/effects/shared.py | tests/test_event_space_selection.py | No-effect simulation + net-shift-favors-enemy clause implemented (Session 21, `base_bot._is_ineffective_event`; tested). MISSING third clause: 'only effect would be to remove one or more friendly pieces without replacing them' → T3. |
 | 8.3.4 | Event Placement | PARTIAL | cards/effects/early_war.py | — | Unavailable-first fixed at cards 32u/43u/46u (Session 21); every other place/relocate site unaudited → fold into Piece 3 card audit. |
@@ -117,14 +117,23 @@ no citation despite likely implementations.
   entry for card 86, P-Musket only, removed). Permanent drift test:
   `test_icon_data_matches_reference.py`. Directive CONTENT remains
   unauditable in-repo → see QUESTIONS.md Q15 (sheet text needed).
-- **T12 (P1, suspected defect — blocked on Q15 source text)**
-  `base_bot` `force_if_eligible_enemy` (cards 18/44) computes
-  `enemies = {BRITISH, INDIANS, FRENCH} − {self.faction}`: the British
-  bot counts its Indian ALLY as an enemy, and PATRIOTS are never
-  anyone's enemy. Structurally wrong under any reading, but the exact
-  intended condition is on the Event Instructions sheet, which is not in
-  Reference Documents. Confirm wording, then fix per side (Royalist
-  enemies = {PATRIOTS, FRENCH}; Rebellion enemies = {BRITISH, INDIANS}).
+- **T12 — FIXED (Session 25).** The Event Instructions sheet contents
+  were in Reference Documents all along — the "Special Instructions"
+  sections at the bottom of each `* bot flowchart and reference.txt`
+  (Session 22/24 claims of a missing source corrected; the sections are
+  keyed by card TITLE, which is why number-based greps missed them).
+  Sheet wording for 18/44: "Target an Eligible enemy Faction. If none,
+  choose Command & Special Activity instead." Fixed per the Glossary
+  ("Enemy: assets of the other Side", 1.5.2): Royalist bots target
+  {PATRIOTS, FRENCH}, Rebellion bots {BRITISH, INDIANS}; target chosen
+  per §8.3.5 harm ordering (random enemy, player first) and passed to
+  the card 18/44 handlers, which previously defaulted to BRITISH /
+  PATRIOTS and could make the EXECUTOR ineligible. Handlers now
+  side-aware when no explicit target. Also fixed while re-running the
+  battery: the free-op battle planner approved French Battles pre-ToA
+  that `battle.execute` rejects (§3.5) — now a genuine decline.
+  Tests: `test_force_if_eligible_enemy.py` (6),
+  `test_bot_free_ops.py::test_french_free_battle_pre_toa…`.
 - **T3 (P1)** §8.3.3 missing clause: "only effect would be to remove one
   or more friendly pieces without replacing them" — extend
   `_is_ineffective_event` (piece-delta bookkeeping per faction).

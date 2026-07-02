@@ -158,18 +158,17 @@ Session 21 (see audit_report.md) with no human ruling needed.
 
 Two official texts are absent from Reference Documents and block audits:
 
-1. **Event Instructions sheet** (reverse of the Random Spaces sheet,
-   §8.3.1). The `event_instructions.py` directive KEYS are verified
-   complete against the card ICON lines, but the directive CONTENT
-   (conditions like "target eligible enemy", "ignore if 4+ Militia")
-   cannot be checked against anything in-repo. It is also needed to
-   resolve T12 (the `force_if_eligible_enemy` enemy-set looks wrong:
-   British treat Indians as an enemy and nobody treats Patriots as one).
+1. **Event Instructions sheet** — RESOLVED (Eric): the sheet contents
+   have been in Reference Documents all along, as the per-faction
+   "Special Instructions" sections at the BOTTOM of each
+   `* bot flowchart and reference.txt` (keyed by card title, not
+   number — the reason earlier searches missed them). T12 fixed against
+   that text in Session 25; the full directive-content audit is now
+   unblocked (ROADMAP Piece 3).
 2. **Playbook "Non-Player Examples of Play"** — RESOLVED: Eric supplied
    `LOD_Playbook_Aug2016.pdf`; added to Reference Documents as PDF +
    extracted text (`Playbook Aug2016.txt`). Unblocks ROADMAP Piece 6.
    Note: the Playbook does NOT contain the Event Instructions sheet
    wording, so item 1 (and T12) remains open.
 
-Action (Eric): add the Event Instructions sheet text (reverse of the
-Random Spaces sheet) to Reference Documents.
+Both items resolved — no outstanding source-material requests.

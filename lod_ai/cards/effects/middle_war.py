@@ -680,7 +680,10 @@ def evt_042_attack_danbury(state, shaded=False):
 @register(44)
 def evt_044_mansfield_recalled(state, shaded=False):
     if not shaded:
-        target = state.get("card44_target_faction", PATRIOTS)
+        target = state.get("card44_target_faction")
+        if target not in {BRITISH, PATRIOTS, FRENCH, INDIANS}:
+            active = str(state.get("active", BRITISH)).upper()
+            target = PATRIOTS if active in (BRITISH, INDIANS) else BRITISH
         state.setdefault("ineligible_through_next", set()).add(target)
         push_history(state, f"Card 44 unshaded: {target} ineligible through next")
 

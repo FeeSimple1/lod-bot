@@ -180,9 +180,12 @@ def evt_018_if_not_stormy(state, shaded=False):
     """
     if shaded:
         return
-    target = state.get("card18_target_faction", BRITISH)
+    target = state.get("card18_target_faction")
     if target not in {BRITISH, PATRIOTS, FRENCH, INDIANS}:
-        target = BRITISH
+        # No explicit target (non-bot path without a CLI choice): default
+        # to an enemy of the executing faction (Glossary 1.5.2), never self.
+        active = str(state.get("active", PATRIOTS)).upper()
+        target = PATRIOTS if active in (BRITISH, INDIANS) else BRITISH
     state.setdefault("ineligible_through_next", set()).add(target)
     push_history(state, f"Card 18 unshaded: {target} ineligible through next")
 

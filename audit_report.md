@@ -2784,3 +2784,34 @@ as an enemy and Patriots are never counted as anyone's enemy (T12).
 
 Lesson recorded: negative claims ("X does not exist in the code") must be
 verified case-insensitively and against data files, not just .py sources.
+
+## Session 25: T12 fixed — cards 18/44 enemy targeting (July 2026)
+
+Eric pointed out the Event Instructions sheet contents live at the
+bottom of each flowchart reference file ("Special Instructions",
+keyed by card TITLE — number-based greps missed them; second search
+false-negative this week, lesson repeated). Sheet wording for 18/44:
+"Target an Eligible enemy Faction. If none, choose Command & Special
+Activity instead."
+
+Fixes:
+- `base_bot.force_if_eligible_enemy`: enemy set was
+  {BRITISH, INDIANS, FRENCH} − {self} (British counted their Indian
+  ally; Patriots were never an enemy). Now side-based per Glossary
+  "Enemy" (1.5.2) via `_enemy_factions()`; among multiple eligible
+  enemies the target is chosen per §8.3.5 harm ordering (random enemy,
+  player first, seeded rng) and passed via card{18,44}_target_faction.
+- Card 18/44 handlers hard-defaulted to BRITISH / PATRIOTS — a British
+  bot playing 18 made ITSELF ineligible. Now side-aware fallback from
+  state["active"] when no explicit target (human CLI target selection
+  remains a Piece 7 item).
+- Free-op battle planner approved French Battle grants pre-ToA that
+  battle.execute rejects (§3.5) — surfaced as a FREE BATTLE_PLUS2 skip
+  on gate seed 1775:13 after the targeting change shifted trajectories.
+  Planner now declines pre-ToA French battles (genuine decline).
+
+Verification: both roots green (1,249 + 41; 7 tests added); gate clean
+seeds 1-20 invariants-on; balance rebaselined — 11/60 flips,
+concentrated in 1775 (Indians 7→11: Royalist events no longer waste
+targeting on allies, and Indians are never targeted by British);
+1776 aggregate unchanged.

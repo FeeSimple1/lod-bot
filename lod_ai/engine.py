@@ -305,6 +305,11 @@ class Engine:
             return sorted(ties)[0]
 
         if op in ("battle", "battle_plus2"):
+            # Planner must agree with the executor: §3.5 — French cannot
+            # Battle before the Treaty of Alliance (battle.execute raises;
+            # a pre-ToA grant is a genuine decline, not a skip).
+            if faction == C.FRENCH and not st.get("toa_played"):
+                return None
             cands = [sid for sid in spaces
                      if self._own_force_in(st, sid, faction) > 0
                      and self._enemy_force_in(st, sid, faction) > 0]

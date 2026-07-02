@@ -301,3 +301,26 @@ def test_free_indian_march_never_targets_a_city():
         from lod_ai.map import adjacency as map_adj
         dest = hist.split("FREE MARCH by INDIANS in ")[1].split(" |")[0].strip()
         assert map_adj.space_type(dest) != "City"
+
+
+def test_french_free_battle_pre_toa_is_genuine_decline():
+    """§3.5: French cannot Battle before the Treaty of Alliance. A card
+    granting French a free Battle pre-ToA must be a planner decline
+    ('no legal plan'), not an execution skip — battle.execute raises on
+    the ToA gate that the planner previously did not check."""
+    from lod_ai.engine import Engine
+    from lod_ai import rules_consts as C
+
+    eng = Engine(initial_state={
+        "spaces": {"Boston": {C.REGULAR_FRE: 2, C.REGULAR_BRI: 2}},
+        "resources": {C.BRITISH: 9, C.PATRIOTS: 9, C.FRENCH: 9, C.INDIANS: 9},
+        "available": {}, "unavailable": {}, "markers": {}, "support": {},
+    })
+    eng.set_human_factions(set())
+    assert not eng.state.get("toa_played")
+    plan = eng._plan_bot_free_op(eng.state, C.FRENCH, "battle_plus2", None)
+    assert plan is None  # genuine decline
+
+    eng.state["toa_played"] = True
+    plan = eng._plan_bot_free_op(eng.state, C.FRENCH, "battle_plus2", None)
+    assert plan == {"space": "Boston"}
