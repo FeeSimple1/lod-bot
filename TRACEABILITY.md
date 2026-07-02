@@ -186,6 +186,14 @@ no citation despite likely implementations.
   verify or implement (lone player never wins mid-game; NP tie order
   French > Indian > Patriot; difficulty option).
 
+- **T13 (P2)** B51/P51 (and milder B52/P52) force-conditions hand-roll
+  battle math superseded by `battle.bot_battle_scores` + the free-March
+  planner — rebuild on the faithful helpers (audit Session 28).
+- **T14 (P2)** Execution-guidance sweep across ~16 handler sites (see
+  audit_report Session 28 list) — fold into the Piece 3 card audit.
+- **T15 (P3)** "Would-be-removed / would-gain" sheet conditions
+  approximated as "exists" (P80, F73, F95, F83) — tighten by simulation.
+
 ## Verification pass queue
 
 1. §8.4 + 8.4.1–8.4.11 vs `british_bot.py` (+ supply/desertion/redeploy

@@ -1434,8 +1434,6 @@ class IndianBot(BaseBot):
     # Cards where the Indian special instruction says
     # "If no Village can be placed, Command & SA instead."
     _VILLAGE_REQUIRED_CARDS = {4, 72, 90}
-    # Cards: "Target an Eligible enemy Faction. If none, Command & SA."
-    _ELIGIBLE_ENEMY_CARDS = {18, 44}
     # Card 38: "Place War Parties; if not possible, Command & SA instead."
     _WP_REQUIRED_CARDS = {38}
     # Card 83: "Use shaded if Village can be placed, otherwise unshaded."
@@ -1455,14 +1453,6 @@ class IndianBot(BaseBot):
             return True
         return False
 
-    def _has_eligible_enemy(self, state: Dict) -> bool:
-        """Return True if any enemy faction is currently Eligible."""
-        elig_map = state.get("eligible", {})
-        for fac in (C.PATRIOTS, C.FRENCH):
-            if elig_map.get(fac, True):  # default True if not tracked
-                return True
-        return False
-
     def _can_place_war_parties(self, state: Dict) -> bool:
         """Return True if War Parties can be placed (any available)."""
         return (state["available"].get(C.WARPARTY_U, 0)
@@ -1471,8 +1461,11 @@ class IndianBot(BaseBot):
     def _choose_event_vs_flowchart(self, state: Dict, card: Dict) -> bool:
         """Override base to handle Indian conditional event instructions.
         Cards 4/72/90: play event only if Village can be placed.
-        Cards 18/44: play event only if eligible enemy exists.
         Card 38: play event only if War Parties can be placed.
+        (Cards 18/44 route through the generic force_if_eligible_enemy
+        directive, which also TARGETS the chosen enemy per the sheet and
+        §8.3.5 — the old local check verified eligibility but let the
+        handler fall back to a default target.)
         Card 83: shaded if Village placeable, else unshaded.
         """
         cid = card.get("id")
@@ -1502,9 +1495,6 @@ class IndianBot(BaseBot):
         if cid in self._VILLAGE_REQUIRED_CARDS:
             if not self._can_place_village(state):
                 return False  # fall through to flowchart (Command & SA)
-        elif cid in self._ELIGIBLE_ENEMY_CARDS:
-            if not self._has_eligible_enemy(state):
-                return False
         elif cid in self._WP_REQUIRED_CARDS:
             if not self._can_place_war_parties(state):
                 return False

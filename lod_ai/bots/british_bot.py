@@ -267,10 +267,12 @@ class BritishBot(BaseBot):
         if directive == "force_if_80":
             # Card 80: "Choose a Rebel Faction with pieces in Cities, and select
             # Cities where that Faction has pieces. If none, Command & SA."
+            # Sheet: "Choose a REBEL Faction with pieces in Cities" —
+            # Rebellion = Patriots + French (1.5.2). Indians are Royalist
+            # and were wrongly listed here (audit Session 28).
             rebel_tags = {
                 C.PATRIOTS: [C.REGULAR_PAT, C.MILITIA_A, C.MILITIA_U, C.FORT_PAT],
                 C.FRENCH: [C.REGULAR_FRE],
-                C.INDIANS: [C.WARPARTY_A, C.WARPARTY_U, C.VILLAGE],
             }
             for faction, tags in rebel_tags.items():
                 for city_sid in CITIES:

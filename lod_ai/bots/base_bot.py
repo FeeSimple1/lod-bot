@@ -275,12 +275,19 @@ class BaseBot:
     def _condition_satisfied(self, directive: str, state: Dict, card: Dict) -> bool:
         """Evaluate conditional directives from the instruction sheet."""
         if directive.startswith("ignore_if_") and "militia" in directive:
+            # Card 29: "Patriots … must Activate their Militia … until ½ of
+            # them are Active, rounding down." Sheet (British): "Target
+            # Patriots. If < 4 Militia would Activate, choose Command &
+            # Special Activity instead." The number that WOULD Activate is
+            # floor(total/2) − already-Active, not half the Underground
+            # count (audit Session 28).
             try:
                 threshold = int(directive.split("_")[2])
             except (IndexError, ValueError):
                 return False
             hidden = sum(sp.get(C.MILITIA_U, 0) for sp in state["spaces"].values())
-            to_flip = hidden // 2
+            active = sum(sp.get(C.MILITIA_A, 0) for sp in state["spaces"].values())
+            to_flip = max(0, (hidden + active) // 2 - active)
             return to_flip < threshold
         return False
 

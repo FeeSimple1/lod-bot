@@ -2884,3 +2884,58 @@ reference passage in one week (T2 grep, Q15 sheet location, now the
 friendly/enemy bullets). The pattern: acting on a partial reading.
 The traceability matrix exists precisely to force full-section reads;
 Piece 2 should extend it to Ch 1-7 before more Ch 1-7-dependent fixes.
+
+## Session 28: Event Instructions content audit — all 48 sheet entries (July 2026)
+
+Source: the per-faction "Special Instructions" sections at the bottom of
+the four flowchart reference files (located Session 25). Every entry was
+classified (play-condition / text-side selection / execution guidance)
+and checked against event_instructions.py, the per-bot condition code,
+and (where cheap) the handlers. Verdicts:
+
+**Fixed this session (3):**
+- BRITISH 80: condition counted INDIAN pieces as a "Rebel Faction with
+  pieces in Cities" — Indians are Royalist (1.5.2). Dropped.
+- INDIANS 18/44: the local override verified an eligible enemy existed
+  but never TARGETED one; the handler then defaulted (post-T12,
+  side-aware, but not eligibility-aware — only-French-eligible produced
+  a Patriot target). Now routed through the generic
+  force_if_eligible_enemy directive (condition + §8.3.5 targeting);
+  local helper and card-set removed.
+- BRITISH 29 (ignore_if_4_militia): "would Activate" was computed as
+  Underground//2, ignoring already-Active Militia. Card 29 activates
+  "until ½ of them are Active", so the count is floor(total/2) − Active.
+  With 8U/6A the old formula said 4 (play), the correct count is 1
+  (ignore).
+
+**Verified OK (18):** B18/B44/P18/P44/I18/I44 (post-T12), P8 (matches
+"If French is a human player, C&SA"), P71 + P90 + I32 + I4 + I38
+(text-side selections incl. village/WP placement conditions), I72/I90
+(village conditions), I83 (side-pick on village placeability), B62
+(New York Active-Opp + no-Tories condition), B70/P70/I70/F70 (Q2
+audit), F52 (+ no-remove flag), F62 (militia-only flag).
+
+**Backlog (new items in TRACEABILITY.md):**
+- T13 (P2): B51/P51 "March to set up Battle per the Battle
+  instructions" conditions hand-roll Force-Level math (min-pairing,
+  halving approximations) that Sessions 19-20 eliminated from
+  B12/P4/F16 — rebuild on battle.bot_battle_scores + the free-March
+  planner. B52/P52 similar but milder.
+- T14 (P2, fold into Piece 3): execution-guidance sweep — verify the
+  HANDLERS implement per-faction selection guidance: B23 (move
+  Patriots Support→non-Support), B30 shaded (leave 1 Regular per
+  space; also the directive "force" is a layer error — the sheet gives
+  no play condition for unshaded 30), B52 (removal sites), B80/I80
+  (City/Fort space selection), B88/P88/I88/F88 (March origin shared
+  with enemy), B95/I21 (non-Village first)/I22 (Village first)/I86/P86
+  (Village space)/I89/F89 (Active Support first), P83 (Quebec City
+  control), B29/P29/I29 (Activation targeting — partial test coverage
+  exists).
+- T15 (P3): "would-be-removed/would-gain" conditions approximated as
+  "exists": P80 (any Village vs Village-would-be-removed), F73/F95
+  (Fort exists vs Fort-would-be-removed), F83 (assumes 3 pieces might
+  flip Quebec City control). Tighten by simulation.
+
+Tests: test_force_if_eligible_enemy.py +2 (card 80 Indians-excluded,
+card 29 formula), test_indian_bot_compliance.py rewritten 18/44 test
+(targeting via generic directive).

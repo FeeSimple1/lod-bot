@@ -78,3 +78,30 @@ def test_card44_handler_never_self_targets_without_override():
     evt_044_mansfield_recalled(st, shaded=False)
     assert C.PATRIOTS not in st["ineligible_through_next"]
     assert C.BRITISH in st["ineligible_through_next"]
+
+
+def test_british_card80_condition_excludes_indian_pieces():
+    """Sheet (British, card 80): "Choose a REBEL Faction with pieces in
+    Cities" — Rebellion is Patriots + French (1.5.2). Indian War Parties
+    in a City must not satisfy the condition (they did before Session 28)."""
+    from lod_ai.bots.british_bot import BritishBot
+    bot = BritishBot()
+    st = _state({})
+    st["spaces"] = {"Boston": {C.WARPARTY_U: 2}}
+    assert bot._force_condition_met("force_if_80", st, {"id": 80}) is False
+    st["spaces"]["Boston"][C.MILITIA_U] = 1
+    assert bot._force_condition_met("force_if_80", st, {"id": 80}) is True
+
+
+def test_card29_would_activate_accounts_for_already_active():
+    """Card 29: activation runs "until ½ of them are Active" — the count
+    that WOULD Activate is floor(total/2) − already-Active. With 8
+    Underground and 6 already Active, only 1 would flip (< 4 → ignore);
+    the old hidden//2 formula said 4 and wrongly played the event."""
+    st = _state({})
+    st["spaces"] = {"Massachusetts": {C.MILITIA_U: 8, C.MILITIA_A: 6}}
+    bot = _bot(C.BRITISH)
+    assert bot._condition_satisfied("ignore_if_4_militia", st, {"id": 29}) is True
+    st["spaces"]["Massachusetts"][C.MILITIA_A] = 0
+    # 8 Underground, 0 Active → 4 would flip → do NOT ignore.
+    assert bot._condition_satisfied("ignore_if_4_militia", st, {"id": 29}) is False

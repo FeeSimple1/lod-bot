@@ -44,13 +44,13 @@ PATRIOTS = {
 # carries the Musket icon. Removed Session 24.)
 INDIANS = {
     4: "force_shaded",    # The Penobscot Expedition — "Use the shaded text." (conditional in IndianBot override)
-    18: "force",   # "If it hadn't been so stormy…" (eligible-enemy condition in IndianBot override)
+    18: "force_if_eligible_enemy",   # "If it hadn't been so stormy…" — target eligible enemy, else C&SA
     21: "force",   # The Gamecock Thomas Sumter
     22: "force",   # The Newburgh Conspiracy
     29: "force",   # Edward Bancroft, British Spy
     32: "force_shaded",   # Rule Britannia! — "Use the shaded text."
     38: "force_shaded",   # Johnson's Royal Greens — "Use the shaded text." (WP condition in IndianBot override)
-    44: "force",   # Earl of Mansfield Recalled from Paris (eligible-enemy condition in IndianBot override)
+    44: "force_if_eligible_enemy",   # Earl of Mansfield — target eligible enemy, else C&SA
     70: "force",   # British Gain From French in India
     72: "force",   # French Settlers Help (village condition in IndianBot override)
     80: "force_if_80",   # Confusion Allows Slaves to Escape — errata: Patriot Fort removable, else C&SA

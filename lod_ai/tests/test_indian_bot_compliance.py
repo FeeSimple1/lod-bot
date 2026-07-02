@@ -400,21 +400,28 @@ class TestEventInstructionConditions:
         state["available"][C.VILLAGE] = 0
         assert bot._can_place_village(state) is False
 
-    def test_has_eligible_enemy(self):
-        """Cards 18/44: Should detect eligible enemy factions."""
+    def test_cards_18_44_target_eligible_enemy_via_generic_directive(self):
+        """Cards 18/44 route through force_if_eligible_enemy (sheet:
+        "Target an Eligible enemy Faction. If none, choose Command &
+        Special Activity instead."). The old local check verified
+        eligibility but never set the target, so the handler could
+        default to an ineligible faction."""
         bot = IndianBot()
         state = _base_state()
-        # Default: all factions eligible
-        state["eligible"] = {
-            C.BRITISH: True, C.PATRIOTS: True,
-            C.INDIANS: True, C.FRENCH: True,
-        }
-        assert bot._has_eligible_enemy(state) is True
+        card = {"id": 18, "dual": True,
+                "faction_icons": {C.INDIANS: "MUSKET"}}
+        # Only FRENCH eligible → must play and target FRENCH.
+        state["eligible"] = {C.BRITISH: True, C.PATRIOTS: False,
+                             C.INDIANS: True, C.FRENCH: True}
+        assert bot._choose_event_vs_flowchart(state, card) is True
+        assert state["card18_target_faction"] == C.FRENCH
+        assert C.FRENCH in state["ineligible_through_next"]
 
-        # Make all enemies ineligible
-        state["eligible"][C.PATRIOTS] = False
-        state["eligible"][C.FRENCH] = False
-        assert bot._has_eligible_enemy(state) is False
+        # No Rebellion faction eligible → Command & SA instead.
+        state2 = _base_state()
+        state2["eligible"] = {C.BRITISH: True, C.PATRIOTS: False,
+                              C.INDIANS: True, C.FRENCH: False}
+        assert bot._choose_event_vs_flowchart(state2, card) is False
 
     def test_can_place_war_parties(self):
         """Card 38: Should check if War Parties can be placed."""
