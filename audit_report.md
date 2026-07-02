@@ -2815,3 +2815,33 @@ seeds 1-20 invariants-on; balance rebaselined — 11/60 flips,
 concentrated in 1775 (Indians 7→11: Royalist events no longer waste
 targeting on allies, and Indians are never targeted by British);
 1776 aggregate unchanged.
+
+## Session 26: T3 — §8.3.3 clause 2 + dead no-effect clause (July 2026)
+
+Implemented §8.3.3's second clause: an Event whose ONLY effect would be
+to remove one or more friendly pieces without replacing them with other
+friendly pieces is Ineffective. Method: exact reconstruction — deepcopy
+the simulated *after*, restore every removed Side piece per space and
+its pool entries, and require equality with *before*; any friendly
+placement or any other change (support, resources, markers, enemy
+pieces) fails the reconstruction, so the clause fires only on strict
+"only removal" cases. "Friendly" spans the executing Side (Glossary
+"Enemy" mirror, §1.5.2; §8.3.5 treats ally pieces as friendly).
+
+Bigger find while testing: the §8.3.3 "no effect at all" clause has
+been DEAD in every live game. `random.Random.__eq__` is identity-based,
+so two deepcopies of a state carrying the seeded rng never compare
+equal, and `_is_ineffective_event`'s `before == after` always returned
+False. Unit tests passed because their hand-built states had no rng.
+The comparison now strips rng, rng_log, and history (die rolls are not
+game effects). Property-test moral for ROADMAP Piece 4: equality-based
+invariants must be exercised against production-shaped states.
+
+Verification: both roots green (1,255 + 41; 6 tests added); gate clean
+seeds 1-20 invariants-on; soak 200 games zero failures. Balance
+rebaselined: 27/60 flips — the revived no-effect clause changes many
+event-vs-command decisions. Indians 1775 11→14 and French 1778 9→13;
+Patriots 1775 5→2. Direction is coherent (bots that previously wasted
+turns executing null events now take Commands; strong-Command factions
+gain). The 60-game pinned sample has wide variance — true rates to be
+characterized by the Piece 8 large-N run.

@@ -299,10 +299,76 @@ class BaseBot:
             return (C.PATRIOTS, C.FRENCH)
         return (C.BRITISH, C.INDIANS)
 
+    # Side piece tags for the §8.3.3 friendly-removal clause. Space-count
+    # pieces only: Blockades/Squadrons live in the markers dict, so any
+    # change to them fails the reconstruction equality below and correctly
+    # blocks an "only friendly removal" verdict.
+    _SIDE_PIECES = {
+        C.BRITISH:  (C.REGULAR_BRI, C.TORY, C.FORT_BRI,
+                     C.WARPARTY_A, C.WARPARTY_U, C.VILLAGE),
+        C.INDIANS:  (C.REGULAR_BRI, C.TORY, C.FORT_BRI,
+                     C.WARPARTY_A, C.WARPARTY_U, C.VILLAGE),
+        C.PATRIOTS: (C.REGULAR_PAT, C.MILITIA_A, C.MILITIA_U,
+                     C.FORT_PAT, C.REGULAR_FRE),
+        C.FRENCH:   (C.REGULAR_PAT, C.MILITIA_A, C.MILITIA_U,
+                     C.FORT_PAT, C.REGULAR_FRE),
+    }
+
+    def _only_removes_friendly_pieces(self, before: Dict, after: Dict) -> bool:
+        """§8.3.3 clause 2: True when the Event's ONLY effect is to remove
+        one or more friendly pieces from the map without replacing them
+        with other friendly pieces. "Friendly" spans the executing
+        faction's Side (Glossary "Enemy" mirror; §1.5.2, §8.3.5 "remove
+        the other Faction's pieces" treats the ally's pieces as friendly).
+
+        Method: exact reconstruction. Take *after*, put every removed
+        friendly piece back (per space, per tag) and restore the pool
+        entries (available/casualties/unavailable/out_of_play) for those
+        tags. If the result equals *before*, nothing else happened. Any
+        friendly placement anywhere, or any other change (support,
+        resources, markers, enemy pieces, eligibility), makes the
+        reconstruction differ → not Ineffective by this clause."""
+        from copy import deepcopy
+        tags = self._SIDE_PIECES[self.faction]
+        b_spaces = before.get("spaces", {})
+        test = deepcopy(after)
+        t_spaces = test.get("spaces", {})
+        if set(t_spaces) != set(b_spaces):
+            return False
+        removed_any = False
+        for sid, sp_b in b_spaces.items():
+            sp_t = t_spaces[sid]
+            for tag in tags:
+                b, a = sp_b.get(tag, 0), sp_t.get(tag, 0)
+                if a > b:
+                    return False        # friendly pieces placed → replaced
+                if a < b:
+                    removed_any = True
+                    sp_t[tag] = b       # put them back
+                    if b == 0:
+                        sp_t.pop(tag, None)
+        if not removed_any:
+            return False
+        for pool in ("available", "casualties", "unavailable", "out_of_play"):
+            pb, pt = before.get(pool), test.get(pool)
+            if isinstance(pb, dict) and isinstance(pt, dict):
+                for tag in tags:
+                    if tag in pb:
+                        pt[tag] = pb[tag]
+                    else:
+                        pt.pop(tag, None)
+        b_cmp = deepcopy(before)
+        for st_ in (test, b_cmp):
+            for k in ("history", "rng", "rng_log"):
+                st_.pop(k, None)
+        return test == b_cmp
+
     def _is_ineffective_event(self, card: Dict, state: Dict) -> bool:
         """Return True if executing *card* would be Ineffective per §8.3.3:
-        it would have no effect at all, or it would shift the difference
-        between Support and Opposition in favor of the enemy side."""
+        it would have no effect at all, its only effect would be to remove
+        friendly pieces without replacing them, or it would shift the
+        difference between Support and Opposition in favor of the enemy
+        side."""
         handler = CARD_HANDLERS.get(card["id"])
         if not handler:
             return True
@@ -330,6 +396,16 @@ class BaseBot:
             return True
         if self.faction in (C.PATRIOTS, C.FRENCH) and d_after > d_before:
             return True
-        before.pop("history", None)
-        after.pop("history", None)
+        # §8.3.3: "where the only effect would be to remove one or more
+        # friendly pieces without replacing them with other friendly pieces"
+        if self._only_removes_friendly_pieces(before, after):
+            return True
+        # No-effect comparison. Drop non-semantic keys: two deepcopies of a
+        # random.Random NEVER compare equal (identity-based __eq__), which
+        # silently disabled this clause in any state carrying the seeded
+        # rng; rng_log grows on any die roll, and rolling dice is not an
+        # effect.
+        for st_ in (before, after):
+            for k in ("history", "rng", "rng_log"):
+                st_.pop(k, None)
         return before == after

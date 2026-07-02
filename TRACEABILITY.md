@@ -30,7 +30,7 @@ no citation exists.
 | 8.3 | Non-Player Events | OK | bots/base_bot.py, bots/british_bot.py, bots/free_op_planner.py, bots/french.py, bots/indians.py, bots/patriot.py, bots/random_spaces.py, cards/effects/brilliant_stroke.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py, engine.py, util/year_end.py | tests/test_bot_free_ops.py, tests/test_early_war_cards.py, tests/test_event_space_selection.py | Intro only; no normative content beyond 8.3.x below. |
 | 8.3.1 | Event Instructions | PARTIAL (T2+T8, P1) | engine.py | — | `bots/event_instructions.py` implements musket directives, BUT non-British dicts are self-described 'pared-down' — but keys verified complete vs musket icons (Session 24); CONTENT audit unblocked: sheet text = the per-faction Special Instructions sections in the flowchart reference files (Piece 3). Second-faction instructions applying to granted free actions: NOT consulted by `engine._drain_free_ops` → T8. Sword auto-ignore implemented + data-verified (T2 closed, Session 24). |
 | 8.3.2 | Dual-Use Events | OK | cards/effects/shared.py | — | `base_bot._execute_event` / `_is_ineffective_event`: shaded iff dual and faction in {PATRIOTS, FRENCH}; force_shaded/unshaded directives override. `select_support_shift_spaces` mirrors it for side inference. |
-| 8.3.3 | Ineffective Events | PARTIAL (T3, P1) | bots/base_bot.py, cards/effects/shared.py | tests/test_event_space_selection.py | No-effect simulation + net-shift-favors-enemy clause implemented (Session 21, `base_bot._is_ineffective_event`; tested). MISSING third clause: 'only effect would be to remove one or more friendly pieces without replacing them' → T3. |
+| 8.3.3 | Ineffective Events | OK (T3 fixed, Session 26) | bots/base_bot.py, cards/effects/shared.py | tests/test_event_space_selection.py | No-effect simulation + net-shift-favors-enemy clause implemented (Session 21, `base_bot._is_ineffective_event`; tested). MISSING third clause: 'only effect would be to remove one or more friendly pieces without replacing them' → T3. |
 | 8.3.4 | Event Placement | PARTIAL | cards/effects/early_war.py | — | Unavailable-first fixed at cards 32u/43u/46u (Session 21); every other place/relocate site unaudited → fold into Piece 3 card audit. |
 | 8.3.5 | Events: Who/What/Where | PARTIAL (T7, P2) | bots/free_op_planner.py, bots/random_spaces.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py | tests/test_bot_free_ops.py, tests/test_early_war_cards.py, tests/test_event_space_selection.py | Shift routing → 8.3.6 OK (Session 21). Free-Command choices → faction priorities OK (free_op_planner + engine._plan_bot_free_op; card 84 Session 21). Maximise-Forts-then-pieces used for card 6. NOT generally implemented: who-gets-benefits ordering (executing → friendly → random enemy non-player first; harm → random enemy player first) and flowchart-question-spaces-first → T7, per-card audit in Piece 3. |
 | 8.3.6 | Events that Shift Support/Opposition | OK | bots/base_bot.py, bots/random_spaces.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py | tests/test_early_war_cards.py, tests/test_event_space_selection.py | `shared.select_support_shift_spaces` (Session 21): royalist/rebel two-level key, pop-weighted, zero-gain over negative-gain; §8.2 ties; instead-execute-C&SA guard via 8.3.3 net-shift test. Tested both sides + guard (test_event_space_selection.py). |
@@ -134,9 +134,18 @@ no citation despite likely implementations.
   that `battle.execute` rejects (§3.5) — now a genuine decline.
   Tests: `test_force_if_eligible_enemy.py` (6),
   `test_bot_free_ops.py::test_french_free_battle_pre_toa…`.
-- **T3 (P1)** §8.3.3 missing clause: "only effect would be to remove one
-  or more friendly pieces without replacing them" — extend
-  `_is_ineffective_event` (piece-delta bookkeeping per faction).
+- **T3 — FIXED (Session 26).** §8.3.3 clause 2 implemented:
+  `_only_removes_friendly_pieces` (exact state reconstruction — put the
+  removed Side pieces back, restore their pool entries, compare;
+  "friendly" spans the Side per Glossary/§8.3.5). Found and fixed a
+  bigger latent bug in the process: `random.Random` compares by
+  IDENTITY, so `before == after` was always False in any state carrying
+  the seeded rng — the §8.3.3 "no effect at all" clause had been dead in
+  every live game (unit tests passed because their states lacked rng).
+  The comparison now drops rng/rng_log/history. Reviving the clause
+  changed many event decisions (27/60 baseline flips; Indians 1775
+  11→14, French 1778 9→13 — bots stop burning turns on null events).
+  Tests: `test_ineffective_friendly_removal.py` (6).
 - **T4 (P1)** §8.1.2 shared placement/removal helpers: build
   `nonplayer_place_order` / `nonplayer_remove_order` utilities
   implementing the full priority text; migrate card handlers and bot
