@@ -857,6 +857,9 @@ class BritishBot(BaseBot):
             """Check if a space is eligible for Tory placement."""
             if sid == WEST_INDIES:
                 return False
+            # §3.2.1: Tories may be placed only in Cities or Colonies.
+            if _MAP_DATA.get(sid, {}).get("type") not in ("City", "Colony"):
+                return False
             sup = self._support_level(state, sid)
             if sup <= C.ACTIVE_OPPOSITION:
                 return False  # Skip Active Opposition
@@ -1035,8 +1038,10 @@ class BritishBot(BaseBot):
                 return self._march(state, tried_muster=True)
             return False
 
-        if not reg_plan and all_muster_spaces:
-            reg_plan = {"space": all_muster_spaces[0], "n": 0}
+        # A Tory-only / RL-only / Fort-only Muster passes regular_plan=None
+        # (muster.execute's documented contract). Fabricating a zero-count
+        # plan pointed the executor's §3.2.1 Regular-destination check at an
+        # arbitrary selected space (e.g. a Tory space) and raised.
 
         if not all_muster_spaces:
             if not tried_march:
@@ -1072,7 +1077,11 @@ class BritishBot(BaseBot):
             tory_plan=tory_plan,
             reward_levels=reward_levels,
             build_fort=bool(fort_space),
-            fort_space=fort_space,
+            # Step-3 target: the Fort space, or the B8-chosen Reward-Loyalty
+            # space. (Previously chosen_rl_space was never passed, so the
+            # executor silently applied/skipped RL at the Regular
+            # destination instead of the space the flowchart selected.)
+            fort_space=fort_space or chosen_rl_space,
             rl_free_first=rl_free_first,
         )
 

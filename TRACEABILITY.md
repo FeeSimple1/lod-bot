@@ -22,7 +22,7 @@ no citation exists.
 
 | § | Rule | Status | Code | Tests | Notes |
 |---|------|--------|------|-------|-------|
-| 8.1 | Non-Player Sequence of Play | **GAP (T1, P0)** + PARTIAL | bots/free_op_planner.py, bots/french.py, bots/indians.py, bots/patriot.py, bots/random_spaces.py, cards/effects/early_war.py, cards/effects/shared.py, engine.py, tools/batch_smoke.py | tests/test_bot_free_ops.py, tests/test_early_war_cards.py, tests/test_pat_bot.py | VIOLATION — 'Commands Not Limited': `engine._options_for_slot` (engine.py:554) applies `limited_only`/`special_allowed=False` to ALL seats; `base_bot.take_turn` propagates to `state['_limited']`/`_no_special` and engine.py:619-622 rejects >1 space / SA use. Per §8.1 a Non-player in a LimCom slot executes a FULL Command and SA. (Event-granted free LimComs ARE correctly capped at 1 space in the free-op path.) Other bullets: no-voluntary-removal OK by absence (no 1.4.1 voluntary-removal path exists for bots); sword-icon auto-ignore → T2; resource-cost fallthrough → T6; ToA BS numeric condition → T10; leader-follows-largest-group implemented (`indians.follow_indian_leaders_after_move`) but ties resolve to first neighbour in iteration order, not randomly, and 'moves from origin' is approximated post-hoc → T5. |
+| 8.1 | Non-Player Sequence of Play | PARTIAL (T1 **FIXED**) | bots/free_op_planner.py, bots/french.py, bots/indians.py, bots/patriot.py, bots/random_spaces.py, cards/effects/early_war.py, cards/effects/shared.py, engine.py, tools/batch_smoke.py | tests/test_bot_free_ops.py, tests/test_early_war_cards.py, tests/test_pat_bot.py | T1 FIXED (Session 23): 'Commands Not Limited' — `engine._options_for_slot` (engine.py:554) applies `limited_only`/`special_allowed=False` to ALL seats; `base_bot.take_turn` propagates to `state['_limited']`/`_no_special` and engine.py:619-622 rejects >1 space / SA use. Per §8.1 a Non-player in a LimCom slot executes a FULL Command and SA. (Event-granted free LimComs ARE correctly capped at 1 space in the free-op path.) Other bullets: no-voluntary-removal OK by absence (no 1.4.1 voluntary-removal path exists for bots); sword-icon auto-ignore → T2; resource-cost fallthrough → T6; ToA BS numeric condition → T10; leader-follows-largest-group implemented (`indians.follow_indian_leaders_after_move`) but ties resolve to first neighbour in iteration order, not randomly, and 'moves from origin' is approximated post-hoc → T5. |
 | 8.1.1 | Events, Commands, SAs — guidelines | PARTIAL | cards/effects/early_war.py, cards/effects/shared.py | — | 'Max extent' is convention across bots/planners (not centrally tested); 'most Support/Opposition = level x Pop' now explicit in `select_support_shift_spaces` (§1.6.2 double-Active falls out of the ±2 encoding). No general test asserts max-extent behaviour → Piece 4 property candidate. |
 | 8.1.2 | Pieces and Resources | PARTIAL (T4, P1) | bots/free_op_planner.py, cards/effects/early_war.py, engine.py | tests/test_bot_free_ops.py, tests/test_early_war_cards.py | No shared placement/removal-order helper exists; each site hand-rolls. Removal alternation + spare-last-Tory implemented locally for card 6 only (Session 21). Placement order (Forts/Villages → Militia/WP → alternating cubes from fewest), removal order generally, move-Unavailable-first, remove-to-replace-even-without-replacements, March-Underground-first: all unaudited per site. Cited only in free_op_planner comments. |
 | 8.1.3 | Selecting Spaces | OK | — | — | Priority-loop semantics implemented across bot command methods and free_op_planner; ties → §8.2 seeded (Session 21). No section-number citation in code (cite it when next touched). |
@@ -92,15 +92,21 @@ no citation despite likely implementations.
 
 ## Backlog from this pass
 
-- **T1 (P0, behavioural violation)** §8.1 Commands Not Limited: engine
-  restricts bot 2nd-eligible slots to Limited Command / no SA
-  (`engine._options_for_slot` → `play_turn(allowed=…)` →
-  `base_bot.take_turn` → enforcement engine.py:619-622). Rule: Non-player
-  in a LimCom slot executes a FULL Command and Special Activity;
-  event-granted free LimComs stay limited (that path is already correct).
-  Fix in engine slot options (bot seats only), full verification battery +
-  balance rebaseline. Expect real balance movement — this suppresses every
-  bot SA in second-eligible-after-command slots today.
+- **T1 — FIXED (Session 23)** §8.1 Commands Not Limited:
+  `engine._allowed_for_faction` now upgrades bot seats in LimCom slots to
+  a full Command + SA (Event availability still per SoP); human seats
+  keep SoP limits; event-granted free LimComs stay limited via the
+  free-op path. Tested in `test_commands_not_limited_8_1.py`. The fix
+  exposed and forced fixes for three latent §3.2.1 Muster bugs (see
+  audit_report.md Session 23): Tory placement lacked the City/Colony
+  type filter in BOTH the British bot and the executor (Tories could
+  land in Reserves); the bot fabricated a zero-count Regular plan that
+  pointed the executor's Regular-destination check at arbitrary spaces;
+  and the executor's step-3 target fell back to an unbound Regular
+  destination — with the B8-chosen Reward-Loyalty space never passed at
+  all, RL silently executed (or was skipped) at the wrong space.
+  Balance rebaselined: 33/60 pinned winners flipped — expected for a
+  sequence-of-play-wide fix; 1776 remains Patriot-favoured (12/20).
 - **T2 (P1)** §8.1/§8.3.1 sword-icon auto-ignore: no icon data exists in
   code (`grep -ri sword lod_ai` → nothing). Check every sword-underlined
   faction symbol in `card reference full.txt` against the per-faction

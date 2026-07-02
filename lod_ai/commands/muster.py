@@ -240,6 +240,7 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
     if faction == BRITISH:
         # Pay cost (1 Resource per selected space)
         _brit_cost(state, len(selected))
+        dest: Optional[str] = None   # Regular destination (step 1), if any
 
         # 1) Regular placement (in exactly ONE City/Colony/WI).
         # §3.2.1: "place UP TO six Regulars" -- zero is legal, so a
@@ -263,6 +264,9 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
             for sp_id, n in tory_plan.items():
                 if sp_id not in selected or sp_id == WEST_INDIES_ID:
                     continue
+                # §3.2.1: Tories may be placed only in Cities or Colonies.
+                if _madj.space_type(sp_id) not in ("City", "Colony"):
+                    continue
                 support_level = state.get("support", {}).get(sp_id, NEUTRAL)
                 if support_level == ACTIVE_OPPOSITION:
                     continue  # skip Active Opp
@@ -273,11 +277,17 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
                 place = _draw_from_pool(state, TORY, place)
                 add_piece(state, TORY, sp_id, place)
 
-        # 3) Fort or Reward Loyalty in ONE selected space
+        # 3) Fort or Reward Loyalty in ONE selected space (§3.2.1 "in up to
+        # one selected Muster space"). The step-3 space is *fort_space*
+        # (callers pass their Fort OR Reward-Loyalty space through it);
+        # fall back to the Regular destination, else skip — a Tory-only
+        # Muster has no implicit step-3 target.
         if build_fort or reward_levels:
-            # Use fort_space if specified, otherwise fall back to Regular destination
             target = fort_space if fort_space and fort_space in selected else dest
-            if build_fort:
+            if target is None:
+                push_history(state, f"{faction} MUSTER: no step-3 space — "
+                                    "Fort/Reward Loyalty skipped")
+            elif build_fort:
                 _make_fort(state, target)
             else:
                 # Re-validate RL preconditions AFTER placements, since

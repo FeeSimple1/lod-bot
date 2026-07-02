@@ -591,6 +591,21 @@ class Engine:
             "event_allowed": True,
         }
 
+    def _allowed_for_faction(self, faction: str,
+                             first_action: dict | None) -> Dict[str, Any]:
+        """Slot options for *faction*, per the Sequence of Play (2.3.4) and
+        §8.1 "Commands Not Limited": whenever a Non-player Faction is by the
+        Sequence of Play to execute a Limited Command, it instead executes a
+        full Command and Special Activity. Human seats keep the SoP limits.
+        Event-granted free LimComs are unaffected — they run through the
+        free-op path, which caps them at one space per §8.1."""
+        allowed = self._options_for_slot(first_action)
+        if allowed.get("limited_only") and not self.is_human_faction(faction):
+            allowed = dict(allowed)
+            allowed["limited_only"] = False
+            allowed["special_allowed"] = True
+        return allowed
+
     def _command_effect_count(self, state: dict) -> int:
         affected = state.get("_turn_affected_spaces", set())
         count = len(affected) if isinstance(affected, (set, list, tuple)) else 0
@@ -1343,7 +1358,7 @@ class Engine:
         while queue and len(actions) < 2:
             faction = queue.pop(0)
             eligible_position += 1
-            allowed = self._options_for_slot(first_action)
+            allowed = self._allowed_for_faction(faction, first_action)
             sig = inspect.signature(self.play_turn)
             if "allowed" in sig.parameters:
                 result = self.play_turn(faction, card=card, allowed=allowed, human_decider=human_decider)

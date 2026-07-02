@@ -287,11 +287,10 @@ the references.
 Small, surgical work — none crash-class.  Most of the originally-
 listed items have been closed; see `audit_report.md` Sessions 17-19.
 
-- **T1 (P0)** §8.1 Commands Not Limited violated: engine limits bot
-  2nd-eligible slots to LimCom/no-SA; non-players must take a full
-  Command + SA there. See TRACEABILITY.md (Session 22) — fix first,
-  expect balance movement. Full Ch 8 backlog T1-T11 lives in
-  TRACEABILITY.md; the overall plan is ROADMAP.md.
+- Ch 8 traceability backlog T2-T11 lives in TRACEABILITY.md; the
+  overall plan is ROADMAP.md. (T1 Commands-Not-Limited was FIXED in
+  Session 23 along with three latent §3.2.1 Muster bugs it exposed;
+  33/60 baseline winners flipped, see audit_report.md.)
 
 - Middle/late-war event handlers still contain alphabetical / dict-order
   subset space picks (`late_war.py` ~lines 155/167/205/795/1005; audit

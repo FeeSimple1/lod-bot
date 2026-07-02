@@ -2716,3 +2716,46 @@ Ten further backlog items T2–T11 recorded in TRACEABILITY.md, notably:
 sword-icon auto-ignore has no supporting data anywhere in the code (T2);
 §8.3.3's remove-friendly-without-replacement clause is unimplemented
 (T3); §8.1.2 has no shared placement/removal-order helpers (T4).
+
+## Session 23: T1 fix — §8.1 Commands Not Limited (July 2026)
+
+`engine._allowed_for_faction` (new) wraps `_options_for_slot`: when the
+Sequence of Play (2.3.4) offers a seat a Limited Command and the seat is
+a Non-player, the slot is upgraded to a full Command + Special Activity
+per §8.1 "Commands Not Limited". Event availability still follows the
+SoP; human seats keep the limitation; event-granted free LimComs remain
+limited through the free-op path (§8.1's own carve-out). Unit-tested in
+`test_commands_not_limited_8_1.py` (bot upgrade, human unchanged, SoP
+event flags preserved, first-eligible and after-event slots untouched).
+
+Opening the suppressed paths immediately tripped the gate (1778 seed 10)
+on three latent §3.2.1 Muster bugs, all fixed here:
+
+1. **Tory type filter missing (bot + executor).** §3.2.1: Tories may be
+   placed only in Cities or Colonies. `british_bot._tory_eligible` and
+   `muster.execute`'s Tory loop both lacked the type check, so Tories
+   could be planned into (and executor-placed in) Reserves.
+2. **Fabricated zero-count Regular plan.** `_muster` passed
+   `{"space": all_muster_spaces[0], "n": 0}` when it had no Regulars to
+   place, pointing the executor's Regular-destination check (3.2.1) at
+   arbitrary selected spaces (a Reserve, a Blockaded City) → ValueError.
+   Removed; `regular_plan=None` is the executor's documented Tory-only
+   contract.
+3. **Step-3 target unbound / RL at the wrong space.** With no Regular
+   plan, `muster.execute`'s Fort/Reward-Loyalty step crashed on an
+   unbound `dest`; worse, the bot never passed its B8-chosen RL space,
+   so Reward Loyalty silently executed (or was silently skipped) at the
+   Regular destination instead of the flowchart-selected space. The
+   step-3 space now flows through `fort_space` (Fort or RL), with a
+   clean skip when there is no target. Regressions in
+   `test_muster_321_regressions.py` (4 tests).
+
+Verification: both roots green (1,240 + 41); clean-sweep gate clean,
+seeds 1-20, all scenarios, invariants on; soak 200 games invariants-on,
+zero crashes/failures; balance rebaselined — 33/60 pinned winners
+flipped, the expected magnitude for a fix that changes every
+2nd-eligible-after-Command bot turn. Per-scenario aggregates: 1775
+9/7/4 → 7/7/6 (IND/PAT/BRI), 1776 16/4 → 12/7/1 (PAT/BRI/IND), 1778
+9/8/2/1 → 5/10/2/3 (PAT/FRE/IND/BRI). British recover share everywhere,
+consistent with previously-suppressed SAs; 1776 remains Patriot-favoured
+as documented in Session 17.
