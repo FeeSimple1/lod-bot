@@ -3,7 +3,6 @@ import random
 from typing import Dict, List, Tuple, Optional
 from lod_ai import rules_consts as C
 from lod_ai.board import pieces
-from lod_ai.bots.random_spaces import iter_random_spaces
 from lod_ai.bots import event_instructions as EI
 from lod_ai import dispatcher
 from lod_ai.cards import CARD_HANDLERS
@@ -279,18 +278,36 @@ class BaseBot:
 
     # optional
     def _is_ineffective_event(self, card: Dict, state: Dict) -> bool:
-        """Return True if executing *card* would change nothing."""
+        """Return True if executing *card* would be Ineffective per §8.3.3:
+        it would have no effect at all, or it would shift the difference
+        between Support and Opposition in favor of the enemy side."""
         handler = CARD_HANDLERS.get(card["id"])
         if not handler:
             return True
         from copy import deepcopy
         before = deepcopy(state)
         after = deepcopy(state)
+        # Handlers read state["active"] for §8.3.6 side selection; mirror
+        # _execute_event. Set on BOTH copies so the equality test below is
+        # unaffected by the key itself.
+        before["active"] = self.faction
+        after["active"] = self.faction
         shaded = card.get("dual") and self.faction in {C.PATRIOTS, C.FRENCH}
         try:
             handler(after, shaded=shaded)
         except Exception:
             return True  # treat as ineffective if handler crashes
+        # §8.3.3 net-shift clause. Support levels are encoded ±2 Active /
+        # ±1 Passive, so pop × level sums Total Support − Total Opposition
+        # directly (§1.6.2/§1.6.3).
+        def _support_diff(st):
+            return sum(_map_population(sid) * lvl
+                       for sid, lvl in st.get("support", {}).items())
+        d_before, d_after = _support_diff(before), _support_diff(after)
+        if self.faction in (C.BRITISH, C.INDIANS) and d_after < d_before:
+            return True
+        if self.faction in (C.PATRIOTS, C.FRENCH) and d_after > d_before:
+            return True
         before.pop("history", None)
         after.pop("history", None)
         return before == after

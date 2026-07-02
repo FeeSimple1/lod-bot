@@ -1,5 +1,8 @@
 from lod_ai.cards import register
-from .shared import add_resource, shift_support, adjust_fni, pick_cities, pick_colonies, pick_two_cities
+from .shared import (
+    add_resource, shift_support, adjust_fni, pick_cities, pick_colonies,
+    pick_random_spaces, select_support_shift_spaces,
+)
 from lod_ai.util.free_ops import queue_free_op
 from lod_ai.board.pieces import (
     move_piece,
@@ -64,15 +67,22 @@ def evt_002_common_sense(state, shaded=False):
     Shaded   – Shift 2 Cities 1 level toward Active Opposition and place
                2 Propaganda in each.
     """
+    cities = [n for n, info in state["spaces"].items()
+              if info.get("type") == "City"]
     if shaded:
-        for city in pick_cities(state, 2):
+        # §8.3.5 → §8.3.6: highest gain in Opposition (pop-weighted, §8.1.1);
+        # §8.2 random only among equal-priority Cities.
+        for city in select_support_shift_spaces(state, cities, 2,
+                                                target=-2, steps=1,
+                                                shaded=True):
             shift_support(state, city, -1)
             place_marker(state, PROPAGANDA, city, 2)
     else:
-        cities = pick_cities(state, 1)
-        if not cities:
+        # Placement counts are equal in every City → equal priority → §8.2.
+        picked = pick_random_spaces(state, cities, 1)
+        if not picked:
             return
-        city = cities[0]
+        city = picked[0]
         place_piece(state, REGULAR_BRI, city, 2)
         place_piece(state, TORY,   city, 2)
         place_marker(state, PROPAGANDA, city, 2)
@@ -126,6 +136,31 @@ def evt_004_penobscot(state, shaded=False):
         if removed < 3:
             remove_piece(state, MILITIA_A, None, 3 - removed, to="available")
 
+def _remove_british_cubes_812(state, sid, qty):
+    """Remove *qty* British cubes from *sid* to Casualties per §8.1.2:
+    alternate Regulars and Tories beginning with whichever is most in the
+    space (Regulars if even), but if possible without removing the last
+    Tory in the space."""
+    sp = state["spaces"].get(sid, {})
+    take_regular = sp.get(REGULAR_BRI, 0) >= sp.get(TORY, 0)
+    removed = 0
+    while removed < qty:
+        regs, tories = sp.get(REGULAR_BRI, 0), sp.get(TORY, 0)
+        if regs == 0 and tories == 0:
+            break
+        want = REGULAR_BRI if take_regular else TORY
+        if want == TORY and tories == 1 and regs > 0:
+            want = REGULAR_BRI          # spare the last Tory if possible
+        if want == REGULAR_BRI and regs == 0:
+            want = TORY
+        elif want == TORY and tories == 0:
+            want = REGULAR_BRI
+        remove_piece(state, want, sid, 1, to="casualties")
+        removed += 1
+        take_regular = want != REGULAR_BRI   # alternate
+    return removed
+
+
 # 6  BENEDICT ARNOLD
 @register(6)                       # Benedict Arnold
 def evt_006_benedict_arnold(state, shaded=False):
@@ -135,34 +170,43 @@ def evt_006_benedict_arnold(state, shaded=False):
     Shaded   – Heroic: remove 1 British Fort + 2 British cubes from *one* space
                (to Casualties).
     """
-    spaces_sorted = sorted(state["spaces"])
+    spaces = state["spaces"]
+
+    def _pick_removal_space(fort_tag, other_tags, colony_only):
+        """§8.3.5: maximise Forts removed, then other pieces; §8.2 ties."""
+        def key(sid):
+            sp = spaces[sid]
+            return (min(1, sp.get(fort_tag, 0)),
+                    min(2, sum(sp.get(t, 0) for t in other_tags)))
+        cands = [sid for sid in spaces
+                 if (not colony_only or spaces[sid].get("type") == "Colony")
+                 and key(sid) > (0, 0)]
+        if not cands:
+            return None
+        best = max(key(s) for s in cands)
+        ties = [s for s in cands if key(s) == best]
+        return ties[0] if len(ties) == 1 else pick_random_spaces(state, ties, 1)[0]
 
     if shaded:
-        candidates = [
-            sid for sid in spaces_sorted
-            if state["spaces"][sid].get(FORT_BRI)
-            or state["spaces"][sid].get(REGULAR_BRI)
-            or state["spaces"][sid].get(TORY)
-        ]
-        target = candidates[0] if candidates else (spaces_sorted[0] if spaces_sorted else None)
+        target = _pick_removal_space(FORT_BRI, (REGULAR_BRI, TORY),
+                                     colony_only=False)
         if not target:
             return
-        remove_piece(state, FORT_BRI,     target, 1, to="casualties")
-        removed = remove_piece(state, REGULAR_BRI, target, 2, to="casualties")
-        if removed < 2:
-            # top up with Tories if Regulars insufficient
-            remove_piece(state, TORY, target, 2-removed, to="casualties")
+        remove_piece(state, FORT_BRI, target, 1, to="casualties")
+        # §8.1.2 (via §8.3.5): alternate Regulars and Tories beginning with
+        # whichever is most (Regulars if even), sparing the last Tory.
+        _remove_british_cubes_812(state, target, 2)
         return
 
-    colony_choices = pick_colonies(state, 1)
-    if not colony_choices:
+    target = _pick_removal_space(FORT_PAT, (MILITIA_A, MILITIA_U),
+                                 colony_only=True)
+    if not target:
         return
-
-    target = colony_choices[0]
     remove_piece(state, FORT_PAT,     target, 1, to="casualties")
-    removed = remove_piece(state, MILITIA_U, target, 2, to="available")
+    # §8.1.2: Active before Underground Militia.
+    removed = remove_piece(state, MILITIA_A, target, 2, to="available")
     if removed < 2:
-        remove_piece(state, MILITIA_A, target, 2 - removed, to="available")
+        remove_piece(state, MILITIA_U, target, 2 - removed, to="available")
 
 # 10  BENJAMIN FRANKLIN TRAVELS TO FRANCE
 @register(10)   # Benjamin Franklin Travels to France
@@ -171,13 +215,13 @@ def evt_010_franklin_to_france(state, shaded=False):
         add_resource(state, FRENCH,   3)
         add_resource(state, PATRIOTS, 2)
     else:
-        cities = pick_two_cities(state)
-        if len(cities) < 2:
-            # Insufficient cities found — event is ineffective
-            return
-        c1, c2 = cities
-        shift_support(state, c1, +1)
-        shift_support(state, c2, +1)
+        cities = [n for n, info in state["spaces"].items()
+                  if info.get("type") == "City"]
+        # §8.3.5 → §8.3.6: highest gain in Support (pop-weighted); §8.2 ties.
+        for city in select_support_shift_spaces(state, cities, 2,
+                                                target=+2, steps=1,
+                                                shaded=False):
+            shift_support(state, city, +1)
 
 # 13  "…THE ORIGIN OF ALL OUR MISFORTUNES"
 @register(13)
@@ -406,10 +450,13 @@ def evt_032_rule_britannia(state, shaded=False):
     if colony_choices:
         target = str(colony_choices)
     else:
-        colonies = pick_colonies(state, 1)
-        if not colonies:
+        # Any Colony takes the pieces equally → equal priority → §8.2.
+        colonies = [n for n, info in state["spaces"].items()
+                    if info.get("type") == "Colony"]
+        picked = pick_random_spaces(state, colonies, 1)
+        if not picked:
             return
-        target = colonies[0]
+        target = picked[0]
     _pull_from_pools(REGULAR_BRI, 2)
     _pull_from_pools(TORY,   2)
 
@@ -495,8 +542,14 @@ def evt_041_william_pitt(state, shaded=False):
     Shaded   – Shift 2 Colonies 2 levels each toward Passive Opposition.
     """
     target = +1 if not shaded else -1
-    colonies = pick_colonies(state, 2)
-    for col in colonies:
+    colonies = [n for n, info in state["spaces"].items()
+                if info.get("type") == "Colony"]
+    # §8.3.5 → §8.3.6 (pop-weighted gain; §8.2 ties). Note a Colony past the
+    # target level would shift AGAINST the executing side; §8.3.6 ordering
+    # ranks it below zero-gain candidates.
+    for col in select_support_shift_spaces(state, colonies, 2,
+                                           target=target, steps=2,
+                                           shaded=shaded):
         _shift_support_toward(state, col, target, steps=2)
 
 # 43  HMS RUSSIAN MERCHANT WITH 4 000 MUSKETS
@@ -517,10 +570,12 @@ def evt_043_russian_muskets(state, shaded=False):
             remove_piece(state, TORY, None, remove_qty, to="available")
     else:
         eligible = [n for n, sp in state["spaces"].items() if sp.get(REGULAR_BRI, 0)]
-        for loc in eligible[:3]:
-            moved = move_piece(state, TORY, "available", loc, 2)
+        # Equal placement in every qualifying space → §8.2 for the selection;
+        # §8.3.4: place from Unavailable first, then Available.
+        for loc in pick_random_spaces(state, eligible, 3):
+            moved = move_piece(state, TORY, "unavailable", loc, 2)
             if moved < 2:
-                move_piece(state, TORY, "unavailable", loc, 2 - moved)
+                move_piece(state, TORY, "available", loc, 2 - moved)
 
 
 # 46  EDMUND BURKE ON CONCILIATION
@@ -531,11 +586,18 @@ def evt_046_burke(state, shaded=False):
     Shaded   – Shift 2 Cities 1 level toward Passive Opposition.
     """
     if shaded:
-        for city in pick_cities(state, 2):
+        cities = [n for n, info in state["spaces"].items()
+                  if info.get("type") == "City"]
+        # §8.3.5 → §8.3.6 (pop-weighted gain; §8.2 ties).
+        for city in select_support_shift_spaces(state, cities, 2,
+                                                target=-1, steps=1,
+                                                shaded=True):
             _shift_support_toward(state, city, -1, steps=1)
     else:
-        targets = sorted(state.get("spaces", {}))[:3]
-        for space in targets:
+        candidates = [sid for sid in state.get("spaces", {})
+                      if sid != WEST_INDIES_ID]
+        # One Tory in each of three spaces — equal priority → §8.2.
+        for space in pick_random_spaces(state, candidates, 3):
             # Reference says "from Unavailable or Available" — Unavailable first
             moved = move_piece(state, TORY, "unavailable", space, 1)
             if moved < 1:
@@ -882,10 +944,11 @@ def evt_084_six_nations(state, shaded=False):
     """
     from lod_ai.util.free_ops import queue_free_op
     if shaded:
-        target = next(
-            (name for name in sorted(state["spaces"]) if state["spaces"][name].get(VILLAGE, 0)),
-            None,
-        )
+        village_spaces = [name for name in state["spaces"]
+                          if state["spaces"][name].get(VILLAGE, 0)]
+        # One Village from any qualifying space → equal priority → §8.2.
+        picked = pick_random_spaces(state, village_spaces, 1)
+        target = picked[0] if picked else None
         removed = remove_piece(state, VILLAGE, target, 1, to="available") if target else 0
         push_history(
             state,
@@ -898,7 +961,39 @@ def evt_084_six_nations(state, shaded=False):
     if isinstance(override, list) and len(override) >= 2:
         colonies = override[:2]
     else:
-        colonies = pick_colonies(state, 2)
+        # §8.3.5: choices inside a card-granted free Command use the
+        # Faction's own priorities — Indian Gather legality (3.4.1: Support
+        # among Neutral/Passive, War Party in or adjacent, never the West
+        # Indies; mirrors the engine free-op planner) with the most-own-
+        # force priority, restricted to Colonies per the card; §8.2 ties.
+        from lod_ai.commands.gather import SUPPORT_OK
+        from lod_ai.map import adjacency as _madj
+        spaces = state["spaces"]
+
+        def _wp(sid):
+            sp = spaces.get(sid, {})
+            return sp.get(WARPARTY_A, 0) + sp.get(WARPARTY_U, 0)
+
+        def _legal(sid):
+            if spaces.get(sid, {}).get("type") != "Colony":
+                return False
+            if sid == WEST_INDIES_ID:
+                return False
+            if state.get("support", {}).get(sid, 0) not in SUPPORT_OK:
+                return False
+            if _wp(sid) > 0:
+                return True
+            return any(_wp(nbr) for nbr in _madj.adjacent_spaces(sid))
+
+        cands = [sid for sid in spaces if _legal(sid)]
+        colonies = []
+        while cands and len(colonies) < 2:
+            best = max(_wp(s) for s in cands)
+            ties = [s for s in cands if _wp(s) == best]
+            pick = (ties[0] if len(ties) == 1
+                    else pick_random_spaces(state, ties, 1)[0])
+            colonies.append(pick)
+            cands.remove(pick)
     for col in colonies:
         queue_free_op(state, INDIANS, "gather", col)
 

@@ -12,6 +12,7 @@ from .shared import (
     shift_support,
     push_history,
     adjust_fni,
+    select_support_shift_spaces,
 )
 
 def _remove_four_patriot_units(state):
@@ -325,8 +326,12 @@ def evt_025_prison_ships(state, shaded=False):
     if isinstance(override, list):
         cities = [sid for sid in override if sid in state.get("spaces", {})]
     else:
-        cities = [sid for sid in sorted(state.get("spaces", {}))
-                  if _is_city_late(sid)]
+        all_cities = [sid for sid in state.get("spaces", {})
+                      if _is_city_late(sid)]
+        # §8.3.5 → §8.3.6: pop-weighted Support/Opposition gain; §8.2 ties.
+        cities = select_support_shift_spaces(state, all_cities, 2,
+                                             target=(-1 if shaded else +1),
+                                             steps=1, shaded=shaded)
 
     if shaded:
         for city in cities[:2]:

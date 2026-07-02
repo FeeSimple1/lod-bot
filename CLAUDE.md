@@ -287,6 +287,14 @@ the references.
 Small, surgical work — none crash-class.  Most of the originally-
 listed items have been closed; see `audit_report.md` Sessions 17-19.
 
+- Middle/late-war event handlers still contain alphabetical / dict-order
+  subset space picks (`late_war.py` ~lines 155/167/205/795/1005; audit
+  `middle_war.py` too). Route them through
+  `shared.select_support_shift_spaces` (§8.3.6) or
+  `shared.pick_random_spaces` (§8.2) per card text, as Session 21 did
+  for the early-war set. Each needs its card reference read first
+  (agents.md card workflow).
+
 - `_battle`'s B12 selection now uses the resolver's *exact* Force Level
   (§3.6.2-3.6.3) and Loss-Level modifiers (§3.6.5-3.6.6) via the shared
   `battle.bot_battle_scores` / `battle.force_level` helpers, instead of a
@@ -363,6 +371,21 @@ listed items have been closed; see `audit_report.md` Sessions 17-19.
 
 (For context to future Claude sessions or contributors — do not redo
 these investigations from scratch.)
+
+- Non-player Event space selection now follows §8.3.5/§8.3.6/§8.2
+  (Session 21, audit_report.md): support-shift events (cards 2, 10, 25,
+  41, 46) select by pop-weighted gain via
+  `shared.select_support_shift_spaces`, placement/removal events (2u, 6,
+  32u, 43u, 46u, 84) follow §8.3.5 priorities, and §8.2 Random Spaces —
+  now seeded from ``state["rng"]`` via
+  `random_spaces.pick_random_spaces` — is used ONLY to break equal-
+  priority ties. `base_bot._is_ineffective_event` implements §8.3.3's
+  net-shift-favors-the-enemy clause. The "candidate set" question from
+  the July 2026 handoff was resolved from the manual (QUESTIONS.md Q14)
+  — it was not actually ambiguous. Alphabetical subset picks remain in
+  `late_war.py` (~lines 155/167/205/795/1005) and possibly
+  `middle_war.py`; they need the same card-by-card §8.3.5 audit (open
+  item below).
 
 - `shared.adjust_fni` now enforces the §1.9 / §4.5.3 invariant "FNI may
   never exceed the number of Blockades that are Available" on *raises*:

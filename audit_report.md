@@ -2622,3 +2622,77 @@ against the space states). Balance baseline refreshed: 19/60 pinned
 winners shifted (free SAs now fire; March follows faction priorities);
 per-scenario aggregates moved within band and 1776 remains
 Patriot-favored as documented in Session 17.
+
+## Session 21: Event space selection — §8.3.5/§8.3.6/§8.2 transcription (July 2026)
+
+Audit finding (superseding the previous session's handoff, which escalated
+this as a design ambiguity): the "candidate set" question for events that
+shift Support/Opposition in unnamed Cities/Colonies is **answered by the
+manual** and required no human ruling. §8.3.5 routes shift-space selection
+to §8.3.6 (Royalist: highest gain in Support, then highest loss in
+Opposition; Rebellion mirrored; Population-weighted per §8.1.1, Active
+double per §1.6.2). §8.2 Random Spaces is a tie-breaker only ("If several
+candidate Province or Cities have EQUAL priority…"). A maxed-out space has
+zero gain and cannot tie a space where the shift works; if every candidate
+is zero, §8.3.3 (Ineffective Events) applies at the play/don't-play layer.
+
+Mismatches found and fixed (by card, `lod_ai/cards/effects/early_war.py`
+unless noted):
+
+- **2 Common Sense** — shaded: 2 Cities picked alphabetically → §8.3.6
+  selection; unshaded: 1 City alphabetical → equal priority → §8.2.
+- **6 Benedict Arnold** — both sides picked alphabetically (unshaded even
+  among Colonies with nothing to remove) → §8.3.5 maximise Forts then
+  pieces removed, §8.2 ties; militia removal order fixed to Active before
+  Underground (§8.1.2); shaded cube removal now alternates Regulars/Tories
+  from the most numerous (Regulars if even), sparing the last Tory (§8.1.2).
+- **10 Franklin** — unshaded: first two Cities alphabetically → §8.3.6.
+- **32 Rule Britannia!** — unshaded: alphabetical Colony → equal priority
+  → §8.2 (override key preserved).
+- **41 William Pitt** — 2 Colonies alphabetical → §8.3.6. Note the old
+  picker could select a Colony past the target level and shift it AGAINST
+  the executing side; §8.3.6 ordering ranks those below zero-gain picks.
+- **43 HMS Russian Merchant** — unshaded: first 3 qualifying spaces in
+  dict order → §8.2 among equal candidates; Tory sourcing fixed to
+  Unavailable first (§8.3.4).
+- **46 Burke** — shaded: 2 Cities alphabetical → §8.3.6; unshaded: 3
+  spaces alphabetical → §8.2 (West Indies excluded).
+- **84 "Merciless Indian Savages"** — unshaded: 2 alphabetical Colonies
+  (possibly Gather-illegal, later logged as "genuine declines") → legal
+  Colonies per 3.4.1 with the most-own-force priority the engine free-op
+  planner uses (§8.3.5: free Commands use the Faction's priorities), §8.2
+  ties; shaded Village space now §8.2 among equal candidates.
+- **25 British Prison Ships** (`late_war.py`) — same pattern as 41/46 →
+  routed through the shared §8.3.6 helper.
+
+Infrastructure:
+
+- `bots/random_spaces.py` — `choose_random_space` threads the seeded
+  ``state["rng"]`` (was module-level `random`, unreproducible); new
+  `pick_random_spaces(state, candidates, count)` re-rolls per §8.2; the
+  arrow walk fixed to continue at the TOP of the next column (§8.2
+  "from the bottom of one column to the top of the next") instead of
+  rotating rows within each column; stale dead import removed from
+  `base_bot`.
+- `cards/effects/shared.py` — new `select_support_shift_spaces` (§8.3.6
+  key + §8.2 ties; side from `state["active"]`, else §8.3.2 shading);
+  `pick_two_cities` deleted; `pick_cities`/`pick_colonies` docstrings now
+  restrict them to full-list use.
+- `bots/base_bot.py::_is_ineffective_event` — implements §8.3.3's
+  net-shift clause: an Event whose simulated net Support−Opposition
+  difference moves in favor of the enemy side is Ineffective (this also
+  covers §8.3.6's "instead executes a Command and Special Activity"
+  guard). Simulation now sets `state["active"]` on both copies, mirroring
+  `_execute_event`.
+
+Verification: both test roots green (1,271 tests; 13 added in
+`test_event_space_selection.py` covering §8.2 rng determinism, the arrow
+walk, §8.3.6 ordering both sides, zero-vs-negative gain, and the §8.3.3
+guard on cards 41/46); clean-sweep gate clean on 1775/1776/1778 seeds
+1-20 with invariants; balance rebaselined (13/60 pinned winners shifted,
+9 in 1775 as expected for early-war cards + the global §8.3.3 guard;
+per-scenario faction aggregates moved ≤2/20 and 1776 is unchanged).
+
+Known remaining (not fixed here): other alphabetical/dict-order subset
+picks in `late_war.py` (lines ~155/167/205/795/1005) and possibly
+`middle_war.py` need the same card-by-card audit against §8.3.5/§8.2.

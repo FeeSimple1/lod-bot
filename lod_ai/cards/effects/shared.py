@@ -86,19 +86,93 @@ def shift_support(state, space_id: str, delta: int) -> None:
 from lod_ai.util.naval import adjust_fni  # noqa: F401
 
 def pick_cities(state, count: int = 1):
-    """Return up to *count* City IDs sorted alphabetically."""
+    """Return up to *count* City IDs in sorted order.
+
+    ONLY for gathering the full candidate list (pass a count >= number of
+    spaces), where order is irrelevant. Do NOT use to select a subset: event
+    space selection must follow §8.3.5/§8.3.6 priorities with §8.2 random
+    tie-breaks (see select_support_shift_spaces / pick_random_spaces).
+    """
     cities = [n for n, info in state["spaces"].items() if info.get("type") == "City"]
     cities.sort()
     return cities[:count]
 
 
-def pick_two_cities(state):
-    """Return two City IDs; for now pick the first two alphabetically."""
-    return pick_cities(state, 2)            # deterministic for tests
-
-
 def pick_colonies(state, count: int = 1):
-    """Return up to *count* Colony IDs sorted alphabetically."""
+    """Return up to *count* Colony IDs in sorted order.
+
+    Same caveat as pick_cities: full-list use only, never subset selection.
+    """
     colonies = [n for n, info in state["spaces"].items() if info.get("type") == "Colony"]
     colonies.sort()
     return colonies[:count]
+
+
+# --------------------------------------------------------------------------- #
+# Non-player Event space selection (§8.3.5 / §8.3.6 / §8.2)
+# --------------------------------------------------------------------------- #
+# §8.2 tie-break picks for candidates of EQUAL priority (re-exported so card
+# modules have a single import site).
+from lod_ai.bots.random_spaces import pick_random_spaces  # noqa: E402
+
+
+def _walk_toward(cur: int, target: int, steps: int) -> int:
+    """Result of shifting *cur* up to *steps* levels toward *target*."""
+    new = cur
+    for _ in range(steps):
+        if new == target:
+            break
+        new += 1 if new < target else -1
+    return max(MIN_SUPPORT, min(MAX_SUPPORT, new))
+
+
+def select_support_shift_spaces(state, candidates, count, *, target: int,
+                                steps: int = 1, shaded=None):
+    """Select *count* spaces for an Event Support/Opposition shift.
+
+    §8.3.5 routes Event shift-space selection to §8.3.6: Royalist factions
+    select "for the highest gain in Support, then the highest loss in
+    Opposition"; Rebellion factions the reverse. Gain/loss is Population-
+    weighted (§8.1.1: level times Population), with Active counting double
+    Passive (§1.6.2) — both fall out of the ±2/±1 support encoding times
+    Population. Candidates tied on the §8.3.6 key are resolved by the §8.2
+    Random Spaces table (per §8.1/§8.2, random selection applies only among
+    candidates of EQUAL priority).
+
+    The executing side comes from state["active"] when set (base_bot sets it
+    during event execution), else from *shaded* per §8.3.2 (Non-player
+    Patriot/French execute the shaded text, British/Indian the unshaded).
+    Zero-gain candidates outrank negative-gain ones, so an event forced to
+    select spaces never shifts a space against the executing side while a
+    harmless space exists. The §8.3.3 net-shift guard (base_bot) keeps bots
+    from playing an event whose net shift favors the enemy at all.
+    """
+    active = state.get("active")
+    if active is not None:
+        royalist = _canon_faction(str(active)) in (BRITISH, INDIANS)
+    elif shaded is not None:
+        royalist = not shaded
+    else:
+        royalist = True
+
+    support = state.get("support", {})
+
+    def gain_key(sid):
+        pop = _madj.population(sid)
+        cur = support.get(sid, 0)
+        new = _walk_toward(cur, target, steps)
+        support_gain = (max(new, 0) - max(cur, 0)) * pop
+        opposition_gain = (max(-new, 0) - max(-cur, 0)) * pop
+        if royalist:
+            return (support_gain, -opposition_gain)
+        return (opposition_gain, -support_gain)
+
+    chosen: list = []
+    remaining = list(dict.fromkeys(candidates))
+    while remaining and len(chosen) < count:
+        best = max(gain_key(s) for s in remaining)
+        ties = [s for s in remaining if gain_key(s) == best]
+        pick = ties[0] if len(ties) == 1 else pick_random_spaces(state, ties, 1)[0]
+        chosen.append(pick)
+        remaining.remove(pick)
+    return chosen

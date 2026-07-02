@@ -5,15 +5,25 @@ Random Spaces table (Rule 8.2).
 The table is indexed as RANDOM_SPACES_TABLE[row][col] where
     row = 0-5   → result of 1D6 − 1
     col = 0-2   → result of 1D3 − 1
-Entries containing “A / B” represent two candidate spaces for that cell.
+Entries containing “A / B” represent two candidate spaces for that cell
+(choose the top / higher-Population space first per §8.2).
+
+§8.2 is a TIE-BREAKER only: it applies when several candidate spaces have
+EQUAL priority for a Non-player Command, Special Activity, or Event (§8.1,
+§8.2). Substantive priorities — e.g. §8.3.6 for Support/Opposition shifts,
+§8.3.5 piece-maximisation — must be applied by the caller first.
+
+All selection here uses the seeded ``state["rng"]`` so games are
+reproducible from the scenario seed and survive the save/load RNG
+round-trip enforced by the invariant gate.
 """
 
-import random
+import random as _global_random
 
 from lod_ai.map import adjacency as map_adj
 
 RANDOM_SPACES_TABLE = [
-    # 1D3 = 1                     2                               3
+    # 1D3 = 1                     2                                3
     ["Quebec City",               "Northwest / Maryland-Delaware", "North Carolina"],
     ["Quebec / New York",         "Philadelphia",                  "Savannah"],
     ["New Hampshire",             "Pennsylvania",                  "Florida / South Carolina"],
@@ -60,39 +70,77 @@ def _label_to_ids(label: str) -> list[str]:
     return ids
 
 
-def choose_random_space(candidates):
+def _walk_from(start_row: int, start_col: int):
+    """Yield table entries following the §8.2 arrows: down the starting
+    column from the rolled box, from the bottom of one column to the TOP of
+    the next, and from Massachusetts (row 6, col 3) back to Quebec City
+    (row 1, col 1) — i.e. one column-major cycle over all 18 boxes."""
+    start = (start_col - 1) * 6 + (start_row - 1)
+    for i in range(18):
+        idx = (start + i) % 18
+        col, row = divmod(idx, 6)
+        yield RANDOM_SPACES_TABLE[row][col]
+
+
+def choose_random_space(candidates, rng=None):
     """
-    Select a random space from *candidates* using the Random Spaces table (Rule 8.2).
-    Rolls 1D3 for the starting column and 1D6 for the starting row, then follows the
-    arrow order (down the column, then wrap to the next column) until a candidate
-    space is found. Returns None if no candidate appears in the table.
+    Select a random space from *candidates* using the Random Spaces table
+    (Rule 8.2). Rolls 1D3 for the starting column and 1D6 for the starting
+    row, then follows the arrows until a candidate space is found (two-space
+    boxes resolve top space first). Returns None if no candidate appears in
+    the table.
+
+    Pass the seeded ``state["rng"]`` as *rng*; the module-level fallback
+    exists only for ad-hoc interactive use and is NOT reproducible.
     """
     if not candidates:
         return None
-    rng = random
+    if rng is None:
+        rng = _global_random
     remaining = set(candidates)
     start_col = _roll_d3(rng)  # 1-3
     start_row = _roll_d6(rng)  # 1-6
-    order_rows = list(range(start_row, 7)) + list(range(1, start_row))
-    order_cols = list(range(start_col, 4)) + list(range(1, start_col))
-    for c in order_cols:
-        for r in order_rows:
-            entry = RANDOM_SPACES_TABLE[r - 1][c - 1]
-            for space_id in _label_to_ids(entry):
-                if space_id in remaining:
-                    return space_id
+    for entry in _walk_from(start_row, start_col):
+        for space_id in _label_to_ids(entry):
+            if space_id in remaining:
+                return space_id
     return None
 
 
-def iter_random_spaces():
+def pick_random_spaces(state, candidates, count=1):
+    """
+    Pick up to *count* distinct spaces from *candidates* per §8.2, re-rolling
+    for each additional space (§8.2: "roll again to select another space only
+    if needed"). Uses the seeded ``state["rng"]``.
+
+    Fallbacks: without an rng (bare unit-test states) selection is sorted
+    order — the same deterministic stand-in the audited free-op planners use
+    (`free_op_planner._rand_choice`). Candidates that do not appear on the
+    table (synthetic test spaces) are selected by seeded equal-chance roll,
+    which §8.2's Play Note sanctions.
+    """
+    remaining = sorted(set(candidates))
+    picked: list[str] = []
+    rng = state.get("rng") if isinstance(state, dict) else None
+    while remaining and len(picked) < count:
+        if rng is None:
+            choice = remaining[0]
+        else:
+            choice = choose_random_space(remaining, rng)
+            if choice is None:
+                choice = remaining[rng.randrange(len(remaining))]
+        picked.append(choice)
+        remaining.remove(choice)
+    return picked
+
+
+def iter_random_spaces(rng=None):
     """Yield an infinite stream of spaces following the 8.2 arrow rules."""
-    rng = random
+    if rng is None:
+        rng = _global_random
     start_col = _roll_d3(rng)  # 1-3
     start_row = _roll_d6(rng)  # 1-6
-    order_rows = list(range(start_row, 7)) + list(range(1, start_row))
-    order_cols = list(range(start_col, 4)) + list(range(1, start_col))
     while True:
-        for c in order_cols:
-            for r in order_rows:
-                for space in _label_to_ids(RANDOM_SPACES_TABLE[r - 1][c - 1]):
-                    yield space
+        for entry in _walk_from(start_row, start_col):
+            for space in _label_to_ids(entry):
+                yield space

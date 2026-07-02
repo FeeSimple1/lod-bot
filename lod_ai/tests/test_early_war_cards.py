@@ -65,7 +65,11 @@ def test_card2_common_sense_any_two_cities():
     assert "New_York_City" in state["markers"][PROPAGANDA]["on_map"]
 
 
-def test_card6_benedict_arnold_any_colony_and_militia_activation():
+def test_card6_benedict_arnold_targets_fort_colony_and_removes_active_first():
+    """§8.3.5: select the Colony where the most Forts then pieces are
+    removed (Virginia has nothing → never selected, despite alphabetical
+    order favouring it under the old placeholder when named e.g. Albany);
+    §8.1.2: remove Active before Underground Militia."""
     state = _base_state()
     state["spaces"] = {
         "Georgia": {"type": "Colony", FORT_PAT: 1, MILITIA_U: 1, MILITIA_A: 2},
@@ -75,9 +79,25 @@ def test_card6_benedict_arnold_any_colony_and_militia_activation():
     early_war.evt_006_benedict_arnold(state, shaded=False)
 
     assert state["casualties"].get(FORT_PAT) == 1
-    assert state["available"].get(MILITIA_U) == 1
-    assert state["available"].get(MILITIA_A) == 1
     assert FORT_PAT not in state["spaces"]["Georgia"]
+    # 2 Militia removed, Active first (§8.1.2)
+    assert state["available"].get(MILITIA_A) == 2
+    assert state["available"].get(MILITIA_U) is None
+    assert state["spaces"]["Georgia"].get(MILITIA_U) == 1
+
+
+def test_card6_benedict_arnold_prefers_fort_over_more_militia():
+    """§8.3.5: Fort removal outranks removing more other pieces."""
+    state = _base_state()
+    state["spaces"] = {
+        "Virginia": {"type": "Colony", MILITIA_A: 5},
+        "Georgia": {"type": "Colony", FORT_PAT: 1},
+    }
+
+    early_war.evt_006_benedict_arnold(state, shaded=False)
+
+    assert state["casualties"].get(FORT_PAT) == 1
+    assert state["spaces"]["Virginia"].get(MILITIA_A) == 5
 
 
 def test_card6_benedict_arnold_shaded_any_space():
@@ -269,25 +289,50 @@ def test_card32_rule_britannia_any_colony_and_any_recipient():
     assert state["resources"]["INDIANS"] == 1
 
 
-def test_card41_william_pitt_shifts_toward_passive_levels():
+def test_card41_william_pitt_unshaded_selects_by_royalist_gain():
+    """§8.3.6 Royalist: highest gain in Support, then highest loss in
+    Opposition; a Colony already past Passive Support would shift AGAINST
+    the British and must rank below even a zero-gain candidate."""
     state = _base_state()
     state["spaces"] = {
-        "Connecticut": {"type": "Colony"},
-        "Georgia": {"type": "Colony"},
-        "Virginia": {"type": "Colony"},
+        "Connecticut_Rhode_Island": {"type": "Colony"},  # pop 2
+        "Georgia": {"type": "Colony"},                   # pop 1
+        "Virginia": {"type": "Colony"},                  # pop 2
     }
-    state["support"] = {"Connecticut": -2, "Georgia": 2, "Virginia": 0}
+    # Virginia: Neutral → +1 (support gain 2). CRI: Active Opp → Neutral
+    # (opposition loss 4, no support gain). Georgia: Active Support → would
+    # DROP to Passive (negative gain) — must not be selected.
+    state["support"] = {"Connecticut_Rhode_Island": -2,
+                        "Georgia": 2, "Virginia": 0}
 
     early_war.evt_041_william_pitt(state, shaded=False)
 
-    assert state["support"]["Connecticut"] == 0
-    assert state["support"]["Georgia"] == 1
-    assert state["support"]["Virginia"] == 0
+    assert state["support"]["Virginia"] == 1
+    assert state["support"]["Connecticut_Rhode_Island"] == 0
+    assert state["support"]["Georgia"] == 2  # untouched
+
+
+def test_card41_william_pitt_shaded_selects_by_rebel_gain():
+    """§8.3.6 Rebellion: highest gain in Opposition, then loss of Support;
+    a Colony at Active Opposition would soften toward Passive and must
+    rank below zero-gain candidates."""
+    state = _base_state()
+    state["spaces"] = {
+        "Connecticut_Rhode_Island": {"type": "Colony"},
+        "Georgia": {"type": "Colony"},
+        "Virginia": {"type": "Colony"},
+    }
+    # Virginia: Neutral → -1 (opposition gain 2). Georgia: Active Support →
+    # Neutral (support loss 2). CRI: Active Opp → would RISE to Passive Opp
+    # (opposition loss) — must not be selected.
+    state["support"] = {"Connecticut_Rhode_Island": -2,
+                        "Georgia": 2, "Virginia": 0}
 
     early_war.evt_041_william_pitt(state, shaded=True)
 
-    assert state["support"]["Connecticut"] == -1
-    assert state["support"]["Georgia"] == -1
+    assert state["support"]["Virginia"] == -1
+    assert state["support"]["Georgia"] == 0
+    assert state["support"]["Connecticut_Rhode_Island"] == -2  # untouched
 
 
 def test_card46_burke_places_tories_and_shifts_cities():
@@ -310,8 +355,13 @@ def test_card46_burke_places_tories_and_shifts_cities():
     state["support"] = {"Boston": 2, "New_York_City": -2, "Philadelphia": 0}
     early_war.evt_046_burke(state, shaded=True)
 
+    # §8.3.6 Rebellion: Philadelphia Neutral → Passive Opp (opposition gain)
+    # ranks first; Boston Active Support → Passive (support loss) second;
+    # New_York_City at Active Opposition would soften to Passive Opposition
+    # — shifting AGAINST the Rebellion — and must stay untouched.
+    assert state["support"]["Philadelphia"] == -1
     assert state["support"]["Boston"] == 1
-    assert state["support"]["New_York_City"] == -1
+    assert state["support"]["New_York_City"] == -2
 
 
 def test_card72_french_settlers_help_places_royalist_pieces():
@@ -559,23 +609,25 @@ def test_card84_unshaded_gather_restricted_to_colonies():
     free ops must specify Colony locations, not be unrestricted."""
     state = _base_state()
     state["spaces"] = {
-        "Virginia": {"type": "Colony"},
-        "Georgia": {"type": "Colony"},
-        "Boston": {"type": "City"},
-        "Northwest": {"type": "Reserve"},
+        "Virginia": {"type": "Colony", WARPARTY_U: 2},
+        "Georgia": {"type": "Colony", WARPARTY_U: 1},
+        "South_Carolina": {"type": "Colony"},   # 0 own force: ranks last
+        "Boston": {"type": "City", WARPARTY_U: 5},      # not a Colony
+        "Northwest": {"type": "Reserve", WARPARTY_U: 5},  # not a Colony
     }
     state["free_ops"] = []
 
     early_war.evt_084_six_nations(state, shaded=False)
 
-    # Should queue exactly 2 Gather ops, each with a Colony location
+    # Queue exactly 2 Gather ops in legal Colonies (3.4.1: War Party in or
+    # adjacent, Support among Neutral/Passive), most own force first —
+    # never the City/Reserve, and the empty Colony loses the priority.
     ops = state["free_ops"]
     assert len(ops) == 2
-    for fac, op_name, loc in ops:
+    assert [op[2] for op in ops] == ["Virginia", "Georgia"]
+    for fac, op_name, _loc in ops:
         assert fac == "INDIANS"
         assert op_name == "gather"
-        assert loc is not None  # must NOT be None (unrestricted)
-        assert loc in ("Virginia", "Georgia")  # must be a Colony
 
 
 def test_card84_unshaded_player_override_colonies():

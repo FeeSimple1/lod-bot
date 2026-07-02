@@ -137,3 +137,17 @@ staying high).
 
 **Decision (owner, 2026-06-09):** keep the literal reading. Non-qualifying spaces
 are removed to Available — never paid, never shifted.
+
+---
+
+## Q14: Event space selection for unnamed Cities/Colonies — RESOLVED (not ambiguous)
+
+A prior handoff escalated "should candidates for e.g. 'shift 2 Cities' be
+all Cities or only Cities where the shift can take effect?" as a design
+call. On inspection the manual answers it: §8.3.5 routes Support/Opposition
+shift selection to **§8.3.6** (gain-maximisation, Population-weighted per
+§8.1.1/§1.6.2); §8.2 Random Spaces is a tie-breaker among candidates of
+EQUAL priority only; §8.3.3 makes a no-effect (or enemy-favoring) Event
+Ineffective. A maxed-out City has zero gain and can never tie a City where
+the shift works, so the escalated dilemma cannot arise. Implemented in
+Session 21 (see audit_report.md) with no human ruling needed.
