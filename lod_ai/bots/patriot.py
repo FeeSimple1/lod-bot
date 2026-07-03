@@ -195,7 +195,8 @@ class PatriotBot(BaseBot):
 
         avail_forts = state["available"].get(C.FORT_PAT, 0)
         rebel_group = self._rebel_group_size(sp)
-        if avail_forts and rebel_group >= 4 and sp.get(C.FORT_PAT, 0) == 0:
+        if (avail_forts and rebel_group >= 4 and sp.get(C.FORT_PAT, 0) == 0
+                and self._fort_room(sp)):
             return "rally"
         avail_militia = state["available"].get(C.MILITIA_U, 0)
         if avail_militia > 0 or rebel_group >= 4:
@@ -398,7 +399,8 @@ class PatriotBot(BaseBot):
                 if (sp_r.get(C.FORT_PAT, 0) == 0
                         and self._rebel_group_size(sp_r) >= 4
                         and removable >= 2
-                        and st["available"].get(C.FORT_PAT, 0) > 0):
+                        and st["available"].get(C.FORT_PAT, 0) > 0
+                        and self._fort_room(sp_r)):   # §1.4.2 stacking
                     rally_kwargs["build_fort"] = {rally_space}
             # Blockade: move FROM battle city TO city with most Support
             blockade_dest = self._best_blockade_city(st, exclude=battle_sid)
@@ -847,7 +849,7 @@ class PatriotBot(BaseBot):
             for sid, sp in state["spaces"].items():
                 if not self._can_rally_in(state, sid):
                     continue
-                if sp.get(C.FORT_PAT, 0) == 0:
+                if sp.get(C.FORT_PAT, 0) == 0 and self._fort_room(sp):
                     continue
                 # "no other Rebellion pieces" = only the Fort itself
                 other = (sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0) +
@@ -876,7 +878,8 @@ class PatriotBot(BaseBot):
                     continue
                 if sid in spaces_used:
                     continue  # already selected — checked separately in Bullet 4
-                if sp.get(C.FORT_PAT, 0) == 0 and sid not in build_fort_set:
+                if (sp.get(C.FORT_PAT, 0) == 0 and sid not in build_fort_set
+                        and self._fort_room(sp)):
                     continue
                 mil = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
                 if mil > best_cont_mil:
@@ -894,7 +897,8 @@ class PatriotBot(BaseBot):
             best_mil = -1
             for sid in spaces_used:
                 sp = state["spaces"].get(sid, {})
-                if sp.get(C.FORT_PAT, 0) == 0 and sid not in build_fort_set:
+                if (sp.get(C.FORT_PAT, 0) == 0 and sid not in build_fort_set
+                        and self._fort_room(sp)):
                     continue
                 mil = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
                 if mil > best_mil:
@@ -1247,6 +1251,14 @@ class PatriotBot(BaseBot):
     # ===================================================================
     #  DECISION-HELPER FUNCTIONS
     # ===================================================================
+    @staticmethod
+    def _fort_room(sp: Dict) -> bool:
+        """§1.4.2 stacking: max two base pieces per space. rally.execute's
+        _replace_with_fort raises past this; the planner must agree
+        (Session 30 — gate 1778:12 crash once turn flags unfroze)."""
+        return (sp.get(C.FORT_PAT, 0) + sp.get(C.FORT_BRI, 0)
+                + sp.get(C.VILLAGE, 0)) < 2
+
     def _rally_preferred(self, state: Dict) -> bool:
         """P9: Rally if would place Fort OR 1D6 > Underground Militia."""
         avail_forts = state["available"].get(C.FORT_PAT, 0)

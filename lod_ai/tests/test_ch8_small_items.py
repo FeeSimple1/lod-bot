@@ -61,3 +61,22 @@ def test_indians_not_blanket_gated_at_zero_resources():
     from lod_ai.bots.base_bot import BaseBot
     src = inspect.getsource(BaseBot.take_turn)
     assert "C.INDIANS" in src  # the exemption is present
+
+
+def test_per_turn_flags_cleared_at_turn_start(monkeypatch):
+    """Session 30: _sa_done_this_turn and _muster_die_cached froze for the
+    whole game once set (Muster's SA permanently skipped; B6's die rolled
+    once per game). take_turn must clear both at entry."""
+    from lod_ai.bots.base_bot import BaseBot
+
+    bot = BaseBot()
+    bot.faction = "BRITISH"
+    monkeypatch.setattr(bot, "_choose_event_vs_flowchart",
+                        lambda st, card: False)
+    monkeypatch.setattr(bot, "_follow_flowchart", lambda st: None)
+    st = {"resources": {"BRITISH": 5},
+          "_sa_done_this_turn": True, "_muster_die_cached": 3,
+          "history": []}
+    bot.take_turn(st, {"id": 1})
+    assert "_sa_done_this_turn" not in st
+    assert "_muster_die_cached" not in st

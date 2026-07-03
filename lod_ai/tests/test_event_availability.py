@@ -99,9 +99,12 @@ class TestFrenchEventAvailability:
         """Card 49 shaded: places_french_from_unavailable with Unavailable
         French Regulars → returns True."""
         bot = FrenchBot()
+        # Real game states key the unavailable box by on-map tags
+        # (setup_state._apply_unavailable_block maps FRENCH_UNAVAIL ->
+        # REGULAR_FRE); the old key here encoded the dead-bullet bug.
         state = _base_state(
             spaces={"Boston": {}},
-            unavailable={C.FRENCH_UNAVAIL: 5},
+            unavailable={C.REGULAR_FRE: 5},
         )
         card = {"id": 49}
         assert bot._faction_event_conditions(state, card) is True

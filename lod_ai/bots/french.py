@@ -904,9 +904,13 @@ class FrenchBot(BaseBot):
             return True
         # 2. Places French pieces from Unavailable
         if eff["places_french_from_unavailable"]:
+            # The unavailable box is keyed by the on-map tags: setup maps
+            # FRENCH_UNAVAIL -> REGULAR_FRE and SQUADRON -> BLOCKADE
+            # (setup_state._apply_unavailable_block). The old keys never
+            # existed here, so this F2 bullet was dead (Session 30 audit).
             unavail = state.get("unavailable", {})
-            if (unavail.get(C.FRENCH_UNAVAIL, 0) > 0
-                    or unavail.get(C.SQUADRON, 0) > 0):
+            if (unavail.get(C.REGULAR_FRE, 0) > 0
+                    or unavail.get(C.BLOCKADE, 0) > 0):
                 return True
         # 3. Places French pieces on map
         if eff["places_french_on_map"]:

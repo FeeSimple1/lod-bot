@@ -163,8 +163,11 @@ class TestI10MarchMax3:
         refresh_control(state)
         result = bot._march(state)
         assert result is True
-        # Only 1 resource spent
-        assert state["resources"][C.INDIANS] == 0
+        # §3.4.2: "Pay 0 for the first destination where all War Parties
+        # are originating from Indian Reserve Provinces" — origins here
+        # are all Reserves, so the March is free (the old assertion
+        # encoded the pre-Session-29 bug of never claiming the discount).
+        assert state["resources"][C.INDIANS] == 1
 
     def test_march_returns_false_when_no_targets(self):
         """March returns False when nothing valid can be done."""

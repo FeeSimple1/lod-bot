@@ -2964,3 +2964,33 @@ rebaselined: 22/60 flips — the Indian behavior changes are real (act at
 0 Resources via Trade/free March; low-resource Marches now execute
 trimmed instead of erroring into a PASS; leader positioning varies on
 ties). 1775 Indians 13→9, Patriots 2→5; 1776/1778 within usual movement.
+
+## Session 30: §8.4–8.7 verification survey + 4 fixes (July 2026)
+
+Piece 1's remaining half: four parallel audit agents verified Manual
+8.4-8.7 + the four flowcharts against the bots (full findings:
+docs/session30_faction_survey.md; ~45 backlog items). High-severity
+claims were hand-spot-checked before recording. Fixed immediately:
+
+1. `_sa_done_this_turn` and `_muster_die_cached` were set and NEVER
+   cleared — after the first Garrison SA every later British Muster
+   silently skipped its Skirmish/Naval Pressure for the rest of the
+   game, and B6's Muster-vs-Battle die was rolled once per GAME. Both
+   now cleared at take_turn entry (per-turn scope; tested).
+2. French F2 bullet "Event moves French Regulars or Squadrons from
+   Unavailable" was dead: it read unavailable-box keys
+   (FRENCH_UNAVAIL/SQUADRON) that setup remaps to REGULAR_FRE/BLOCKADE.
+3. Patriot Rally fort builds lacked the §1.4.2 stacking-room check in
+   the Win-the-Day path (and belt-and-braces on two other sites) —
+   crashed the gate at 1778:12 once the unfrozen flags shifted
+   trajectories.
+
+Two genuine reference contradictions found → QUESTIONS.md Q16 (pre-ToA
+Hortalez "up to 1D3" vs flowchart exact-spend) and Q17 (failed Raid →
+Gather per manual, → I6 per flowchart). Per Never-Guess: awaiting
+Eric's ruling; code currently follows the flowchart in both.
+
+Verification: both roots green (1,272); gate clean seeds 1-20
+invariants-on; balance rebaselined (the unfrozen SA/die flags are a
+major British behavior restoration). Backlog triage for the ~45
+survey items is the next block of Piece 1/Piece 3 work.

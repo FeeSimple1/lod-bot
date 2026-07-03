@@ -23,6 +23,16 @@ class BaseBot:
           - limited_only (bool): True -> 1 space, no SA
           - special_allowed (bool): False -> skip SA
         """
+        # Per-TURN coordination flags. These are set during a turn (e.g.
+        # Garrison marks its SA so a same-turn Muster fallback doesn't run
+        # a second one; B6 caches its Muster-vs-Battle die) but nothing
+        # ever cleared them, freezing them for the rest of the GAME:
+        # after the first Garrison SA every later British Muster silently
+        # skipped its Skirmish/Naval Pressure, and B6's "a D6 roll" was
+        # rolled once per game (Session 30 audit).
+        state.pop("_sa_done_this_turn", None)
+        state.pop("_muster_die_cached", None)
+
         # Propagate slot constraints into state so command methods can check.
         if allowed:
             if allowed.get("limited_only"):
