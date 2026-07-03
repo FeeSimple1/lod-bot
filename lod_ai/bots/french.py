@@ -765,14 +765,19 @@ class FrenchBot(BaseBot):
         # F16: "First execute a Special Activity." SA entry at F17 (Naval Pressure)
         if not no_sa:
             self._try_naval_pressure(state)
-        # §3.6.8 Win-the-Day: when the Rebellion wins, the French may move a
-        # Blockade from the Battle City to another City.  We move it to the
-        # non-battle City with the most Support.  The free Patriot Rally is the
-        # Patriots' own optional choice ("Patriots may free Rally"); the French
-        # bot does not make that cross-faction decision, so it is declined here.
+        # §8.6.6: "the Patriots execute a free Rally Command (8.5.2) in
+        # one space" — mandatory wording, selected by the 8.5.2/P7
+        # priorities for non-player Patriots (resolved QUESTIONS.md Q9;
+        # the old callback declined it outright — Session 31). Blockade:
+        # "to another City with MORE Support" — strictly greater than the
+        # battle City, else no move.
         def _win_callback(st, battle_sid):
+            rally_space = None
+            if C.PATRIOTS not in (st.get("human_factions") or set()):
+                from lod_ai.bots.patriot import PatriotBot
+                rally_space = PatriotBot()._best_rally_space(st)
             blockade_dest = None
-            best_sup = -999
+            best_sup = self._support_level(st, battle_sid)
             for sid2 in st["spaces"]:
                 if sid2 == battle_sid or not map_adj.is_city(sid2):
                     continue
@@ -780,7 +785,7 @@ class FrenchBot(BaseBot):
                 if sup > best_sup:
                     best_sup = sup
                     blockade_dest = sid2
-            return None, {}, blockade_dest
+            return rally_space, {}, blockade_dest
 
         battle.execute(
             state, C.FRENCH, {}, [sid for _, sid in targets],

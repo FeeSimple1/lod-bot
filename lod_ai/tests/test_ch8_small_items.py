@@ -80,3 +80,18 @@ def test_per_turn_flags_cleared_at_turn_start(monkeypatch):
     bot.take_turn(st, {"id": 1})
     assert "_sa_done_this_turn" not in st
     assert "_muster_die_cached" not in st
+
+
+def test_blockade_move_requires_strictly_more_support():
+    """§8.5.1/§8.6.6: Win-the-Day Blockade moves 'to another City with
+    MORE Support' — a tie or worse means no move."""
+    from lod_ai.bots.patriot import PatriotBot
+    bot = PatriotBot()
+    st = {"spaces": {}, "support": {"Boston": 1, "New_York_City": 1,
+                                    "Philadelphia": 0}}
+    # Origin support 1; all other cities <= 1 → no destination.
+    assert bot._best_blockade_city(st, exclude="Boston",
+                                   min_support=1) is None
+    st["support"]["Philadelphia"] = 2
+    assert bot._best_blockade_city(st, exclude="Boston",
+                                   min_support=1) == "Philadelphia"

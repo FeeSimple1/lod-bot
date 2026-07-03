@@ -382,14 +382,11 @@ class PatriotBot(BaseBot):
             battle space.  Rally uses P7 priorities; Blockade moves to
             the City with most Support (excluding the battle city itself).
             """
-            # §3.6.8: Win-the-Day free Rally is in the battle space.
-            # However, Rally is illegal in West Indies and Indian Reserves
-            # (Quebec / Northwest / Southwest) per §3.3.1 and §1.4.2.  If the
-            # battle was fought in such a space, skip the free Rally.
-            if self._can_rally_in(st, battle_sid):
-                rally_space = battle_sid
-            else:
-                rally_space = None
+            # §8.5.1: "the Patriots execute a free Rally Command (8.5.2)
+            # in one space" — the space is selected by the 8.5.2/P7
+            # priorities, NOT hardwired to the battle space (Session 31;
+            # the correct selector existed as dead code).
+            rally_space = self._best_rally_space(st)
             rally_kwargs = {}
             if rally_space:
                 sp_r = st["spaces"].get(rally_space, {})
@@ -402,8 +399,11 @@ class PatriotBot(BaseBot):
                         and st["available"].get(C.FORT_PAT, 0) > 0
                         and self._fort_room(sp_r)):   # §1.4.2 stacking
                     rally_kwargs["build_fort"] = {rally_space}
-            # Blockade: move FROM battle city TO city with most Support
-            blockade_dest = self._best_blockade_city(st, exclude=battle_sid)
+            # Blockade: "to another City with MORE Support" than the
+            # battle City (§8.5.1) — strictly greater, else no move.
+            blockade_dest = self._best_blockade_city(
+                st, exclude=battle_sid,
+                min_support=self._support_level(st, battle_sid))
             return rally_space, rally_kwargs, blockade_dest
 
         battle.execute(
@@ -482,16 +482,20 @@ class PatriotBot(BaseBot):
         return None
 
     def _best_blockade_city(self, state: Dict,
-                            exclude: str | None = None) -> str | None:
+                            exclude: str | None = None,
+                            min_support: int | None = None) -> str | None:
         """Select City with most Support for French Blockade move (P4).
 
         Parameters
         ----------
         exclude : str | None
             A city to exclude (the battle city the blockade moves FROM).
+        min_support : int | None
+            §8.5.1/§8.6.6: the destination must have strictly MORE
+            Support than the origin City; pass the origin's level.
         """
         best = None
-        best_support = -999
+        best_support = min_support if min_support is not None else -999
         for sid in CITIES:
             if sid == exclude:
                 continue

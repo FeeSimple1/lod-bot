@@ -517,7 +517,9 @@ class BritishBot(BaseBot):
         no_sa = state.get("_no_special") or limited
         if not no_sa:
             self._apply_howe_fni(state)  # B38 Howe lowers FNI before SA
-            self._skirmish_then_naval(state)
+            # §8.4.1: "First execute Naval Pressure, or if that is not
+            # possible, Skirmish." (Was inverted — Session 31.)
+            self._naval_then_skirmish(state)
             state["_sa_done_this_turn"] = True
 
         refresh_control(state)
@@ -1092,7 +1094,9 @@ class BritishBot(BaseBot):
                 and not state.get("_limited")
                 and not state.get("_no_special")):
             self._apply_howe_fni(state)  # B38 Howe lowers FNI before SA
-            self._skirmish_then_naval(state)
+            # §8.4.1: "First execute Naval Pressure, or if that is not
+            # possible, Skirmish." (Was inverted — Session 31.)
+            self._naval_then_skirmish(state)
         return True
 
     # =======================================================================

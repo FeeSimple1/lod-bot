@@ -2994,3 +2994,29 @@ Verification: both roots green (1,272); gate clean seeds 1-20
 invariants-on; balance rebaselined (the unfrozen SA/die flags are a
 major British behavior restoration). Backlog triage for the ~45
 survey items is the next block of Piece 1/Piece 3 work.
+
+## Session 31: Survey backlog block 1 — WTD rallies + Garrison SA order (July 2026)
+
+- §8.4.1 Garrison SA order was inverted: "First execute Naval Pressure,
+  or if that is not possible, Skirmish" — code ran Skirmish first
+  (`_skirmish_then_naval`); now `_naval_then_skirmish`.
+- §8.5.1 Win-the-Day free Rally was hardwired to the battle space; the
+  rule grants "a free Rally Command (8.5.2) in one space", selected by
+  the 8.5.2/P7 priorities. The correct selector (`_best_rally_space`)
+  existed as dead code and is now wired in.
+- §8.6.6: the French bot's callback declined the free Patriot Rally
+  outright (comment claimed it was the Patriots' optional cross-faction
+  choice; the rule text is mandatory and resolved Q9 had already ruled).
+  Non-player Patriots now rally via P7 priorities; human Patriots still
+  skip (Piece 7 CLI item).
+- §8.5.1/§8.6.6 Blockade move destination must have strictly MORE
+  Support than the battle City — both callbacks now enforce it
+  (`_best_blockade_city(min_support=…)`); previously any max-support
+  city qualified, even at equal or lower Support.
+
+Verification: both roots green (1,272 + 41; +1 blockade test); gate
+clean seeds 1-20 invariants-on; balance rebaselined (47 baseline lines
+changed — Garrison Naval-first plus real WTD rallies move many pinned
+games). Survey items remaining: Supply pay-vs-move inversions (3
+factions), dead BS reaction chain, Scout/Raid/March deviations — see
+docs/session30_faction_survey.md.
