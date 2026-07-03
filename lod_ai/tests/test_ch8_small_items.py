@@ -115,3 +115,35 @@ def test_pre_treaty_hortalez_spends_up_to_the_roll(monkeypatch):
     assert bot._hortelez(st, before_treaty=True) is True
     assert st["resources"]["FRENCH"] == 0          # spent the 1 it had
     assert st["resources"]["PATRIOTS"] > 5         # Patriots gained
+
+
+def test_raid_uses_at_most_one_special_activity(monkeypatch):
+    """§4.1 one SA per turn. 8.7.1's zero-Resource clause is 'Plunder
+    (or if that is not possible, Trade)' — either/or. The old sequence
+    ran Plunder AND Trade at 0 Resources, then the I5 block again."""
+    bot = IndianBot()
+    calls = []
+
+    def fake_plunder(st):
+        st["_turn_used_special"] = True
+        calls.append("plunder")
+        return True
+
+    monkeypatch.setattr(bot, "_can_raid", lambda st: True)
+    monkeypatch.setattr(bot, "_raid", lambda st: True)
+    monkeypatch.setattr(bot, "_can_plunder", lambda st: True)
+    monkeypatch.setattr(bot, "_plunder", fake_plunder)
+    monkeypatch.setattr(bot, "_trade",
+                        lambda st: calls.append("trade") or True)
+    monkeypatch.setattr(bot, "_war_path_or_trade",
+                        lambda st: calls.append("war_path"))
+
+    st = {"resources": {C.INDIANS: 0}}
+    assert bot._raid_sequence(st) is True
+    assert calls == ["plunder"]          # exactly ONE SA
+
+    # SA already used this turn → no further SA at all.
+    calls.clear()
+    st2 = {"resources": {C.INDIANS: 0}, "_turn_used_special": True}
+    assert bot._raid_sequence(st2) is True
+    assert calls == []

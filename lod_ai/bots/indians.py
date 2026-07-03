@@ -239,19 +239,18 @@ class IndianBot(BaseBot):
             return False
 
         no_sa = state.get("_limited") or state.get("_no_special")
-        if not no_sa:
-            # I4: "If Resources fall to zero, Plunder then Trade before completing"
+        if not no_sa and not state.get("_turn_used_special"):
+            # ONE Special Activity total (§4.1). 8.7.1: if Resources fell
+            # to zero during the Raid, "Plunder (or if that is not
+            # possible, Trade)"; otherwise I5: Plunder in a Raid space,
+            # else War Path, else Trade. (Previously this block ran
+            # Plunder AND Trade unconditionally at 0 Resources and then
+            # fell through to the I5 block — up to three SAs per turn.
+            # Session 35.)
             if state["resources"].get(C.INDIANS, 0) == 0:
-                if self._can_plunder(state):
-                    self._plunder(state)
-                self._trade(state)
-
-            # optional Plunder (I5)
-            if self._can_plunder(state):
-                if not self._plunder(state):
-                    # if plunder impossible, War‑Path instead (arrow "Else I8")
-                    self._war_path_or_trade(state)
-            else:
+                if not (self._can_plunder(state) and self._plunder(state)):
+                    self._trade(state)
+            elif not (self._can_plunder(state) and self._plunder(state)):
                 self._war_path_or_trade(state)
         return True
 
@@ -382,7 +381,31 @@ class IndianBot(BaseBot):
             pop = _MAP_DATA.get(space, {}).get("population", 0)
             return (wp_total - rebels, pop)
 
-        targets.sort(key=lambda t: score(t), reverse=True)
+        # 8.7.1: "first where Plunder will be possible after the Raid
+        # movement, then elsewhere, within each in the spaces with the
+        # highest Population" — a two-TIER sort (boolean, then Pop), not
+        # a raw WP-minus-Rebels margin; equal candidates break randomly
+        # per 8.2 (Session 35).
+        def tier_key(space: str) -> Tuple[int, int]:
+            sp = state["spaces"][space]
+            rebels = (sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                      + sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+                      + sp.get(C.FORT_PAT, 0))
+            wp_total = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
+            wp_after = wp_total + (1 if (wp_total == 0
+                                         or wp_total <= rebels) else 0)
+            pop = _MAP_DATA.get(space, {}).get("population", 0)
+            return (1 if wp_after > rebels else 0, pop)
+
+        from lod_ai.bots.random_spaces import pick_random_spaces
+        groups: Dict[Tuple[int, int], List[str]] = {}
+        for t in targets:
+            groups.setdefault(tier_key(t), []).append(t)
+        targets = []
+        for key in sorted(groups, reverse=True):
+            g = groups[key]
+            targets.extend(g if len(g) == 1
+                           else pick_random_spaces(state, g, len(g)))
         selected: List[str] = []
         move_plan: List[Tuple[str, str]] = []
 

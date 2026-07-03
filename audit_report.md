@@ -3097,3 +3097,32 @@ path). Both roots green (1,277 + 41); gate clean seeds 1-20
 invariants-on; balance unchanged over all 60 pinned games (no
 rebaseline) — bot-on-bot declarations are rare in the pinned seeds but
 now resolve correctly when they occur.
+
+## Session 35: Indian Raid — one SA per turn + two-tier target sort (July 2026)
+
+- The Raid sequence's zero-Resource block ran Plunder AND Trade
+  unconditionally, then fell through to the I5 block which could
+  Plunder again — up to THREE Special Activities in one turn (§4.1
+  allows one). Now: one SA total, gated on _turn_used_special (which
+  the SA executors already set): at 0 Resources, Plunder or-else Trade
+  (8.7.1's either/or); otherwise I5 Plunder, else War Path, else Trade.
+- Target priority was a raw WP-minus-Rebels margin sort; 8.7.1 is a
+  two-TIER order — "first where Plunder will be possible after the
+  Raid movement, then elsewhere, within each … highest Population" —
+  with equal candidates breaking randomly per 8.2 (seeded). The
+  plunder-possible test now includes the Underground WP the Raid
+  itself would move in.
+
+Remaining under this item (documented, not implemented): the mid-raid
+replenish reading — selecting up to 3 spaces beyond current Resources
+and Plundering when they hit zero to fund the remainder — stays
+unimplemented; selection is still capped at min(3, Resources). The
+Playbook's Indian example (Trade at 0, then "can only afford to Raid
+in one space… only one Raid will be executed") supports the cap when
+the SA is already spent; whether an unused SA licenses over-selection
+needs either the Playbook's other examples or a ruling. Filed in
+TRACEABILITY under the survey backlog.
+
+Verification: both roots green (1,278 + 41; +1 one-SA test); gate
+clean seeds 1-20 invariants-on; balance rebaselined (Indian SA economy
+tightened; modest shifts).
