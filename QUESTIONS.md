@@ -175,7 +175,7 @@ Both items resolved — no outstanding source-material requests.
 
 ---
 
-## Q16: Pre-ToA Hortalez — manual "up to 1D3" vs flowchart F6 exact spend — OPEN
+## Q16: Pre-ToA Hortalez — manual "up to 1D3" vs flowchart F6 exact spend — RESOLVED
 
 Manual 8.6.1: Roderigue Hortalez et Cie spends "**up to** 1D3 French
 Resources". Flowchart F6: "Spend 1D3 … If none, Pass." The code follows
@@ -183,7 +183,7 @@ the flowchart (french.py:411-424): it requires paying the exact roll and
 can PASS with Resources 1-2 when the roll is 3. Post-ToA code already
 uses min(resources, roll). Which reading governs pre-ToA?
 
-## Q17: Failed Raid routing — manual "instead execute Gather" vs flowchart I4→I6 — OPEN
+## Q17: Failed Raid routing — manual "instead execute Gather" vs flowchart I4→I6 — RESOLVED
 
 Manual 8.7.1: "If no Raid is possible, instead execute Gather" and
 8.7.2 repeats it ("or if the Indians selected a Raid or March Command
@@ -191,3 +191,18 @@ but were unable to execute it, Gather"). The flowchart YAML routes a
 failed Raid to the I6 decision (which can end in Scout or March), and
 the code follows the flowchart (indians.py:202-220). Manual is explicit
 twice; flowchart disagrees. Which governs?
+
+---
+
+### Rulings for Q16 / Q17 (Eric, July 2026)
+
+- **Q16:** the manual controls — pre-Treaty Hortalez spends **up to**
+  1D3 (min of the roll and French Resources); the flowchart's "Spend
+  1D3 … If none, Pass" is space-saving abbreviation. Implemented in
+  `french.py:_hortelez` (both branches now identical "up to" logic).
+- **Q17:** the specific flowchart routing controls over the general
+  manual clause — a failed Raid (or March) proceeds to the I6
+  decision ("Gather would place 2+ Villages, or 1D6 < Available War
+  Parties?") and may end up Scouting/Marching instead of Gathering.
+  The code already did this; ruling documented at the routing site in
+  `indians.py`.

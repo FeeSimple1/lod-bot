@@ -763,12 +763,9 @@ def test_hortalez_pre_treaty_cannot_afford_skips():
     })
     state["rng"] = random.Random(seed)
     bot._hortelez(state, before_treaty=True)
-    # Resources < roll (2 < 3): must skip entirely
-    assert state["resources"][C.FRENCH] == 2
-    assert state["resources"][C.PATRIOTS] == 0
-    # History should mention "skipped"
-    history = " ".join(str(h) for h in state.get("history", []))
-    assert "skipped" in history.lower()
+    # Q16: spends what it has (2 of the rolled 3); Patriots gain per 3.5.2
+    assert state["resources"][C.FRENCH] == 0
+    assert state["resources"][C.PATRIOTS] > 0
 
 
 def test_hortalez_pre_treaty_pays_exact_roll():
@@ -1097,15 +1094,11 @@ def test_f6_hortalez_returns_bool():
     result = bot._hortelez(state, before_treaty=True)
     assert result is True
 
-    # Failure case: can't afford (find seed with roll > 1, set resources to 1)
-    for seed in range(200):
-        rng = random.Random(seed)
-        roll = rng.randint(1, 3)
-        if roll > 1:
-            break
+    # Failure case is 0 Resources only (Q16: "up to 1D3" — any positive
+    # holding executes; unreachable past the F3 gate but function-level).
     state2 = _full_state(toa_played=False)
-    state2["resources"] = {C.FRENCH: 1, C.PATRIOTS: 0, C.BRITISH: 10, C.INDIANS: 10}
-    state2["rng"] = random.Random(seed)
+    state2["resources"] = {C.FRENCH: 0, C.PATRIOTS: 0, C.BRITISH: 10, C.INDIANS: 10}
+    state2["rng"] = random.Random(1)
     result2 = bot._hortelez(state2, before_treaty=True)
     assert result2 is False
 

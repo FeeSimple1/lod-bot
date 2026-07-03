@@ -202,7 +202,12 @@ class IndianBot(BaseBot):
         if (support + roll) <= opposition:
             if self._raid_sequence(state):    # I4 → I5
                 return
-            # If Raid impossible: fall through to I6 decision path
+            # Failed Raid → the I6 decision, NOT unconditional Gather.
+            # Manual 8.7.2 and the I4 box fine print say "instead Gather";
+            # the flowchart edge routes to I6. QUESTIONS.md Q17 ruling
+            # (Eric, July 2026): the specific flowchart routing controls
+            # over the general manual clause — Gather still takes its
+            # 2-Villages-or-die-roll entry test. Same for a failed March.
             self._reset_command_trace(state)
 
         # ---------- I6 decision ----------------------------------------

@@ -95,3 +95,23 @@ def test_blockade_move_requires_strictly_more_support():
     st["support"]["Philadelphia"] = 2
     assert bot._best_blockade_city(st, exclude="Boston",
                                    min_support=1) == "Philadelphia"
+
+
+def test_pre_treaty_hortalez_spends_up_to_the_roll(monkeypatch):
+    """Q16 ruling: §8.6.1 'spending up to 1D3 French Resources' controls
+    over flowchart F6's exact-spend wording. With 1 Resource and a roll
+    of 3, the French spend 1 and execute — they do not Pass."""
+    import random
+    from lod_ai.bots.french import FrenchBot
+
+    bot = FrenchBot()
+
+    class Roll3:
+        def randint(self, a, b):
+            return 3
+    st = {"resources": {"BRITISH": 5, "PATRIOTS": 5, "FRENCH": 1,
+                        "INDIANS": 5},
+          "spaces": {}, "rng": Roll3(), "history": []}
+    assert bot._hortelez(st, before_treaty=True) is True
+    assert st["resources"]["FRENCH"] == 0          # spent the 1 it had
+    assert st["resources"]["PATRIOTS"] > 5         # Patriots gained

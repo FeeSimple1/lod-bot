@@ -3020,3 +3020,24 @@ changed — Garrison Naval-first plus real WTD rallies move many pinned
 games). Survey items remaining: Supply pay-vs-move inversions (3
 factions), dead BS reaction chain, Scout/Raid/March deviations — see
 docs/session30_faction_survey.md.
+
+## Session 32: Q16/Q17 rulings implemented (July 2026)
+
+Eric ruled on both open reference conflicts:
+
+- **Q16 (pre-ToA Hortalez):** the manual controls — "spending up to 1D3
+  French Resources" (8.6.1); flowchart F6's "Spend 1D3 … If none, Pass"
+  is space-saving abbreviation. `french.py:_hortelez` now pays
+  min(roll, Resources) on both sides of the Treaty; previously the
+  pre-Treaty branch demanded the exact roll and the French could PASS
+  holding 1-2 Resources on a roll of 3. Two tests that encoded the
+  exact-spend reading rewritten to the ruling.
+- **Q17 (failed Raid routing):** the specific flowchart routing
+  controls over the general manual clause — a failed Raid (or March)
+  proceeds to the I6 decision and may end up Scouting/Marching instead
+  of Gathering. The code already did this; the ruling is now documented
+  at the routing site (indians.py) so future audits don't re-flag it.
+
+Verification: both roots green (1,274 + 41; +1 Q16 test); gate clean
+seeds 1-20 invariants-on; balance within band (5/60 flips from Q16 —
+pre-Treaty French no longer skip Hortalez), baseline refreshed.

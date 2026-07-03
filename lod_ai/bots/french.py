@@ -409,24 +409,18 @@ class FrenchBot(BaseBot):
 
     # ----- Hortalez (F6 / F11) ---------------------------------
     def _hortelez(self, state: Dict, *, before_treaty: bool) -> bool:
-        """F6 (before Treaty): Spend exactly 1D3 French Resources.
-           If French Resources < roll, Hortalez cannot execute — abort.
-        F11 (after Treaty): Spend up to 1D3 French Resources.
-           Bot always spends max possible (min of resources and roll).
+        """§8.6.1 / §8.6.3: spend UP TO 1D3 French Resources (both before
+        and after the Treaty). Flowchart F6 reads "Spend 1D3 … If none,
+        Pass" — QUESTIONS.md Q16 ruling (Eric, July 2026): the manual's
+        "up to" controls; F6's wording is space-saving abbreviation.
+        Previously the pre-Treaty branch demanded the exact roll and
+        could Pass with 1-2 Resources on a roll of 3.
 
         Returns True if Hortalez executed, False if skipped.
         """
         roll = state["rng"].randint(1, 3)
         state.setdefault("rng_log", []).append(("Hortalez 1D3", roll))
-        if before_treaty:
-            # F6: must pay exactly 1D3 — abort if can’t afford
-            if state["resources"][C.FRENCH] < roll:
-                push_history(state, f"Roderigue Hortalez et Cie (pre‑Treaty): Cannot afford {roll}, skipped")
-                return False
-            pay = roll
-        else:
-            # F11: spend up to 1D3
-            pay = min(state["resources"][C.FRENCH], roll)
+        pay = min(state["resources"][C.FRENCH], roll)
         if pay < 1:
             return False
         hortelez.execute(state, C.FRENCH, {}, pay=pay)
