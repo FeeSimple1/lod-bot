@@ -1046,6 +1046,50 @@ class Engine:
             self.state.pop("bs_free", None)
 
     # ---- Main BS resolution (§2.3.8) ---------------------------------
+
+    def _bs_trump_chain(self, all_decls: list, first_eligible: str | None):
+        """Process BS declarations in order, resolving trumps (2.3.8), and
+        RE-POLL the bots after each successful declaration: 8.4.11 ("…or
+        the Patriots play their Brilliant Stroke card"), 8.6.11 ("…or the
+        British play theirs") and 8.7.8 ("…or a Rebellion Faction plays a
+        BS other than the Treaty of Alliance") are REACTION triggers.
+        Previously nothing ever passed other_bs_faction, so no bot could
+        respond to another declaration (Session 34; survey finding).
+        Human reactions to a bot BS remain a Piece 7 CLI item.
+        Returns the surviving declaration info, or None."""
+        current: dict | None = None
+        queue = list(all_decls)
+        polled = set(str(d) for d in all_decls)
+        while queue:
+            decl = queue.pop(0)
+            info = self._bs_decl_info(decl)
+            if not info or not self._bs_is_legal(info):
+                continue
+            if current and not self._bs_can_trump(info, current):
+                continue
+            if current:
+                # Trumped — return the card to its owner (2.3.8)
+                bs.mark_bs_played(self.state, current["key"], False)
+                push_history(self.state, f"{info['faction']} trumps "
+                                         f"{current['faction']}'s Brilliant Stroke")
+            current = info
+            if info.get("toa"):
+                break   # ToA cannot be trumped; stop checking
+            bs.mark_bs_played(self.state, info["key"], True)
+            for fac in (C.BRITISH, C.PATRIOTS, C.INDIANS, C.FRENCH):
+                if fac in polled or fac in self.human_factions:
+                    continue
+                if bs.bot_wants_bs(self.state, fac,
+                                   first_eligible=first_eligible,
+                                   human_factions=self.human_factions,
+                                   other_bs_faction=info["faction"]):
+                    polled.add(fac)
+                    queue.append(fac)
+                    push_history(self.state,
+                                 f"{fac} responds to {info['faction']}'s "
+                                 f"Brilliant Stroke")
+        return current
+
     def _resolve_brilliant_stroke_interrupt(self, card: dict, first_eligible: str | None = None) -> bool:
         """Check for Brilliant Stroke plays before the 1st eligible acts.
 
@@ -1073,22 +1117,7 @@ class Engine:
             return False
 
         # ---- 2. Resolve trump hierarchy --------------------------------
-        current: dict | None = None
-        for decl in all_decls:
-            info = self._bs_decl_info(decl)
-            if not info or not self._bs_is_legal(info):
-                continue
-            if current and not self._bs_can_trump(info, current):
-                continue
-            if current:
-                # Trumped — return the card to its owner
-                bs.mark_bs_played(self.state, current["key"], False)
-                push_history(self.state, f"{info['faction']} trumps {current['faction']}'s Brilliant Stroke")
-            current = info
-            if info.get("toa"):
-                break   # ToA cannot be trumped; stop checking
-            bs.mark_bs_played(self.state, info["key"], True)
-
+        current = self._bs_trump_chain(all_decls, first_eligible)
         if not current:
             return False
 

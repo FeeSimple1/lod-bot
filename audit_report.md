@@ -3076,3 +3076,24 @@ rewritten to assert the rules.
 Verification: both roots green (1,274 + 41); gate clean seeds 1-20
 invariants-on; balance rebaselined (large shift, as expected for a
 change to every faction's yearly Supply economics).
+
+## Session 34: BS reaction chain revived (July 2026)
+
+The bot Brilliant-Stroke REACTION triggers — 8.4.11 "…or the Patriots
+play their Brilliant Stroke card", 8.6.11 "…or the British play
+theirs", 8.7.8 "…or a Rebellion Faction plays a BS other than the
+Treaty of Alliance" — were dead for all factions: `bot_wants_bs`
+implemented them correctly, but the engine only polled bots once with
+`other_bs_faction=None` and never re-polled after a declaration.
+
+The trump resolution is now a queue (`engine._bs_trump_chain`): after
+each successful declaration, every undeclared bot is re-polled with the
+declarer as `other_bs_faction`; responders join the queue and trump per
+the 2.3.8 hierarchy (Trumped cards return to their owners; ToA stops
+the chain). Human reactions to a bot BS remain a Piece 7 CLI item.
+
+Tests: test_bs_reaction_chain.py (2 — reaction+trump path, no-trigger
+path). Both roots green (1,277 + 41); gate clean seeds 1-20
+invariants-on; balance unchanged over all 60 pinned games (no
+rebaseline) — bot-on-bot declarations are rare in the pinned seeds but
+now resolve correctly when they occur.
