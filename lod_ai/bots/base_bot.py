@@ -39,7 +39,13 @@ class BaseBot:
                 "notes": notes or "",
             }  # Event executed
 
-        if state["resources"][self.faction] <= 0:
+        # British B3, Patriot P3 and French F3 are explicit flowchart
+        # nodes: "Resources > 0? No → PASS". The INDIAN flowchart has no
+        # such node — it handles 0 Resources inline (I8: "If Indian
+        # Resources = 0, Trade if possible…"; Raid: "Plunder then Trade
+        # before completing"), so Indians must reach their flowchart.
+        if (state["resources"][self.faction] <= 0
+                and self.faction != C.INDIANS):
             state['_pass_reason'] = 'resource_gate'
             push_history(state, f"{self.faction} PASS (no Resources)")
             return {

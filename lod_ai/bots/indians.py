@@ -49,22 +49,39 @@ def _adjacent(space: str) -> List[str]:
 
 
 def _ops_leader_destination(state: Dict, leader: str) -> str | None:
-    """OPS Leader Movement: the space holding the largest group of own War
-    Parties among the leader's origin (stays) and its neighbours (moved).
-    Returns a neighbour only if it strictly beats the origin, else None."""
+    """OPS Leader Movement (§8.1): follow the largest group of own units
+    that moves from (or stays in) the leader's origin space; equal-size
+    groups are selected RANDOMLY (seeded rng).
+
+    Approximation note (TRACEABILITY T5, partial): the executors do not
+    record which War Parties moved this command, so "group that moved
+    from origin" is approximated by post-move WP counts in the origin and
+    its neighbours. Full fidelity needs move recording in the March/
+    Scout/Gather/Raid executors."""
     loc = leader_location(state, leader)
     if not loc:
         return None
-    sp = state["spaces"].get(loc, {})
-    best_dst = None
-    best_wp = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
-    for nbr in _adjacent(loc):
-        nsp = state["spaces"].get(nbr, {})
-        nbr_wp = nsp.get(C.WARPARTY_U, 0) + nsp.get(C.WARPARTY_A, 0)
-        if nbr_wp > best_wp:
-            best_wp = nbr_wp
-            best_dst = nbr
-    return best_dst
+
+    def _wp(sid: str) -> int:
+        sp = state["spaces"].get(sid, {})
+        return sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
+
+    candidates = [(_wp(loc), loc)] + [(_wp(n), n) for n in _adjacent(loc)]
+    best = max(cnt for cnt, _ in candidates)
+    if best == 0:
+        return None
+    ties = [sid for cnt, sid in candidates if cnt == best]
+    if ties == [loc]:
+        return None                      # origin group is largest → stays
+    if len(ties) == 1:
+        pick = ties[0]
+    else:
+        # §8.1: "If two or more such groups are of the same size, select
+        # which one the Leader joins randomly."
+        rng = state.get("rng")
+        pick = (ties[rng.randrange(len(ties))] if rng is not None
+                else sorted(ties)[0])
+    return None if pick == loc else pick
 
 
 def follow_indian_leaders_after_move(state: Dict) -> None:
@@ -1083,7 +1100,29 @@ class IndianBot(BaseBot):
         if not validated_plan:
             return False
 
-        march.execute(state, C.INDIANS, {}, [], [], plan=validated_plan)
+        # §3.4.2: pay 1 Resource per destination Province; pay 0 for the
+        # first destination where all Marching War Parties originate in
+        # Indian Reserves. §8.1: trim to what is affordable (execute the
+        # instructions the Faction can pay for), else fall through.
+        from lod_ai.map.adjacency import space_type as _sptype
+        all_reserve = all(_sptype(e["src"]) == "Reserve"
+                          for e in validated_plan)
+        budget = state["resources"].get(C.INDIANS, 0) + (1 if all_reserve
+                                                         else 0)
+        dests: list = []
+        for entry in validated_plan:
+            if entry["dst"] not in dests:
+                dests.append(entry["dst"])
+        if len(dests) > budget:
+            allowed = set(dests[:budget])
+            validated_plan = [e for e in validated_plan
+                              if e["dst"] in allowed]
+            if not validated_plan:
+                return False
+
+        march.execute(state, C.INDIANS,
+                      {"all_reserve_origin": all_reserve}, [], [],
+                      plan=validated_plan)
         self._follow_leaders_after_move(state)
         return True
 
@@ -1098,8 +1137,14 @@ class IndianBot(BaseBot):
         )
 
     def _can_scout(self, state: Dict) -> bool:
-        # Scout costs 1 Indian + 1 British Resource (§3.4.3)
+        # Scout costs 1 Indian + 1 British Resource (§3.4.3). §8.1: a
+        # Command the Faction (or the paying ally) cannot afford is
+        # treated as unexecutable — continue down the flowchart. (The
+        # Indian check was shielded by the old blanket 0-Resource PASS
+        # gate, which the Indian flowchart does not have.)
         if state["resources"].get(C.BRITISH, 0) < 1:
+            return False
+        if state["resources"].get(C.INDIANS, 0) < 1:
             return False
         return self._space_has_wp_and_regulars(state)
 

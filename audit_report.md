@@ -2939,3 +2939,28 @@ audit), F52 (+ no-remove flag), F62 (militia-only flag).
 Tests: test_force_if_eligible_enemy.py +2 (card 80 Indians-excluded,
 card 29 formula), test_indian_bot_compliance.py rewritten 18/44 test
 (targeting via generic directive).
+
+## Session 29: Ch 8 small items — T5, T6, T9 (July 2026)
+
+- **T5** `_ops_leader_destination`: equal-size groups (origin included)
+  now resolve by seeded random per §8.1 ("select which one the Leader
+  joins randomly"); previously first-neighbour-in-iteration won and an
+  origin tie always stayed. Moved-group tracking (vs the post-move
+  count approximation) still open — needs executor move recording.
+- **T6** The blanket 0-Resource PASS gate is faithful for B3/P3/F3 but
+  the Indian flowchart has no such node. Exempting Indians exposed:
+  `_can_scout` missing the Indian half of §3.4.3's two-payer cost
+  (crashed the gate at 1775:3 once un-shielded), and Indian March had
+  no affordability guard at all plus never claimed §3.4.2's free first
+  destination for all-Reserve origins. March now trims destinations to
+  budget (§8.1 partial execution) and passes `all_reserve_origin`.
+- **T9** swept: ~20 arbitrary subset selections catalogued with line
+  numbers into TRACEABILITY.md; all are per-card space selections for
+  the Piece 3 audit, none fixable blind.
+
+Verification: both roots green (1,270 + 41; 4 tests added); gate clean
+seeds 1-20 invariants-on; soak 120 games zero failures. Balance
+rebaselined: 22/60 flips — the Indian behavior changes are real (act at
+0 Resources via Trade/free March; low-resource Marches now execute
+trimmed instead of erroring into a PASS; leader positioning varies on
+ties). 1775 Indians 13→9, Patriots 2→5; 1776/1778 within usual movement.

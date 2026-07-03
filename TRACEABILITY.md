@@ -162,23 +162,39 @@ no citation despite likely implementations.
   sparing. Cards 6/32u/43u/46u migrated; unit tests in
   `test_nonplayer_pieces_812.py` (9). Balance: zero pinned flips
   (checked over all 60, no rebaseline).
-- **T5 (P2)** §8.1 leader-follow: neighbour ties resolve
-  first-in-iteration (should be random); 'largest group that moves from
-  origin' approximated by post-move board state
-  (`indians._ops_leader_destination`).
-- **T6 (P2)** §8.1 resource-cost fallthrough: bots PASS at 0 Resources at
-  the top of take_turn; rule wants flowchart fallthrough to a Command it
-  can afford (and partial execution when it can afford some instructions).
-  Audit each flowchart's cost handling.
+- **T5 — tie randomness FIXED (Session 29); moved-group tracking
+  remains.** Ties among equal-size groups (including the origin group)
+  now resolve by seeded random per §8.1. The "group that MOVED from
+  origin" is still approximated by post-move WP counts — full fidelity
+  needs move recording in the March/Scout/Gather/Raid executors
+  (documented in `_ops_leader_destination`).
+- **T6 — FIXED (Session 29).** The blanket 0-Resource PASS is
+  flowchart-faithful for British/Patriots/French (explicit B3/P3/F3
+  "Resources > 0?" nodes) but the INDIAN flowchart has no such node —
+  it handles 0 Resources inline (I8 Trade; Raid's mid-command
+  Plunder/Trade). Indians are now exempt from the blanket gate, which
+  exposed and forced two §8.1 affordability fixes: `_can_scout` never
+  checked the INDIAN half of Scout's cost (§3.4.3: both factions pay
+  1), and the Indian March had NO affordability guard (march.execute
+  raised) nor did it ever claim §3.4.2's free first destination for
+  all-Reserve origins — the bot now trims destinations to budget and
+  passes the `all_reserve_origin` flag. Remaining under T6: the Raid
+  node's mid-command "Plunder then Trade before completing" (I-flowchart)
+  is unverified.
 - **T7 (P2)** §8.3.5 benefit/harm target ordering (executing → friendly →
   random enemy non-player first; harm → random enemy player first): no
   general implementation; per-card audit (Piece 3).
 - **T8 (P2)** §8.3.1 second-faction event instructions must govern how a
   faction executes actions granted by another faction's event;
   `engine._drain_free_ops` never consults `event_instructions`.
-- **T9 (P2)** §8.3.8 random default for uncovered event choices: audit all
-  handlers for first/alphabetical defaults (same class as Session 21
-  finds; 2 sites cite 8.3.8 today).
+- **T9 — swept and itemized (Session 29); fixes belong to Piece 3.**
+  Grep sweep found ~20 first/alphabetical subset selections across the
+  card handlers, essentially all card-specific SPACE selections
+  (§8.3.5/§8.3.6/§8.2 territory, needing per-card text reads) rather
+  than pure §8.3.8 misc choices: early_war.py lines ~275/403/464/726/
+  789/1069, late_war.py ~156/168/204/209/340/351/803/1013, middle_war.py
+  ~582/596/1094. Each goes through the agents.md card workflow with the
+  Piece 3 audit.
 - **T10 (P3)** §8.3.7 details: abort-if-no-Leader-LimCom, SA-independence,
   simultaneous-BS trump order, §8.1 ToA numeric condition — locate and
   verify each.
