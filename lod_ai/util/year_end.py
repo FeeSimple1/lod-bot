@@ -79,6 +79,28 @@ def _supply_phase(state, *, bots=None, human_factions=None):
             return True
         return False
 
+    def _control_after(sid, removals):
+        """Space control after hypothetically removing *removals*
+        ({tag: n}) from *sid* — simulate, refresh, read (8.5.5/8.6.7/
+        8.7.5 all key the pay decision on an actual control change)."""
+        import copy
+        st2 = {"spaces": copy.deepcopy(state["spaces"]),
+               "control": dict(state.get("control", {}))}
+        sp2 = st2["spaces"].get(sid, {})
+        for tag, n in removals.items():
+            sp2[tag] = max(0, sp2.get(tag, 0) - n)
+        board_control.refresh_control(st2)
+        return st2.get("control", {}).get(sid)
+
+    def _rl_would_be_possible(sid, post_control):
+        """6.4.1: Reward Loyalty needs British Control, a Regular AND a
+        Tory in the space, and Support below Active."""
+        sp = state["spaces"].get(sid, {})
+        return (post_control == "BRITISH"
+                and sp.get(REGULAR_BRI, 0) >= 1
+                and sp.get(TORY, 0) >= 1
+                and state.get("support", {}).get(sid, 0) < ACTIVE_SUPPORT)
+
     # British — collect unsupplied spaces, then sort by bot priority
     human = human_factions or set()
     brit_unsupplied = []
@@ -133,26 +155,48 @@ def _supply_phase(state, *, bots=None, human_factions=None):
             continue
         pat_unsupplied.append(sid)
 
-    if bots and PATRIOTS in bots and PATRIOTS not in human:
-        bot = bots[PATRIOTS]
-        priority = bot.ops_supply_priority(state)
-        priority_index = {s: i for i, s in enumerate(priority)}
-        pat_unsupplied.sort(key=lambda s: priority_index.get(s, 999))
-
-    for sid in pat_unsupplied:
+    # §8.5.5: pay ONLY where removing Patriot pieces (6.2.1: one per two
+    # units, rounded down) would change Control — within those, first
+    # where the British would otherwise be able to Reward Loyalty, then
+    # most Villages, then highest Population. All OTHER unsupplied spaces
+    # remove per 8.1.2 (cubes first, then Active before Underground).
+    def _pat_removal(sid):
         sp = state["spaces"][sid]
-        if _pay(PATRIOTS, sid, "Patriot Supply"):
-            continue
         total = sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0) + sp.get(REGULAR_PAT, 0)
-        remove_target = total // 2
-        for pid in (MILITIA_U, MILITIA_A, REGULAR_PAT):
-            if remove_target == 0:
-                break
-            qty = min(sp.get(pid, 0), remove_target)
-            if qty:
-                remove_piece(state, pid, sid, qty, to="available")
-                remove_target -= qty
+        n = total // 2
+        plan, left = {}, n
+        for pid in (REGULAR_PAT, MILITIA_A, MILITIA_U):   # 8.1.2 friendly order
+            take = min(state["spaces"][sid].get(pid, 0), left)
+            if take:
+                plan[pid] = take
+                left -= take
+        return plan
+
+    pat_pay, pat_other = [], []
+    for sid in pat_unsupplied:
+        plan = _pat_removal(sid)
+        before = state.get("control", {}).get(sid)
+        after = _control_after(sid, plan)
+        if plan and after != before:
+            sp = state["spaces"][sid]
+            key = (0 if _rl_would_be_possible(sid, after) else 1,
+                   -sp.get(VILLAGE, 0),
+                   -(map_adj.population(sid)))
+            pat_pay.append((key, sid))
+        else:
+            pat_other.append(sid)
+    pat_pay.sort()
+
+    def _pat_remove(sid):
+        for pid, qty in _pat_removal(sid).items():
+            remove_piece(state, pid, sid, qty, to="available")
         push_history(state, f"Patriot Supply – units removed from {sid}")
+
+    for _, sid in pat_pay:
+        if not _pay(PATRIOTS, sid, "Patriot Supply"):
+            _pat_remove(sid)               # 6.2.1: can't pay → remove
+    for sid in pat_other:
+        _pat_remove(sid)
 
     # French — collect unsupplied spaces, then sort by bot priority
     fre_unsupplied = []
@@ -169,42 +213,46 @@ def _supply_phase(state, *, bots=None, human_factions=None):
             continue
         fre_unsupplied.append(sid)
 
-    if bots and FRENCH in bots and FRENCH not in human:
-        bot = bots[FRENCH]
-        priority = bot.ops_supply_priority(state)
-        priority_index = {s: i for i, s in enumerate(priority)}
-        fre_unsupplied.sort(key=lambda s: priority_index.get(s, 999))
-
+    # §8.6.7: pay ONLY where moving the French Regulars out would change
+    # Control — within those, first where the British would otherwise be
+    # able to Reward Loyalty, then highest Population. All OTHER
+    # unsupplied spaces move to the nearest Patriot Fort (or, if none,
+    # to Available). 6.2.1: can't pay → move.
+    fre_pay, fre_other = [], []
     for sid in fre_unsupplied:
-        sp = state["spaces"][sid]
-        fr = sp.get(REGULAR_FRE, 0)
+        fr = state["spaces"][sid].get(REGULAR_FRE, 0)
+        before = state.get("control", {}).get(sid)
+        after = _control_after(sid, {REGULAR_FRE: fr})
+        if after != before:
+            key = (0 if _rl_would_be_possible(sid, after) else 1,
+                   -(map_adj.population(sid)))
+            fre_pay.append((key, sid))
+        else:
+            fre_other.append(sid)
+    fre_pay.sort()
 
-        # Try to move to the nearest space with a Patriot Fort
-        forts = [
-            s for s, sp2 in state["spaces"].items()
-            if sp2.get(FORT_PAT)
-        ]
+    def _fre_move_out(sid):
+        fr = state["spaces"][sid].get(REGULAR_FRE, 0)
+        forts = [s for s, sp2 in state["spaces"].items()
+                 if sp2.get(FORT_PAT) and s != sid]
         if forts:
-            dest = min(
-                forts,
-                key=lambda x: len(map_adj.shortest_path(sid, x))
-            )
-            if dest != sid:
-                bp.move_piece(state, REGULAR_FRE, sid, dest, fr)
-                push_history(
-                    state,
-                    f"French Supply – moved {fr} regs {sid}→{dest}"
-                )
-                continue
+            dists = {s: len(map_adj.shortest_path(sid, s)) for s in forts}
+            best = min(dists.values())
+            ties = sorted(s for s, d in dists.items() if d == best)
+            rng = state.get("rng")
+            dest = (ties[rng.randrange(len(ties))]
+                    if rng is not None and len(ties) > 1 else ties[0])
+            bp.move_piece(state, REGULAR_FRE, sid, dest, fr)
+            push_history(state, f"French Supply – moved {fr} regs {sid}→{dest}")
+        else:
+            bp.remove_piece(state, REGULAR_FRE, sid, fr)
+            push_history(state, f"French Supply – {fr} regs to Available ({sid})")
 
-        if _pay(FRENCH, sid, "French Supply"):
-            continue
-
-        bp.remove_piece(state, REGULAR_FRE, sid, fr)
-        push_history(
-            state,
-            f"French Supply – {fr} regs removed ({sid})"
-        )
+    for _, sid in fre_pay:
+        if not _pay(FRENCH, sid, "French Supply"):
+            _fre_move_out(sid)
+    for sid in fre_other:
+        _fre_move_out(sid)
 
     # Indians – auto‑Village
     if not any(sp.get(VILLAGE, 0) for sp in state["spaces"].values()):
@@ -222,24 +270,66 @@ def _supply_phase(state, *, bots=None, human_factions=None):
             continue
         indian_unsupplied.append(sid)
 
-    if bots and INDIANS in bots and INDIANS not in human:
-        bot = bots[INDIANS]
-        indian_unsupplied = bot.ops_supply_priority(state, indian_unsupplied)
+    # §8.7.5: pay FIRST where moving the War Parties out would ADD
+    # Rebellion Control, THEN where Gather could place a Village (3.4.1:
+    # room, 3+ War Parties — 2 with Cornplanter — Support among
+    # Neutral/Passive). If Resources run out or NEITHER condition is
+    # met, move the War Parties to the nearest Village space. Ties
+    # within each bucket break randomly (8.2, seeded).
+    from lod_ai.bots.random_spaces import pick_random_spaces
+    from lod_ai.commands.gather import SUPPORT_OK as _GATHER_OK
+    from lod_ai.leaders import leader_location as _leader_loc
 
+    def _gather_village_possible(sid):
+        sp = state["spaces"][sid]
+        wp = sp.get(WARPARTY_A, 0) + sp.get(WARPARTY_U, 0)
+        need = 2 if _leader_loc(state, "LEADER_CORNPLANTER") == sid else 3
+        bases = (sp.get(VILLAGE, 0) + sp.get(FORT_BRI, 0)
+                 + sp.get(FORT_PAT, 0))
+        return (state.get("available", {}).get(VILLAGE, 0) > 0
+                and wp >= need and bases < 2
+                and state.get("support", {}).get(sid, 0) in _GATHER_OK)
+
+    ind_pay_a, ind_pay_b, ind_other = [], [], []
     for sid in indian_unsupplied:
         sp = state["spaces"][sid]
-        if _pay(INDIANS, sid, "Indian Supply"):
-            continue
-        dests = [d for d, sp2 in state["spaces"].items() if sp2.get(VILLAGE)]
+        wp = {WARPARTY_A: sp.get(WARPARTY_A, 0),
+              WARPARTY_U: sp.get(WARPARTY_U, 0)}
+        before = state.get("control", {}).get(sid)
+        after = _control_after(sid, wp)
+        if after == "REBELLION" and before != "REBELLION":
+            ind_pay_a.append(sid)
+        elif _gather_village_possible(sid):
+            ind_pay_b.append(sid)
+        else:
+            ind_other.append(sid)
+    ordered_pay = (pick_random_spaces(state, ind_pay_a, len(ind_pay_a))
+                   + pick_random_spaces(state, ind_pay_b, len(ind_pay_b)))
+
+    def _ind_move_out(sid):
+        sp = state["spaces"][sid]
+        dests = [d for d, sp2 in state["spaces"].items()
+                 if sp2.get(VILLAGE) and d != sid]
         if not dests:
-            continue
-        dest = min(dests, key=lambda d: len(map_adj.shortest_path(sid, d)))
+            return
+        dists = {d: len(map_adj.shortest_path(sid, d)) for d in dests}
+        best = min(dists.values())
+        ties = sorted(d for d, dv in dists.items() if dv == best)
+        rng = state.get("rng")
+        dest = (ties[rng.randrange(len(ties))]
+                if rng is not None and len(ties) > 1 else ties[0])
         for pid in (WARPARTY_U, WARPARTY_A):
             qty = sp.get(pid, 0)
             if qty:
                 remove_piece(state, pid, sid, qty, to="available")
                 place_with_caps(state, pid, dest, qty)
         push_history(state, f"Indian Supply – War Parties moved {sid} ➜ {dest}")
+
+    for sid in ordered_pay:
+        if not _pay(INDIANS, sid, "Indian Supply"):
+            _ind_move_out(sid)
+    for sid in ind_other:
+        _ind_move_out(sid)
 
     # Refresh & caps
     board_control.refresh_control(state)

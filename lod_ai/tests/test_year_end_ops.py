@@ -78,65 +78,84 @@ class TestBritishSupplyPriority:
 
 
 class TestPatriotSupplyPriority:
-    """Patriot Supply: ops_supply_priority controls payment order."""
+    """§8.5.5: pay ONLY where removing Patriot pieces would change
+    Control; all other unsupplied spaces remove per 8.1.2."""
 
-    def test_bot_priority_respected(self, monkeypatch):
-        monkeypatch.setattr(year_end.board_control, "refresh_control", _noop_refresh, raising=False)
+    def test_pays_only_control_changing_space(self, monkeypatch):
         monkeypatch.setattr(year_end.caps_util, "enforce_global_caps", lambda s: None, raising=False)
 
         state = basic_state()
-        state["resources"][C.PATRIOTS] = 1
+        state["resources"][C.PATRIOTS] = 5
         state["spaces"] = {
-            "ColA": {C.MILITIA_U: 4, C.MILITIA_A: 0, C.REGULAR_PAT: 0},
-            "ColB": {C.MILITIA_U: 2, C.MILITIA_A: 0, C.REGULAR_PAT: 0},
+            # Uncontrolled (2v2); removing 1 Militia gives BRITISH
+            # Control → control changes → must PAY.
+            "Pennsylvania": {"type": "Colony", C.MILITIA_U: 2,
+                             C.REGULAR_BRI: 2},
+            # Already British-controlled (5>4); removing 2 leaves it
+            # British → no change → must REMOVE, not pay.
+            "Virginia": {"type": "Colony", C.MILITIA_U: 4,
+                         C.REGULAR_BRI: 5},
             C.WEST_INDIES_ID: {},
         }
-        state["support"] = {"ColA": C.ACTIVE_OPPOSITION, "ColB": C.ACTIVE_OPPOSITION}
+        year_end.board_control.refresh_control(state)
 
-        bot = MagicMock()
-        # Bot says pay ColB first (ColB keeps pieces, ColA loses)
-        bot.ops_supply_priority.return_value = ["ColB", "ColA"]
-        bots = {C.PATRIOTS: bot}
+        year_end._supply_phase(state, bots={}, human_factions=set())
 
-        year_end._supply_phase(state, bots=bots, human_factions=set())
+        assert state["spaces"]["Pennsylvania"][C.MILITIA_U] == 2   # paid
+        assert state["spaces"]["Virginia"][C.MILITIA_U] == 2       # 4//2 removed
+        assert state["resources"][C.PATRIOTS] == 4                 # exactly 1 paid
 
-        assert state["spaces"]["ColB"][C.MILITIA_U] == 2  # kept
-        # ColA should have lost half its militia (4//2 = 2 removed)
-        assert state["spaces"]["ColA"][C.MILITIA_U] == 2
+    def test_removal_order_cubes_first(self, monkeypatch):
+        """8.1.2 friendly order: Continentals, then Active before
+        Underground Militia (was U→A→Continentals, fully reversed)."""
+        monkeypatch.setattr(year_end.caps_util, "enforce_global_caps", lambda s: None, raising=False)
+        state = basic_state()
+        state["resources"][C.PATRIOTS] = 0
+        state["spaces"] = {
+            "Virginia": {"type": "Colony", C.REGULAR_PAT: 1,
+                         C.MILITIA_A: 1, C.MILITIA_U: 2,
+                         C.REGULAR_BRI: 9},
+            C.WEST_INDIES_ID: {},
+        }
+        year_end.board_control.refresh_control(state)
+        year_end._supply_phase(state, bots={}, human_factions=set())
+        # total 4 → remove 2: the Continental and the Active Militia.
+        sp = state["spaces"]["Virginia"]
+        assert sp.get(C.REGULAR_PAT, 0) == 0
+        assert sp.get(C.MILITIA_A, 0) == 0
+        assert sp.get(C.MILITIA_U, 0) == 2
 
 
 class TestIndianSupplyPriority:
-    """Indian Supply: ops_supply_priority(state, spaces) reorders unsupplied."""
+    """§8.7.5: pay first where moving the War Parties would ADD
+    Rebellion Control, then where Gather could place a Village; if
+    neither (or Resources run out), move to the nearest Village."""
 
-    def test_bot_priority_respected(self, monkeypatch):
-        monkeypatch.setattr(year_end.board_control, "refresh_control", _noop_refresh, raising=False)
+    def test_875_buckets(self, monkeypatch):
         monkeypatch.setattr(year_end.caps_util, "enforce_global_caps", lambda s: None, raising=False)
 
         state = basic_state()
-        state["resources"][C.INDIANS] = 1
+        state["resources"][C.INDIANS] = 2
+        state["available"][C.VILLAGE] = 2
         state["spaces"] = {
-            "ProvA": {C.WARPARTY_U: 2, C.WARPARTY_A: 0},
-            "ProvB": {C.WARPARTY_U: 1, C.WARPARTY_A: 0, C.VILLAGE: 1},  # Village = in supply
-            "ProvC": {C.WARPARTY_U: 3, C.WARPARTY_A: 0},
+            # WPs leaving would hand Rebellion Control (2v2 → 0v2) → PAY.
+            "Virginia": {"type": "Colony", C.WARPARTY_U: 2,
+                         C.MILITIA_A: 2},
+            # 3 WPs, room, Neutral → Gather could place a Village → PAY.
+            "Pennsylvania": {"type": "Colony", C.WARPARTY_U: 3},
+            # Neither condition → move to nearest Village space.
+            "Georgia": {"type": "Colony", C.WARPARTY_U: 1},
+            "Northwest": {"type": "Reserve", C.VILLAGE: 1},
             C.WEST_INDIES_ID: {},
         }
-        state["support"] = {}
+        year_end.board_control.refresh_control(state)
 
-        bot = MagicMock()
-        # Bot reorders: ProvC first, then ProvA
-        bot.ops_supply_priority.return_value = ["ProvC", "ProvA"]
-        bots = {C.INDIANS: bot}
+        year_end._supply_phase(state, bots={}, human_factions=set())
 
-        year_end._supply_phase(state, bots=bots, human_factions=set())
-
-        # Bot should have been called with the unsupplied spaces list
-        bot.ops_supply_priority.assert_called_once()
-        call_args = bot.ops_supply_priority.call_args
-        # The second arg should be a list of unsupplied space IDs
-        unsupplied_arg = call_args[0][1]
-        assert "ProvA" in unsupplied_arg
-        assert "ProvC" in unsupplied_arg
-        assert "ProvB" not in unsupplied_arg  # ProvB has a Village, so in supply
+        assert state["spaces"]["Virginia"][C.WARPARTY_U] == 2      # paid
+        assert state["spaces"]["Pennsylvania"][C.WARPARTY_U] == 3  # paid
+        assert state["spaces"]["Georgia"].get(C.WARPARTY_U, 0) == 0  # moved
+        assert state["resources"][C.INDIANS] == 0
 
 
 # ============================================================
@@ -524,9 +543,11 @@ class TestZeroPlayerYearEnd:
 
         year_end.resolve(state, bots=bots, human_factions=set())
 
-        # Verify Supply priority methods were called
+        # Verify Supply priority methods were called. (British only:
+        # since Session 33 the Patriot/French/Indian pay decisions are
+        # computed from the rules — 8.5.5/8.6.7/8.7.5 — in year_end
+        # itself, and no longer consult the bot ordering hooks.)
         brit_bot.bot_supply_priority.assert_called()
-        pat_bot.ops_supply_priority.assert_called()
 
         # Verify Leader Redeploy methods were called
         brit_bot.bot_redeploy_leader.assert_called()
@@ -539,30 +560,27 @@ class TestZeroPlayerYearEnd:
         # (French bot picks Tory desertion targets)
         french_bot.ops_loyalist_desertion_priority.assert_called()
 
-    def test_patriot_ops_supply_priority_ordering(self, monkeypatch):
-        """Verify Patriot bot supply priority controls which space gets paid."""
-        monkeypatch.setattr(year_end.board_control, "refresh_control", _noop_refresh, raising=False)
+    def test_patriot_supply_pays_by_pop_until_resources_run_out(self, monkeypatch):
+        """§8.5.5 + 6.2.1: two control-changing spaces, one Resource —
+        the higher-Population space is paid first; the other falls back
+        to removal."""
         monkeypatch.setattr(year_end.caps_util, "enforce_global_caps", lambda s: None, raising=False)
 
         state = basic_state()
         state["resources"][C.PATRIOTS] = 1
         state["spaces"] = {
-            "ColA": {"type": "Colony", C.MILITIA_U: 4, C.MILITIA_A: 0, C.REGULAR_PAT: 0},
-            "ColB": {"type": "Colony", C.MILITIA_U: 2, C.MILITIA_A: 0, C.REGULAR_PAT: 0},
+            # both uncontrolled 2v2; removal (1) would give British
+            # Control → both are pay-worthy. Virginia pop 2 > Georgia 1.
+            "Virginia": {"type": "Colony", C.MILITIA_U: 2, C.REGULAR_BRI: 2},
+            "Georgia": {"type": "Colony", C.MILITIA_U: 2, C.REGULAR_BRI: 2},
             C.WEST_INDIES_ID: {},
         }
-        state["support"] = {"ColA": C.ACTIVE_OPPOSITION, "ColB": C.ACTIVE_OPPOSITION}
+        year_end.board_control.refresh_control(state)
+        year_end._supply_phase(state, bots={}, human_factions=set())
 
-        bot = MagicMock()
-        # Bot prioritizes ColB — so ColB gets paid, ColA loses pieces
-        bot.ops_supply_priority.return_value = ["ColB", "ColA"]
-        bots = {C.PATRIOTS: bot}
-
-        year_end._supply_phase(state, bots=bots, human_factions=set())
-
-        # ColB should keep pieces (paid), ColA should lose half
-        assert state["spaces"]["ColB"][C.MILITIA_U] == 2  # kept
-        assert state["spaces"]["ColA"][C.MILITIA_U] == 2  # lost half (4//2=2 removed)
+        assert state["spaces"]["Virginia"][C.MILITIA_U] == 2      # paid
+        assert state["spaces"]["Georgia"][C.MILITIA_U] == 1       # removed 2//2
+        assert state["resources"][C.PATRIOTS] == 0
 
     def test_bs_trigger_check(self, monkeypatch):
         """Verify ops_bs_trigger is invoked via check_bs_triggers."""

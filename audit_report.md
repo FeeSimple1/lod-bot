@@ -3041,3 +3041,38 @@ Eric ruled on both open reference conflicts:
 Verification: both roots green (1,274 + 41; +1 Q16 test); gate clean
 seeds 1-20 invariants-on; balance within band (5/60 flips from Q16 —
 pre-Treaty French no longer skip Hortalez), baseline refreshed.
+
+## Session 33: Supply pay-vs-move rewritten for Patriots/French/Indians (July 2026)
+
+The three Winter Quarters Supply branches paid unconditionally (or, for
+the French, moved unconditionally) in bot-suggested order. The rules
+make the choice conditional on a simulated Control change:
+
+- §8.5.5 Patriots: pay ONLY where removing half the units (6.2.1)
+  would change Control — ordered by would-enable-Reward-Loyalty
+  (6.4.1: British Control + Regular + Tory + sub-Active Support), most
+  Villages, highest Population; everywhere else remove per 8.1.2
+  (Continentals first, then Active before Underground — the old code
+  removed in exactly the reverse order, and paid every space).
+- §8.6.7 French: pay ONLY where the Regulars' departure would change
+  Control (RL-first, then Pop); everywhere else move to the nearest
+  Patriot Fort or to Available. Old code moved-first everywhere and
+  only paid when NO fort existed anywhere on the map. Nearest-fort
+  ties now break randomly (8.2, seeded).
+- §8.7.5 Indians: pay first where the War Parties' departure would ADD
+  Rebellion Control, then where Gather could place a Village (room,
+  3 WPs or 2 with Cornplanter, Neutral/Passive support, Village
+  available); if neither or Resources run out, move to the nearest
+  Village. Old code paid every space in bucket order including the
+  must-move bucket, with no post-move simulation.
+
+Control changes are decided by actual simulation (`_control_after`:
+copy spaces, apply the removal, refresh_control, compare). The
+Patriot/French/Indian `ops_supply_priority` bot hooks are no longer
+consulted (the rules fully determine the ordering); the British branch
+keeps its hook. Four tests that encoded the bot-hook contract were
+rewritten to assert the rules.
+
+Verification: both roots green (1,274 + 41); gate clean seeds 1-20
+invariants-on; balance rebaselined (large shift, as expected for a
+change to every faction's yearly Supply economics).
