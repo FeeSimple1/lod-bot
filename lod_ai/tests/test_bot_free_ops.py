@@ -89,6 +89,46 @@ def test_toa_free_french_muster_is_free_for_bots():
     assert eng.state["spaces"][C.WEST_INDIES_ID].get(C.REGULAR_FRE, 0) > 0
 
 
+def test_free_french_muster_planner_respects_3_5_3():
+    """§3.5.3: French Muster selects "any one Colony or City with
+    Rebellion Control or the West Indies."  The planner previously used
+    the BRITISH destination rule (non-Blockaded City / adjacent Colony),
+    so a locationless free French Muster could pick a City without
+    Rebellion Control — muster.execute then raised and the free op was
+    logged as an execution skip (clean-sweep gate, 1778 seed 5)."""
+    st = build_state("1775", seed=1)
+    st["toa_played"] = True
+    eng = Engine(initial_state=st)
+    eng.set_human_factions(set())
+    from lod_ai.board.control import refresh_control
+    refresh_control(eng.state)
+    plan = eng._plan_bot_free_op(eng.state, C.FRENCH, "muster", None)
+    if plan is not None:
+        dest = plan["selected"][0]
+        from lod_ai.map import adjacency as map_adj
+        assert (dest == C.WEST_INDIES_ID
+                or (map_adj.is_city(dest)
+                    or map_adj.space_type(dest) == "Colony")
+                and eng.state["control"].get(dest) == "REBELLION")
+
+
+def test_free_french_muster_pinned_illegal_location_declines():
+    """A card-pinned location the executor would reject must be a
+    genuine decline (None), not a plan that skips at execution."""
+    st = build_state("1775", seed=1)
+    st["toa_played"] = True
+    eng = Engine(initial_state=st)
+    eng.set_human_factions(set())
+    from lod_ai.board.control import refresh_control
+    refresh_control(eng.state)
+    # Find a City that is NOT Rebellion-Controlled
+    from lod_ai.map import adjacency as map_adj
+    pinned = next(sid for sid in eng.state["spaces"]
+                  if map_adj.is_city(sid)
+                  and eng.state["control"].get(sid) != "REBELLION")
+    assert eng._plan_bot_free_op(eng.state, C.FRENCH, "muster", pinned) is None
+
+
 def test_card94_tory_muster_places_tories_for_free():
     """Card 94: free Indian Gather + free Tory Muster in New York. Both must
     cost zero and the Muster must actually place Tories."""

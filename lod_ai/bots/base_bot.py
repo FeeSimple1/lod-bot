@@ -32,6 +32,9 @@ class BaseBot:
         # rolled once per game (Session 30 audit).
         state.pop("_sa_done_this_turn", None)
         state.pop("_muster_die_cached", None)
+        # Spaces where a Skirmish was executed this turn (§8.4.1: no
+        # Garrison moves into a skirmished City). Set by skirmish.execute.
+        state.pop("_turn_skirmished_spaces", None)
 
         # Propagate slot constraints into state so command methods can check.
         if allowed:

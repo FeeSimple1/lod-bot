@@ -332,6 +332,32 @@ class Engine:
             return plan_free_march(st, faction, loc)
 
         if op == "muster" and faction in (C.BRITISH, C.FRENCH):
+            if faction == C.FRENCH:
+                # §3.5.3: "Select any one Colony or City with Rebellion
+                # Control or the West Indies."  muster.execute enforces
+                # the Control half and raises otherwise — the planner
+                # must agree, or a card-granted free Muster surfaces as
+                # an execution skip instead of a genuine decline.
+                from lod_ai.map import adjacency as map_adj
+
+                def _fr_legal(sid):
+                    if sid == C.WEST_INDIES_ID:
+                        return True
+                    if not (map_adj.is_city(sid)
+                            or map_adj.space_type(sid) == "Colony"):
+                        return False
+                    return st.get("control", {}).get(sid) == "REBELLION"
+
+                if loc is not None and not _fr_legal(loc):
+                    return None
+                dest = loc
+                if dest is None:
+                    legal = [sid for sid in spaces if _fr_legal(sid)]
+                    if not legal:
+                        return None
+                    dest = _rand_tiebreak(
+                        legal, lambda s: self._own_force_in(st, s, faction))
+                return {"space": None, "selected": [dest]}
             dest = loc
             if dest is None:
                 from lod_ai.commands.muster import _is_legal_regular_dest

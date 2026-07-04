@@ -173,6 +173,11 @@ def execute(
     refresh_control(state)
     enforce_global_caps(state)
 
+    # Record the skirmished space for same-turn coordination rules
+    # (§8.4.1 Garrison: "Do not move Regulars to any City where a
+    # Skirmish has been executed").  Cleared per turn in base_bot.
+    state.setdefault("_turn_skirmished_spaces", set()).add(space_id)
+
     state.setdefault("log", []).append(
         f"{faction} SKIRMISH {space_id} opt {option}"
     )

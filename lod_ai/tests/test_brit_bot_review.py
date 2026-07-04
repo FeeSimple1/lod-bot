@@ -423,33 +423,36 @@ class TestB10MarchLeaveBehind:
 # ==========================================================================
 class TestB5GarrisonCitySelection:
     def test_garrison_city_requires_rebellion_control(self):
-        """B5: _garrison_phase2a_targets should only pick Rebellion-controlled Cities."""
+        """§8.4.1: "Move just enough Regulars to add British Control of
+        Cities" — any City NOT under British Control (Rebellion-
+        Controlled or Uncontrolled) is a Phase 2a target; only Cities
+        already under British Control are excluded.
+
+        REWRITTEN (Session 38): the old test pinned Uncontrolled Cities
+        as excluded, which contradicts the rule — flipping an
+        Uncontrolled City to British Control "adds" Control just as
+        flipping a Rebellion-Controlled one does (survey British #3).
+        """
         bot = BritishBot()
         state = _base_state(
             spaces={
-                "Boston": {C.REGULAR_BRI: 0, C.REGULAR_PAT: 3, C.MILITIA_A: 0,
-                           C.MILITIA_U: 0, C.REGULAR_FRE: 0, C.FORT_PAT: 0,
-                           C.TORY: 0, C.WARPARTY_A: 0, C.WARPARTY_U: 0,
-                           C.FORT_BRI: 0},
-                "New_York_City": {C.REGULAR_BRI: 0, C.REGULAR_PAT: 1,
-                                  C.MILITIA_A: 0, C.MILITIA_U: 0,
-                                  C.REGULAR_FRE: 0, C.FORT_PAT: 0,
-                                  C.TORY: 0, C.WARPARTY_A: 0, C.WARPARTY_U: 0,
-                                  C.FORT_BRI: 0},
+                "Boston": {C.REGULAR_BRI: 0, C.REGULAR_PAT: 3},
+                "New_York_City": {C.REGULAR_BRI: 0, C.REGULAR_PAT: 1},
+                "Philadelphia": {C.REGULAR_BRI: 2, C.TORY: 1},
             },
-            # Boston = Rebellion-controlled, NYC = uncontrolled (no control)
-            control={"Boston": "REBELLION"},
-            support={"Boston": -1, "New_York_City": 0},
+            control={"Boston": "REBELLION", "New_York_City": None,
+                     "Philadelphia": C.BRITISH},
+            support={"Boston": -1, "New_York_City": 0, "Philadelphia": 0},
         )
         targets = bot._garrison_phase2a_targets(state)
         city_ids = [city for city, _ in targets]
-        assert "Boston" in city_ids
-        # NYC should NOT be selected because it's not Rebellion-controlled
-        assert "New_York_City" not in city_ids
-
-        state["control"] = {"New_York_City": None}
-        targets = bot._garrison_phase2a_targets(state)
-        assert len(targets) == 0
+        assert "Boston" in city_ids            # Rebellion-Controlled
+        assert "New_York_City" in city_ids     # Uncontrolled: flip ADDS Control
+        assert "Philadelphia" not in city_ids  # already British-Controlled
+        # Needed per the §1.7 tally: rebels - royalist + 1
+        needed = dict(targets)
+        assert needed["Boston"] == 4
+        assert needed["New_York_City"] == 2
 
     def test_garrison_city_selects_most_rebels_first(self):
         """B5: 'first where most Rebels without Patriot Fort'."""
@@ -634,23 +637,20 @@ class TestB5GarrisonMultiPhase:
         assert pool["Virginia"] >= 1
 
     def test_garrison_phase2b_reinforce_targets(self):
-        """B5 Phase 2b: British-controlled cities needing 1+ Regular
-        or 3+ cubes should be listed."""
+        """B5 Phase 2b (§8.4.1): British-Controlled Cities needing 1+
+        Regular (no Active Support) or 3+ British cubes are listed.
+
+        REWRITTEN (Session 38): boards made piece-consistent with the
+        §1.7 Control tally — Phase 2b now evaluates Control on the
+        (post-move) piece counts rather than trusting a stale control
+        dict, so a declared-British City whose pieces say otherwise is
+        not a reinforcement target.
+        """
         bot = BritishBot()
         state = _base_state(
             spaces={
-                "Boston": {C.REGULAR_BRI: 0, C.TORY: 1,
-                           C.FORT_BRI: 0,
-                           C.WARPARTY_A: 0, C.WARPARTY_U: 0,
-                           C.REGULAR_PAT: 0, C.REGULAR_FRE: 0,
-                           C.MILITIA_A: 0, C.MILITIA_U: 0,
-                           C.FORT_PAT: 0},
-                "New_York_City": {C.REGULAR_BRI: 1, C.TORY: 0,
-                                  C.FORT_BRI: 0,
-                                  C.WARPARTY_A: 0, C.WARPARTY_U: 0,
-                                  C.REGULAR_PAT: 0, C.REGULAR_FRE: 0,
-                                  C.MILITIA_A: 0, C.MILITIA_U: 2,
-                                  C.FORT_PAT: 0},
+                "Boston": {C.REGULAR_BRI: 0, C.TORY: 1},
+                "New_York_City": {C.REGULAR_BRI: 2, C.MILITIA_U: 1},
             },
             control={"Boston": C.BRITISH, "New_York_City": C.BRITISH},
             support={"Boston": 0, "New_York_City": 0},
@@ -659,7 +659,7 @@ class TestB5GarrisonMultiPhase:
         city_ids = [city for city, _ in targets]
         # Boston: 0 Regs, not Active Support → needs 1+ Reg
         assert "Boston" in city_ids
-        # NYC: 1 cube total < 3 → needs reinforcement to 3+
+        # NYC: 2 British cubes < 3 → needs reinforcement to 3+
         assert "New_York_City" in city_ids
 
     def test_garrison_displacement_picks_most_rebels(self):
@@ -998,3 +998,149 @@ class TestLeaderLocationReverse:
         )
         loc = leader_location(state, "LEADER_CLINTON")
         assert loc == "Boston"
+
+
+# ==========================================================================
+# Session 38: Garrison origin-pool + displacement scoping + skirmished-City
+# exclusion (survey British #3 remnants)
+# ==========================================================================
+class TestB5GarrisonRemnants:
+    def test_origin_pool_includes_uncontrolled_origin(self):
+        """§3.2.2: "Move any number of British Regulars from any spaces
+        (not Blockaded Cities)" — an origin without British Control
+        contributes.  §8.4.1's leave-2-more retention is scoped to
+        origins WITH British Control; only the last-Regular rule
+        applies elsewhere."""
+        bot = BritishBot()
+        state = _base_state(
+            spaces={"Virginia": {C.REGULAR_BRI: 3, C.REGULAR_PAT: 3}},
+            control={"Virginia": None},
+            support={"Virginia": 0},
+        )
+        pool = bot._garrison_origin_pool(state)
+        # No retention (not British-Controlled); keep last Regular
+        # (Pop > 0, no Active Support) → 3 - 1 = 2 movable
+        assert pool.get("Virginia") == 2
+
+    def test_origin_pool_rebellion_controlled_origin_contributes(self):
+        """§3.2.2/§8.4.1: a Rebellion-Controlled origin contributes all
+        but the last Regular (previously it contributed 0)."""
+        bot = BritishBot()
+        state = _base_state(
+            spaces={"Massachusetts": {C.REGULAR_BRI: 2, C.MILITIA_A: 5}},
+            control={"Massachusetts": "REBELLION"},
+            support={"Massachusetts": -2},
+        )
+        pool = bot._garrison_origin_pool(state)
+        assert pool.get("Massachusetts") == 1
+
+    def test_origin_pool_excludes_blockaded_city(self):
+        """§3.2.2: "A Blockaded City or units starting there may not be
+        included in any part of a Garrison Command"."""
+        bot = BritishBot()
+        state = _base_state(
+            spaces={"Boston": {C.REGULAR_BRI: 4}},
+            control={"Boston": None},
+            support={"Boston": 0},
+        )
+        state["markers"] = {C.BLOCKADE: {"pool": 0, "on_map": {"Boston"}}}
+        pool = bot._garrison_origin_pool(state)
+        assert "Boston" not in pool
+
+    def test_phase2a_excludes_skirmished_city(self):
+        """§8.4.1: "Do not move Regulars to any City where a Skirmish
+        has been executed"."""
+        bot = BritishBot()
+        state = _base_state(
+            spaces={"Boston": {C.REGULAR_PAT: 2}},
+            control={"Boston": "REBELLION"},
+            support={"Boston": -1},
+        )
+        state["_turn_skirmished_spaces"] = {"Boston"}
+        assert bot._garrison_phase2a_targets(state) == []
+        state["_turn_skirmished_spaces"] = set()
+        assert [c for c, _ in bot._garrison_phase2a_targets(state)] == ["Boston"]
+
+    def test_phase2a_prefers_fortless_but_keeps_forted_city_eligible(self):
+        """§8.4.1 priorities are successive filters: "first where there
+        are the most Rebellion pieces without a Patriot Fort, then to
+        New York City, then random" — a City WITH a Patriot Fort is
+        still a legal Garrison destination (§3.2.2 places no Fort
+        restriction on movement), so it stays eligible behind the
+        fortless tier."""
+        bot = BritishBot()
+        state = _base_state(
+            spaces={
+                "Boston": {C.REGULAR_PAT: 1},
+                "Charles_Town": {C.REGULAR_PAT: 4, C.FORT_PAT: 1},
+            },
+            control={"Boston": "REBELLION", "Charles_Town": "REBELLION"},
+            support={"Boston": -1, "Charles_Town": -2},
+        )
+        targets = bot._garrison_phase2a_targets(state)
+        assert [c for c, _ in targets] == ["Boston", "Charles_Town"]
+
+    def test_displacement_considers_all_qualifying_cities(self):
+        """§3.2.2: displacement may occur "in one City (under British
+        Control, no Patriot Fort and not Blockaded)" — not only in a
+        City Regulars just moved into.  §8.4.1: displace the largest
+        possible number of Rebellion pieces."""
+        bot = BritishBot()
+        state = _base_state(
+            spaces={
+                "Boston": {C.REGULAR_BRI: 6, C.REGULAR_PAT: 2, C.MILITIA_A: 2},
+                "New_York_City": {C.REGULAR_BRI: 3, C.REGULAR_PAT: 1},
+                "Massachusetts": {},
+            },
+            support={"Massachusetts": C.ACTIVE_OPPOSITION},
+        )
+        # NYC is the only move destination, but Boston (not moved into,
+        # British-Controlled, 4 Rebellion units vs NYC's 1) is preferred.
+        move_map = {"Quebec_City": {"New_York_City": 1}}
+        city, province = bot._select_displacement(
+            state, ["New_York_City"], move_map)
+        assert city == "Boston"
+        assert province is not None
+
+    def test_displacement_limited_command_restricted_to_destination(self):
+        """§3.2.2/§2.3.5: in a Limited Command the displaced units must
+        be in the destination City."""
+        bot = BritishBot()
+        state = _base_state(
+            spaces={
+                "Boston": {C.REGULAR_BRI: 6, C.REGULAR_PAT: 2, C.MILITIA_A: 2},
+                "New_York_City": {C.REGULAR_BRI: 3, C.REGULAR_PAT: 1},
+                "New_York": {},
+            },
+            support={"New_York": 0},
+        )
+        move_map = {"Quebec_City": {"New_York_City": 1}}
+        city, _ = bot._select_displacement(
+            state, ["New_York_City"], move_map, limited=True)
+        assert city == "New_York_City"
+
+    def test_phase2b_counts_planned_phase2a_arrivals(self):
+        """§8.4.1 Phase 2b runs on the post-move board: a City being
+        flipped in Phase 2a counts as British Controlled, and planned
+        arrivals count toward the 1-Regular / 3-cube thresholds."""
+        bot = BritishBot()
+        state = _base_state(
+            spaces={"Boston": {C.REGULAR_PAT: 1}},
+            control={"Boston": "REBELLION"},
+            support={"Boston": 0},
+        )
+        # Without planned arrivals Boston is not British-Controlled
+        assert bot._garrison_phase2b_targets(state) == []
+        # With 2 planned arrivals: controlled, 2 cubes → needs 1 more
+        assert bot._garrison_phase2b_targets(state, {"Boston": 2}) == [("Boston", 1)]
+
+    def test_phase2b_excludes_skirmished_city(self):
+        """§8.4.1: no Regulars into a skirmished City in Phase 2b either."""
+        bot = BritishBot()
+        state = _base_state(
+            spaces={"Boston": {C.REGULAR_BRI: 1, C.TORY: 0}},
+            control={"Boston": C.BRITISH},
+            support={"Boston": 0},
+        )
+        state["_turn_skirmished_spaces"] = {"Boston"}
+        assert bot._garrison_phase2b_targets(state) == []

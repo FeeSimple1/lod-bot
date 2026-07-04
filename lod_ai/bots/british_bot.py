@@ -27,6 +27,7 @@ from lod_ai.util.history import push_history
 from lod_ai.leaders import leader_location
 from lod_ai.economy.resources import can_afford, spend
 from lod_ai.map import adjacency as map_adj
+from lod_ai.util.naval import has_blockade
 
 # ---------------------------------------------------------------------------
 #  Shared geography helpers
@@ -499,18 +500,22 @@ class BritishBot(BaseBot):
     #  NODE B5  :  GARRISON Command  (full multi-phase per flowchart)
     # =======================================================================
     def _garrison(self, state: Dict) -> bool:
-        """Full multi-phase Garrison per B5 reference:
+        """Full multi-phase Garrison per §8.4.1 / B5 reference:
 
-        Phase 1: SA first (Skirmish then Naval).
-        Phase 2a: From British-controlled origins (retention rules), move
-                  just enough Regulars to add British Control to cities.
-                  Priority: most Rebels without Patriot Fort, then NYC.
-        Phase 2b: Reinforce existing British Control cities:
-                  first 1+ Regular if without Active Support,
+        Phase 1: SA first (Naval Pressure, else Skirmish).
+        Phase 2a: From any non-Blockaded origins (§3.2.2; retention rules
+                  per §8.4.1), move just enough Regulars to add British
+                  Control to Cities.  Priority: most Rebels without
+                  Patriot Fort, then NYC, then random.  No moves into
+                  skirmished Cities.
+        Phase 2b: Reinforce British Control cities (incl. those flipped
+                  in 2a): first 1+ Regular if without Active Support,
                   then 3+ British cubes first where Underground Militia.
         Phase 3: If no cubes moved, Muster fallback.
         Phase 4: If cubes moved, Activate Underground Militia and displace
-                  Rebels (first most Opposition, then least Support, lowest Pop).
+                  Rebels from any qualifying City (dest-only if Limited):
+                  most Rebels first; target Province with most Opposition,
+                  then least Support, lowest Pop.
         """
         # Phase 1: SA first (skip if limited/no-SA slot)
         limited = state.get("_limited")
@@ -535,11 +540,25 @@ class BritishBot(BaseBot):
         total_moved = 0
         dest_cities: List[str] = []
 
+        # A planned target City must not simultaneously act as an origin:
+        # sending Regulars OUT of a City being flipped double-books its
+        # pieces (each target's "needed" is computed on the pre-move
+        # tally) and can leave it short of Control after the moves.
+        for _city, _n in phase2a_targets:
+            origin_avail.pop(_city, None)
+
         max_dest = 1 if limited else None  # Limited Command: 1 city only
         for city, needed in phase2a_targets:
             if max_dest is not None and len(dest_cities) >= max_dest:
                 break
             if needed <= 0:
+                continue
+            # §8.4.1 "Move just enough Regulars to ADD British Control":
+            # a partial move that cannot reach the Control threshold adds
+            # nothing — skip the City rather than strand Regulars there.
+            avail_total = sum(
+                v for o, v in origin_avail.items() if o != city and v > 0)
+            if avail_total < needed:
                 continue
             still_needed = needed
             # Pick origins sorted by most available first
@@ -558,15 +577,32 @@ class BritishBot(BaseBot):
             if still_needed < needed:
                 dest_cities.append(city)
 
-        # Phase 2b: Reinforce existing British Control cities
+        # Phase 2b: Reinforce British Control cities (incl. those being
+        # flipped in Phase 2a — pass planned arrivals so control and the
+        # 1-Regular/3-cube thresholds reflect the post-move board).
         # (skip if limited — already filled 1 dest from phase 2a)
         if not (max_dest is not None and len(dest_cities) >= max_dest):
-            reinforce_targets = self._garrison_phase2b_targets(state)
+            planned_in: Dict[str, int] = {}
+            planned_out: Dict[str, int] = {}
+            for origin, inner in move_map.items():
+                for dst, n in inner.items():
+                    planned_in[dst] = planned_in.get(dst, 0) + n
+                    planned_out[origin] = planned_out.get(origin, 0) + n
+            reinforce_targets = self._garrison_phase2b_targets(
+                state, planned_in, planned_out)
             for city, need in reinforce_targets:
                 if max_dest is not None and len(dest_cities) >= max_dest:
                     break
                 if need <= 0:
                     continue
+                # §8.4.1 "to give each ... at least one Regular / at least
+                # three British cubes": skip if the threshold can't be met.
+                avail_total = sum(
+                    v for o, v in origin_avail.items() if o != city and v > 0)
+                if avail_total < need:
+                    continue
+                # Once targeted, this City must not act as an origin.
+                origin_avail.pop(city, None)
                 still_need = need
                 for origin in sorted(origin_avail, key=lambda o: -origin_avail.get(o, 0)):
                     if still_need <= 0:
@@ -587,8 +623,10 @@ class BritishBot(BaseBot):
         if total_moved == 0:
             return self._muster(state, tried_march=False)
 
-        # Phase 4: Displacement — pick city with most Rebels as source
-        displace_city, displace_target = self._select_displacement(state, dest_cities, move_map)
+        # Phase 4: Displacement — any qualifying City (§3.2.2), most
+        # Rebels first (§8.4.1); Limited Command restricts to the dest.
+        displace_city, displace_target = self._select_displacement(
+            state, dest_cities, move_map, limited=bool(limited))
 
         # Affordability check: Garrison costs 2 Resources
         if state["resources"].get(C.BRITISH, 0) < 2:
@@ -610,33 +648,56 @@ class BritishBot(BaseBot):
         return True
 
     # -------------------------------------------------------------------
+    @staticmethod
+    def _rebellion_pieces(sp: Dict) -> int:
+        """Rebellion pieces per the §1.7 Control tally (Patriot_ + French_
+        tags) — mirrors board.control.refresh_control."""
+        return sum(
+            q for t, q in sp.items()
+            if isinstance(t, str) and isinstance(q, int) and q > 0
+            and t.startswith(("Patriot_", "French_"))
+        )
+
+    @staticmethod
+    def _royalist_pieces(sp: Dict) -> int:
+        """Royalist pieces per the §1.7 Control tally (British_ + Indian_
+        tags + Villages) — mirrors board.control.refresh_control."""
+        total = sum(
+            q for t, q in sp.items()
+            if isinstance(t, str) and isinstance(q, int) and q > 0
+            and t.startswith(("British_", "Indian_"))
+        )
+        return total + max(0, sp.get(C.VILLAGE, 0))
+
     def _garrison_origin_pool(self, state: Dict) -> Dict[str, int]:
-        """Compute how many Regulars each British-controlled origin can
-        contribute to Garrison, respecting retention rules:
-        - Leave 2 more Royalist than Rebel pieces (counting Forts)
-        - Remove last Regular only if Pop 0 or Active Support
+        """Compute how many Regulars each origin space can contribute to
+        Garrison.
+
+        §3.2.2 PROCEDURE: "Move any number of British Regulars from any
+        spaces (not Blockaded Cities)" — the origin pool is NOT limited
+        to British-Controlled spaces.  §8.4.1 scopes the two retention
+        rules differently:
+        - "leave two more Royalist than Rebellion pieces in each origin
+          space *with British Control*" — controlled origins only;
+        - "remove the last Regular only from spaces with Population 0
+          or Active Support" — every origin.
+        (Previously only British-Controlled origins contributed at all —
+        survey British #3 remnant.)
         """
         pool: Dict[str, int] = {}
         for sid, sp in state["spaces"].items():
-            if self._control(state, sid) != C.BRITISH:
-                continue
-            royalist = (
-                sp.get(C.REGULAR_BRI, 0)
-                + sp.get(C.TORY, 0)
-                + sp.get(C.WARPARTY_A, 0)
-                + sp.get(C.WARPARTY_U, 0)
-                + sp.get(C.FORT_BRI, 0)
-            )
-            rebel = (
-                sp.get(C.REGULAR_PAT, 0)
-                + sp.get(C.REGULAR_FRE, 0)
-                + sp.get(C.MILITIA_A, 0)
-                + sp.get(C.MILITIA_U, 0)
-                + sp.get(C.FORT_PAT, 0)
-            )
-            must_leave = rebel + 2
-            spare = max(0, royalist - must_leave)
             regs = sp.get(C.REGULAR_BRI, 0)
+            if regs <= 0:
+                continue
+            if sid == WEST_INDIES:
+                continue  # WI is a holding box, not a map space (§1.3)
+            if has_blockade(state, sid):
+                continue  # §3.2.2: units starting in a Blockaded City excluded
+            if self._control(state, sid) == C.BRITISH:
+                must_leave = self._rebellion_pieces(sp) + 2
+                spare = max(0, self._royalist_pieces(sp) - must_leave)
+            else:
+                spare = regs
             pop = _MAP_DATA.get(sid, {}).get("population", 0)
             at_active_support = self._support_level(state, sid) >= C.ACTIVE_SUPPORT
             min_regs = 0 if (pop == 0 or at_active_support) else 1
@@ -646,62 +707,124 @@ class BritishBot(BaseBot):
         return pool
 
     def _garrison_phase2a_targets(self, state: Dict) -> List[Tuple[str, int]]:
-        """Phase 2a: Cities where moving Regulars would add British Control.
-        Returns list of (city, regulars_needed), sorted by priority:
-        first where most Rebels without Patriot Fort, then NYC.
+        """Phase 2a (§8.4.1): "Move just enough Regulars to add British
+        Control of Cities, first where there are the most Rebellion
+        pieces without a Patriot Fort, then to New York City, then
+        random."
+
+        Candidates are all Cities NOT currently under British Control —
+        Rebellion-Controlled or Uncontrolled both "add" British Control
+        when flipped (previously only Rebellion-Controlled Cities were
+        considered — survey British #3 remnant).  Excluded: Blockaded
+        Cities (§3.2.2) and Cities where a Skirmish was executed this
+        turn (§8.4.1 "Do not move Regulars to any City where a Skirmish
+        has been executed").
+
+        Priorities are successive filters per the bot convention:
+        Cities without a Patriot Fort ranked by most Rebellion pieces,
+        then New York City, then seeded random (§8.2).  A City WITH a
+        Patriot Fort can still gain British Control (§3.2.2 places no
+        Fort restriction on movement), so forted Cities stay eligible
+        in the trailing tiers.
+
+        Returns list of (city, regulars_needed) in priority order.
+        `regulars_needed` uses the §1.7 Control tally (Royalist =
+        British + Indian pieces + Villages) and requires at least one
+        British piece for British Control.
         """
+        skirmished = state.get("_turn_skirmished_spaces", set())
         targets: List[Tuple[tuple, str, int]] = []
         for city in CITIES:
-            sp = state["spaces"].get(city, {})
-            if self._control(state, city) != "REBELLION":
+            if city not in state["spaces"]:
                 continue
-            if sp.get(C.FORT_PAT, 0) > 0:
-                continue
-            rebel = (
-                sp.get(C.REGULAR_PAT, 0)
-                + sp.get(C.REGULAR_FRE, 0)
-                + sp.get(C.MILITIA_A, 0)
-                + sp.get(C.MILITIA_U, 0)
-                + sp.get(C.FORT_PAT, 0)
-            )
-            brit_there = (
+            sp = state["spaces"][city]
+            if self._control(state, city) == C.BRITISH:
+                continue  # nothing to add
+            if city in skirmished:
+                continue  # §8.4.1 skirmished-City exclusion
+            if has_blockade(state, city):
+                continue  # §3.2.2
+            rebel = self._rebellion_pieces(sp)
+            royalist = self._royalist_pieces(sp)
+            brit = (
                 sp.get(C.REGULAR_BRI, 0)
                 + sp.get(C.TORY, 0)
                 + sp.get(C.FORT_BRI, 0)
             )
-            # Need enough to exceed rebel pieces (brit > rebel for control)
-            needed = max(0, rebel + 1 - brit_there)
-            is_nyc = 1 if city == "New_York_City" else 0
-            # Sort: most rebels first, NYC second, random tiebreak
-            key = (-rebel, -is_nyc, state["rng"].random())
+            needed = rebel - royalist + 1
+            if brit == 0:
+                needed = max(needed, 1)  # §1.7: need a British piece present
+            if needed <= 0:
+                continue
+            has_fort = sp.get(C.FORT_PAT, 0) > 0
+            is_nyc = city == "New_York_City"
+            # Successive filters: fortless-most-rebels → NYC → random (§8.2)
+            key = (
+                1 if has_fort else 0,
+                -rebel if not has_fort else 0,
+                0 if is_nyc else 1,
+                state["rng"].random(),
+            )
             targets.append((key, city, needed))
         targets.sort()
         return [(city, needed) for _, city, needed in targets]
 
-    def _garrison_phase2b_targets(self, state: Dict) -> List[Tuple[str, int]]:
-        """Phase 2b: Reinforce existing British Control cities.
-        - First 1+ Regular if without Active Support
-        - Then 3+ British cubes first where Underground Militia
-        Returns list of (city, cubes_needed), sorted by priority.
+    def _garrison_phase2b_targets(
+        self, state: Dict, incoming: Dict[str, int] | None = None,
+        outgoing: Dict[str, int] | None = None,
+    ) -> List[Tuple[str, int]]:
+        """Phase 2b (§8.4.1): "Then move additional Regulars, first to
+        give each British Controlled City without Active Support at
+        least one Regular, then to give each British Controlled City at
+        least three British cubes of any types beginning with those
+        Cities that have Underground Militia."
+
+        `incoming`/`outgoing` carry Regulars already planned in Phase 2a
+        so the checks reflect the post-move board: Cities being flipped
+        in Phase 2a count as British Controlled here, planned arrivals
+        count toward the 1-Regular / 3-cube thresholds, and planned
+        departures (a City can be an origin in the same Command) count
+        against them.  Excluded:
+        Blockaded Cities (§3.2.2) and skirmished Cities (§8.4.1).
+        Ties within each priority are seeded random (§8.2; formerly
+        alphabetical).
+
+        Returns list of (city, regulars_needed), sorted by priority.
         """
+        incoming = incoming or {}
+        outgoing = outgoing or {}
+        skirmished = state.get("_turn_skirmished_spaces", set())
+        rng = state["rng"]
         targets: List[Tuple[tuple, str, int]] = []
         for city in CITIES:
             sp = state["spaces"].get(city, {})
-            if self._control(state, city) != C.BRITISH:
+            net = incoming.get(city, 0) - outgoing.get(city, 0)
+            # Post-move British Control per the §1.7 tally
+            royalist = self._royalist_pieces(sp) + net
+            rebel = self._rebellion_pieces(sp)
+            brit_present = (
+                sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                + sp.get(C.FORT_BRI, 0) + net
+            ) > 0
+            if not (royalist > rebel and brit_present):
                 continue
-            regs = sp.get(C.REGULAR_BRI, 0)
+            if city in skirmished:
+                continue  # §8.4.1: no Regulars into a skirmished City
+            if has_blockade(state, city):
+                continue  # §3.2.2
+            regs = sp.get(C.REGULAR_BRI, 0) + net
             at_active_support = self._support_level(state, city) >= C.ACTIVE_SUPPORT
             brit_cubes = regs + sp.get(C.TORY, 0)
             has_underground = sp.get(C.MILITIA_U, 0) > 0
 
             # First priority: 1+ Regular if without Active Support
             if not at_active_support and regs == 0:
-                targets.append(((0, 0, city), city, 1))
+                targets.append(((0, 0, rng.random()), city, 1))
             # Second priority: 3+ cubes first where Underground Militia
             if brit_cubes < 3:
                 need = 3 - brit_cubes
                 underground_prio = 0 if has_underground else 1
-                targets.append(((1, underground_prio, city), city, need))
+                targets.append(((1, underground_prio, rng.random()), city, need))
 
         targets.sort()
         return [(city, need) for _, city, need in targets]
@@ -709,24 +832,44 @@ class BritishBot(BaseBot):
     def _select_displacement(
         self, state: Dict, dest_cities: List[str],
         move_map: dict | None = None,
+        *, limited: bool = False,
     ) -> Tuple[str | None, str | None]:
-        """Phase 4: Activate Militia then displace most Rebels.
-        Pick the destination city with most Rebels as the displacement source.
-        Pick adjacent Province with most Opposition, then least Support, then lowest Pop.
-        Only consider cities that will be British-controlled after the planned moves.
+        """Phase 4 (§8.4.1): "displace the largest possible number of
+        Rebellion pieces, first to a Province with the most Opposition
+        then with least Support, within that to the lowest Population
+        possible."
+
+        §3.2.2 scopes the candidate Cities: "in one City (under British
+        Control, no Patriot Fort and not Blockaded) displace all
+        Rebellion units to an adjacent space" — ANY qualifying City,
+        whether or not Regulars just moved there (previously only the
+        moved-into Cities were considered — survey British #3 remnant).
+        Only under a Limited Command must the displacement originate in
+        the destination City (§3.2.2/§2.3.5).  Control is evaluated on
+        the post-move board (planned arrivals in move_map count).
+        Ties are seeded random (§8.2).
         """
-        if not dest_cities:
+        candidates = dest_cities if limited else list(CITIES)
+        if not candidates:
             return (None, None)
 
-        # Pick city with most Rebels for displacement, but only if the city
-        # will be British-controlled after the planned garrison moves and
-        # has no Patriot Fort (garrison.execute rejects both conditions).
+        net_by_city: Dict[str, int] = {}
+        if move_map:
+            for origin, inner in move_map.items():
+                for dst, n in inner.items():
+                    net_by_city[dst] = net_by_city.get(dst, 0) + n
+                    net_by_city[origin] = net_by_city.get(origin, 0) - n
+
+        rng = state["rng"]
         best_city = None
-        most_rebels = -1
-        for city in dest_cities:
+        best_city_key = None
+        for city in candidates:
             sp = state["spaces"].get(city, {})
-            # Skip if Patriot Fort present
+            # garrison.execute rejects Patriot-Fort / Blockaded / non-
+            # British-Controlled displacement Cities (§3.2.2).
             if sp.get(C.FORT_PAT, 0) > 0:
+                continue
+            if has_blockade(state, city):
                 continue
             rebels = (
                 sp.get(C.REGULAR_PAT, 0)
@@ -736,37 +879,26 @@ class BritishBot(BaseBot):
             )
             if rebels == 0:
                 continue
-            # Simulate post-move British Control: current royalist pieces
-            # plus incoming regulars from move_map must exceed rebel pieces.
-            royalist = (
-                sp.get(C.REGULAR_BRI, 0)
-                + sp.get(C.TORY, 0)
-                + sp.get(C.WARPARTY_A, 0)
-                + sp.get(C.WARPARTY_U, 0)
-                + sp.get(C.FORT_BRI, 0)
-            )
-            incoming = 0
-            if move_map:
-                for inner in move_map.values():
-                    incoming += inner.get(city, 0)
-            rebel_total = (
-                rebels
-                + sp.get(C.FORT_PAT, 0)
-            )
-            if (royalist + incoming) <= rebel_total:
-                continue  # won't be British-controlled after moves
-            if rebels > most_rebels:
-                most_rebels = rebels
+            inc = net_by_city.get(city, 0)
+            royalist = self._royalist_pieces(sp) + inc
+            rebel_total = self._rebellion_pieces(sp)
+            brit_present = (
+                sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                + sp.get(C.FORT_BRI, 0) + inc
+            ) > 0
+            if not (royalist > rebel_total and brit_present):
+                continue  # won't be British-Controlled after moves
+            key = (-rebels, rng.random())
+            if best_city_key is None or key < best_city_key:
+                best_city_key = key
                 best_city = city
 
-        if not best_city or most_rebels == 0:
+        if not best_city:
             return (None, None)
 
         # Pick Colony/Province target: must be ADJACENT to the city.
-        # Priority: most Opposition, least Support, lowest Pop.
-        # Deterministic iteration order: _adjacent returns a sorted tuple;
-        # do NOT re-wrap in a set (set order is hash-seed-dependent and this
-        # loop breaks ties by first-seen).
+        # Priority: most Opposition, least Support, lowest Pop (§8.4.1);
+        # remaining ties seeded random (§8.2).
         adj_spaces = _adjacent(best_city)
         best_province = None
         best_key = None
@@ -780,7 +912,8 @@ class BritishBot(BaseBot):
             opp = max(0, -support_level)
             sup = max(0, support_level)
             pop = _MAP_DATA.get(sid, {}).get("population", 0)
-            key = (-opp, sup, pop)  # minimize: most opp, least support, lowest pop
+            # minimize: most opp, least support, lowest pop, seeded tie-break
+            key = (-opp, sup, pop, rng.random())
             if best_key is None or key < best_key:
                 best_key = key
                 best_province = sid

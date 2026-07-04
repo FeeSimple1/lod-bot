@@ -44,6 +44,7 @@ from lod_ai.rules_consts import (
 )
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
+from lod_ai.util.naval     import has_blockade as naval_has_blockade
 from lod_ai.util.adjacency import is_adjacent
 from lod_ai.map            import adjacency as map_adj
 from lod_ai.board.pieces      import remove_piece, add_piece, flip_pieces
@@ -55,14 +56,16 @@ COMMAND_NAME = "GARRISON"  # auto-registered by commands/__init__.py
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _nav(state: Dict) -> Dict:
-    """Return the nested naval dict created by the Naval‑System helpers."""
-    return state.get("naval", {})
-
-
 def _is_blockaded(city: str, state: Dict) -> bool:
-    """True if the City currently hosts ≥1 Blockade marker."""
-    return city in _nav(state).get("blockades", {})
+    """True if the City currently hosts ≥1 Blockade marker.
+
+    §3.2.2: "A Blockaded City or units starting there may not be
+    included in any part of a Garrison Command."  Blockades live in
+    state["markers"][BLOCKADE]["on_map"] (see lod_ai.util.naval); the
+    previous implementation read a state["naval"]["blockades"] dict
+    that nothing ever populates, so the exclusion was dead code.
+    """
+    return naval_has_blockade(state, city)
 
 
 def _count_brit_cubes(sp: Dict) -> int:

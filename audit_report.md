@@ -3160,3 +3160,76 @@ seeds 1-20 invariants-on; balance rebaselined (4 baseline lines).
 Tests: +1 (six-Regular plan via executor spy). Both roots green
 (1,280 + 41); gate clean seeds 1-20 invariants-on; balance rebaselined
 (British Muster throughput up; sizeable shift as expected).
+
+## Session 38: Garrison origin pool, Phase 2a scoping, displacement, skirmished-City exclusion (July 2026)
+
+Queue item 1 (survey British #3 remnants), plus two latent bugs found on
+the way through the battery.
+
+- §3.2.2/§8.4.1 origin pool: only British-Controlled spaces contributed
+  Regulars. Now any space with Regulars contributes (excluding West
+  Indies and Blockaded Cities); the leave-2-more retention applies only
+  to origins "with British Control" (the rule scopes it there), while
+  the last-Regular rule (Pop 0 / Active Support) applies to every
+  origin. Royalist/Rebellion retention tallies now mirror the §1.7
+  Control tally (Villages/war parties count as Royalist; Villages were
+  previously omitted).
+- §8.4.1 Phase 2a: targets were only Rebellion-Controlled fortless
+  Cities. Now any City NOT under British Control qualifies (flipping an
+  Uncontrolled City "adds" British Control too); Cities with a Patriot
+  Fort stay eligible behind the fortless tier and NYC (priorities read
+  as successive filters per the bot convention — §3.2.2 places no Fort
+  restriction on movement); "needed" is computed with the §1.7 tally.
+  Partial moves that cannot reach the Control threshold are skipped
+  ("Move just enough Regulars to ADD British Control").
+- §8.4.1 "Do not move Regulars to any City where a Skirmish has been
+  executed" was unenforced: skirmish.execute now records its space in
+  state["_turn_skirmished_spaces"] (cleared per turn in base_bot), and
+  Garrison Phases 2a/2b exclude those Cities.
+- §3.2.2 displacement was restricted to moved-into Cities; now ANY
+  post-move British-Controlled, fortless, non-Blockaded City qualifies
+  (Limited Command: destination City only, §2.3.5). Source = most
+  Rebellion units ("largest possible number", §8.4.1); seeded
+  tie-breaks (§8.2) replace first-seen/alphabetical in the source pick,
+  the Province-target pick, and Phase 2b ordering.
+- BUG (dead code): garrison.py's `_is_blockaded` read a
+  state["naval"]["blockades"] dict nothing populates (the real store is
+  state["markers"][BLOCKADE]["on_map"], util.naval.has_blockade), so
+  §3.2.2's Blockade exclusions could never fire. Session 22's command
+  audit had marked them CORRECT — the checks existed but were
+  unreachable. Now routed through util.naval; bot planning filters
+  Blockaded origins/destinations/displacement Cities to match.
+- BUG (planner audit gate): one Garrison plan could use a City as both
+  origin and destination, double-booking its Regulars (1778 seed 2:
+  Boston sent 2 to Philadelphia AND received 2 from Savannah; "needed"
+  was computed on the pre-move tally, so post-move Boston was still
+  Rebellion-Controlled and garrison.execute's displacement Control
+  check raised the trapped ValueError). Planned target Cities are now
+  removed from the origin pool before allocation, and Phase 2b
+  thresholds plus the displacement Control simulation use net planned
+  flows (incoming − outgoing).
+- Free-op planner (§3.5.3): a locationless free FRENCH Muster was
+  planned with the BRITISH destination rule (non-Blockaded City /
+  adjacent Colony); muster.execute then raised "French Muster requires
+  Rebellion Control (or West Indies)" and the clean-sweep gate logged a
+  free-op execution skip (1778 seed 5, exposed by this change's
+  trajectory shift; baseline HEAD was clean on that seed). The planner
+  now applies §3.5.3 (Colony/City with Rebellion Control, or WI) and
+  declines pinned illegal locations as a genuine decline.
+
+Tests: `test_garrison_city_requires_rebellion_control` (pinned the
+Uncontrolled-Cities-excluded behavior) and
+`test_garrison_phase2b_reinforce_targets` (control dict inconsistent
+with its own pieces) rewritten to the rule with citations; +9 tests in
+TestB5GarrisonRemnants; new lod_ai/tests/commands/test_garrison.py
+(Blockade exclusions live, skirmish recording); +2 free French Muster
+planner tests.
+
+Verification: both roots green — 1,296 (lod_ai/tests, incl. balance
+canary) + 41 (tests/) = 1,337; clean-sweep gate seeds 1-10 and 11-20
+clean with invariants on; soak 120 games clean; balance rebaselined
+(old → new): 1775 P 5%→0%, B 20%→30%, I 75%→70%; 1776 B 30%→50%,
+P 35%→25%, I 35%→25%; 1778 F 50%→70%, P 35%→20%, B 15%→5%, I 0%→5%
+(25 winner changes; the stronger early-war British Garrison and the
+now-executing free French Musters account for the directions; the 1778
+British slide is worth rechecking after queue item 2's March fixes).
