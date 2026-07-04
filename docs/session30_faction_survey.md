@@ -75,9 +75,10 @@ British→Uncontrolled flips; blockade model caps 1/City; WTD blockade
 
 ## Indians (§8.7) — worst findings
 1. 8.7.1 Raid 0-Resource path runs Plunder + Trade + possibly Plunder
-   again (up to 3 SAs; rule allows one), and the mid-raid
-   replenish-then-continue is not implemented (pre-capped to starting
-   Resources) (indians.py:236-250, 410).
+   again (up to 3 SAs; rule allows one) [FIXED Session 35], and the
+   mid-raid replenish-then-continue is not implemented (pre-capped to
+   starting Resources) (indians.py:236-250, 410) [FIXED Session 40 per
+   Q18 ruling].
 2. 8.7.5 Supply pays for spaces that must MOVE instead ("If … neither
    of the above conditions are met, move the War Parties");
    add-Rebellion-Control test never simulates the post-move board
@@ -86,7 +87,8 @@ British→Uncontrolled flips; blockade model caps 1/City; WTD blockade
    flowchart YAML routes to I6 (may Scout/March). Reference conflict →
    QUESTIONS.md Q17.
 4. 8.7.4 Scout can lose British Control (moves every British piece
-   out); origin picked before destination priorities.
+   out) [FIXED Session 36]; origin picked before destination priorities
+   [FIXED Session 40 — destination-first over all pairs].
 5. 8.7 intro: FNI-reducing events never satisfy bullet 1; Raid target
    sort ignores the plunder-possible/pop two-tier order and 8.2 ties.
 Also: Village-with-WP placement preference unimplemented; Gather

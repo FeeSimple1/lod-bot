@@ -3314,3 +3314,59 @@ in place; Session 38's 1778 British-slide flag is resolved (5%→20%).
 Known remaining March gap (not in queue item 2, logged for the survey
 long tail): the planner only considers adjacent destinations and does
 not use §3.2.3's City-to-City / City-to-adjacent-Province movement.
+
+## Session 40: Scout destination-first ordering; Q18 mid-raid replenish (July 2026)
+
+Queue item 3 — the Scout remnant from survey Indian #4 plus the Raid
+replenish that Eric's Q18 ruling unblocked.
+
+- §8.7.4 Scout rebuilt destination-first: "first to a space with a
+  Patriot Fort, then to a Village space with enemy pieces, then to
+  remove the most Rebellion Control possible" now governs the whole
+  selection over all legal (origin, destination) pairs; the origin is
+  whichever origin serves the best destination, moving "the most
+  Regulars and Tories possible" (tie-break: larger group, then seeded
+  random per §8.2).  The old code picked the LARGEST origin first and
+  scored only that origin's neighbours, so a big garrison with nothing
+  worth scouting beat a small one sitting next to a Patriot Fort.  Two
+  further consequences of reading the bullet as a priority list: a
+  destination matching NONE of the three priorities is no longer a
+  Scout target (falls through to March per IF NONE — the old code
+  scouted into any adjacent province), and tier 3 is a post-move
+  simulation (the arriving group must actually remove the Rebellion
+  Control, §1.7 tally).  Session 36's origin-budget rules (no Control
+  loss, keep a British piece, 1 WP + 1 Regular minimum) are preserved
+  in a shared helper (_scout_budget).
+- §8.7.1 mid-raid replenish per the Q18 ruling (specific over general;
+  QUESTIONS.md): with an unspent SA the non-player Indians now SELECT
+  up to three Raid targets regardless of the current purse; the Raid
+  executes in affordable batches — raid what the purse covers, then
+  Plunder in a just-raided space (else Trade), then raid the remainder
+  with the new funds.  Unpaid spaces are skipped when the replenish
+  comes up short.  A 0-Resource start with an unspent SA now Trades
+  first and raids on the proceeds, matching the Playbook's Indian
+  example turn.  Without an SA in hand (spent, Limited Command, or
+  no-SA slot) selection stays capped at min(3, Resources) — the
+  Playbook example's cap, per the ruling.  The mid-raid Plunder pick
+  excludes spaces whose War Parties are reserved as sources for the
+  remaining batch (Plunder removes a War Party and could strand a
+  planned move).
+- The one-SA discipline (Session 35) holds on every path: the mid-raid
+  Plunder/Trade consumes the turn's SA, and _raid_sequence's post-raid
+  SA block already keys off _turn_used_special.
+
+Tests: test_raid_limited_by_resources rewritten to the ruling (cap
+applies only when the SA is spent) with citation; +3 Q18 tests
+(over-selection funded by mid-raid Plunder; failed replenish skips
+unpaid spaces; 0-Resource start Trades then raids); +3 Scout tests
+(destination priority beats origin size; no-priority neighbourhood
+declines to March; tier 3 requires actual Control removal).
+
+Verification: both roots green — 1,309 (lod_ai/tests, incl. rebaselined
+canary) + 41 (tests/) = 1,350; clean-sweep gate seeds 1-10 and 11-20
+clean with invariants on; soak 120 games clean; balance rebaselined
+(old → new): 1775 unchanged rates (4 winner swaps); 1776 P 55%→45%,
+B 30%→40%; 1778 B 20%→10%, I 0%→10% (20 winner changes).  Indians
+taking games in 1778 for the first time in the baseline is consistent
+with three-space Raids funded mid-Command and Scouts that now chase
+Patriot Forts.

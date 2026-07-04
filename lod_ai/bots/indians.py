@@ -435,7 +435,22 @@ class IndianBot(BaseBot):
                         return dc_loc
             return None
 
-        max_raid = min(3, state["resources"].get(C.INDIANS, 0))
+        # Q18 ruling (QUESTIONS.md, July 3 2026 — specific over general):
+        # §8.7.1 "If Resources fall to zero during the Raid Command,
+        # Plunder (or if that is not possible, Trade) before completing
+        # the Raid Command" governs over §3.1's affordability clause.
+        # With an unspent SA the non-player Indians may SELECT up to
+        # three targets regardless of the current purse and refuel
+        # mid-Command; without an SA in hand, selection stays capped at
+        # affordability (the Playbook's Indian example, where Trade was
+        # already spent).
+        sa_available = not (state.get("_limited")
+                            or state.get("_no_special")
+                            or state.get("_turn_used_special"))
+        if sa_available:
+            max_raid = 3
+        else:
+            max_raid = min(3, state["resources"].get(C.INDIANS, 0))
         if state.get("_limited"):
             max_raid = min(max_raid, 1)
         for tgt in targets:
@@ -524,7 +539,43 @@ class IndianBot(BaseBot):
         if not validated_selected:
             return False
 
-        raid.execute(state, C.INDIANS, {}, validated_selected, move_plan=validated_plan)
+        res = state["resources"].get(C.INDIANS, 0)
+        if len(validated_selected) <= res:
+            raid.execute(state, C.INDIANS, {}, validated_selected,
+                         move_plan=validated_plan)
+            self._follow_leaders_after_move(state)
+            return True
+
+        # Q18 ruling: raid the affordable spaces first, replenish
+        # mid-Command (Plunder in a just-raided space, else Trade), then
+        # raid the remainder with the new funds.  Unpaid spaces are
+        # skipped when the replenish comes up short.  (Over-selection
+        # only happens with an unspent SA — see max_raid above.)
+        def _batch(spaces_batch):
+            plan_batch = [(s, d) for s, d in validated_plan
+                          if d in spaces_batch]
+            raid.execute(state, C.INDIANS, {}, spaces_batch,
+                         move_plan=plan_batch)
+
+        first = validated_selected[:res]
+        rest = validated_selected[res:]
+        raided_any = False
+        if first:
+            _batch(first)
+            raided_any = True
+        # Mid-raid replenish (§8.7.1).  Plunder removes one War Party
+        # from its space, so exclude the remaining batch's move SOURCES
+        # from the Plunder pick — their War Parties are spoken for.
+        rest_sources = {s for s, d in validated_plan if d in rest}
+        if not (self._can_plunder(state)
+                and self._plunder(state, exclude=rest_sources)):
+            self._trade(state)
+        res = state["resources"].get(C.INDIANS, 0)
+        if rest and res > 0:
+            _batch(rest[:res])
+            raided_any = True
+        if not raided_any:
+            return False
         self._follow_leaders_after_move(state)
         return True
 
@@ -552,12 +603,20 @@ class IndianBot(BaseBot):
                 return True
         return False
 
-    def _plunder(self, state: Dict) -> bool:
-        """I5: Plunder in a Raid space with more WP than Rebels, highest Pop."""
+    def _plunder(self, state: Dict, exclude: set | None = None) -> bool:
+        """I5: Plunder in a Raid space with more WP than Rebels, highest Pop.
+
+        `exclude` (Q18 mid-raid path): spaces whose War Parties are
+        reserved as sources for the rest of the Raid — Plunder removes a
+        War Party, so picking one of these could strand a planned move.
+        """
         # Filter to spaces affected by the Raid command
         raid_spaces = state.get("_turn_affected_spaces", set())
+        exclude = exclude or set()
         choices = []
         for sid in raid_spaces:
+            if sid in exclude:
+                continue
             sp = state["spaces"].get(sid, {})
             pop = _MAP_DATA.get(sid, {}).get("population", 0)
             if pop <= 0:
@@ -1176,76 +1235,18 @@ class IndianBot(BaseBot):
             return False
         return self._space_has_wp_and_regulars(state)
 
-    def _scout(self, state: Dict) -> bool:
-        """I12: Scout (Max 1).
-        Move 1 War Party + most Regulars+Tories possible without changing
-        Control in origin space.
-        Destination priority: first to a Patriot Fort, then to a Village
-        with enemy, then to remove most Rebel Control.
-        Skirmish to remove first a Patriot Fort then most enemy pieces.
-        """
-        refresh_control(state)
-        ctrl = state.get("control", {})
-
-        # Origin: space with WP (any type) + British Regulars
-        choices = []
-        for sid, sp in state["spaces"].items():
-            n_regs = sp.get(C.REGULAR_BRI, 0)
-            if n_regs == 0:
-                continue
-            total_wp = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
-            if total_wp == 0:
-                continue
-            # Prefer origin with most Regulars+Tories (to move most pieces)
-            n_tories = sp.get(C.TORY, 0)
-            choices.append((n_regs + n_tories, total_wp, sid))
-        if not choices:
-            return False
-        _, _, origin = max(choices)
-
-        # Destination priority per reference
-        dests = _adjacent(origin)
-        if not dests:
-            return False
-        dest_scores = []
-        for dst in dests:
-            if dst not in state.get("spaces", {}):
-                continue
-            # §3.4.3: destination must be a Province (not City)
-            if _MAP_DATA.get(dst, {}).get("type") == "City":
-                continue
-            dsp = state["spaces"][dst]
-            has_pat_fort = 1 if dsp.get(C.FORT_PAT, 0) else 0
-            has_village = dsp.get(C.VILLAGE, 0)
-            has_enemy = (dsp.get(C.REGULAR_PAT, 0) + dsp.get(C.REGULAR_FRE, 0)
-                         + dsp.get(C.MILITIA_A, 0) + dsp.get(C.MILITIA_U, 0))
-            village_enemy = 1 if (has_village and has_enemy > 0) else 0
-            rebel_ctrl = 1 if ctrl.get(dst) == "REBELLION" else 0
-            key = (has_pat_fort, village_enemy, rebel_ctrl, state["rng"].random())
-            dest_scores.append((key, dst))
-        if not dest_scores:
-            return False
-        _, target = max(dest_scores)
-
+    def _scout_budget(self, state: Dict, origin: str):
+        """Max (n_regs, n_tories) movable out of *origin* per §8.7.4:
+        "the most Regulars and Tories possible without losing British
+        Control or adding Rebellion Control in the origin space", and
+        §3.4.3's escort shape (1+ Regular must move; Tories up to the
+        number of Regulars).  Returns None when no legal Scout group
+        exists from this origin (Session 36 rules preserved)."""
         sp = state["spaces"][origin]
-        # Reference: "Move 1 War Party" — exactly 1 WP
-        n_wp = 1
-
-        # "most Regulars+Tories possible without changing Control in origin"
-        n_regs = sp.get(C.REGULAR_BRI, 0)
-        n_tories = sp.get(C.TORY, 0)
-
-        # 8.7.4: "the most Regulars and Tories possible WITHOUT losing
-        # British Control or adding Rebellion Control in the origin."
-        # §1.7: British Control = Royalist pieces EXCEED Rebellion pieces
-        # AND at least one British piece is present. The old code kept a
-        # Royalist majority but could move every British cube out
-        # (losing British Control to the Indians-only no-control case),
-        # and its minimum fallback moved 1 WP + 1 Regular even when NO
-        # legal budget existed (Session 36; survey finding).
-        if n_regs == 0:
-            return False
-        refresh_control(state)
+        if sp.get(C.REGULAR_BRI, 0) == 0:
+            return None
+        if sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0) == 0:
+            return None
         royalist = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
                     + sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
                     + sp.get(C.FORT_BRI, 0) + sp.get(C.VILLAGE, 0))
@@ -1257,20 +1258,74 @@ class IndianBot(BaseBot):
             keep_brit = 0 if sp.get(C.FORT_BRI, 0) else 1  # keep a British piece
         else:
             # Not British-controlled: only avoid ADDING Rebellion Control
-            # (rebel must not exceed remaining Royalist pieces).
             budget = royalist - rebel
             keep_brit = 0
         if budget < 2:                            # 1 WP + 1 Regular minimum
-            return False
+            return None
         brit_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
-        max_cubes = min(budget - n_wp, brit_cubes - keep_brit)
+        max_cubes = min(budget - 1, brit_cubes - keep_brit)
         if max_cubes < 1:
-            return False
+            return None
         n_regs = min(sp.get(C.REGULAR_BRI, 0), max_cubes)
         n_tories = min(sp.get(C.TORY, 0), max_cubes - n_regs)
-
         # §3.4.3: "Tories up to the number of Regulars may" move
         n_tories = min(n_tories, n_regs)
+        return (n_regs, n_tories)
+
+    def _scout(self, state: Dict) -> bool:
+        """I12: Scout (Max 1) per §8.7.4.
+
+        The DESTINATION priorities govern the whole selection — "first
+        to a space with a Patriot Fort, then to a Village space with
+        enemy pieces, then to remove the most Rebellion Control
+        possible" — and the origin is whichever legal origin serves the
+        best destination, moving the most Regulars and Tories possible.
+        (The old code picked the biggest origin FIRST and only then
+        scored that origin's neighbours — survey Indian #4 remnant.)
+        A destination matching none of the three priorities is not a
+        Scout target; with no target the flowchart falls to March.
+        Tier 3 is a post-move simulation: the move must actually remove
+        Rebellion Control (§1.7 tally with the arriving group counted).
+        """
+        refresh_control(state)
+        ctrl = state.get("control", {})
+
+        best = None  # (key, origin, dst, n_regs, n_tories)
+        for origin in state["spaces"]:
+            mv = self._scout_budget(state, origin)
+            if mv is None:
+                continue
+            n_regs, n_tories = mv
+            incoming = 1 + n_regs + n_tories  # WP + cubes, all Royalist
+            for dst in _adjacent(origin):
+                if dst not in state.get("spaces", {}):
+                    continue
+                # §3.4.3: destination must be a Province (not City)
+                if _MAP_DATA.get(dst, {}).get("type") == "City":
+                    continue
+                dsp = state["spaces"][dst]
+                has_fort = dsp.get(C.FORT_PAT, 0) > 0
+                enemy = (dsp.get(C.REGULAR_PAT, 0) + dsp.get(C.REGULAR_FRE, 0)
+                         + dsp.get(C.MILITIA_A, 0) + dsp.get(C.MILITIA_U, 0))
+                village_enemy = dsp.get(C.VILLAGE, 0) > 0 and enemy > 0
+                removes_ctrl = False
+                if ctrl.get(dst) == "REBELLION":
+                    roy_d = (dsp.get(C.REGULAR_BRI, 0) + dsp.get(C.TORY, 0)
+                             + dsp.get(C.WARPARTY_U, 0) + dsp.get(C.WARPARTY_A, 0)
+                             + dsp.get(C.FORT_BRI, 0) + dsp.get(C.VILLAGE, 0))
+                    reb_d = (enemy + dsp.get(C.FORT_PAT, 0))
+                    removes_ctrl = reb_d <= roy_d + incoming
+                if not (has_fort or village_enemy or removes_ctrl):
+                    continue
+                tier = 0 if has_fort else (1 if village_enemy else 2)
+                key = (tier, -(n_regs + n_tories), state["rng"].random())
+                if best is None or key < best[0]:
+                    best = (key, origin, dst, n_regs, n_tories)
+
+        if best is None:
+            return False
+        _, origin, target, n_regs, n_tories = best
+        n_wp = 1  # Reference: "Move one War Party" — exactly 1 WP
 
         # I12: Skirmish option — "first a Patriot Fort then most enemy pieces"
         # Calculate post-move enemy cubes (Scout flips all Militia Active)

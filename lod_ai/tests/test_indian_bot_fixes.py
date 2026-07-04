@@ -483,8 +483,12 @@ class TestOPSLeaderMovement:
 # =====================================================================
 
 class TestI4RaidResourceLimit:
-    def test_raid_limited_by_resources(self):
-        """Raid selects at most min(3, resources) targets."""
+    def test_raid_limited_by_resources_when_sa_spent(self):
+        """Without an unspent SA, Raid selects at most min(3, resources)
+        targets (Q18 ruling: the §8.7.1 mid-raid replenish only licenses
+        over-selection while the SA is still in hand — the Playbook's
+        Indian example, where Trade was already spent, caps at
+        affordability)."""
         bot = IndianBot()
         # Use Reserve spaces (Quebec, Northwest, Southwest) which are adjacent
         # to each other per map data, and add Colonies as adjacent targets.
@@ -505,11 +509,78 @@ class TestI4RaidResourceLimit:
             "Quebec": 0, "Quebec_City": 0, "Northwest": 0,
             "New_York": 0, "Southwest": 0,
         }
+        state["_turn_used_special"] = True  # SA spent → no mid-raid refuel
         result = bot._raid(state)
         assert result is True
         # Should have raided at most 2 spaces (limited by resources)
         affected = state.get("_turn_affected_spaces", set())
         assert len(affected) <= 2
+
+
+class TestQ18MidRaidReplenish:
+    """Q18 ruling (QUESTIONS.md, July 3 2026): with an unspent SA,
+    §8.7.1's "If Resources fall to zero during the Raid Command,
+    Plunder (or if that is not possible, Trade) before completing the
+    Raid Command" governs over §3.1 affordability — the non-player
+    Indians may select up to three Raid targets, refuel mid-Command,
+    and finish the selection."""
+
+    def _three_target_state(self, resources):
+        state = _base_state(spaces={
+            # Each target holds its own Underground WP (no moves needed)
+            # and no rebels → Plunder-eligible after the Raid.
+            "Pennsylvania": _empty_space(**{C.WARPARTY_U: 2}),
+            "Virginia": _empty_space(**{C.WARPARTY_U: 2}),
+            "Maryland-Delaware": _empty_space(**{C.WARPARTY_U: 2}),
+        })
+        state["resources"][C.INDIANS] = resources
+        state["resources"][C.PATRIOTS] = 5  # Plunder has someone to rob
+        state["support"] = {"Pennsylvania": -1, "Virginia": -1,
+                            "Maryland-Delaware": -1}
+        return state
+
+    def test_over_selection_funded_by_mid_raid_plunder(self):
+        """1 Resource, three legal targets, SA unspent: raid one, hit
+        zero, Plunder a raided space, raid the other two."""
+        bot = IndianBot()
+        state = self._three_target_state(resources=1)
+        assert bot._raid(state) is True
+        affected = state.get("_turn_affected_spaces", set())
+        assert len(affected) == 3, (
+            f"Q18: all three targets should be raided; got {affected}")
+        assert state.get("_turn_used_special") is True, (
+            "the mid-raid Plunder/Trade consumes the Special Activity")
+        plunders = [h for h in state["history"] if "PLUNDER" in str(h)]
+        assert plunders, "the refuel should have been a Plunder"
+
+    def test_failed_replenish_skips_unpaid_spaces(self):
+        """If neither Plunder nor Trade can raise funds, the unpaid
+        selections are skipped (ruling note in QUESTIONS.md)."""
+        bot = IndianBot()
+        state = self._three_target_state(resources=1)
+        state["resources"][C.PATRIOTS] = 0   # nothing to Plunder
+        # No Village anywhere → Trade impossible as well.
+        assert bot._raid(state) is True
+        affected = state.get("_turn_affected_spaces", set())
+        assert len(affected) == 1, (
+            f"only the affordable space should be raided; got {affected}")
+
+    def test_zero_resource_start_trades_then_raids(self):
+        """Starting at 0 Resources with an unspent SA: no space can be
+        raided yet, so the replenish (Trade — Plunder has no Raid space
+        yet) comes first, then the selection is raided with the new
+        funds.  Mirrors the Playbook example's Trade-then-Raid turn."""
+        bot = IndianBot()
+        state = self._three_target_state(resources=0)
+        # Give the Indians a Trade site: a Village + Underground WP.
+        state["spaces"]["Northwest"] = _empty_space(
+            **{C.WARPARTY_U: 2, C.VILLAGE: 1})
+        state["support"]["Northwest"] = 0
+        assert bot._raid(state) is True
+        affected = state.get("_turn_affected_spaces", set())
+        assert len(affected) >= 1, "the Trade income should fund raids"
+        trades = [h for h in state["history"] if "TRADE" in str(h)]
+        assert trades, "the refuel should have been a Trade"
 
 
 # =====================================================================
@@ -890,3 +961,75 @@ class TestWarPathTradeNoDouble:
         # Trade should have executed
         trade_entries = [e for e in log if "TRADE" in str(e)]
         assert len(trade_entries) >= 1, "Trade should execute when War Path impossible"
+
+
+# =====================================================================
+#  Session 40: §8.7.4 Scout — destination priorities govern
+# =====================================================================
+
+class TestScoutDestinationFirst:
+    def test_destination_priority_beats_origin_size(self):
+        """§8.7.4: "first to a space with a Patriot Fort, then to a
+        Village space with enemy pieces, then to remove the most
+        Rebellion Control possible" — the destination priorities pick
+        the Scout, and the origin serves the best destination.  The old
+        code chose the LARGEST origin first and only then looked at its
+        neighbours (survey Indian #4), so a big garrison with no
+        priority-worthy neighbour beat a small one next to a Patriot
+        Fort."""
+        bot = IndianBot()
+        state = _base_state(spaces={
+            # Big origin: 5 Regulars + 3 WPs, but no priority neighbour
+            # (Quebec_City is a City — §3.4.3 excludes it; Northwest has
+            # nothing).
+            "Quebec": _empty_space(**{C.REGULAR_BRI: 5, C.WARPARTY_U: 3}),
+            "Quebec_City": _empty_space(),
+            # Small origin next to a Patriot Fort province (tier 1).
+            "Northwest": _empty_space(**{C.REGULAR_BRI: 2, C.WARPARTY_U: 1}),
+            "Virginia": _empty_space(**{C.FORT_PAT: 1, C.MILITIA_A: 2}),
+        })
+        state["support"] = {"Quebec": 0, "Quebec_City": 0,
+                            "Northwest": 0, "Virginia": -1}
+        assert bot._scout(state) is True
+        # The group arrived in Virginia (the moving WP activates there;
+        # the escorting Regular is then spent as the Skirmish option-2
+        # sacrifice against the two Militia).
+        assert state["spaces"]["Virginia"].get(C.WARPARTY_A, 0) >= 1, (
+            "the Scout must serve the Patriot-Fort destination")
+        assert state["spaces"]["Virginia"].get(C.MILITIA_A, 0) < 2, (
+            "the destination Skirmish should have removed Militia")
+        assert state["spaces"]["Quebec"][C.REGULAR_BRI] == 5, (
+            "the big fort-less origin must not have been chosen")
+
+    def test_no_priority_destination_declines(self):
+        """A destination matching none of the three §8.7.4 priorities is
+        not a Scout target; with no target the flowchart falls to March
+        (IF NONE).  The old code scouted into ANY adjacent province."""
+        bot = IndianBot()
+        state = _base_state(spaces={
+            "Northwest": _empty_space(**{C.REGULAR_BRI: 3, C.WARPARTY_U: 2}),
+            "Virginia": _empty_space(),   # empty: no fort/village/control
+        })
+        state["support"] = {"Northwest": 0, "Virginia": 0}
+        assert bot._scout(state) is False
+        assert state["spaces"]["Virginia"].get(C.REGULAR_BRI, 0) == 0
+
+    def test_tier3_requires_actual_control_removal(self):
+        """Tier 3 ("remove the most Rebellion Control possible") is a
+        post-move test: a Rebellion-Controlled neighbour only qualifies
+        when the arriving group actually removes the Control."""
+        bot = IndianBot()
+        state = _base_state(spaces={
+            # Origin can move 1 WP + 1 Regular (keeps 1 British piece,
+            # keeps Royalist majority).
+            "Northwest": _empty_space(**{C.REGULAR_BRI: 2, C.WARPARTY_U: 1}),
+            # 6 rebels: incoming 2 can't flip 6 > 0+2 → no Scout.
+            "Virginia": _empty_space(**{C.MILITIA_A: 6}),
+        })
+        state["support"] = {"Northwest": 0, "Virginia": -2}
+        assert bot._scout(state) is False
+        # Beef up the origin so the group CAN remove Control.
+        state["spaces"]["Northwest"] = _empty_space(
+            **{C.REGULAR_BRI: 8, C.WARPARTY_U: 2})
+        assert bot._scout(state) is True
+        assert state.get("control", {}).get("Virginia") != "REBELLION"
