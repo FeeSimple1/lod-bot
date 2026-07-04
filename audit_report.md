@@ -3370,3 +3370,56 @@ B 30%→40%; 1778 B 20%→10%, I 0%→10% (20 winner changes).  Indians
 taking games in 1778 for the first time in the baseline is consistent
 with three-space Raids funded mid-Command and Scouts that now chase
 Patriot Forts.
+
+## Session 41: T13 + T15 — faithful card 51 conditions; would-be-removed simulations (July 2026)
+
+Queue item 4, parts 1 and 3.  T14 (execution-guidance sweep, ~16 sites)
+stays folded into the Piece 3 card audit per TRACEABILITY.md.
+
+- T13: B51/P51 "March to set up Battle per the Battle instructions"
+  force-conditions rebuilt on a new shared helper,
+  `battle.bot_march_sets_up_battle` — bot_battle_scores (the resolver's
+  own Force-Level + §3.6.5/3.6.6 Loss-modifier maths) evaluated on the
+  current board and again after a simulated March of every eligible
+  cube from ALL adjacent origins (§3.2.3 Tory escorts 1:1; §3.3.2
+  Militia keep status, French Regulars accompany Continentals 1:1).
+  The old hand-rolled checks (halved Militia, halved War Parties,
+  min-paired Tories, no Loss modifiers) over-selected: e.g. 4 Patriot
+  cubes vs 3 defending Regulars passed the old math but the faithful
+  scores are 4 vs 4 — not a legal selection.  The simulation restores
+  the board exactly (tested).  B52/P52 carry no battle math since the
+  Session 28 errata rewrite — nothing to rebuild.
+- T15: four "exists" approximations tightened by simulation:
+  - P80: "select spaces where an Indian Village would be removed" —
+    the handler removes 2 Indian pieces per space, War-Parties first,
+    from spaces with 2+ Indian pieces; the condition now requires a
+    space where the 2-removal actually reaches a Village (>= 2 pieces,
+    <= 1 non-Village piece), and pins card80_faction/card80_spaces so
+    the handler targets those spaces.  A lone Village is not even a
+    candidate; a Village behind 3 War Parties survives.
+  - F73: British Fort must be in the card's three removable spaces
+    (New_York/Northwest/Quebec), and card73_space is pinned to the
+    British-Fort space so the removal cannot hit a Patriot Fort first.
+  - F95: British Fort must be in Northwest (the card's only space).
+  - F83: "If playing the Event does not gain Rebellion there, C&SA" —
+    simulates the shaded placement (up to 3 coalition pieces from
+    Available, Patriot Fort first when the space has no Fort/Village,
+    mirroring the handler's pools) against the §1.7 tally; previously
+    True whenever Quebec City wasn't already Rebellion, even with an
+    empty Available pool or a 6-cube garrison.  NOTE for T14: the F83
+    HANDLER picks the Quebec/Quebec_City space with fewest pieces while
+    the sheet says Quebec City — reconcile in the Piece 3 audit.
+
+Tests: new test_t13_card51_conditions.py (6) and
+test_t15_would_be_removed.py (7); three superseded tests rewritten to
+the rule with citations (patriot card-51 tips-balance — now needs 5
+cubes vs 3 Regulars per the modifiers; french force_if_83 — simulation
+semantics on piece-consistent boards; errata force_if_80 — lone
+Village is not a candidate).
+
+Verification: both roots green — 1,324 (lod_ai/tests, incl. rebaselined
+canary) + 41 (tests/) = 1,365; clean-sweep gate seeds 1-10 and 11-20
+clean with invariants on; soak 120 games clean; balance: 1775
+unchanged, 1776 B 40%→45% I 15%→10%, 1778 F 55%→45% P/B +5% each
+(5 winner changes total — the tightened conditions mostly make bots
+decline events that could not actually deliver their effect).

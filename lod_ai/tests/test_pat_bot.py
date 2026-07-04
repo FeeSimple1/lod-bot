@@ -2520,7 +2520,12 @@ def test_card51_force_if_rebel_exceeds():
 
 
 def test_card51_force_if_march_tips_balance():
-    """force_if_51: returns True when adjacent cubes could march in to exceed."""
+    """force_if_51: True when adjacent cubes could march in to exceed —
+    per battle.bot_battle_scores (T13, Session 41): Force Level PLUS the
+    §3.6.5/3.6.6 Loss-Level modifiers.  Against 3 defending Regulars the
+    modifiers make the defender score 4, so the attacker needs 5 cubes,
+    not the old hand-rolled 4 (the superseded approximation ignored the
+    modifiers)."""
     bot = PatriotBot()
     state = _full_state()
     # Boston is adjacent to Massachusetts and Connecticut_Rhode_Island
@@ -2538,7 +2543,11 @@ def test_card51_force_if_march_tips_balance():
         C.WARPARTY_A: 0, C.WARPARTY_U: 0, C.VILLAGE: 0,
         C.FORT_PAT: 0,
     }
-    # Rebel in Boston = 1, Brit = 3.  Adjacent Massachusetts has 3 cubes → 1+3=4 > 3 → True
+    # 1 + 3 marching = 4 attacker score vs defender score 4 (3 Regulars
+    # + Loss modifiers): NOT strictly exceeding → False.
+    assert bot._force_condition_met("force_if_51", state, {}) is False
+    # A fourth adjacent Continental makes it 5 > 4 → True.
+    state["spaces"]["Massachusetts"][C.REGULAR_PAT] = 4
     assert bot._force_condition_met("force_if_51", state, {}) is True
 
 

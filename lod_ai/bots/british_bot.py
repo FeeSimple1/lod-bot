@@ -197,30 +197,12 @@ class BritishBot(BaseBot):
         if directive == "force_if_51":
             # Card 51: "March to set up Battle per the Battle instructions.
             # If not possible, choose Command & Special Activity instead."
-            # Check: any space where Royalist FL exceeds Rebel FL and British
-            # could march there from adjacent?
+            # T13: evaluated with battle.bot_battle_scores — the exact
+            # Force-Level + Loss-modifier maths the resolver uses — over a
+            # simulated March from all adjacent origins (the old check
+            # hand-rolled halved-Militia/halved-WP approximations).
             refresh_control(state)
-            for sid, sp in state["spaces"].items():
-                rebel_cubes = sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
-                total_militia = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
-                rebel_forts = sp.get(C.FORT_PAT, 0)
-                if rebel_cubes + total_militia + rebel_forts == 0:
-                    continue
-                rebel_force = rebel_cubes + (total_militia // 2) + rebel_forts
-                regs = sp.get(C.REGULAR_BRI, 0)
-                tories = min(sp.get(C.TORY, 0), regs)
-                active_wp = sp.get(C.WARPARTY_A, 0)
-                royal_force = regs + tories + (active_wp // 2)
-                # Check if British already exceed here
-                if royal_force > rebel_force:
-                    return True
-                # Check if marching in from adjacent could tip the balance
-                for adj_sid in _adjacent(sid):
-                    adj_sp = state["spaces"].get(adj_sid, {})
-                    march_regs = adj_sp.get(C.REGULAR_BRI, 0)
-                    if march_regs > 0 and (royal_force + march_regs) > rebel_force:
-                        return True
-            return False
+            return battle.bot_march_sets_up_battle(state, C.BRITISH)
 
         if directive == "force_if_52":
             # Card 52 ERRATA: "If possible remove French Regulars from spaces

@@ -864,25 +864,62 @@ class FrenchBot(BaseBot):
                     return True
             return False
 
-        if directive in ("force_if_73", "force_if_95"):
-            # Card 73/95: "If no British Fort is removed, Command & SA."
-            # Check: is there a British Fort on the map that could be removed?
-            for sid, sp in state["spaces"].items():
-                if sp.get(C.FORT_BRI, 0) > 0:
+        if directive == "force_if_73":
+            # Card 73 (Sullivan) removes one Fort or Village in New_York,
+            # Northwest or Quebec ONLY.  Sheet: "If no British Fort is
+            # removed, Command & SA."  T15: the old check accepted ANY
+            # British Fort anywhere; only one in the card's three spaces
+            # can actually be removed.  Pin the handler's target so the
+            # removal hits the British Fort, not a Patriot one.
+            for sid in ("New_York", "Northwest", "Quebec"):
+                if state["spaces"].get(sid, {}).get(C.FORT_BRI, 0) > 0:
+                    state["card73_space"] = sid
                     return True
             return False
 
+        if directive == "force_if_95":
+            # Card 95 (Ohio Frontier) removes one enemy Fort in Northwest
+            # only.  Sheet: "If no British Fort is removed, Command & SA."
+            # T15: was "any British Fort on the map".
+            return state["spaces"].get("Northwest", {}).get(C.FORT_BRI, 0) > 0
+
         if directive == "force_if_83":
             # Card 83: "Select Quebec City. If playing the Event does not
-            # gain Rebellion there, Command & SA."
+            # gain Rebellion there, Command & SA."  T15: simulate the
+            # shaded placement — up to 3 coalition pieces from Available
+            # (Patriot Fort first when the space has no Fort/Village, then
+            # French Regulars / Patriot units, mirroring the handler's
+            # pools) — instead of assuming 3 pieces always might flip it.
+            # (The handler's own Quebec-vs-Quebec_City target pick is a
+            # T14 reconciliation item.)
+            refresh_control(state)
             ctrl = state.get("control", {})
             if ctrl.get("Quebec_City") == "REBELLION":
                 return False  # already Rebellion, no gain possible
-            # Would placing up to 3 coalition pieces swing control?
-            # The shaded event places up to 3 pieces (French + Patriot).
-            # If Quebec City is not already Rebellion, the event might gain it.
-            state["card83_target"] = "Quebec_City"
-            return True
+            sp = state["spaces"].get("Quebec_City", {})
+            avail = state.get("available", {})
+            placeable = 0
+            has_fv = (sp.get(C.FORT_BRI, 0) + sp.get(C.FORT_PAT, 0)
+                      + sp.get(C.VILLAGE, 0)) > 0
+            if not has_fv and avail.get(C.FORT_PAT, 0) > 0:
+                placeable += 1
+            placeable += (avail.get(C.REGULAR_FRE, 0)
+                          + avail.get(C.REGULAR_PAT, 0)
+                          + avail.get(C.MILITIA_U, 0)
+                          + avail.get(C.MILITIA_A, 0))
+            placeable = min(3, placeable)
+            if placeable == 0:
+                return False
+            rebels = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+                      + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                      + sp.get(C.FORT_PAT, 0))
+            royalist = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                        + sp.get(C.FORT_BRI, 0) + sp.get(C.WARPARTY_A, 0)
+                        + sp.get(C.WARPARTY_U, 0) + sp.get(C.VILLAGE, 0))
+            if rebels + placeable > royalist:
+                state["card83_target"] = "Quebec_City"
+                return True
+            return False
 
         return True  # default: play the event
 

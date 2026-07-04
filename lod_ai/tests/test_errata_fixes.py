@@ -98,7 +98,11 @@ class TestIndianForceIf80:
 # =====================================================================
 
 class TestPatriotForceIf80:
-    """Card 80 errata: Patriots should force event only if Indian Villages exist."""
+    """Card 80 errata: "select spaces where an Indian Village would be
+    removed."  T15 (Session 41): the handler selects spaces with >= 2
+    Indian pieces and removes 2 in War-Party-first order, so a Village
+    is removed only where the Indians have >= 2 pieces with at most one
+    non-Village piece.  A lone Village is not even a candidate space."""
 
     def _make_state(self, spaces):
         return {
@@ -111,13 +115,23 @@ class TestPatriotForceIf80:
             "history": [],
         }
 
-    def test_true_when_village_exists(self):
+    def test_true_when_village_would_be_removed(self):
         bot = PatriotBot()
+        # Village + 1 WP: the 2-removal reaches the Village → True
+        state = self._make_state({
+            "Northwest": {C.VILLAGE: 1, C.WARPARTY_U: 1},
+        })
+        card = {"id": 80}
+        assert bot._force_condition_met("force_if_80", state, card) is True
+
+    def test_false_when_lone_village_not_a_candidate(self):
+        bot = PatriotBot()
+        # A lone Village fails the handler's >=2-piece space filter.
         state = self._make_state({
             "Northwest": {C.VILLAGE: 1},
         })
         card = {"id": 80}
-        assert bot._force_condition_met("force_if_80", state, card) is True
+        assert bot._force_condition_met("force_if_80", state, card) is False
 
     def test_false_when_no_villages(self):
         bot = PatriotBot()

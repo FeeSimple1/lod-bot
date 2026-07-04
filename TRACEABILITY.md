@@ -202,13 +202,18 @@ no citation despite likely implementations.
   verify or implement (lone player never wins mid-game; NP tie order
   French > Indian > Patriot; difficulty option).
 
-- **T13 (P2)** B51/P51 (and milder B52/P52) force-conditions hand-roll
-  battle math superseded by `battle.bot_battle_scores` + the free-March
-  planner — rebuild on the faithful helpers (audit Session 28).
+- **T13 (P2)** FIXED (Session 41): B51/P51 force-conditions rebuilt on
+  `battle.bot_march_sets_up_battle` (bot_battle_scores over a simulated
+  all-origins March).  B52/P52 carry no battle math after the Session 28
+  errata rewrite.
 - **T14 (P2)** Execution-guidance sweep across ~16 handler sites (see
   audit_report Session 28 list) — fold into the Piece 3 card audit.
-- **T15 (P3)** "Would-be-removed / would-gain" sheet conditions
-  approximated as "exists" (P80, F73, F95, F83) — tighten by simulation.
+  (Session 41 note: F83's handler picks min-piece Quebec/Quebec_City
+  while the sheet says Quebec City — reconcile here.)
+- **T15 (P3)** FIXED (Session 41): P80 (Village-would-be-removed via the
+  handler's 2-removal order), F73/F95 (British Fort within the card's
+  removable spaces), F83 (simulated 3-piece placement vs the §1.7
+  tally) — all tightened by simulation.
 
 ## Verification pass queue
 

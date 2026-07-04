@@ -1311,40 +1311,34 @@ class PatriotBot(BaseBot):
             # one space."  Patriot bot instruction: "March to set up Battle
             # per the Battle instructions.  If not possible, choose Command
             # & Special Activity instead."
-            # Check: any space with British pieces where Rebel force already
-            # exceeds, OR where marching adjacent rebel cubes could tip it?
+            # T13: evaluated with battle.bot_battle_scores — the exact
+            # Force-Level + Loss-modifier maths the resolver uses — over a
+            # simulated March from all adjacent origins (the old check
+            # hand-rolled halved-Militia approximations and ignored the
+            # Loss-Level modifiers entirely).
             refresh_control(state)
-            for sid, sp in state["spaces"].items():
-                regs = sp.get(C.REGULAR_BRI, 0)
-                tories = sp.get(C.TORY, 0)
-                active_wp = sp.get(C.WARPARTY_A, 0)
-                if regs + tories + active_wp == 0:
-                    continue  # no enemy to battle
-                brit_force = regs + tories + (active_wp // 2) + sp.get(C.FORT_BRI, 0)
-                pat_cubes = sp.get(C.REGULAR_PAT, 0)
-                fre_cubes = min(sp.get(C.REGULAR_FRE, 0), pat_cubes)
-                active_mil = sp.get(C.MILITIA_A, 0)
-                rebel_force = pat_cubes + fre_cubes + (active_mil // 2)
-                # Already exceeds → can battle here
-                if rebel_force > brit_force:
-                    return True
-                # Check adjacent rebel cubes that could march in
-                adj_set = map_adj.adjacent_spaces(sid)
-                march_cubes = 0
-                for adj_sid in adj_set:
-                    adj_sp = state["spaces"].get(adj_sid, {})
-                    march_cubes += adj_sp.get(C.REGULAR_PAT, 0)
-                    march_cubes += adj_sp.get(C.REGULAR_FRE, 0)
-                if rebel_force + march_cubes > brit_force:
-                    return True
-            return False
+            from lod_ai.commands import battle as _battle
+            return _battle.bot_march_sets_up_battle(state, C.PATRIOTS)
         if directive == "force_if_80":
-            # Card 80 ERRATA: "Choose Indians and select spaces where an Indian
-            # Village would be removed. If none, choose Command & SA instead."
-            # Condition: any Indian Village on the map?
-            for sp in state["spaces"].values():
-                if sp.get(C.VILLAGE, 0) > 0:
-                    return True
+            # Card 80 ERRATA: "Choose Indians and select spaces where an
+            # Indian Village would be removed. If none, choose Command &
+            # SA instead."  T15: the handler removes 2 Indian pieces per
+            # selected space in War-Party-first order — a Village is
+            # actually removed only where the Indians have >= 2 pieces and
+            # at most ONE non-Village piece (so the second removal reaches
+            # the Village).  The old check accepted any Village anywhere.
+            qualifying = []
+            for sid, sp in state["spaces"].items():
+                village = sp.get(C.VILLAGE, 0)
+                if village == 0:
+                    continue
+                wps = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
+                if wps + village >= 2 and wps <= 1:
+                    qualifying.append(sid)
+            if qualifying:
+                state["card80_faction"] = C.INDIANS
+                state["card80_spaces"] = qualifying[:2]
+                return True
             return False
         return True  # default: play the event
 

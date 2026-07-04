@@ -357,6 +357,87 @@ def bot_battle_scores(state: Dict, sid: str, attacker_side: str = "ROYALIST",
         state, sp, sid, attacker_side, def_side, att_cc)
     return att_score, def_score
 
+def bot_march_sets_up_battle(state: Dict, attacker_faction: str) -> bool:
+    """Card 51 (B51/P51) force-condition: "March to set up Battle per the
+    Battle instructions.  If not possible, choose Command & Special
+    Activity instead."
+
+    True iff some space either already passes, or could pass after a
+    March, the B12/P4 battle-selection test — attacker_score >
+    defender_score via bot_battle_scores, the same Force-Level +
+    Loss-Level modifier maths the resolver uses (T13: the old bot-side
+    conditions hand-rolled halved-Militia/halved-WP approximations that
+    Sessions 19-20 removed from B12/P4/F16).
+
+    The March simulation moves every eligible cube from ALL adjacent
+    origins into the candidate space (§3.2.3 escorts: Tories 1-for-1
+    with Regulars; §3.3.2: Militia keep status, French Regulars
+    accompany Continentals 1-for-1) — a possibility test, so no
+    retention constraints and cc_wp=0 (conservative).
+    """
+    royalist = attacker_faction == BRITISH
+    side = "ROYALIST" if royalist else "REBELLION"
+    for sid in list(state.get("spaces", {})):
+        sp = state["spaces"][sid]
+        if royalist:
+            defender = (sp.get(REGULAR_PAT, 0) + sp.get(REGULAR_FRE, 0)
+                        + sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0)
+                        + sp.get(FORT_PAT, 0))
+        else:
+            defender = (sp.get(REGULAR_BRI, 0) + sp.get(TORY, 0)
+                        + sp.get(WARPARTY_A, 0) + sp.get(WARPARTY_U, 0)
+                        + sp.get(FORT_BRI, 0))
+        if defender == 0:
+            continue
+
+        # Incoming March group from every adjacent origin.
+        inc: Dict[str, int] = {}
+
+        def _add(tag, n):
+            if n > 0:
+                inc[tag] = inc.get(tag, 0) + n
+
+        for origin in map_adj.adjacent_spaces(sid):
+            osp = state["spaces"].get(origin)
+            if not osp:
+                continue
+            if royalist:
+                regs = osp.get(REGULAR_BRI, 0)
+                _add(REGULAR_BRI, regs)
+                _add(TORY, min(osp.get(TORY, 0), regs))
+            else:
+                cont = osp.get(REGULAR_PAT, 0)
+                _add(REGULAR_PAT, cont)
+                _add(REGULAR_FRE, min(osp.get(REGULAR_FRE, 0), cont))
+                _add(MILITIA_A, osp.get(MILITIA_A, 0))
+                _add(MILITIA_U, osp.get(MILITIA_U, 0))
+
+        for bump in ({}, inc):
+            if bump is inc and not inc:
+                continue
+            saved = {t: sp[t] for t in bump if t in sp}
+            missing = [t for t in bump if t not in sp]
+            for t, n in bump.items():
+                sp[t] = saved.get(t, 0) + n
+            try:
+                if royalist:
+                    att_cubes = sp.get(REGULAR_BRI, 0) + sp.get(TORY, 0)
+                else:
+                    att_cubes = (sp.get(REGULAR_PAT, 0) + sp.get(MILITIA_A, 0)
+                                 + sp.get(MILITIA_U, 0))
+                if att_cubes > 0:
+                    att, deff = bot_battle_scores(
+                        state, sid, side, attacker_faction=attacker_faction)
+                    if att > deff:
+                        return True
+            finally:
+                for t, v in saved.items():
+                    sp[t] = v
+                for t in missing:
+                    sp.pop(t, None)
+    return False
+
+
 def _side_has_leader(state: Dict, sid: str, side: str) -> bool:
     """Return True if any leader for *side* is in space *sid*."""
     leaders = _ROYALIST_LEADERS if side == "ROYALIST" else _REBELLION_LEADERS

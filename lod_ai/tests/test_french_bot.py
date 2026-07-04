@@ -485,21 +485,29 @@ def test_event_force_if_70_british_in_rebel_spaces():
 
 
 def test_event_force_if_83_quebec_city_rebellion():
-    """Card 83: Play if Quebec City would gain Rebellion control."""
+    """Card 83: play iff the simulated placement would GAIN Rebellion
+    control of Quebec City.  REWRITTEN (T15, Session 41): the condition
+    now simulates placing up to 3 coalition pieces from Available
+    against the §1.7 tally instead of returning True whenever Quebec
+    City wasn't already Rebellion; boards are piece-consistent since
+    the condition refreshes control."""
     bot = FrenchBot()
-    # Quebec City already Rebellion → no gain → skip
     state = {
-        "spaces": {"Quebec_City": {}},
+        "spaces": {"Quebec_City": {C.REGULAR_FRE: 3}},  # already Rebellion
         "resources": {C.FRENCH: 5},
-        "control": {"Quebec_City": "REBELLION"},
-        "leaders": {},
+        "available": {C.REGULAR_FRE: 3},
+        "control": {}, "leaders": {}, "support": {}, "markers": {},
     }
     card = {"id": 83}
     assert bot._force_condition_met("force_if_83", state, card) is False
 
-    # Quebec City not Rebellion → could gain → play
-    state["control"]["Quebec_City"] = C.BRITISH
+    # Small British garrison: 3 placements exceed 2 Royalist → play
+    state["spaces"]["Quebec_City"] = {C.REGULAR_BRI: 2}
     assert bot._force_condition_met("force_if_83", state, card) is True
+
+    # Large garrison: 3 placements cannot gain Control → skip
+    state["spaces"]["Quebec_City"] = {C.REGULAR_BRI: 6}
+    assert bot._force_condition_met("force_if_83", state, card) is False
 
 
 def test_event_force_if_52_battle_target():
