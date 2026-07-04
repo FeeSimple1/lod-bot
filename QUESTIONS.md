@@ -206,3 +206,17 @@ twice; flowchart disagrees. Which governs?
   Parties?") and may end up Scouting/Marching instead of Gathering.
   The code already did this; ruling documented at the routing site in
   `indians.py`.
+
+---
+
+## Q18: Mid-raid Plunder to fund additional Raid spaces — OPEN
+
+8.7.1: "If Resources fall to zero during the Raid Command, Plunder (or
+if that is not possible, Trade) before completing the Raid Command."
+Does an unspent SA license the non-player Indians to SELECT more Raid
+spaces than current Resources afford (e.g., 1 Resource, three legal
+targets: raid one, hit zero, Plunder, raid the other two)? The
+Playbook's Indian example caps selection at affordability, but there
+the SA (Trade) was already spent that turn. Current implementation
+caps selection at min(3, Resources) and does not extend. Session 35
+fixed the one-SA discipline either way.
