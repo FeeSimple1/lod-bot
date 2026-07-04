@@ -77,11 +77,10 @@ def test_march_in_place_pays_resource_per_destination_and_tags_command():
             # North_Carolina: 3 British Regulars + 2 Underground Militia.
             # No British power adjacent, no real march move available, but
             # march-in-place activation is legal (and per §3.2.3 activates
-            # 1 Militia per 3 cubes in destination; we have 3 cubes so 1
-            # gets activated by the rule — but the bot's flip_pieces
-            # path flips all of them.  We assert the bot pays cost and
-            # tags the command; behavior of which militia get flipped is
-            # already covered by existing tests.)
+            # §3.2.3: 1 Militia per 3 British cubes in the destination;
+            # 3 cubes here, so exactly 1 of the 2 Underground Militia
+            # activates.  (Rewritten Session 39 — the old assertion
+            # pinned the flip-them-all behavior.)
             "North_Carolina": {
                 C.REGULAR_BRI: 3,
                 C.TORY: 0,
@@ -128,12 +127,12 @@ def test_march_in_place_pays_resource_per_destination_and_tags_command():
         f"§3.2.3: 1 Resource should be spent per destination; before="
         f"{pre_resources}, after={state['resources'][C.BRITISH]}"
     )
-    # Militia got flipped from Underground to Active.
+    # §3.2.3: one Militia per three British cubes — 3 cubes → 1 flip.
     post_mu = state["spaces"]["North_Carolina"].get(C.MILITIA_U, 0)
     post_ma = state["spaces"]["North_Carolina"].get(C.MILITIA_A, 0)
-    assert post_mu == 0 and post_ma == pre_ma + pre_mu, (
-        f"Militia should be flipped to Active; pre Mu={pre_mu} Ma={pre_ma}, "
-        f"post Mu={post_mu} Ma={post_ma}"
+    assert post_mu == pre_mu - 1 and post_ma == pre_ma + 1, (
+        f"Exactly 1 Militia should flip (3 cubes // 3); pre Mu={pre_mu} "
+        f"Ma={pre_ma}, post Mu={post_mu} Ma={post_ma}"
     )
 
 

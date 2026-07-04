@@ -24,9 +24,7 @@ spaces; skirmished-city exclusion unenforced; displacement under-scoped
 (also dead §3.2.2 Blockade checks and an origin/destination
 double-booking found on the way — see audit_report Session 38). Still open: Muster places ≤4
 Regulars (rule: up to 6, "as many as possible"); Tory P2 sorts backwards
-(largest deficit first, ignores Population/actual flip); March pop 1-2
-limit and already-selected-destination preference violated; March CC
-Tory double-count (:1239); _can_battle counts only ACTIVE rebels (rule:
+(largest deficit first, ignores Population/actual flip); FIXED (Session 39): March pop 1-2 limit, already-selected-destination preference, tier-2 catch-all, CC Tory double-count (+ phantom CC WPs, flip-all in-place activation — audit_report Session 39); _can_battle counts only ACTIVE rebels (rule:
 ALL Rebellion pieces + Leaders); RL "largest change" ignores level×pop;
 Supply lacks earnings projection; CoC-prevention proxy wrong; Loyalist
 Desertion static sort can flip Control; pervasive raw-level-vs-pop and

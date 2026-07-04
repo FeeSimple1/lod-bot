@@ -3233,3 +3233,84 @@ P 35%→25%, I 35%→25%; 1778 F 50%→70%, P 35%→20%, B 15%→5%, I 0%→5%
 (25 winner changes; the stronger early-war British Garrison and the
 now-executing free French Musters account for the directions; the 1778
 British slide is worth rechecking after queue item 2's March fixes).
+
+## Session 39: British March destination rules (§8.4.3 / B10) (July 2026)
+
+Queue item 2 (survey British #3 March remnants), plus latent bugs in the
+same path.
+
+- Phase 2 tier-2 catch-all removed: §8.4.3 lists exactly two Phase 2
+  destination profiles — "first to add Tories where Regulars are the
+  only British units, then to add Regulars where Tories are the only
+  British units" — but the old tier assignment admitted EVERY Pop 1+
+  non-Active-Support space as tier 2, marching groups into spaces the
+  rule never names.  Only the two profiles qualify now (a tier-0 group
+  must actually carry a Tory to "add Tories").
+- Population 1-2 limit: now written as 1 <= pop <= 2 per the Manual
+  ("spaces with Population one or two"); the flowchart's "Pop 1+" is
+  extensionally identical on this map (no space exceeds Population 2),
+  so no reference conflict was filed.
+- Already-selected preference un-inverted: the rule says "within each,
+  move first to March destinations already selected above"; the old
+  code EXCLUDED seen destinations.  They are now preferred within each
+  tier, evaluated on the post-move board (planned arrivals count toward
+  the profile test), and re-using one consumes no new destination slot
+  (§3.2.3 pays per destination space selected).
+- Common Cause Tory double-count (survey :1239): "make up the
+  difference between the number of Regulars and Tories IN THE GROUP" —
+  the old code compared the space's raw Regulars against the space's
+  Tories PLUS the group's movable Tories, understating the difference
+  (often negative), so CC War Parties almost never joined.  Group
+  counts are used now; the Tory escort is no longer cut to make room
+  for War Parties (the executor caps Tories + WPs jointly at the
+  Regular count, which the plan satisfies by construction).
+- BUG (phantom CC War Parties): the old plan never put War Parties in
+  the march pieces — common_cause.execute only readies them in the
+  origin (Active first, §4.2.1); march.execute moves them only when
+  they appear in a plan entry.  The WPs' "group size" contribution was
+  therefore paper-only and destinations never received them.  CC WPs
+  now march with their group and arrive Active; if common_cause.execute
+  fails at execution time, the planned WPs are stripped from the plan
+  instead of crashing march.execute.
+- Phase 1 rebuilt to the §8.4.3 sentence: "Moving the largest groups
+  first, add British Control to Cities, then Colonies ... Stop moving
+  groups into each destination space once British Control is
+  established."  Multiple groups now accumulate into one destination
+  until Control flips (the old planner sent exactly one group and never
+  checked the goal); a destination that cannot reach Control with the
+  available groups is skipped and its tentative commitments rolled
+  back (a partial move adds nothing).  Rebellion-cube priority is
+  presence (binary, per the rule text) then highest Population then
+  seeded random (§8.2) — the old sort used most-cubes.  Destination
+  Control math uses the §1.7 tally net of pieces already committed
+  out (Session 38's double-booking lesson applied here too).
+- March-in-place: §3.2.3 activates ONE Militia per THREE British cubes;
+  the old code flipped every Underground Militia in the space (a large
+  illegal British benefit) and would pay a Resource for spaces with
+  fewer than 3 cubes where nothing could activate.  Both fixed; the
+  in-place priority is "first in spaces with Support" (binary) with
+  seeded ties.
+- Execution no longer slices the plan to 4 ENTRIES: the Max-4 limit is
+  on destination spaces (capped during planning); multi-group plans
+  legitimately exceed 4 entries.
+- _movable_from retention now uses the §1.7 tally (Villages count as
+  Royalist) net of ALL committed pieces including CC War Parties.
+
+Tests: new lod_ai/tests/test_brit_march_8_4_3.py (7 tests: catch-all
+removal, Pop 0 exclusion, already-selected preference, 3-cube in-place
+gate, multi-group accumulation, unreachable-target skip, CC group
+difference with WP arrival).  test_british_march_in_place.py's
+flip-all assertion rewritten to the §3.2.3 one-per-three rule (its own
+comment had flagged the discrepancy).
+
+Verification: both roots green — 1,303 (lod_ai/tests, incl. rebaselined
+canary) + 41 (tests/) = 1,344; clean-sweep gate seeds 1-10 and 11-20
+clean with invariants on; soak 120 games clean; balance rebaselined
+(old → new): 1775 B 30%→25%, I 70%→75%; 1776 P 25%→55%, B 50%→30%,
+I 25%→15%; 1778 B 5%→20%, F 70%→55%, P 20%→25% (21 winner changes).
+The big 1776 swing is the militia-activation correction — flip-all was
+suppressing Patriot Underground Militia everywhere the British marched
+in place; Session 38's 1778 British-slide flag is resolved (5%→20%).
+Known remaining March gap (not in queue item 2, logged for the survey
+long tail): the planner only considers adjacent destinations and does
+not use §3.2.3's City-to-City / City-to-adjacent-Province movement.

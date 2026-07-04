@@ -1261,16 +1261,23 @@ class BritishBot(BaseBot):
     def _march(self, state: Dict, *, tried_muster: bool = False) -> bool:
         """Implements node B10 (Max 4).
 
-        Reference bullets:
-        • Lose no British Control. Leave last Tory and War Party in each space,
-          and last Regular if British Control but no Active Support.
-        • Moving the largest groups first, add British Control to up to 2 Cities
-          then Colonies, within each first where Rebel cubes then highest Pop.
-          Use Common Cause to increase group size if destination is adjacent Province.
-        • Then March to Pop 1+ spaces not at Active Support, first to add Tories
-          where Regulars are the only British units, then to add Regulars where
-          Tories are the only British units, within each first in the above destinations.
-        • Then March in place to Activate Militia, first in Support.
+        §8.4.3 bullets (Manual wording governs; flowchart B10 agrees —
+        its "Pop 1+" equals the Manual's "Population one or two" on this
+        map, where no space exceeds Population 2):
+        • Lose no British Control. Leave last Tory and War Party in each
+          space, and last Regular if British Control but no Active Support.
+        • Moving the largest groups first, add British Control to Cities,
+          then Colonies (not Indian Reserves), up to 2 spaces total;
+          within each first where there ARE Rebellion cubes, then highest
+          Population. Stop moving groups into a destination once British
+          Control is established. Use Common Cause to include War Parties
+          (Active first) when the destination is an adjacent Province.
+        • Then March to Population 1-2 spaces not at Active Support,
+          first to add Tories where Regulars are the only British units,
+          then to add Regulars where Tories are the only British units;
+          within each, move first to March destinations already selected.
+        • Then March in place to Activate Underground Militia, first in
+          spaces with Support (§3.2.3: one Militia per three British cubes).
         • If no Common Cause used, execute a Special Activity.
         • If not possible, Muster unless already tried, else Pass.
         """
@@ -1304,14 +1311,11 @@ class BritishBot(BaseBot):
             tories = sp.get(C.TORY, 0) - already.get(C.TORY, 0)
             wp_a = sp.get(C.WARPARTY_A, 0)
             wp_u = sp.get(C.WARPARTY_U, 0)
-            royalist = regs + tories + wp_a + wp_u + sp.get(C.FORT_BRI, 0)
-            rebel = (
-                sp.get(C.REGULAR_PAT, 0)
-                + sp.get(C.REGULAR_FRE, 0)
-                + sp.get(C.MILITIA_A, 0)
-                + sp.get(C.MILITIA_U, 0)
-                + sp.get(C.FORT_PAT, 0)
-            )
+            # §1.7 Control tally (Villages count as Royalist), minus ALL
+            # pieces already committed out of this space in this plan
+            # (incl. Common-Cause War Parties).
+            royalist = self._royalist_pieces(sp) - sum(already.values())
+            rebel = self._rebellion_pieces(sp)
             ctrl = self._control(state, sid)
             at_active_support = self._support_level(state, sid) >= C.ACTIVE_SUPPORT
 
@@ -1357,128 +1361,205 @@ class BritishBot(BaseBot):
         )
 
         # === Phase 1: Add British Control to up to 2 Cities then Colonies ===
+        # §8.4.3: "Moving the largest groups first, add British Control to
+        # Cities, then Colonies (but not Indian Reserve Provinces), for a
+        # total of up to two spaces; within each first where there are
+        # Rebellion cubes, then with the highest Population. Stop moving
+        # groups into each destination space once British Control is
+        # established. Use Common Cause to include War Parties (Active
+        # first) if this would increase the size of a Marching group
+        # moving into an adjacent Province."
+        #
+        # Multiple groups may feed one destination until Control is
+        # established; a destination that cannot reach British Control
+        # with the groups available is skipped (a partial move adds
+        # nothing).  Rebellion-cube priority is PRESENCE (binary per the
+        # rule text) then highest Population then seeded random (§8.2);
+        # the old sort used most-cubes, a different cascade.
         march_max = 1 if state.get("_limited") else 4
-        control_targets: List[Tuple[tuple, str]] = []
+        no_sa_plan = state.get("_limited") or state.get("_no_special")
+        move_plan: List[Dict] = []
+        cc_spaces: Dict[str, int] = {}  # B13: CC War Parties used per origin
+        seen_dst: set = set()
+        spaces_used = 0
+
+        cand_best: Dict[str, tuple] = {}
         for sid in origins:
             for dst in _adjacent(sid):
-                if dst not in state.get("spaces", {}):
+                if dst in cand_best or dst not in state.get("spaces", {}):
                     continue
                 if self._control(state, dst) == C.BRITISH:
                     continue
-                dsp = state["spaces"][dst]
                 dtype = _MAP_DATA.get(dst, {}).get("type", "")
                 if dtype not in ("City", "Colony"):
-                    continue
-                is_city = 0 if dtype == "City" else 1  # Cities first
-                rebel_cubes = (dsp.get(C.REGULAR_PAT, 0) + dsp.get(C.REGULAR_FRE, 0)
-                               + dsp.get(C.MILITIA_A, 0) + dsp.get(C.MILITIA_U, 0))
+                    continue  # "(but not Indian Reserve Provinces)"
+                dsp = state["spaces"][dst]
+                rebel_cubes = (dsp.get(C.REGULAR_PAT, 0)
+                               + dsp.get(C.REGULAR_FRE, 0)
+                               + dsp.get(C.MILITIA_A, 0)
+                               + dsp.get(C.MILITIA_U, 0))
                 pop = _MAP_DATA.get(dst, {}).get("population", 0)
-                control_targets.append(((is_city, -rebel_cubes, -pop), dst, sid))
-        control_targets.sort()
-        # Deduplicate destinations, keep first 2
-        seen_dst: set = set()
-        move_plan: List[Dict] = []
-        cc_spaces: Dict[str, int] = {}  # B13: CC War Parties per space
-        spaces_used = 0
-        for _, dst, origin in control_targets:
-            if dst in seen_dst or spaces_used >= min(2, march_max):
-                continue
-            movable = _movable_from(origin)
-            total = movable.get(C.REGULAR_BRI, 0) + movable.get(C.TORY, 0)
+                cand_best[dst] = (
+                    0 if dtype == "City" else 1,
+                    0 if rebel_cubes > 0 else 1,
+                    -pop,
+                    state["rng"].random(),
+                )
+        control_targets = sorted(cand_best, key=cand_best.get)
 
-            # B10+B13: When destination is an adjacent Province, include
-            # War Parties via Common Cause to increase group size.
-            # CC restriction: War Parties may never move into Cities.
-            # "Province" in rules = Colony or Reserve (anything not a City).
-            dst_type = _MAP_DATA.get(dst, {}).get("type", "")
-            cc_wp_count = 0
-            osp = state["spaces"][origin]
-            if dst_type not in ("City", "Special"):
-                # B13: WP as Tories when Regulars > Tories
-                regs_here = osp.get(C.REGULAR_BRI, 0)
-                tories_here = osp.get(C.TORY, 0) + movable.get(C.TORY, 0)
-                if regs_here > tories_here:
-                    wp_a = osp.get(C.WARPARTY_A, 0)
-                    wp_u = osp.get(C.WARPARTY_U, 0)
-                    # Preserve last WP per B13 March constraint
-                    avail_wp = max(0, wp_a + wp_u - 1)
-                    cc_wp_count = min(avail_wp, regs_here - tories_here)
-                    total += cc_wp_count
+        for dst in control_targets:
+            if spaces_used >= min(2, march_max):
+                break
+            dsp = state["spaces"][dst]
+            out_committed = sum(_committed.get(dst, {}).values())
+            needed = (self._rebellion_pieces(dsp)
+                      - (self._royalist_pieces(dsp) - out_committed) + 1)
+            brit_dst = (dsp.get(C.REGULAR_BRI, 0) + dsp.get(C.TORY, 0)
+                        + dsp.get(C.FORT_BRI, 0))
+            if brit_dst == 0:
+                needed = max(needed, 1)  # §1.7: Control needs a British piece
+            dst_is_colony = _MAP_DATA.get(dst, {}).get("type") == "Colony"
+            got = 0
+            tentative: List[Dict] = []
+            tentative_cc: Dict[str, int] = {}
+            # "Moving the largest groups first"
+            adj_origins = [o for o in origins
+                           if o != dst and o not in seen_dst
+                           and dst in _adjacent(o)]
+            adj_origins.sort(key=lambda o: -sum(_movable_from(o).values()))
+            for origin in adj_origins:
+                if got >= needed:
+                    break
+                movable = _movable_from(origin)
+                reg_count = movable.get(C.REGULAR_BRI, 0)
+                # §3.2.3: Tories accompany Regulars 1 for 1; the executor
+                # caps Tories + CC War Parties together at the Regular count.
+                tory_count = min(movable.get(C.TORY, 0), reg_count)
+                cc_wp = 0
+                if dst_is_colony and not no_sa_plan:
+                    # §8.4.3 COMMON CAUSE: "make up the difference between
+                    # the number of Regulars and Tories in the group" —
+                    # GROUP counts, not space totals.  (The old code added
+                    # the space's Tories on top of the group's movable
+                    # Tories, understating the difference so CC War
+                    # Parties almost never joined a March.)
+                    osp = state["spaces"][origin]
+                    avail_wp = max(0, osp.get(C.WARPARTY_A, 0)
+                                   + osp.get(C.WARPARTY_U, 0) - 1)
+                    avail_wp = max(0, avail_wp
+                                   - tentative_cc.get(origin, 0)
+                                   - cc_spaces.get(origin, 0))
+                    cc_wp = min(avail_wp, max(0, reg_count - tory_count))
+                if reg_count + tory_count + cc_wp <= 0:
+                    continue
+                pieces: Dict[str, int] = {}
+                if reg_count:
+                    pieces[C.REGULAR_BRI] = reg_count
+                if tory_count:
+                    pieces[C.TORY] = tory_count
+                if cc_wp:
+                    # CC War Parties MARCH with the group and arrive
+                    # Active (§4.2.1).  common_cause.execute only readies
+                    # them in the origin (Active first); march.execute
+                    # moves them when they are in the plan's pieces — the
+                    # old plan left them out, so the "group size" they
+                    # added was phantom and the destination never
+                    # received them.
+                    pieces[C.WARPARTY_A] = cc_wp
+                    tentative_cc[origin] = tentative_cc.get(origin, 0) + cc_wp
+                tentative.append({"src": origin, "dst": dst, "pieces": pieces})
+                oc = _committed.setdefault(origin, {})
+                for tag, cnt in pieces.items():
+                    oc[tag] = oc.get(tag, 0) + cnt
+                got += reg_count + tory_count + cc_wp
+            if tentative and got >= needed:
+                move_plan.extend(tentative)
+                for o, n in tentative_cc.items():
+                    cc_spaces[o] = cc_spaces.get(o, 0) + n
+                seen_dst.add(dst)
+                spaces_used += 1
+            else:
+                # Control unreachable — roll the tentative commitments back.
+                for mv in tentative:
+                    oc = _committed.get(mv["src"], {})
+                    for tag, cnt in mv["pieces"].items():
+                        oc[tag] = oc.get(tag, 0) - cnt
 
-            if total <= 0:
-                continue
-            pieces: Dict[str, int] = {}
-            reg_count = movable.get(C.REGULAR_BRI, 0)
-            if reg_count > 0:
-                pieces[C.REGULAR_BRI] = reg_count
-            # Enforce 1:1 escort cap: Tories + CC War Parties <= Regulars
-            tory_count = movable.get(C.TORY, 0)
-            escort_cap = reg_count - cc_wp_count
-            if tory_count > 0:
-                pieces[C.TORY] = min(tory_count, max(0, escort_cap))
-            if cc_wp_count > 0:
-                cc_spaces[origin] = cc_wp_count
-            # Skip if no march-movable pieces after escort capping.
-            # CC War Parties contribute to destination attractiveness but are
-            # moved by common_cause.execute(), not by march.execute().
-            if sum(pieces.values()) <= 0:
-                continue
-            move_plan.append({"src": origin, "dst": dst, "pieces": pieces})
-            # Track committed pieces for this origin
-            orig_committed = _committed.setdefault(origin, {})
-            for tag, cnt in pieces.items():
-                orig_committed[tag] = orig_committed.get(tag, 0) + cnt
-            seen_dst.add(dst)
-            spaces_used += 1
+        # === Phase 2: Population 1-2 spaces not at Active Support ===
+        # §8.4.3: "Then March to spaces with Population one or two that
+        # are not at Active Support, first to add Tories where Regulars
+        # are the only British units, then to add Regulars where Tories
+        # are the only British units; within each, move first to March
+        # destinations already selected above."
+        #
+        # ONLY those two destination profiles qualify — the old tier-2
+        # was a catch-all admitting every Pop 1+ space.  Already-selected
+        # destinations are PREFERRED within each tier (the old code
+        # excluded them outright), and re-using one consumes no new
+        # destination slot (§3.2.3 pays per destination space selected).
+        if spaces_used < march_max or seen_dst:
+            planned_in: Dict[str, Dict[str, int]] = {}
+            for mv in move_plan:
+                d = planned_in.setdefault(mv["dst"], {})
+                for tag, cnt in mv["pieces"].items():
+                    d[tag] = d.get(tag, 0) + cnt
 
-        # === Phase 2: Pop 1+ spaces not at Active Support ===
-        if spaces_used < march_max:
-            phase2_targets: List[Tuple[tuple, str, str]] = []
+            phase2_targets: List[Tuple[tuple, str]] = []
+            p2_seen: set = set()
             for sid in origins:
+                if sid in seen_dst:
+                    continue  # planned destinations do not act as origins
                 for dst in _adjacent(sid):
-                    if dst not in state.get("spaces", {}) or dst in seen_dst:
+                    if dst in p2_seen or dst not in state.get("spaces", {}):
                         continue
                     pop = _MAP_DATA.get(dst, {}).get("population", 0)
-                    if pop < 1:
-                        continue
+                    if not (1 <= pop <= 2):
+                        continue  # "Population one or two"
                     if self._support_level(state, dst) >= C.ACTIVE_SUPPORT:
                         continue
                     dsp = state["spaces"][dst]
-                    # Priority: add Tories where Regulars are only British units
-                    regs_only = (dsp.get(C.REGULAR_BRI, 0) > 0
-                                 and dsp.get(C.TORY, 0) == 0
-                                 and dsp.get(C.FORT_BRI, 0) == 0)
-                    # Then add Regulars where Tories are only British units
-                    tories_only = (dsp.get(C.TORY, 0) > 0
-                                   and dsp.get(C.REGULAR_BRI, 0) == 0
-                                   and dsp.get(C.FORT_BRI, 0) == 0)
-                    tier = 0 if regs_only else (1 if tories_only else 2)
-                    phase2_targets.append(((tier, -pop), dst, sid))
+                    inc = planned_in.get(dst, {})
+                    regs_d = dsp.get(C.REGULAR_BRI, 0) + inc.get(C.REGULAR_BRI, 0)
+                    tories_d = dsp.get(C.TORY, 0) + inc.get(C.TORY, 0)
+                    forts_d = dsp.get(C.FORT_BRI, 0)
+                    regs_only = regs_d > 0 and tories_d == 0 and forts_d == 0
+                    tories_only = tories_d > 0 and regs_d == 0 and forts_d == 0
+                    if not (regs_only or tories_only):
+                        continue
+                    tier = 0 if regs_only else 1
+                    already = 0 if dst in seen_dst else 1
+                    phase2_targets.append(
+                        ((tier, already, state["rng"].random()), dst))
+                    p2_seen.add(dst)
             phase2_targets.sort()
-            for _, dst, origin in phase2_targets:
-                if spaces_used >= march_max or dst in seen_dst:
-                    continue
-                movable = _movable_from(origin)
-                total = movable.get(C.REGULAR_BRI, 0) + movable.get(C.TORY, 0)
-                if total <= 0:
-                    continue
-                pieces = {}
-                reg_count = movable.get(C.REGULAR_BRI, 0)
-                if reg_count > 0:
-                    pieces[C.REGULAR_BRI] = reg_count
-                # Enforce 1:1 escort cap: Tories <= Regulars
-                if movable.get(C.TORY, 0) > 0:
-                    pieces[C.TORY] = min(movable[C.TORY], reg_count)
-                # Skip if no pieces to move
-                if sum(pieces.values()) <= 0:
-                    continue
-                move_plan.append({"src": origin, "dst": dst, "pieces": pieces})
-                # Track committed pieces for this origin
-                orig_committed = _committed.setdefault(origin, {})
-                for tag, cnt in pieces.items():
-                    orig_committed[tag] = orig_committed.get(tag, 0) + cnt
-                seen_dst.add(dst)
-                spaces_used += 1
+            for key, dst in phase2_targets:
+                if dst not in seen_dst and spaces_used >= march_max:
+                    continue  # a re-used destination needs no new slot
+                tier = key[0]
+                adj_origins = [o for o in origins
+                               if o != dst and o not in seen_dst
+                               and dst in _adjacent(o)]
+                adj_origins.sort(key=lambda o: -sum(_movable_from(o).values()))
+                for origin in adj_origins:
+                    movable = _movable_from(origin)
+                    reg_count = movable.get(C.REGULAR_BRI, 0)
+                    if reg_count <= 0:
+                        continue  # §3.2.3: Tories cannot march unescorted
+                    tory_count = min(movable.get(C.TORY, 0), reg_count)
+                    if tier == 0 and tory_count <= 0:
+                        continue  # must actually ADD Tories
+                    pieces = {C.REGULAR_BRI: reg_count}
+                    if tory_count:
+                        pieces[C.TORY] = tory_count
+                    move_plan.append({"src": origin, "dst": dst,
+                                      "pieces": pieces})
+                    oc = _committed.setdefault(origin, {})
+                    for tag, cnt in pieces.items():
+                        oc[tag] = oc.get(tag, 0) + cnt
+                    if dst not in seen_dst:
+                        seen_dst.add(dst)
+                        spaces_used += 1
+                    break
 
         # === Phase 3: March in place to Activate Militia, first in Support ===
         # "March in place" activates Underground Militia where British are present.
@@ -1489,10 +1570,19 @@ class BritishBot(BaseBot):
             for sid, sp in state["spaces"].items():
                 if sid in seen_dst:
                     continue
-                if sp.get(C.MILITIA_U, 0) > 0 and sp.get(C.REGULAR_BRI, 0) > 0:
+                # §3.2.3 PROCEDURE: destinations "Activate one Militia for
+                # every three British cubes there" — an in-place space with
+                # fewer than 3 British cubes activates nothing, so paying a
+                # Resource to select it would be a dead move.
+                brit_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                if (sp.get(C.MILITIA_U, 0) > 0
+                        and sp.get(C.REGULAR_BRI, 0) > 0
+                        and brit_cubes >= 3):
                     sup = self._support_level(state, sid)
-                    # First in Support (lower sort key = higher priority)
-                    activate_targets.append((-sup, sid))
+                    # "first in spaces with Support" (binary presence),
+                    # remaining ties seeded random (§8.2)
+                    activate_targets.append(
+                        ((0 if sup > 0 else 1, state["rng"].random()), sid))
             activate_targets.sort()
             for _, sid in activate_targets:
                 if spaces_used >= march_max:
@@ -1522,14 +1612,23 @@ class BritishBot(BaseBot):
                 march_ctx = cc_ctx
                 used_cc = True
             except (ValueError, KeyError):
-                pass  # CC failed — proceed without it
+                # CC failed — the planned CC War Parties cannot march.
+                # Strip them from the plan (and drop entries left empty)
+                # so march.execute doesn't try to move unreadied pieces.
+                for mv in move_plan:
+                    mv["pieces"].pop(C.WARPARTY_A, None)
+                move_plan = [mv for mv in move_plan
+                             if sum(mv["pieces"].values()) > 0]
 
         # Execute the March (Max 4 spaces) for actual moves
         if move_plan:
-            all_srcs = list({p["src"] for p in move_plan})[:4]
-            all_dsts = list({p["dst"] for p in move_plan})[:4]
-            # Resource affordability: march costs 1 per destination
-            march_cost = len(set(p["dst"] for p in move_plan[:4]))
+            all_srcs = list({p["src"] for p in move_plan})
+            all_dsts = list({p["dst"] for p in move_plan})
+            # Resource affordability: march costs 1 per destination.
+            # Destination COUNT is capped (≤4) during planning; the plan
+            # may hold more than 4 entries when several groups feed one
+            # destination, so never slice the entry list.
+            march_cost = len(set(p["dst"] for p in move_plan))
             if not can_afford(state, C.BRITISH, march_cost):
                 if not tried_muster:
                     self._reset_command_trace(state)
@@ -1549,7 +1648,7 @@ class BritishBot(BaseBot):
                 march_ctx,
                 all_srcs,
                 all_dsts,
-                plan=move_plan[:4],
+                plan=move_plan,
                 bring_escorts=needs_escorts,
                 limited=False,
             )
@@ -1561,7 +1660,7 @@ class BritishBot(BaseBot):
             # leader's space + counts of British units that moved
             # there) and let bot_leader_movement decide where they
             # belong post-march.  Skip if no plan or no British leaders.
-            self._follow_leaders_after_march(state, move_plan[:4])
+            self._follow_leaders_after_march(state, move_plan)
 
             # OPS: a Common-Cause March moves War Parties (as Tory-equivalents)
             # out of their spaces, so any Indian Leader there must follow the
@@ -1596,7 +1695,10 @@ class BritishBot(BaseBot):
                 )
                 for sid in affordable_in_place:
                     sp = state["spaces"][sid]
-                    mu = sp.get(C.MILITIA_U, 0)
+                    brit_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                    # §3.2.3: Activate ONE Militia per THREE British cubes
+                    # (the old code flipped every Underground Militia).
+                    mu = min(sp.get(C.MILITIA_U, 0), brit_cubes // 3)
                     if mu > 0:
                         flip_pieces(state, C.MILITIA_U, C.MILITIA_A, sid, mu)
                         push_history(
