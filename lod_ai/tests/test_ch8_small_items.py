@@ -187,3 +187,28 @@ def test_scout_never_moves_last_british_piece_out(monkeypatch):
            "rng": __import__("random").Random(3)}
     assert bot._scout(st2) is False
     assert not captured
+
+
+def test_muster_plans_up_to_six_regulars(monkeypatch):
+    """3.2.1 'place up to six Regulars'; 8.4.2 'as many as possible' —
+    the plan was capped at 4."""
+    from unittest.mock import patch
+    from lod_ai.bots.british_bot import BritishBot
+    from lod_ai.bots import british_bot as bb
+    import random
+
+    bot = BritishBot()
+    st = {"spaces": {"Boston": {C.REGULAR_BRI: 1},
+                     "Massachusetts": {}},
+          "support": {}, "control": {},
+          "available": {C.REGULAR_BRI: 8, C.TORY: 0, "British_Fort": 0},
+          "resources": {C.BRITISH: 9, C.PATRIOTS: 9, C.FRENCH: 9,
+                        C.INDIANS: 9},
+          "markers": {C.RAID: {"pool": 0, "on_map": set()},
+                      C.PROPAGANDA: {"pool": 0, "on_map": set()}},
+          "rng": random.Random(5), "history": []}
+    captured = {}
+    with patch.object(bb.muster, "execute",
+                      side_effect=lambda *a, **k: captured.update(k)):
+        bot._muster(st, tried_march=True)
+    assert captured.get("regular_plan", {}).get("n") == 6

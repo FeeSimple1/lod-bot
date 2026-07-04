@@ -3145,3 +3145,18 @@ documented survey item.
 
 Tests: +1 (both leak cases). Both roots green (1,279 + 41); gate clean
 seeds 1-20 invariants-on; balance rebaselined (4 baseline lines).
+
+## Session 37: Muster — six Regulars; Tory priority 2 rebuilt (8.4.2)
+
+- The Regular plan was capped at 4; 3.2.1 allows "up to six" and 8.4.2
+  says "as many Regulars as possible". Now min(6, Available).
+- Tory priority 2 ("then to change Control of the most Population")
+  sorted by the LARGEST rebel-minus-British deficit — precisely the
+  spaces the Tories are least likely to flip — and ignored Population
+  and whether Control would actually change. Now: only spaces where a
+  1.7 simulation of the placed Tories changes Control, ranked by
+  Population, seeded-random ties (8.2).
+
+Tests: +1 (six-Regular plan via executor spy). Both roots green
+(1,280 + 41); gate clean seeds 1-20 invariants-on; balance rebaselined
+(British Muster throughput up; sizeable shift as expected).

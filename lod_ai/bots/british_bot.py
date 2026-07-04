@@ -898,18 +898,39 @@ class BritishBot(BaseBot):
             tory_plan[sid] = n
             avail_tories -= n
 
-        # Priority 2: change most Control
+        # Priority 2 (8.4.2): "then to change Control of the most
+        # Population" — only spaces where the placed Tories actually
+        # change Control (1.7 simulation), ranked by Population, seeded-
+        # random ties (8.2). The old sort took the LARGEST rebel-minus-
+        # British deficit — the spaces least likely to flip — and ignored
+        # Population entirely (Session 37).
         if avail_tories > 0:
+            refresh_control(state)
             tory_p2: List[Tuple[tuple, str]] = []
             for sid, sp in state["spaces"].items():
                 if sid in tory_plan or not _tory_eligible(sid):
                     continue
-                brit_pieces = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0) + sp.get(C.FORT_BRI, 0)
+                n = min(_tory_max(sid), avail_tories)
+                if n <= 0:
+                    continue
+                royalist = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                            + sp.get(C.FORT_BRI, 0) + sp.get(C.WARPARTY_A, 0)
+                            + sp.get(C.WARPARTY_U, 0) + sp.get(C.VILLAGE, 0))
                 rebel_pieces = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
                                 + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
                                 + sp.get(C.FORT_PAT, 0))
-                gap = rebel_pieces - brit_pieces
-                tory_p2.append((-gap, sid))
+                before = state.get("control", {}).get(sid)
+                # After adding n Tories (British pieces, so presence holds):
+                if royalist + n > rebel_pieces:
+                    after = C.BRITISH
+                elif rebel_pieces > royalist + n:
+                    after = "REBELLION"
+                else:
+                    after = None
+                if after == before:
+                    continue        # placement would not change Control
+                pop = _MAP_DATA.get(sid, {}).get("population", 0)
+                tory_p2.append(((-pop, state["rng"].random()), sid))
             tory_p2.sort()
             for _, sid in tory_p2:
                 if avail_tories <= 0 or len(tory_plan) + len(selected_spaces) >= max_spaces:
@@ -1031,7 +1052,9 @@ class BritishBot(BaseBot):
             all_muster_spaces.append(chosen_rl_space)
 
         reg_plan = (
-            {"space": regular_destinations[0], "n": min(4, state["available"].get(C.REGULAR_BRI, 0))}
+            # 3.2.1 "place up to six Regulars"; 8.4.2 "as many as possible"
+            # (was capped at 4 — Session 37).
+            {"space": regular_destinations[0], "n": min(6, state["available"].get(C.REGULAR_BRI, 0))}
             if state["available"].get(C.REGULAR_BRI, 0) > 0 and regular_destinations
             else None
         )
