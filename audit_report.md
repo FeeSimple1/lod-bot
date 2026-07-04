@@ -3126,3 +3126,22 @@ TRACEABILITY under the survey backlog.
 Verification: both roots green (1,278 + 41; +1 one-SA test); gate
 clean seeds 1-20 invariants-on; balance rebaselined (Indian SA economy
 tightened; modest shifts).
+
+## Session 36: Scout retention — British Control preserved (8.7.4/1.7)
+
+Scout's "most Regulars and Tories possible without losing British
+Control or adding Rebellion Control in the origin" had two leaks:
+§1.7's second condition (British Control needs at least one BRITISH
+piece present) was never checked, so Scout could move every British
+cube out of a controlled origin; and the minimum fallback forced a
+1 WP + 1 Regular move even when no legal budget existed. Now: a
+British-controlled origin keeps its Royalist majority AND one British
+cube (unless a British Fort covers presence); an uncontrolled origin
+only guards against handing Rebellion Control (budget = royalist −
+rebel, correcting the extra piece the old formula retained); no legal
+budget → Scout declines and the flowchart falls through to March per
+IF NONE. Origin-before-destination selection order remains a
+documented survey item.
+
+Tests: +1 (both leak cases). Both roots green (1,279 + 41); gate clean
+seeds 1-20 invariants-on; balance rebaselined (4 baseline lines).

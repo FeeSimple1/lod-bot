@@ -1235,35 +1235,39 @@ class IndianBot(BaseBot):
         n_regs = sp.get(C.REGULAR_BRI, 0)
         n_tories = sp.get(C.TORY, 0)
 
-        # Check control preservation: compute how many pieces we can remove
-        # without flipping control.  We need at least 1 Regular for Scout.
+        # 8.7.4: "the most Regulars and Tories possible WITHOUT losing
+        # British Control or adding Rebellion Control in the origin."
+        # §1.7: British Control = Royalist pieces EXCEED Rebellion pieces
+        # AND at least one British piece is present. The old code kept a
+        # Royalist majority but could move every British cube out
+        # (losing British Control to the Indians-only no-control case),
+        # and its minimum fallback moved 1 WP + 1 Regular even when NO
+        # legal budget existed (Session 36; survey finding).
         if n_regs == 0:
             return False
-
-        # Simplified control check: count all Royalist pieces in origin.
-        # If removing pieces would let Rebellion gain control, reduce count.
+        refresh_control(state)
         royalist = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
                     + sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
                     + sp.get(C.FORT_BRI, 0) + sp.get(C.VILLAGE, 0))
         rebel = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
                  + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
                  + sp.get(C.FORT_PAT, 0))
-        moveable = royalist - rebel - 1  # keep 1 more than rebels
-        if moveable < 2:  # need at least 1 WP + 1 Regular
-            # Try moving just 1 WP + 1 Regular (minimum)
-            n_regs = 1
-            n_tories = 0
+        if state.get("control", {}).get(origin) == C.BRITISH:
+            budget = royalist - rebel - 1        # keep the Royalist majority
+            keep_brit = 0 if sp.get(C.FORT_BRI, 0) else 1  # keep a British piece
         else:
-            # Cap to what we can move: 1 WP + regs + tories ≤ moveable
-            total_desired = n_wp + n_regs + n_tories
-            if total_desired > moveable:
-                # Reduce tories first, then regulars
-                excess = total_desired - moveable
-                tory_cut = min(excess, n_tories)
-                n_tories -= tory_cut
-                excess -= tory_cut
-                if excess > 0:
-                    n_regs = max(1, n_regs - excess)
+            # Not British-controlled: only avoid ADDING Rebellion Control
+            # (rebel must not exceed remaining Royalist pieces).
+            budget = royalist - rebel
+            keep_brit = 0
+        if budget < 2:                            # 1 WP + 1 Regular minimum
+            return False
+        brit_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+        max_cubes = min(budget - n_wp, brit_cubes - keep_brit)
+        if max_cubes < 1:
+            return False
+        n_regs = min(sp.get(C.REGULAR_BRI, 0), max_cubes)
+        n_tories = min(sp.get(C.TORY, 0), max_cubes - n_regs)
 
         # §3.4.3: "Tories up to the number of Regulars may" move
         n_tories = min(n_tories, n_regs)

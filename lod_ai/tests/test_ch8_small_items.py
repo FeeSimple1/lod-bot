@@ -147,3 +147,43 @@ def test_raid_uses_at_most_one_special_activity(monkeypatch):
     st2 = {"resources": {C.INDIANS: 0}, "_turn_used_special": True}
     assert bot._raid_sequence(st2) is True
     assert calls == []
+
+
+def test_scout_never_moves_last_british_piece_out(monkeypatch):
+    """8.7.4 + 1.7: British Control needs a British piece present. Scout
+    must not empty the origin of British cubes (old code could), and
+    must decline entirely when no legal budget exists (old fallback
+    forced a 1WP+1Regular move regardless)."""
+    bot = IndianBot()
+    captured = {}
+
+    def spy_execute(state, faction, ctx, origin, target, **kw):
+        captured.update(kw, origin=origin)
+    monkeypatch.setattr(indians_mod.scout, "execute", spy_execute)
+
+    # British-controlled origin, no Fort: 2 Regs + 2 WPs vs 1 Militia.
+    # royalist 4, rebel 1 → budget 2 (keep majority); keep 1 British cube
+    # → max_cubes = min(2-1, 2-1) = 1 → move 1 WP + 1 Regular, leaving a
+    # Regular behind.
+    st = {"spaces": {
+              "Virginia": {C.REGULAR_BRI: 2, C.WARPARTY_U: 2, C.MILITIA_A: 1},
+              "North_Carolina": {C.FORT_PAT: 1, C.MILITIA_A: 1},
+          },
+          "support": {}, "control": {},
+          "resources": {C.INDIANS: 5, C.BRITISH: 5, C.PATRIOTS: 5, C.FRENCH: 5},
+          "rng": __import__("random").Random(3)}
+    assert bot._scout(st) is True
+    assert captured["n_regulars"] == 1        # one Regular stays (§1.7)
+
+    # No legal budget: 1 Reg + 1 WP vs 2 Militia (royalist 2, rebel 2,
+    # uncontrolled → budget 0) → Scout must decline, not force a move.
+    captured.clear()
+    st2 = {"spaces": {
+               "Virginia": {C.REGULAR_BRI: 1, C.WARPARTY_U: 1, C.MILITIA_A: 2},
+               "North_Carolina": {C.FORT_PAT: 1},
+           },
+           "support": {}, "control": {},
+           "resources": {C.INDIANS: 5, C.BRITISH: 5, C.PATRIOTS: 5, C.FRENCH: 5},
+           "rng": __import__("random").Random(3)}
+    assert bot._scout(st2) is False
+    assert not captured
