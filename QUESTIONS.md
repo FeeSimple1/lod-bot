@@ -209,7 +209,7 @@ twice; flowchart disagrees. Which governs?
 
 ---
 
-## Q18: Mid-raid Plunder to fund additional Raid spaces — OPEN
+## Q18: Mid-raid Plunder to fund additional Raid spaces — RESOLVED
 
 8.7.1: "If Resources fall to zero during the Raid Command, Plunder (or
 if that is not possible, Trade) before completing the Raid Command."
@@ -220,3 +220,15 @@ Playbook's Indian example caps selection at affordability, but there
 the SA (Trade) was already spent that turn. Current implementation
 caps selection at min(3, Resources) and does not extend. Session 35
 fixed the one-SA discipline either way.
+
+**Eric's ruling (July 3, 2026): specific over general — the §8.7.1
+bullet governs.** With an unspent SA, non-player Indians may select
+Raid targets beyond current affordability (up to three per §3.4.4/
+§8.7.1 priorities), and when Resources hit zero mid-Command they
+Plunder (else Trade) before completing the remaining selected spaces.
+The §3.1 affordability rule yields to the bot-specific instruction.
+As with Q16/Q17, this ruling is case-by-case for THIS conflict — do
+not generalize a precedence rule from it. To be implemented with
+queue item 3 (Raid mid-raid replenish); selection should still not
+exceed what the replenish can plausibly fund (a failed Plunder AND
+failed Trade leaves the shortfall unraidable — skip unpaid spaces).
