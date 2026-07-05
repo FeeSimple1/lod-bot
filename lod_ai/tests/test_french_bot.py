@@ -1146,3 +1146,89 @@ def test_f10_muster_fallback_includes_west_indies():
     assert result is True
     affected = state.get("_turn_affected_spaces", set())
     assert "West_Indies" in affected
+
+
+# =====================================================================
+#  Session 42: §8.6.5 March — Colonies tier, additive bullet 2, §8.2 ties
+# =====================================================================
+
+def _s42_state(spaces, resources=None):
+    import random as _r
+    st = {
+        "spaces": spaces,
+        "resources": resources or {C.FRENCH: 5, C.PATRIOTS: 5,
+                                   C.BRITISH: 5, C.INDIANS: 0},
+        "available": {}, "unavailable": {}, "casualties": {},
+        "support": {}, "control": {}, "markers": {}, "leaders": {},
+        "rng": _r.Random(11), "history": [], "toa_played": True,
+        "fni_level": 0,
+    }
+    return st
+
+
+def test_f14_march_colony_tier_beats_reserve():
+    """§8.6.5: "first in Cities, then Colonies" — the rule names Cities
+    and Colonies only; a Reserve is not a bullet-1 destination even when
+    it holds more British (Session 42: Reserves used to tie with
+    Colonies in a single non-City level)."""
+    bot = FrenchBot()
+    st = _s42_state({
+        # Source adjacent to both a Colony and a Reserve
+        "Virginia": {C.REGULAR_FRE: 4},          # Colony (uncontrolled dest? no — source)
+        "North_Carolina": {C.TORY: 1},           # Colony dest, 1 British piece
+        "Southwest": {C.TORY: 3},                # Reserve dest, MORE British
+    })
+    assert bot._march(st) is True
+    assert st["spaces"]["Southwest"].get(C.REGULAR_FRE, 0) == 0, (
+        "Reserve must not be selected as a bullet-1 destination")
+    assert st["spaces"]["North_Carolina"].get(C.REGULAR_FRE, 0) >= 2, (
+        "the Colony should gain enough French to add Rebellion Control")
+
+
+def test_f14_march_bullet2_additive_and_moves_all_regulars():
+    """§8.6.5 bullet 2 is part of the SAME March Command ("Then March
+    any French Regulars..."), not a fallback taken only when bullet 1
+    fails — and it moves ALL isolated Regulars, not one (Session 42)."""
+    bot = FrenchBot()
+    st = _s42_state({
+        # Bullet-1 material: source next to a flippable (empty,
+        # Uncontrolled) City.  NYC stays free of British pieces so the
+        # only "British space" is Virginia and Quebec's nearest hop is
+        # uniquely Northwest.
+        "New_York": {C.REGULAR_FRE: 3},
+        "New_York_City": {},
+        # Isolated stack far from the British (Quebec's neighbours hold
+        # no British pieces): 3 Regulars must ALL step toward the
+        # British via Northwest.  The Villages keep Quebec out of
+        # Rebellion Control (3 v 3 tie) so no retention budget applies.
+        "Quebec": {C.REGULAR_FRE: 3, C.VILLAGE: 3},
+        "Northwest": {},
+        "Virginia": {C.REGULAR_BRI: 2},   # nearest British for Quebec
+    })
+    assert bot._march(st) is True
+    assert st["spaces"]["New_York_City"].get(C.REGULAR_FRE, 0) >= 1, (
+        "bullet 1 should have flipped New_York_City")
+    assert st["spaces"]["Quebec"].get(C.REGULAR_FRE, 0) == 0, (
+        "ALL isolated Regulars march, not one")
+    # Quebec's 3 arrive in Northwest; New_York's leftover Regular is
+    # ALSO an isolated stack and steps the same way (both hop through
+    # Northwest toward Virginia) — "any French Regulars" means all of
+    # them.
+    assert st["spaces"]["Northwest"].get(C.REGULAR_FRE, 0) >= 3, (
+        "the isolated stacks step toward the nearest British")
+
+
+def test_f14_march_bullet2_respects_rebel_control():
+    """"Lose no Rebellion Control": an isolated stack in a
+    Rebellion-Controlled space leaves enough pieces behind."""
+    bot = FrenchBot()
+    st = _s42_state({
+        "Quebec": {C.REGULAR_FRE: 3, C.WARPARTY_U: 2},  # 3 rebel vs 2 royalist
+        "Northwest": {},
+        "Virginia": {C.REGULAR_BRI: 2},
+    })
+    bot._march(st)  # may move a capped number or decline entirely
+    # Whatever happened, Quebec must still be Rebellion-Controlled.
+    from lod_ai.board.control import refresh_control
+    refresh_control(st)
+    assert st["control"].get("Quebec") == "REBELLION"

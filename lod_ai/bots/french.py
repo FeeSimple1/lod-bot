@@ -502,22 +502,29 @@ class FrenchBot(BaseBot):
         return rebel <= royalist
 
     def _march(self, state: Dict) -> bool:
-        """F14: Full March implementation per flowchart reference.
+        """F14 / §8.6.5 French March (Manual wording governs).
 
-        Steps (in order):
-        1. Lose no Rebel Control.
-        2. March as many French Regulars and Continentals as possible to add
-           Rebel Control, first in Cities, within that first where most British.
-        3. March French not in/adjacent to space with British toward nearest
-           British pieces.
-        4. If none of the above, March 1 French Regular to a space with
-           Patriots and British.
+        • Lose no Rebellion Control (all bullets).
+        • March as many French Regulars and Continentals as possible to
+          add Rebellion Control, first in Cities, THEN COLONIES, within
+          each first where most British pieces.
+        • THEN March any (i.e. all) French Regulars not in or adjacent
+          to a space with British pieces towards the nearest British —
+          part of the same March Command, not a fallback.
+        • If neither of the above is possible, March one French Regular
+          to a space with both Patriots and British pieces.
+        Ties seeded per §8.2.
         """
         refresh_control(state)
         ctrl = state.get("control", {})
 
-        # ---- Step 2: March to add Rebel Control ----
-        # Collect sources: spaces with French Regulars
+        # ---- Bullet 1: add Rebellion Control, Cities then Colonies ----
+        # §8.6.5: "March with as many French Regulars and Continentals
+        # as possible to add Rebellion Control, first in Cities, then
+        # Colonies, within each first to spaces with most British
+        # pieces."  Session 42: the Colonies tier was missing — every
+        # non-City space (Reserves included) tied at one level; the rule
+        # names Cities and Colonies only.  Ties seeded per §8.2.
         sources: Dict[str, int] = {}
         for sid, sp in state["spaces"].items():
             fre = sp.get(C.REGULAR_FRE, 0)
@@ -527,28 +534,31 @@ class FrenchBot(BaseBot):
         if not sources:
             return False
 
-        # Identify destinations not already REBELLION, adjacent to a source
         dest_candidates = []
         for dst in state["spaces"]:
             if ctrl.get(dst) == "REBELLION":
                 continue
+            dtype = _MAP_DATA.get(dst, {}).get("type", "")
+            if dtype not in ("City", "Colony"):
+                continue  # "first in Cities, then Colonies"
             adj = map_adj.adjacent_spaces(dst)
             adj_sources = [s for s in adj if s in sources]
             if not adj_sources:
                 continue
-            is_city = 1 if _MAP_DATA.get(dst, {}).get("type") == "City" else 0
+            tier = 0 if dtype == "City" else 1
             dsp = state["spaces"][dst]
             british = dsp.get(C.REGULAR_BRI, 0) + dsp.get(C.TORY, 0)
-            dest_candidates.append((-is_city, -british, state["rng"].random(), dst, adj_sources))
+            dest_candidates.append(
+                (tier, -british, state["rng"].random(), dst, adj_sources))
         dest_candidates.sort()
 
         move_plans = []
-        used_from: Dict[str, int] = defaultdict(int)  # track committed pieces per source
-        march_max = 1 if state.get("_limited") else len(dest_candidates)
-        dest_used = 0
+        used_from: Dict[str, int] = defaultdict(int)  # committed per source
+        limited = bool(state.get("_limited"))
+        dest_list: List[str] = []
 
-        for _, _, _, dst, adj_sources in dest_candidates:
-            if dest_used >= march_max:
+        for _tier, _, _, dst, adj_sources in dest_candidates:
+            if limited and dest_list:
                 break
             dsp = state["spaces"][dst]
             royalist = self._royalist_pieces_in(dsp)
@@ -572,7 +582,8 @@ class FrenchBot(BaseBot):
                 if ctrl.get(src) == "REBELLION":
                     total_rebel = self._rebel_pieces_in(sp) - used_from[src]
                     total_royalist = self._royalist_pieces_in(sp)
-                    max_can_move = min(max_can_move, max(0, total_rebel - total_royalist - 1))
+                    max_can_move = min(max_can_move,
+                                       max(0, total_rebel - total_royalist - 1))
                 take = min(max_can_move, need - gathered)
                 if take > 0:
                     entry_pieces = {C.REGULAR_FRE: take}
@@ -581,7 +592,8 @@ class FrenchBot(BaseBot):
                     escort = min(take, pat_avail, need - gathered - take)
                     if escort > 0:
                         entry_pieces[C.REGULAR_PAT] = escort
-                    plan_entries.append({"src": src, "dst": dst, "pieces": entry_pieces})
+                    plan_entries.append(
+                        {"src": src, "dst": dst, "pieces": entry_pieces})
                     gathered += take + (escort if escort > 0 else 0)
 
             if gathered >= need:
@@ -590,7 +602,58 @@ class FrenchBot(BaseBot):
                     for tag, cnt in entry["pieces"].items():
                         if tag == C.REGULAR_FRE:
                             used_from[entry["src"]] += cnt
-                dest_used += 1
+                dest_list.append(dst)
+
+        # ---- Bullet 2: isolated French Regulars toward nearest British ----
+        # §8.6.5: "THEN March any French Regulars that are not in or
+        # adjacent to a space with British pieces towards the nearest
+        # British."  Session 42: this ran only when bullet 1 produced
+        # nothing, moved a single Regular from the first alphabetical
+        # source, and returned; the rule adds these moves to the SAME
+        # March Command — ALL isolated stacks step toward the British
+        # (minus the lose-no-Rebellion-Control budget), next hop by
+        # shortest distance, ties seeded per §8.2.
+        british_spaces = {sid for sid, sp in state["spaces"].items()
+                          if sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0) > 0}
+        if british_spaces and not (limited and dest_list):
+            for src in sources:
+                sp = state["spaces"][src]
+                fre = sp.get(C.REGULAR_FRE, 0) - used_from[src]
+                if fre <= 0:
+                    continue
+                adj = map_adj.adjacent_spaces(src)
+                if src in british_spaces or any(a in british_spaces
+                                                for a in adj):
+                    continue  # not isolated from the British
+                best_key, best_next = None, None
+                for neighbor in adj:
+                    if neighbor not in state["spaces"]:
+                        continue
+                    dists = [len(path) for path in
+                             (map_adj.shortest_path(neighbor, b)
+                              for b in british_spaces) if path]
+                    if not dists:
+                        continue
+                    key = (min(dists), state["rng"].random())
+                    if best_key is None or key < best_key:
+                        best_key, best_next = key, neighbor
+                if best_next is None:
+                    continue
+                movable = fre
+                if ctrl.get(src) == "REBELLION":
+                    total_rebel = self._rebel_pieces_in(sp) - used_from[src]
+                    total_royalist = self._royalist_pieces_in(sp)
+                    movable = min(movable,
+                                  max(0, total_rebel - total_royalist - 1))
+                if movable <= 0:
+                    continue
+                move_plans.append({"src": src, "dst": best_next,
+                                   "pieces": {C.REGULAR_FRE: movable}})
+                used_from[src] += movable
+                if best_next not in dest_list:
+                    dest_list.append(best_next)
+                if limited:
+                    break
 
         if move_plans:
             all_srcs = list(dict.fromkeys(p["src"] for p in move_plans))
@@ -621,61 +684,22 @@ class FrenchBot(BaseBot):
                 move_plans = [p for p in move_plans if p["pieces"]]
                 all_srcs = list(dict.fromkeys(p["src"] for p in move_plans))
                 all_dsts = list(dict.fromkeys(p["dst"] for p in move_plans))
-            if not move_plans:
-                pass  # fall through to Step 3
-            else:
+            if move_plans:
                 march.execute(state, C.FRENCH, {}, all_srcs, all_dsts,
                               bring_escorts=True, move_plan=move_plans)
                 return True
 
-        # ---- Step 3: March isolated French toward nearest British ----
-        # Affordability gate: Steps 3 and 4 each use 1 destination
+        # ---- Bullet 3: "If neither of the above are possible" ----------
+        # March one French Regular to a space with both Patriots and
+        # British pieces.  Ties seeded per §8.2 (was alphabetical).
         if state["resources"].get(C.FRENCH, 0) <= 0:
             return False
-
-        british_spaces = set()
-        for sid, sp in state["spaces"].items():
-            if sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0) > 0:
-                british_spaces.add(sid)
-
-        if british_spaces:
-            for src in sorted(sources.keys()):
-                sp = state["spaces"][src]
-                fre = sp.get(C.REGULAR_FRE, 0) - used_from.get(src, 0)
-                if fre <= 0:
-                    continue
-                adj = map_adj.adjacent_spaces(src)
-                # Is this French "not in/adjacent to space with British"?
-                near_british = src in british_spaces or any(a in british_spaces for a in adj)
-                if near_british:
-                    continue
-                # Find adjacent space closest to nearest British via BFS
-                best_next, best_dist = None, float("inf")
-                for neighbor in adj:
-                    if neighbor not in state["spaces"]:
-                        continue
-                    for brit_space in british_spaces:
-                        path = map_adj.shortest_path(neighbor, brit_space)
-                        if path and len(path) < best_dist:
-                            best_dist = len(path)
-                            best_next = neighbor
-                if not best_next:
-                    continue
-                # Check lose-no-rebel-control
-                if self._would_lose_rebel_control(state, src, {C.REGULAR_FRE: 1}):
-                    continue
-                march.execute(state, C.FRENCH, {}, [src], [best_next],
-                              bring_escorts=False, move_plan=[
-                                  {"src": src, "dst": best_next,
-                                   "pieces": {C.REGULAR_FRE: 1}}])
-                return True
-
-        # ---- Step 4: Fallback — March 1 French Regular to space with both ----
-        for src in sorted(sources.keys()):
+        fallbacks = []
+        for src in sources:
             sp = state["spaces"][src]
             if sp.get(C.REGULAR_FRE, 0) <= 0:
                 continue
-            for neighbor in sorted(map_adj.adjacent_spaces(src)):
+            for neighbor in map_adj.adjacent_spaces(src):
                 if neighbor not in state["spaces"]:
                     continue
                 nsp = state["spaces"][neighbor]
@@ -683,13 +707,18 @@ class FrenchBot(BaseBot):
                             + nsp.get(C.MILITIA_U, 0)) > 0
                 has_brits = (nsp.get(C.REGULAR_BRI, 0) + nsp.get(C.TORY, 0)) > 0
                 if has_pats and has_brits:
-                    if self._would_lose_rebel_control(state, src, {C.REGULAR_FRE: 1}):
+                    if self._would_lose_rebel_control(
+                            state, src, {C.REGULAR_FRE: 1}):
                         continue
-                    march.execute(state, C.FRENCH, {}, [src], [neighbor],
-                                  bring_escorts=False, move_plan=[
-                                      {"src": src, "dst": neighbor,
-                                       "pieces": {C.REGULAR_FRE: 1}}])
-                    return True
+                    fallbacks.append(
+                        (state["rng"].random(), src, neighbor))
+        if fallbacks:
+            _, src, neighbor = min(fallbacks)
+            march.execute(state, C.FRENCH, {}, [src], [neighbor],
+                          bring_escorts=False, move_plan=[
+                              {"src": src, "dst": neighbor,
+                               "pieces": {C.REGULAR_FRE: 1}}])
+            return True
 
         return False
 

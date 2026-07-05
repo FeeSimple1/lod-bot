@@ -3423,3 +3423,45 @@ clean with invariants on; soak 120 games clean; balance: 1775
 unchanged, 1776 B 40%→45% I 15%→10%, 1778 F 55%→45% P/B +5% each
 (5 winner changes total — the tightened conditions mostly make bots
 decline events that could not actually deliver their effect).
+
+## Session 42: French March rebuilt to §8.6.5 (July 2026)
+
+Queue item 5, first slice — survey French #4.
+
+- "First in Cities, THEN COLONIES": bullet-1 destinations were any
+  non-Rebellion space with every non-City type (Reserves included)
+  tied at one sort level.  Now only Cities and Colonies qualify, tiered
+  City → Colony, within each most British pieces, ties seeded (§8.2).
+- Bullet 2 un-demoted: "THEN March any French Regulars that are not in
+  or adjacent to a space with British pieces towards the nearest
+  British" is part of the SAME March Command.  The old code ran it only
+  when bullet 1 produced nothing, moved a single Regular from the first
+  ALPHABETICAL source, and returned.  Now every isolated stack steps
+  toward the nearest British in the same march plan — all its Regulars
+  minus the lose-no-Rebellion-Control budget — with the next hop chosen
+  by shortest distance and seeded ties.  A Limited Command still caps
+  the whole March at one destination.
+- Bullet 3 fallback ("if neither of the above are possible, March one
+  French Regular to a space with both Patriots and British") retained,
+  with seeded ties replacing the alphabetical source/neighbour scans.
+- The affordability trim (1 French Resource per destination) and the
+  Patriot escort-fee trim continue to apply to the combined plan;
+  bullet-1 destinations keep priority in the trim order.
+
+Tests: +3 (Colony tier beats a British-heavier Reserve; bullet 2
+additive with a bullet-1 flip in the same Command and ALL isolated
+Regulars moving — including the bullet-1 source's remainder; origin
+retention keeps a Rebellion-Controlled stack's space).  Existing F14
+suite unchanged and green.
+
+Verification: both roots green — 1,327 (lod_ai/tests, incl. rebaselined
+canary) + 41 (tests/) = 1,368; clean-sweep gate seeds 1-10 and 11-20
+clean with invariants on; soak 120 games clean; balance: 1775 and 1776
+unchanged, 1778 F 45%→40% B 15%→20% (7 winner changes) — the French
+now push isolated Regulars toward the front instead of parking them,
+which trades a little safety for rule fidelity.
+
+Remaining queue-5 long tail (next sessions): pop-weighting
+(level × Population per 8.1.1) + seeded tie-break sweep across
+british_bot/patriot; Patriot Rally/March/Desertion/CoC items; WQ
+redeploy 0-piece fallbacks.

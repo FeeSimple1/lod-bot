@@ -65,7 +65,7 @@ shared with RL; BS first-eligible None-passthrough.
    the remapped REGULAR_FRE/BLOCKADE) — dead since setup remaps keys.
 4. 8.6.5 March: missing "then Colonies" tier; "March any French
    Regulars … towards nearest British" demoted to fallback and moves
-   only 1 Regular; alphabetical ties.
+   only 1 Regular; alphabetical ties. [FIXED Session 42]
 5. 8.6.4 Muster fallback can pick a Province (3.5.3: Colony/City/WI
    only; muster.execute doesn't validate type either) + Q16 (Hortalez
    pre-ToA "up to 1D3" conflict — see QUESTIONS.md).
