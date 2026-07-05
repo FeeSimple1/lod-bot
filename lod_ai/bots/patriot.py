@@ -1096,9 +1096,15 @@ class PatriotBot(BaseBot):
         ]
         if not spaces:
             return False
+        # §8.5.3: "first in spaces with Active Support, within that
+        # first in the space with highest Population" — a BINARY
+        # Active-Support tier, then Population, then seeded ties (§8.2).
+        # (Session 44: was a raw support-level cascade, which wrongly
+        # ranked Passive Support above Neutral etc.)
         spaces.sort(key=lambda n: (
-            -self._support_level(state, n),
+            0 if self._support_level(state, n) == C.ACTIVE_SUPPORT else 1,
             -_MAP_DATA[n].get("population", 0),
+            state["rng"].random(),
         ))
         # Limited Command: 1 space only
         if state.get("_limited"):

@@ -3502,3 +3502,52 @@ Verification: both roots green — 1,333 (lod_ai/tests) + 41 (tests/) =
 soak 120 games clean; balance identical on all three scenarios (zero
 winner changes — the fixes bite only in rare zero-piece states), so no
 rebaseline was needed.
+
+## Session 44: §8.1.1 pop-weighting + §8.2 seeded ties — first sweep block (July 2026)
+
+Queue item 5, third slice — the "most Support/Opposition" weighting
+(§8.1.1: the value a space contributes to Total Support/Opposition,
+i.e. level x Population) and seeded ties at four selection sites.
+
+- Naval Pressure blockade pick ("then from the City with the most
+  Support"): was the raw support level; now level x Population.
+- Garrison displacement Province ("most Opposition then with least
+  Support, within that lowest Population"): Opposition/Support terms
+  now weighted; lowest Population separates remaining ties as before.
+- Muster Reward Loyalty (§8.4.5 "lowest total of Raid and Propaganda
+  markers, within that where the largest change in (Support -
+  Opposition) is possible"): the change is now affordable shift levels
+  x Population — capped by the purse after the per-marker costs and
+  the per-space Muster cost, with the Gage discount — instead of the
+  raw level distance to Active Support, uncapped.  The §8.4.5
+  prohibition ("do not Reward Loyalty in a space if only Raid and/or
+  Propaganda markers would be removed") is now enforced by filtering
+  candidates whose affordable change is zero (this also drops Pop-0
+  spaces, whose shift cannot change the total score).  Seeded ties.
+- Patriot Rabble-Rousing (§8.5.3 "first in spaces with Active Support,
+  within that first in the space with highest Population"): was a raw
+  support-level cascade that wrongly ranked Passive Support above
+  Neutral etc.; now a binary Active-Support tier, then Population,
+  then seeded ties.
+
+Tests: new test_pop_weighting_8_1_1.py (3 — weighted displacement
+through _select_displacement; the §8.4.5 affordable-change ordering;
+the §8.5.3 binary tier).
+
+Verification: both roots green — 1,336 (lod_ai/tests) + 41 (tests/) =
+1,377; clean-sweep gate seeds 1-10/11-20 clean with invariants on;
+soak 120 games clean.  Balance rebaselined (old → new): 1775
+P 0%→10%, B 25%→10%, I 75%→80%; 1776 P 45%→35%, I 10%→20%; 1778
+F 40%→60% (beyond band), B 20%→5%, P 30%→25% (26 winner changes).
+The magnitude is mostly trajectory shift — the new seeded tie-break
+draws perturb the rng stream in every game that Rabble-Rouses or
+Rewards Loyalty — plus a genuinely more selective RL (affordability
+cap + markers-only prohibition).  The 1778 British rate has now
+see-sawed 15→5→20→5 across Sessions 38-44 on comparable rng-stream
+shifts, which suggests 20-game-per-scenario samples are too small to
+read British 1778 strength from; ROADMAP Piece 8 (large-N stats) is
+the right instrument — flagged there rather than chased per-session.
+
+Remaining queue-5 items: Patriot Rally/March/Desertion/CoC block;
+any residual raw-level/first-seen sites outside the four fixed here
+(the Piece 3 card audit will catch handler-side ones).

@@ -459,8 +459,13 @@ class BritishBot(BaseBot):
                 rebels = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
                           + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0))
                 sup = self._support_level(state, sid)
-                # Priority: Battle space (0 first), most Rebels w/o Fort, most Support
-                key = (in_battle, 1 if has_pat_fort else 0, -rebels, -sup)
+                pop = _MAP_DATA.get(sid, {}).get("population", 0)
+                # Priority: Battle space (0 first), most Rebels w/o Fort,
+                # most Support — §8.1.1: "most Support" is the value the
+                # space contributes to Total Support, i.e. level x Pop
+                # (Session 44: was the raw level).
+                key = (in_battle, 1 if has_pat_fort else 0, -rebels,
+                       -(sup * pop))
                 if best_key is None or key < best_key:
                     best_key = key
                     best_city = sid
@@ -891,9 +896,12 @@ class BritishBot(BaseBot):
             if stype not in ("Colony", "Province"):
                 continue
             support_level = self._support_level(state, sid)
-            opp = max(0, -support_level)
-            sup = max(0, support_level)
             pop = _MAP_DATA.get(sid, {}).get("population", 0)
+            # §8.1.1: "most Opposition"/"least Support" are contribution
+            # values (level x Population); "lowest Population" then
+            # separates the remaining ties (Session 44: were raw levels).
+            opp = max(0, -support_level) * pop
+            sup = max(0, support_level) * pop
             # minimize: most opp, least support, lowest pop, seeded tie-break
             key = (-opp, sup, pop, rng.random())
             if best_key is None or key < best_key:
@@ -1090,11 +1098,26 @@ class BritishBot(BaseBot):
             prop_on_map = state.get("markers", {}).get(C.PROPAGANDA, {}).get("on_map", set())
 
             def _rl_key(n):
-                markers = (1 if n in raid_on_map else 0) + (1 if n in prop_on_map else 0)
-                sup = self._support_level(state, n)
-                shift = -sup
+                # §8.4.5: "first select the space or spaces with the
+                # lowest total of Raid and Propaganda markers, within
+                # that where the largest change in (Support - Opposition)
+                # is possible."  The change in the TOTAL score is shift
+                # levels x Population (§8.1.1), and "possible" caps the
+                # levels at what the purse can pay after the markers
+                # (Session 44: was raw levels, uncapped, no §8.2 tie).
+                markers = ((1 if n in raid_on_map else 0)
+                           + (1 if n in prop_on_map else 0))
                 already = 0 if n in all_selected else 1
-                return (already, markers, -shift)
+                max_shift = C.ACTIVE_SUPPORT - self._support_level(state, n)
+                muster_count = len(all_selected) + already
+                budget = (state["resources"].get(C.BRITISH, 0)
+                          - muster_count - markers)
+                if leader_location(state, "LEADER_GAGE") == n:
+                    budget += 1  # Gage discount (leader_capabilities)
+                affordable = min(max_shift, max(0, budget))
+                pop = _MAP_DATA.get(n, {}).get("population", 0)
+                return (already, markers, -(affordable * pop),
+                        state["rng"].random())
 
             rl_candidates = [
                 sid for sid, sp in state["spaces"].items()
@@ -1102,6 +1125,12 @@ class BritishBot(BaseBot):
                 and self._control(state, sid) == C.BRITISH
                 and sp.get(C.REGULAR_BRI, 0) >= 1
                 and sp.get(C.TORY, 0) >= 1
+            ]
+            # §8.4.5: "Do not Reward Loyalty in a space if only Raid
+            # and/or Propaganda markers would be removed" — a candidate
+            # whose affordable shift is zero levels is not eligible.
+            rl_candidates = [
+                s for s in rl_candidates if _rl_key(s)[2] < 0
             ]
             # §3.2 / §3.2.1: Muster (Limited Command) affects only 1 space.
             # When we've already filled the per-Muster space cap, the
