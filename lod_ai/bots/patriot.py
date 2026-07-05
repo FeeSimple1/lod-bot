@@ -1421,14 +1421,23 @@ class PatriotBot(BaseBot):
         return [sid for *_, sid in spaces]
 
     def ops_redeploy_washington(self, state: Dict) -> str | None:
-        """Redeploy Washington to space with most Continentals."""
-        best = None
-        best_cont = -1
+        """§8.5.6: Redeploy Washington to the space with most
+        Continentals.  §6.5.2 scopes legal targets to spaces with the
+        Faction's own pieces — at 0 Continentals the pick falls back to
+        any Patriot-piece space, and with no Patriot pieces anywhere
+        Washington goes to Available (None).  Ties seeded per §8.2.
+        (Session 43: the old scan could return a Patriot-less
+        dict-order space at 0 Continentals.)"""
+        rng = state["rng"]
+        best_key, best = None, None
         for sid, sp in state["spaces"].items():
-            cont = sp.get(C.REGULAR_PAT, 0)
-            if cont > best_cont:
-                best_cont = cont
-                best = sid
+            pat_pieces = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.MILITIA_A, 0)
+                          + sp.get(C.MILITIA_U, 0) + sp.get(C.FORT_PAT, 0))
+            if pat_pieces == 0:
+                continue  # §6.5.2: not a legal redeploy space
+            key = (-sp.get(C.REGULAR_PAT, 0), rng.random())
+            if best_key is None or key < best_key:
+                best_key, best = key, sid
         return best
 
     def ops_patriot_desertion_priority(self, state: Dict) -> List[Tuple[str, str]]:

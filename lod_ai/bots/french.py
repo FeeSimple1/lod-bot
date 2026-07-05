@@ -1037,20 +1037,29 @@ class FrenchBot(BaseBot):
         """Redeploy the French Leader to a space with French Regulars and
         Continentals if possible, within that where most French Regulars.
         """
-        best, best_score = None, -1
+        rng = state["rng"]
+        best_key, best = None, None
         for sid, sp in state["spaces"].items():
             fre = sp.get(C.REGULAR_FRE, 0)
             pat = sp.get(C.REGULAR_PAT, 0)
             if fre > 0 and pat > 0:
-                if fre > best_score:
-                    best, best_score = sid, fre
+                key = (-fre, rng.random())
+                if best_key is None or key < best_key:
+                    best_key, best = key, sid
         if best:
             return best
-        # Fallback: space with most French Regulars (no Continentals needed)
+        # Fallback: space with most French Regulars (no Continentals
+        # needed).  §6.5.2: only spaces with FRENCH pieces are legal —
+        # with no French Regulars on the map the Leader goes to
+        # Available (None).  Ties seeded per §8.2.  (Session 43: the
+        # old fallback could return a French-less dict-order space.)
         for sid, sp in state["spaces"].items():
             fre = sp.get(C.REGULAR_FRE, 0)
-            if fre > best_score:
-                best, best_score = sid, fre
+            if fre == 0:
+                continue
+            key = (-fre, rng.random())
+            if best_key is None or key < best_key:
+                best_key, best = key, sid
         return best
 
     def ops_loyalist_desertion_priority(self, state: Dict) -> List[Tuple[str, str]]:

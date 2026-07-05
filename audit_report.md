@@ -3465,3 +3465,40 @@ Remaining queue-5 long tail (next sessions): pop-weighting
 (level × Population per 8.1.1) + seeded tie-break sweep across
 british_bot/patriot; Patriot Rally/March/Desertion/CoC items; WQ
 redeploy 0-piece fallbacks.
+
+## Session 43: WQ Leader Redeploy fallbacks per §6.5.2 (July 2026)
+
+Queue item 5, second slice — the redeploy remnants from the survey
+(Patriots "Also", Indians "Also") plus the same defect found in the
+British and French picks on inspection.
+
+§6.5.2: "Each Faction may redeploy its Leader marker to a space with
+same Faction's pieces or Available."  All four bots' redeploy pickers
+initialised their best-score scan at -1, so when the primary metric was
+zero everywhere (no Continentals / British Regulars / French Regulars /
+War Parties on the map) the FIRST DICT-ORDER SPACE won — a space with
+no friendly pieces at all — and the year_end caller treated it as a
+legal destination instead of sending the Leader to Available.
+
+- Patriots (§8.5.6 "most Continentals"): candidates now require Patriot
+  pieces (Continentals, Militia, Fort); at 0 Continentals the pick
+  falls back to a Patriot-piece space; None (→ Available) otherwise.
+- British ("most British Regulars"): candidates require British pieces
+  (Regulars, Tories, Fort).
+- French (Regulars+Continentals, then most Regulars): the fallback tier
+  now requires French Regulars present; None otherwise.
+- Indians (Brant/Dragging Canoe "most War Parties"; Cornplanter's
+  qualifying-Province scan): candidates require Indian pieces — a
+  Village space is legal at 0 War Parties; Cornplanter's first-seen
+  dict-order pick over qualifying Provinces is now seeded (§8.2), as
+  are all four factions' remaining ties.
+
+Tests: new test_wq_redeploy_6_5_2.py (6 tests covering the zero-metric
+fallbacks, Available (None) with no friendly pieces anywhere, and the
+preserved primary priorities).
+
+Verification: both roots green — 1,333 (lod_ai/tests) + 41 (tests/) =
+1,374; clean-sweep gate seeds 1-10 and 11-20 clean with invariants on;
+soak 120 games clean; balance identical on all three scenarios (zero
+winner changes — the fixes bite only in rare zero-piece states), so no
+rebaseline was needed.

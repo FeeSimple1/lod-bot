@@ -1474,19 +1474,30 @@ class IndianBot(BaseBot):
         """
         result: Dict[str, str | None] = {}
 
+        rng = state["rng"]
+
         def _most_wp_space():
-            best_sid, best_n = None, -1
+            # §6.5.2: only spaces with INDIAN pieces (War Parties or
+            # Villages) are legal redeploy targets; with none anywhere
+            # the Leader goes to Available (None).  Ties seeded per
+            # §8.2.  (Session 43: the old scan returned a dict-order
+            # space with no Indian pieces when no War Parties were on
+            # the map, and broke most-WP ties by dict order.)
+            best_key, best_sid = None, None
             for sid, sp in state["spaces"].items():
                 n = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
-                if n > best_n:
-                    best_n = n
-                    best_sid = sid
+                if n + sp.get(C.VILLAGE, 0) == 0:
+                    continue
+                key = (-n, rng.random())
+                if best_key is None or key < best_key:
+                    best_key, best_sid = key, sid
             return best_sid
 
         for leader in ("LEADER_BRANT", "LEADER_DRAGGING_CANOE"):
             result[leader] = _most_wp_space()
 
         corn_target = None
+        corn_key = None
         for sid, sp in state["spaces"].items():
             mdata = _MAP_DATA.get(sid, {})
             if mdata.get("type") == "City":
@@ -1499,8 +1510,11 @@ class IndianBot(BaseBot):
                 continue
             if not self._village_room(state, sid):
                 continue
-            corn_target = sid
-            break
+            # Ties among qualifying Provinces seeded per §8.2 (was
+            # first-seen dict order).
+            key = rng.random()
+            if corn_key is None or key < corn_key:
+                corn_key, corn_target = key, sid
         if corn_target is None:
             corn_target = _most_wp_space()
         result["LEADER_CORNPLANTER"] = corn_target

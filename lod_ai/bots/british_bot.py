@@ -2019,14 +2019,22 @@ class BritishBot(BaseBot):
         return [sid for _, sid in pay_spaces]
 
     def bot_redeploy_leader(self, state: Dict) -> str | None:
-        """Redeploy: British Leader to the space with most British Regulars."""
-        best_sid = None
-        best_regs = -1
+        """Redeploy: British Leader to the space with most British
+        Regulars.  §6.5.2 scopes legal targets to spaces with the
+        Faction's own pieces (Regulars, Tories or a Fort); with none
+        anywhere the Leader goes to Available (None).  Ties seeded per
+        §8.2.  (Session 43: the old scan could return a British-less
+        dict-order space when no Regulars were on the map.)"""
+        rng = state["rng"]
+        best_key, best_sid = None, None
         for sid, sp in state["spaces"].items():
-            regs = sp.get(C.REGULAR_BRI, 0)
-            if regs > best_regs:
-                best_regs = regs
-                best_sid = sid
+            brit = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                    + sp.get(C.FORT_BRI, 0))
+            if brit == 0:
+                continue  # §6.5.2: not a legal redeploy space
+            key = (-sp.get(C.REGULAR_BRI, 0), rng.random())
+            if best_key is None or key < best_key:
+                best_key, best_sid = key, sid
         return best_sid
 
     def bot_loyalist_desertion(self, state: Dict, count: int) -> List[Tuple[str, int]]:
