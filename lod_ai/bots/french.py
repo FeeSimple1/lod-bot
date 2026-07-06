@@ -352,15 +352,12 @@ class FrenchBot(BaseBot):
             for sid in state.get("spaces", {}):
                 if _MAP_DATA.get(sid, {}).get("type") != "City":
                     continue
-                # No-benefit filter (S56, Q21): the engine models at most
-                # one Blockade per City; placing onto an already-blockaded
-                # City silently DESTROYED the marker (set.add no-op after
-                # pool decrement) while still raising FNI.  Skip such
-                # cities — same class as §8.4.5's "do not ... if only
-                # markers would be removed" and the S45 bullet-6 filter.
-                # Whether the §8.6.3 letter ("the City with most Support")
-                # demands literal STACKING (§4.5.3 note allows it) needs a
-                # marker-count data model — filed as Q21.
+                # Q21 (RULED, Eric July 2026): "add one Blockade ... to
+                # the City with most Support" carries an implicit
+                # not-already-blockaded qualifier — skip blockaded
+                # Cities (the Spread reading).  Historical note: before
+                # S56 a placement here silently DESTROYED the marker
+                # (set.add no-op after pool decrement) while raising FNI.
                 if sid in on_map:
                     continue
                 in_battle = 1 if sid in affected else 0
@@ -870,7 +867,7 @@ class FrenchBot(BaseBot):
                 if sid2 == battle_sid or not map_adj.is_city(sid2):
                     continue
                 if sid2 in _bloc_on:
-                    continue  # set model: moving onto it would lose the marker (S56/Q21)
+                    continue  # occupied City is not a Blockade destination (Q21 ruling; also guards the set model)
                 sup = self._support_level(st, sid2)
                 if sup > best_sup:
                     best_sup = sup

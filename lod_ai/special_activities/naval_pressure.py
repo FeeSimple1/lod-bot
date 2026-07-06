@@ -58,13 +58,13 @@ def _place_blockade_from_wi(state: Dict, city_id: str) -> None:
     if pool <= 0:
         raise ValueError("No Blockade markers in West Indies to place.")
     on_map = bloc.setdefault("on_map", set())
-    # S56 marker conservation: on_map is a SET (max one Blockade per
-    # City in this model); adding a duplicate silently DESTROYED the
-    # marker after the pool decrement.  §4.5.3's note allows physical
-    # stacking — representing that needs a count model (Q21); until
-    # then a duplicate placement must fail loudly, not lose a marker.
+    # S56 marker conservation + Q21 ruling (Eric, July 2026): non-player
+    # placement never targets an already-blockaded City (implicit
+    # qualifier in §8.6.3), and the set model holds one Blockade per
+    # City — a duplicate placement is a caller bug and must fail
+    # loudly, never lose the marker (the pre-S56 silent destruction).
     if city_id in on_map:
-        raise ValueError(f"{city_id} already holds a Blockade (set model; Q21).")
+        raise ValueError(f"{city_id} already holds a Blockade (Q21 ruling; set model).")
     bloc["pool"] = pool - 1
     on_map.add(city_id)
 

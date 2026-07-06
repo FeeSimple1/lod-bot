@@ -271,8 +271,8 @@ transcribes it.
 
 ---
 
-## Q20 (Session 56, OPEN, non-blocking): French March bullet 1 — "as
-many as possible" vs just-enough
+## Q20 (Session 56, RESOLVED — Eric ruled July 6 2026): French March
+bullet 1 — "as many as possible" vs just-enough
 
 §8.6.5: "March with as many French Regulars and Continentals as
 possible to add Rebellion Control, first in Cities, then Colonies..."
@@ -283,11 +283,15 @@ MAXIMUM movable French/Continentals into each control-adding
 destination (subject to lose-no-Rebellion-Control), or (b) move just
 enough to flip Control (current implementation, mirroring the British
 pattern).  (a) would concentrate French stacks — materially stronger
-French defense and follow-up Battles.  Current behavior kept at (b)
-pending ruling.
+French defense and follow-up Battles.
 
-## Q21 (Session 56, OPEN, non-blocking): Blockade stacking vs the
-one-per-City set model
+**Eric's ruling (July 6, 2026): interpretation (b)** — "Treat §8.6.5
+parallel to the British §8.4.3: move just enough to establish
+Rebellion Control at each destination."  Matches the implementation;
+no code change required.
+
+## Q21 (Session 56, RESOLVED — Eric ruled July 6 2026): Blockade
+stacking vs the one-per-City set model
 
 §4.5.3 note: "There is no limit to the number of Blockades that may
 be placed on one City."  The engine models city Blockades as a SET of
@@ -310,4 +314,10 @@ Reading (b) literal-letter target with as-modeled failure (NP falls
 through to Skirmish when the top city is blockaded) — Rebellion
 259/300 (86%): P133/F126/I37/B4.  The ruling swings the INDIANS by
 2x and the Patriot/French mix; the British stay ~1% under both, so
-Q21 is not the British lever.  Interim (a) kept pending ruling.
+Q21 is not the British lever.
+
+**Eric's ruling (July 6, 2026): interpretation (a)** — read "add one
+Blockade ... to the City with most Support" with an implicit
+not-already-blockaded qualifier (the Spread reading).  Matches the
+implementation; the set model stands (no count-model refactor);
+the loud duplicate guards stay as invariant protection.

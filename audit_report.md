@@ -4347,3 +4347,16 @@ Examples 2-5 (Garrison+expulsion, Muster+Skirmish, British Brilliant
 Stroke — the §8.3.7 exemplar, Indian Scout+War Path) are scoped with
 Playbook line ranges in the fixture header for next session.  No
 behavioral changes this commit; battery green (1,411 + 101).
+
+## Session 58: Q20/Q21 rulings recorded (July 2026)
+
+Eric ruled both open questions on July 6, 2026:
+- Q20 = interpretation (b): §8.6.5 parallel to §8.4.3 — French March
+  moves just enough to establish Rebellion Control per destination.
+  Matches the implementation; no code change.
+- Q21 = interpretation (a): §8.6.3's "the City with most Support"
+  carries an implicit not-already-blockaded qualifier (Spread).
+  Matches the S56 interim; set model stands; the loud duplicate
+  guards remain as invariant protection.
+QUESTIONS.md updated (Q1-Q21 now ALL RESOLVED); the four code
+comments citing pending/interim behavior now cite the rulings.
