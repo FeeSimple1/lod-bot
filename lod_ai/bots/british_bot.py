@@ -1296,9 +1296,12 @@ class BritishBot(BaseBot):
                 and not state.get("_limited")
                 and not state.get("_no_special")):
             self._apply_howe_fni(state)  # B38 Howe lowers FNI before SA
-            # §8.4.1: "First execute Naval Pressure, or if that is not
-            # possible, Skirmish." (Was inverted — Session 31.)
-            self._naval_then_skirmish(state)
+            # §8.4.2: "also Skirmish (8.4.1) or, if that is not possible,
+            # Naval Pressure (8.4.1)" — the (8.4.1) cites the SA
+            # DESCRIPTIONS, not Garrison's NP-first order; the flowchart
+            # B8 edge points to B11/Skirmish.  Session 31 had applied
+            # Garrison's order here (Session 54).
+            self._skirmish_then_naval(state)
         return True
 
     # =======================================================================
@@ -2125,63 +2128,51 @@ class BritishBot(BaseBot):
         return best_sid
 
     def bot_loyalist_desertion(self, state: Dict, count: int) -> List[Tuple[str, int]]:
-        """Loyalist Desertion: Remove Tories to change least Control,
-        if possible without removing last Tory in any space.
+        """§8.4.10: "Remove Tories so as to change the least Control
+        possible, if possible without removing the last Tory from any
+        space."  Each removal is scored on a live snapshot and the
+        priorities re-computed after every single Tory — the old static
+        margin sort bulk-removed from one space and could flip Control
+        mid-batch (Session 54, the §8.5.7 fix pattern from Session 45).
+        Control changes are §1.7 simulations; §8.2 seeded ties.
 
-        Returns list of (space_id, n_to_remove) totaling *count*.
+        Returns a list of (space_id, 1) removals totaling ≤ *count*.
         """
+        rng = state["rng"]
+        snap = {sid: dict(sp) for sid, sp in state["spaces"].items()}
+
+        def _ctl(sp):
+            reb = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+                   + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                   + sp.get(C.FORT_PAT, 0))
+            roy = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                   + sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
+                   + sp.get(C.FORT_BRI, 0) + sp.get(C.VILLAGE, 0))
+            bri = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                   + sp.get(C.FORT_BRI, 0))
+            if reb > roy:
+                return "REBELLION"
+            if roy > reb and bri > 0:
+                return C.BRITISH
+            return None
+
         removals: List[Tuple[str, int]] = []
-        remaining = count
-
-        # Build list of spaces with Tories, sorted by least Control impact
-        candidates: List[Tuple[tuple, str]] = []
-        for sid, sp in state["spaces"].items():
-            tories = sp.get(C.TORY, 0)
-            if tories == 0:
-                continue
-            # Compute how much control would change if we remove 1 Tory
-            royalist = (sp.get(C.REGULAR_BRI, 0) + tories
-                       + sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
-                       + sp.get(C.FORT_BRI, 0))
-            rebel = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
-                    + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
-                    + sp.get(C.FORT_PAT, 0))
-            margin = royalist - rebel
-            is_last = 1 if tories == 1 else 0  # avoid last Tory
-            # Sort: avoid last first, then least margin change (biggest margin first)
-            candidates.append(((is_last, -margin), sid))
-
-        candidates.sort()
-
-        for _, sid in candidates:
-            if remaining <= 0:
+        for _ in range(count):
+            best_key, best_sid = None, None
+            for sid, sp in snap.items():
+                if sp.get(C.TORY, 0) == 0:
+                    continue
+                after = dict(sp)
+                after[C.TORY] -= 1
+                changes = 1 if _ctl(after) != _ctl(sp) else 0
+                is_last = 1 if sp.get(C.TORY, 0) == 1 else 0
+                key = (changes, is_last, rng.random())
+                if best_key is None or key < best_key:
+                    best_key, best_sid = key, sid
+            if best_sid is None:
                 break
-            sp = state["spaces"][sid]
-            tories = sp.get(C.TORY, 0)
-            # Avoid removing last Tory if possible (only do it if we must)
-            can_take = tories - 1 if tories > 1 else 0
-            if can_take <= 0 and remaining > 0:
-                # Only take last Tory if we must
-                continue
-            take = min(can_take, remaining)
-            if take > 0:
-                removals.append((sid, take))
-                remaining -= take
-
-        # If we still need more, reluctantly take last Tories
-        if remaining > 0:
-            for _, sid in candidates:
-                if remaining <= 0:
-                    break
-                sp = state["spaces"][sid]
-                tories = sp.get(C.TORY, 0)
-                already = sum(n for s, n in removals if s == sid)
-                left = tories - already
-                if left > 0:
-                    take = min(left, remaining)
-                    removals.append((sid, take))
-                    remaining -= take
-
+            snap[best_sid][C.TORY] -= 1
+            removals.append((best_sid, 1))
         return removals
 
     @staticmethod

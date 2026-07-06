@@ -4058,3 +4058,34 @@ side 63-87%.  Recommendation recorded: finish the §8.4 UNVERIFIED
 verification pass before tuning (the French were 0% until Session 50
 found unimplemented rules; the British rows have had no equivalent
 pass since Sessions 38-39).
+
+## Session 54: §8.4 British pass, part 1 — Muster SA order, Loyalist Desertion (July 2026)
+
+Driven by the Session 53 large-N finding (British 1-3% everywhere).
+
+- §8.4.2 verified line-by-line against the text and §3.2.1: Regulars
+  one-space-up-to-six (3.2.1 governs), Tory P1-P3 (S37 work confirmed),
+  RL-or-Fort step (S44 work confirmed), entry gate.  ONE deviation
+  found: the post-Muster SA ran Naval-Pressure-first — Session 31 had
+  applied GARRISON's §8.4.1 order to Muster, but §8.4.2 says "also
+  Skirmish (8.4.1) or, if that is not possible, Naval Pressure" (the
+  8.4.1 cites are the SA descriptions, not the order; flowchart B8's
+  edge to B11/Skirmish agrees).  Fixed.
+- §8.4.10 Loyalist Desertion rewritten to per-Tory re-scored removal
+  with §1.7 control simulation and §8.2 seeded ties (the old static
+  margin sort could bulk-empty a stack and flip Control mid-batch —
+  the §8.5.7 pattern from Session 45).
+- §8.4.6 Indian Trade offer verified correct (gate, 1D6, half round
+  up).
+
+Tests: test_british_84_s54.py (2).  Battery: 1,434 + 41 green; gate
+1-20 clean; soak 120 DONE clean; smoke rebaselined (20-game noise).
+
+Large-N rerun (300 games, seeds 5000+, largeN_s54.jsonl): British
+STILL 0-2% — the Muster SA order was not the lever.  1775
+P23/B0/F50/I27; 1776 P57/B1/F38/I4; 1778 P20/B2/F69/I9.  Remaining
+suspects, in order: §8.4.4 Battle details (last audited S19-20,
+before the S28 errata and everything since), the B-node flowchart
+inventory (never done), the B2→B6→B9 decision gates' thresholds, and
+the structural CRC>CBC starvation (rebel bots now waste few pieces).
+That is the next session's target.
