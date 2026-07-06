@@ -3903,3 +3903,56 @@ scenarios IN BAND (1775 P -5/B +5; 1776 P -5/I +5; 1778 F +5/I -5;
 Remaining Piece 3: the never-audited remainder of the 109 cards
 (cross-check audit_report session lists against all 96 event
 handlers); T7/T8 general layers; T10 BS details.
+
+## Session 50: T10 Brilliant Stroke details — the Treaty of Alliance was never played (July 2026)
+
+T10 verification pass over §8.3.7/§2.3.8/§2.3.9 + the §8.1 NP note.
+
+THE find: **no bot path ever declared the Treaty of Alliance.**
+bot_wants_bs requires toa_played=True, card 109 is held (never drawn),
+and _collect_bot_bs_declarations had no ToA branch — so in bot-only
+1775/1776 games the French never entered the war, never qualified for
+victory (§2.3.9/§7.2), and spent every game in the pre-ToA flowchart.
+Confirmed empirically: 60+ cards into 1775/1776 sims, toa_played still
+False; French 1775/1776 win rate was 0% since the beginning of the
+project.  Fixed: the engine now declares ToA for a bot French when
+§2.3.9's conditions hold with the §8.1 note applied — Available French
+Regulars + AVAILABLE Squadrons/Blockades + CBC/2 > 15 (nonplayer
+preparations_total; the interrupt site already guarantees no-WQ and
+1st-Eligible-not-acted).  _bs_is_legal uses the NP total for a bot
+French.
+
+Second find: preparations_total counted UNAVAILABLE Squadrons —
+§2.3.9 says "Available French Regulars and Squadrons/Blockades", and
+§1.3.9 keeps Unavailable pieces out of play; the total overcounted by
+3 at 1775 setup.  Now WI pool + placed markers only.  (Two superseded
+test fixtures rewritten with citations.)
+
+Third find: **every bot Brilliant Stroke ran with NO Special
+Activity** — _try_bs_special_activity dispatched with space=None, so
+every space-requiring SA raised and was silently skipped (the Patriot
+list even offered the British-only Common Cause).  §8.3.7 "use the
+flowchart to select the SA" now routes through the bots' own SA
+pickers (B: Skirmish→Naval Pressure; P: Partisans→Skirmish→Persuasion
+per §8.5.1; F: Skirmish→Naval Pressure→Préparer la Guerre; I: War
+Path→Plunder→Trade).
+
+Verified OK: trump hierarchy (ToA > Indians > French > British >
+Patriots, ToA untrumpable) incl. the S34 reaction re-poll;
+abort-if-no-Leader-LimCom with card return; no-WQ + before-1st-action
+gating; 8.4.11/8.5.8/8.6.11/8.7.8 trigger conditions in bot_wants_bs.
+T10 residuals (TRACEABILITY): second LimCom is a battle/muster/rally
+approximation rather than a flowchart re-entry; SA "match the first
+Command" pairing is a fixed chain; leader-involvement treats the
+Leader's space as the LimCom space (origination nuance for
+March/Scout/Raid/Garrison).
+
+Tests: new test_bs_t10_s50.py (4).
+
+Verification: both roots green — 1,391 (lod_ai/tests incl. commands/)
++ 41 = 1,432; gate seeds 1-20 clean invariants-on; soak 120 DONE
+clean.  Balance: 1778 IDENTICAL (ToA pre-played there — a clean
+control); 1775 F 0→50 (!), I 50→15, B 15→0; 1776 F 0→35, B 20→0,
+P 70→60.  Rebaselined.  The French now actually fight the war they
+were designed to join; British/Indian early-scenario rates need
+Piece 8 reads on the new regime before any tuning talk.

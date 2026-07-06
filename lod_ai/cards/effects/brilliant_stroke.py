@@ -67,13 +67,26 @@ def mark_bs_played(state, key: str, played: bool) -> None:
     bs_played_map(state)[key] = played
 
 
-def preparations_total(state) -> int:
+def preparations_total(state, *, nonplayer: bool = False) -> int:
     """French Preparations = Available French Regulars + Squadrons/Blockades
-    + Cumulative British Casualties (§2.3.9)."""
+    + Cumulative British Casualties (§2.3.9).
+
+    §8.1 note: "While the entire CBC counts towards allowing the Treaty
+    of Alliance for players, Non-player French only count half of it"
+    — pass nonplayer=True for the bot's ToA timing (Session 50).
+    """
     available = state.get("available", {})
     fre_regs = available.get(REGULAR_FRE, 0)
-    naval = total_blockades(state)
+    # §2.3.9 counts AVAILABLE Squadrons/Blockades — the West Indies pool
+    # and any placed on Cities, NOT the Unavailable box (§1.3.9;
+    # Session 50: total_blockades() included Unavailable and overcounted
+    # Preparations by 3 at 1775 setup).
+    from lod_ai.util.naval import west_indies_blockades, _blockade_markers
+    naval = (west_indies_blockades(state)
+             + len(_blockade_markers(state).get("on_map", set())))
     cbc = state.get("cbc", 0)
+    if nonplayer:
+        cbc //= 2
     return fre_regs + naval + cbc
 
 

@@ -752,7 +752,9 @@ class Engine:
         if not self.state.get("eligible", {}).get(fac, True):
             return False
         if info.get("toa"):
-            return bs.toa_available(self.state) and bs.preparations_total(self.state) > 15
+            np = C.FRENCH not in self.human_factions   # §8.1 half-CBC note
+            return (bs.toa_available(self.state)
+                    and bs.preparations_total(self.state, nonplayer=np) > 15)
         return bs.bs_available(self.state, fac)
 
     @staticmethod
@@ -937,6 +939,18 @@ class Engine:
         """Evaluate every bot faction's trigger conditions and return a list
         of faction strings for those that want to play BS."""
         decls: list[str] = []
+        # §2.3.9 + §8.1 note: Non-player French play the Treaty of
+        # Alliance as soon as its conditions hold — Available French
+        # Regulars + Squadrons/Blockades + HALF of CBC exceed 15, French
+        # Eligible (the interrupt site already guarantees no WQ card and
+        # that the 1st Eligible has not acted).  Session 50: no bot path
+        # ever declared ToA, so bot-only 1775/1776 games never entered
+        # the French war at all.
+        if (C.FRENCH not in self.human_factions
+                and bs.toa_available(self.state)
+                and self.state.get("eligible", {}).get(C.FRENCH, True)
+                and bs.preparations_total(self.state, nonplayer=True) > 15):
+            decls.append(bs.TOA_KEY)
         for fac in (C.BRITISH, C.PATRIOTS, C.INDIANS, C.FRENCH):
             if fac in self.human_factions:
                 continue   # humans declare via the interactive prompt
@@ -995,22 +1009,45 @@ class Engine:
         return True
 
     def _try_bs_special_activity(self, faction: str) -> None:
-        """Execute the faction's SA per flowchart, independently."""
-        # Each faction's preferred SA
-        sa_map = {
-            C.BRITISH:  ["skirmish", "common_cause"],
-            C.PATRIOTS: ["partisans", "common_cause"],
-            C.FRENCH:   [],  # Préparer la Guerre handled separately
-            C.INDIANS:  ["war_path", "trade"],
-        }
+        """§8.3.7: "Use the flowchart to select the Special Activity …
+        but if possible execute it independently."  Route through the
+        bots' own SA pickers, which choose spaces per their flowchart
+        nodes (Session 50: the old dispatcher calls passed space=None,
+        so every space-requiring SA raised and every bot BS ran with NO
+        Special Activity; the Patriot list even offered the
+        British-only Common Cause).
+        """
+        bot = self.bots.get(faction)
+        if not bot:
+            return
         self._reset_trace_on(self.state)
-        for sa in sa_map.get(faction, []):
+        chains = {
+            C.BRITISH:  ("_try_skirmish", "_try_naval_pressure"),
+            C.PATRIOTS: ("_try_partisans", "_try_skirmish",
+                         "_try_persuasion"),          # §8.5.1 chain
+            C.FRENCH:   ("_try_skirmish", "_try_naval_pressure"),
+            C.INDIANS:  ("_war_path", "_plunder", "_trade"),
+        }
+        for name in chains.get(faction, ()):
+            fn = getattr(bot, name, None)
+            if fn is None:
+                continue
             try:
-                self.dispatcher.execute(sa, faction=faction, space=None)
-                normalize_state(self.state)
-                return
+                if fn(self.state):
+                    normalize_state(self.state)
+                    return
             except Exception:
                 continue
+        # French fallback: Préparer la Guerre (§4.5.1) has no
+        # space-picker method — module-level helper.
+        if faction == C.FRENCH:
+            try:
+                from lod_ai.bots.french import _preparer_la_guerre
+                if _preparer_la_guerre(self.state,
+                                       self.state.get("toa_played", False)):
+                    normalize_state(self.state)
+            except Exception:
+                pass
 
     def _try_bs_second_limcom(self, faction: str, exclude: str) -> None:
         """Try a second Limited Command in any eligible space except *exclude*."""

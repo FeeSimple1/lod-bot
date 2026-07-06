@@ -199,9 +199,16 @@ no citation despite likely implementations.
   789/1069, late_war.py ~156/168/204/209/340/351/803/1013, middle_war.py
   ~582/596/1094. Each goes through the agents.md card workflow with the
   Piece 3 audit.
-- **T10 (P3)** §8.3.7 details: abort-if-no-Leader-LimCom, SA-independence,
-  simultaneous-BS trump order, §8.1 ToA numeric condition — locate and
-  verify each.
+- **T10 (P3)** FIXED (Session 50) — bot ToA declaration existed nowhere
+  (French never entered the war in bot 1775/1776 games; French win rate
+  was structurally 0%); §8.1 half-CBC NP preparations + §2.3.9
+  Available-only Squadron counting implemented; bot BS SAs actually
+  execute now (space=None dispatch had silently skipped every one).
+  Verified: trump order + S34 re-poll, abort-if-no-Leader-LimCom,
+  no-WQ/before-1st-action gates.  Residual: second LimCom is a
+  battle/muster/rally approximation (not flowchart re-entry); SA
+  pairing is a fixed chain; Leader-origination nuance for
+  March/Scout/Raid/Garrison LimComs.
 - **T11 (P3)** §8.8 one-player victory rules for human+bot seatings:
   verify or implement (lone player never wins mid-game; NP tie order
   French > Indian > Patriot; difficulty option).

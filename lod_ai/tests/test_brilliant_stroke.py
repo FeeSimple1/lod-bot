@@ -78,7 +78,10 @@ def test_treaty_of_alliance_trumps_and_cannot_be_trumped():
 
     engine.state["leaders"]["LEADER_ROCHAMBEAU"] = "Massachusetts"
     engine.state["spaces"]["Massachusetts"][C.REGULAR_FRE] = 1
-    engine.state["available"][C.REGULAR_FRE] = 13
+    # §2.3.9: Preparations count AVAILABLE Regulars/Squadrons only —
+    # 16 Available Regulars clear the >15 bar (Session 50: the old
+    # fixture leaned on Unavailable Blockades, which no longer count).
+    engine.state["available"][C.REGULAR_FRE] = 16
     engine.state["unavailable"][C.BLOCKADE] = 3
     engine.state["cbc"] = 0
 
@@ -136,20 +139,20 @@ def test_british_reward_loyalty_cost_not_waived_in_brilliant_stroke():
 # New tests: bot BS conditions, preparations_total, bot execution
 # ---------------------------------------------------------------
 
-def test_preparations_total_uses_full_cbc():
-    """preparations_total should use full CBC per §2.3.9."""
-    from lod_ai.util.naval import _blockade_markers
+def test_preparations_total_uses_full_cbc_and_available_naval():
+    """§2.3.9: full CBC for players, and only AVAILABLE
+    Squadrons/Blockades (the WI pool + placed markers) — the
+    Unavailable box does not count (§1.3.9; Session 50 rewrote the
+    old expectation that included it)."""
     state = {
         "available": {C.REGULAR_FRE: 4},
         "unavailable": {C.BLOCKADE: 2},
         "markers": {C.BLOCKADE: {"pool": 1, "on_map": set()}},
         "cbc": 10,
+        "spaces": {},
     }
-    # Available French Regulars = 4
-    # Total blockades = pool(1) + on_map(0) + unavail(2) = 3
-    # CBC = 10
-    # Total = 4 + 3 + 10 = 17
-    assert bs.preparations_total(state) == 17
+    # 4 Regulars + pool(1) [unavailable 2 EXCLUDED] + CBC 10 = 15
+    assert bs.preparations_total(state) == 15
 
 
 def test_bot_wants_bs_requires_toa_played():
