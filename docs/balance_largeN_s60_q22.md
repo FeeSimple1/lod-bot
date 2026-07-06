@@ -36,3 +36,10 @@ British 26/300 with the Howe-scenario 1776 at 22%.  The Indian 1775
 number (45%) is §7.3 final-scoring dominance on the now-Royalist
 support race (S62 margin-source read in audit_report — rules-verified
 inputs; design-meta for Eric).
+
+## Addendum: post-S63 (largeN_s63.jsonl)
+
+After the target-aware event sweep: P 7/26/21, B 2/22/3, F 45/31/66,
+I 46/21/10 — Royalist 104/300 (35%), stable vs S62 (the sweep is
+correctness in the event gate, not a balance lever; British event
+plays shift slightly toward commands on the fixed-target cards).
