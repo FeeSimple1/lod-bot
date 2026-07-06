@@ -230,3 +230,49 @@ def test_indian_reserve_defense_modifier_counts_villages():
     assert with_village == without - 1, (
         "Village-only Reserve defense must apply the -1 modifier"
     )
+
+
+def test_cc_war_parties_absorb_losses_in_tory_slot():
+    """Q19 (Playbook p.~850): CC War Parties absorb Battle losses "as a
+    Tory" — the §3.6.7 alternation takes Regular, then a CC WP (to
+    Available, no CBC) before more Regulars, sparing British cubes."""
+    from lod_ai.commands import battle
+    state = _fresh()
+    for sid, sp in state["spaces"].items():
+        for tag in (C.REGULAR_BRI, C.REGULAR_PAT, C.REGULAR_FRE,
+                    C.MILITIA_A, C.MILITIA_U, C.FORT_PAT, C.TORY,
+                    C.WARPARTY_A, C.WARPARTY_U, C.FORT_BRI, C.VILLAGE):
+            sp[tag] = 0
+    sp = state["spaces"]["Virginia"]
+    sp[C.REGULAR_BRI] = 4
+    sp[C.WARPARTY_A] = 2
+    sp[C.REGULAR_PAT] = 6
+    sp[C.MILITIA_U] = 1     # +1 attacker-loss mod -> ODD loss level, so
+    #                         the Tory-slot absorption visibly spares a
+    #                         Regular (even losses hide it: the mandated
+    #                         alternation overshoots to the same Regulars)
+    state["resources"][C.BRITISH] = 5
+    refresh_control(state)
+    import copy
+    base = copy.deepcopy(state)
+
+    cbc0 = state.get("cbc", 0)
+    battle.execute(state, C.BRITISH,
+                   {"common_cause": {"Virginia": 2}}, ["Virginia"])
+    with_cc_regs_lost = 4 - state["spaces"]["Virginia"].get(C.REGULAR_BRI, 0)
+    with_cc_wp_lost = 2 - state["spaces"]["Virginia"].get(C.WARPARTY_A, 0)
+    with_cc_cbc = state.get("cbc", 0) - cbc0
+
+    battle.execute(base, C.BRITISH, {}, ["Virginia"])
+    no_cc_regs_lost = 4 - base["spaces"]["Virginia"].get(C.REGULAR_BRI, 0)
+
+    total_with_cc = with_cc_regs_lost + with_cc_wp_lost
+    assert total_with_cc >= 3, "setup should force 3+ attacker removals"
+    # Q19: the WPs absorb in the Tory slot, so strictly fewer Regulars
+    # die than in the same battle without CC.
+    assert with_cc_wp_lost >= 1, "a CC WP must have absorbed a loss"
+    assert with_cc_regs_lost < no_cc_regs_lost, (
+        "CC absorption must spare British Regulars (Q19 / Playbook)"
+    )
+    # CBC counts cubes/forts only — the absorbed WPs add nothing.
+    assert with_cc_cbc == with_cc_regs_lost

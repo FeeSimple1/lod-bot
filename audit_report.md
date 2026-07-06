@@ -4191,3 +4191,25 @@ green; gates 1-10/11-20 clean; soak 120 invariants DONE clean;
 balance rebaselined.  90-game diagnostic: outcome mix essentially
 unchanged (British battles are only ~1/game, so CC parity moves few
 events) — the structural investigation continues.
+
+## Session 55 (cont.): Q19 resolved by reference — CC War Parties absorb losses as Tories (July 2026)
+
+The Playbook (p.~850, "Indian War Parties can also be used in a
+Battle") settles Q19 same-session: "if the Common Cause Special
+Activity was used — as a Tory adding to Force Level AND ABSORBING
+LOSSES."  Implemented in battle.py _remove: up to cc_wp Active War
+Parties fill the TORY slot of the §3.6.7 Regulars/Tories alternation
+(WP before own Tories within the slot — §8.1.2 "without removing the
+last Tory"; the WP routes to Available and increments no casualties
+track, §3.6.7 "Other removed pieces to Available").  Observed effect:
+at odd attacker Loss Levels a Regular is spared (CBC 3 -> 2 in the
+test fixture); at even levels the mandated alternation overshoots to
+the same Regulars (and burns a WP) — parity quirk documented in the
+test.  QUESTIONS.md Q19 marked RESOLVED BY REFERENCE (flagged for
+Eric's confirmation, non-blocking).
+
+Tests: +1 (CC absorption, with/without-CC differential).  Battery:
+1,403 + 101 green; gates 1-10/11-20 clean; soak 120 DONE clean;
+balance rebaselined.  Large-N rerun (largeN_s55b.jsonl): unchanged
+from the s55 read (British 1/5/2% — CC battles are too rare for Q19
+to move the aggregate).

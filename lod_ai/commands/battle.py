@@ -674,7 +674,20 @@ def _resolve_space(
 
     # -- Casualty removal (S3.6.7) --
     def _remove(side: str, loss: int) -> tuple[int, bool]:
-        """Alternate removal per S3.6.7. Underground pieces ignored."""
+        """Alternate removal per S3.6.7. Underground pieces ignored.
+
+        Q19 (resolved by reference, S55): Common-Cause War Parties are
+        utilized "as if they were Tories" (§4.2.1) and the Playbook is
+        explicit — "if the Common Cause Special Activity was used — as
+        a Tory adding to Force Level AND ABSORBING LOSSES" (Playbook
+        p.~850, Indian War Parties in Battle).  So up to cc_wp Active
+        War Parties fill the TORY slot of the Regulars/Tories
+        alternation.  Within the slot the loaned WP absorbs before the
+        British's own Tories (§8.1.2 spirit: "if possible without
+        removing the last Tory"; a WP routes to Available and counts
+        toward no casualties track — War Parties are not cubes, §3.6.7
+        "Other removed pieces to Available").
+        """
         if loss <= 0:
             return 0, False
 
@@ -682,6 +695,7 @@ def _resolve_space(
         removed = 0
         removed_cube_or_fort = False
         remaining_loss = loss
+        cc_left = cc_wp if side == "ROYALIST" else 0
 
         def _take_one(tag: str) -> bool:
             nonlocal removed, remaining_loss, removed_cube_or_fort
@@ -696,12 +710,24 @@ def _resolve_space(
                 removed_cube_or_fort = True
             return True
 
+        def _take_tory_slot() -> bool:
+            """One removal from the Tory slot: CC War Parties first
+            (Q19 — they absorb "as a Tory"), then real Tories."""
+            nonlocal removed, remaining_loss, cc_left
+            if cc_left > 0 and sp.get(WARPARTY_A, 0) > 0:
+                remove_piece(state, WARPARTY_A, sid, 1, to="available")
+                removed += 1
+                remaining_loss -= loss_value(WARPARTY_A)
+                cc_left -= 1
+                return True
+            return _take_one(TORY)
+
         if side == "ROYALIST":
-            # Phase 1: Alternate Regulars and Tories
+            # Phase 1: Alternate Regulars and Tories (CC WP in Tory slot)
             while remaining_loss > 0:
                 took_reg = _take_one(REGULAR_BRI)
                 if remaining_loss > 0:
-                    took_tory = _take_one(TORY)
+                    took_tory = _take_tory_slot()
                 else:
                     break
                 if not took_reg and not took_tory:
