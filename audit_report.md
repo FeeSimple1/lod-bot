@@ -4037,3 +4037,24 @@ non-player-French tie would resolve wrongly.  Stays with C7/T11.
 
 No fixes required — four sessions' worth of Piece 3 hardening appears
 to have left the human path and the bots stable under human-mode play.
+
+## Session 53: C7 §7.1 ranking + Piece 8 first large-N balance read (July 2026)
+
+C7 (confirmed live in S52 game 3): final_scoring now applies §7.1's
+NON-PLAYERS-FIRST tie tier ahead of the Patriots>British>French>Indians
+order (bot-only games unaffected — the tier no-ops with no human
+seats), logs 1st-4th placements, and victory.check identifies the
+passer with §7.1's "all players lose equally" note when a Non-player
+passes with humans seated.  Tests: test_victory_ranking_s53.py (3).
+Battery: both roots green (1,391 + 41 + canary), gate 1-20 clean; no
+soak/balance rerun (zero bot-only behavior delta — tie tier inert
+without humans, remainder is history lines).
+
+Piece 8: first instrumented large-N run — 300 games, seeds 5000+,
+full write-up in docs/balance_largeN_s53.md.  Headline: the British
+win 1-3% in ALL scenarios with CIs excluding parity — a measured
+structural fact, not the 20-game noise of prior sessions.  Rebellion
+side 63-87%.  Recommendation recorded: finish the §8.4 UNVERIFIED
+verification pass before tuning (the French were 0% until Session 50
+found unimplemented rules; the British rows have had no equivalent
+pass since Sessions 38-39).
