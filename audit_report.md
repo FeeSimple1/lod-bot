@@ -4398,3 +4398,45 @@ fixed).  Example 1 remains green.  Battery: 1,411 + 101 green +
 1 xfailed.  Fixes are S59's first item — they are Royalist-SIDE
 strength fixes (better Scout stacks, Brant positioning, War Path
 targeting), the first British-helping fidelity finds since S55.
+
+## Session 59: D1-D3 fixed — Example 5 golden flipped GREEN (July 2026)
+
+All three Playbook-Example-5 deviations fixed and the strict-xfail
+removed; the fixture now reproduces the designer's walk-through
+end-to-end (group mix, Brant die, War Path target, fees, CBC/CRC).
+
+- D1 (corrected scope): the Scout DID move its War Party (S58's
+  "no WP" read came from the executor not logging the WP move — the
+  history gap misled the diagnosis; the golden's asserts were right).
+  The real defect was the R/T MIX: _scout_budget greedily filled
+  Regulars (3R+0T).  Now selected by the §8.1.2 alternation idiom
+  ("beginning with whichever is fewest in the space (Regulars if
+  even)") under the §3.4.3 caps (1+ Regular, Tories <= Regulars) —
+  yields the Playbook's exact 2R+1T from a 3R/3T stack.
+- D2: the post-Scout leader follow re-ran the WQ most-WPs redeploy
+  and teleported Brant toward uninvolved spaces.  Now move-aware:
+  moved-vs-staying WPs compared in the origin; tie -> D6, 1-3
+  follows (Playbook procedure; die logged to rng_log).  NOTE: the
+  generic follow-after-move used by March/Raid paths still uses the
+  redeploy heuristic — flagged for the goldens to exercise (no
+  ground truth for those paths yet).
+- D3: War Path ranked targets by enemy PRESENCE; §8.7.1 says "the
+  most Rebellion pieces POSSIBLE" — now ranked by what the chosen
+  option can actually remove (option 2 needs 2+ UG WPs AND 2+
+  Rebellion cubes; option-3 Fort feasibility — 2+ UG WPs, no cubes —
+  now gates the fort tier, fixing a latent trap where an infeasible
+  fort space outranked everything and aborted the SA).  Village-
+  province tiebreak now effective.  war_path.py executor removal
+  order fixed to §8.1.2 (Militia before Continentals/French) in both
+  option blocks; 2 superseded tests REWRITTEN with citations.
+- Test-harness note: _ScriptedRng must not forward dunders and needs
+  __deepcopy__ — the engine simulates each bot turn on a deepcopy of
+  the state, and the wrapper otherwise degraded into a recursing
+  hollow object whose exception the engine converted into a silent
+  INDIAN PASS (the S58 probe's misleading first read).
+
+Battery: 1,412 + 101 green (2 rewritten); gates 1-10/11-20 clean;
+soak 120 invariants DONE clean; balance rebaselined.  Large-N
+(largeN_s59.jsonl): P 27/61/28, B 3/1/1, F 53/32/68, I 17/6/3 —
+statistically unchanged (Scout fires ~once/game; correctness, not a
+lever).  Examples 2-4 remain the queue head.

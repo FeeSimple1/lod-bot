@@ -267,9 +267,11 @@ class TestWarPath:
         })
         state["available"][C.WARPARTY_A] = 5
         war_path.execute(state, C.INDIANS, {}, "Ohio", option=1)
-        # Option 1 removes 1 piece: the Continental (first cube in priority).
-        # No extra Militia should be removed since Brant is not present.
-        assert state["spaces"]["Ohio"].get(C.MILITIA_A, 0) == 3
+        # §8.1.2 enemy-removal order (S59): Militia BEFORE the cube types
+        # — option 1 removes 1 Militia; the Continental survives.  No
+        # extra Militia since Brant is not present.
+        assert state["spaces"]["Ohio"].get(C.MILITIA_A, 0) == 2
+        assert state["spaces"]["Ohio"].get(C.REGULAR_PAT, 0) == 1
 
     def test_brant_removes_extra_militia(self):
         """With Brant present, War Path removes 1 additional Militia."""
@@ -282,8 +284,9 @@ class TestWarPath:
         })
         state["available"][C.WARPARTY_A] = 5
         war_path.execute(state, C.INDIANS, {}, "Ohio", option=1)
-        # Option 1 removes 1 Continental. Brant removes 1 extra Militia.
-        assert state["spaces"]["Ohio"].get(C.MILITIA_A, 0) == 2
+        # §8.1.2 (S59): option 1 removes 1 Militia (before cube types);
+        # Brant removes 1 extra Militia -> 2 gone.
+        assert state["spaces"]["Ohio"].get(C.MILITIA_A, 0) == 1
 
     def test_option1_rejects_fort_only(self):
         """Option 1 requires Rebellion units (cubes/Militia), not just a Fort."""

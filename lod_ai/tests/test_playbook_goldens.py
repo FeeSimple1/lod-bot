@@ -85,28 +85,26 @@ class _ScriptedRng:
             return self._script.pop(0)
         return self._base.randint(a, b)
 
+    def __deepcopy__(self, memo):
+        # The engine simulates each bot turn on a deepcopy of the state
+        # (engine._simulate_action) and commits the sandbox wholesale —
+        # the wrapper must survive the copy WITH its remaining script.
+        import copy as _c
+        return _ScriptedRng(_c.deepcopy(self._base, memo),
+                            list(self._script))
+
     def __getattr__(self, name):
+        # Never forward dunders: deepcopy/pickle would otherwise hijack
+        # the base Random's __getstate__/__setstate__ and produce a
+        # hollow wrapper whose attribute lookups recurse forever.
+        if name.startswith("_"):
+            raise AttributeError(name)
         return getattr(self._base, name)
 
 
 import pytest
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="S58 golden findings — engine diverges from Playbook Example 5 "
-    "in three places: (D1) Scout moves NO War Party and no Tory "
-    "(§3.4.3: 'the Indians move at least one War Party ... At least one "
-    "British Regular must (and Tories up to the number of Regulars may) "
-    "move with the War Parties'; §8.7.4: 'Move one War Party and the "
-    "most Regulars and Tories possible'; §8.1.2 alternation R,T,R gives "
-    "the Playbook's 2R+1T); (D2) Brant leader-follow ignores the "
-    "moving-equals-staying D6 (1-3 follows) and 'follows' a phantom "
-    "group to Quebec; (D3) War Path ignores the Village-space tiebreak "
-    "('within each first in a province with at least one Village') and "
-    "removes a Continental where §8.1.2 removes Militia first.  Fix in "
-    "S59, then remove this mark.",
-)
 def test_playbook_example_5_indian_scout_war_path():
     """Playbook Example 5 (p.26): 1776 Medium Scenario + one extra War
     Party in each Indian Reserve (3 left Available) + 2 Indian

@@ -963,25 +963,35 @@ class IndianBot(BaseBot):
         """
         choices = []
         for sid, sp in state["spaces"].items():
-            if sp.get(C.WARPARTY_U, 0) == 0:
+            wp_u = sp.get(C.WARPARTY_U, 0)
+            if wp_u == 0:
                 continue
-            enemy = (
-                sp.get(C.FORT_PAT, 0)
-                + sp.get(C.MILITIA_A, 0)
-                + sp.get(C.MILITIA_U, 0)
-                + sp.get(C.REGULAR_PAT, 0)
-                + sp.get(C.REGULAR_FRE, 0)
-            )
-            if enemy == 0:
+            rebel_cubes_here = sum(sp.get(t, 0) for t in (
+                C.MILITIA_A, C.MILITIA_U, C.REGULAR_PAT, C.REGULAR_FRE))
+            # §8.7.1 WAR PATH (S59, Playbook Example 5, D3): rank by what
+            # the SA can actually REMOVE ("the most Rebellion pieces
+            # POSSIBLE"), not by enemy presence — option 2 (2 removals)
+            # needs 2+ Underground WPs and 2+ Rebellion cubes; option 3
+            # (Fort) needs 2+ Underground WPs and NO Rebellion cubes.
+            fort_removable = 1 if (sp.get(C.FORT_PAT, 0)
+                                   and rebel_cubes_here == 0
+                                   and wp_u >= 2) else 0
+            if rebel_cubes_here >= 2 and wp_u >= 2:
+                removable = 2
+            elif rebel_cubes_here >= 1:
+                removable = 1
+            else:
+                removable = 0
+            if not fort_removable and removable == 0:
                 continue
-            fort = 1 if sp.get(C.FORT_PAT, 0) else 0
-            # "within that first in a Province with 1+ Villages"
+            # "within each first in a province with at least one Village"
             # ("Province" = Colony or Reserve; map.json has no "Province"
-            # type, so the previous == "Province" check never matched)
+            # type, so a == "Province" check would never match)
             is_prov = 1 if _MAP_DATA.get(sid, {}).get("type") in ("Colony", "Reserve") else 0
             has_village = 1 if sp.get(C.VILLAGE, 0) >= 1 else 0
             prov_vill = is_prov * has_village
-            choices.append((fort, enemy, prov_vill, state["rng"].random(), sid))
+            choices.append((fort_removable, removable, prov_vill,
+                            state["rng"].random(), sid))
         if not choices:
             return False
         target = max(choices)[-1]
@@ -1308,10 +1318,38 @@ class IndianBot(BaseBot):
         max_cubes = min(budget - 1, brit_cubes - keep_brit)
         if max_cubes < 1:
             return None
-        n_regs = min(sp.get(C.REGULAR_BRI, 0), max_cubes)
-        n_tories = min(sp.get(C.TORY, 0), max_cubes - n_regs)
-        # §3.4.3: "Tories up to the number of Regulars may" move
+        # §8.1.2 selection idiom (S59, Playbook Example 5): pick the mix
+        # by ALTERNATING Regulars and Tories, "beginning with whichever
+        # is fewest in the space (Regulars if even)" — the Playbook's
+        # 2R+1T from a 3R/3T stack.  §3.4.3 hard caps: at least one
+        # Regular moves, Tories never exceed Regulars.  (The old greedy
+        # fill took all-Regulars first — 3R+0T.)
+        r_left = sp.get(C.REGULAR_BRI, 0)
+        t_left = sp.get(C.TORY, 0)
+        n_regs = n_tories = 0
+        pick_reg = r_left <= t_left  # fewest first; tie -> Regulars
+        for _ in range(max_cubes):
+            if pick_reg and r_left:
+                n_regs += 1
+                r_left -= 1
+            elif (not pick_reg) and t_left and (
+                    n_tories < n_regs or r_left):
+                # a Tory pick that would break the §3.4.3 T<=R cap is
+                # only allowed while a Regular remains to rebalance
+                n_tories += 1
+                t_left -= 1
+            elif r_left:
+                n_regs += 1
+                r_left -= 1
+            elif t_left and n_tories < n_regs:
+                n_tories += 1
+                t_left -= 1
+            else:
+                break
+            pick_reg = not pick_reg
         n_tories = min(n_tories, n_regs)
+        if n_regs < 1:
+            return None
         return (n_regs, n_tories)
 
     def _scout(self, state: Dict) -> bool:
@@ -1388,7 +1426,30 @@ class IndianBot(BaseBot):
             n_warparties=n_wp, n_regulars=n_regs, n_tories=n_tories,
             skirmish=do_skirmish, skirmish_option=skirmish_opt,
         )
-        self._follow_leaders_after_move(state)
+        # OPS leader-follow, move-aware (S59, Playbook Example 5, D2):
+        # "Royalist Leaders follow largest group of own units that moves
+        # from (or stays in) their spaces."  Compare the WPs that MOVED
+        # against the WPs that STAYED in the origin; on a tie the
+        # Playbook rolls a D6 — 1-3 follows, 4-6 stays.  (The old code
+        # re-ran the WQ most-WPs redeploy and teleported leaders toward
+        # uninvolved spaces.)
+        staying_wp = (state["spaces"][origin].get(C.WARPARTY_U, 0)
+                      + state["spaces"][origin].get(C.WARPARTY_A, 0))
+        for _ldr in ("LEADER_BRANT", "LEADER_CORNPLANTER",
+                     "LEADER_DRAGGING_CANOE"):
+            if leader_location(state, _ldr) != origin:
+                continue
+            if n_wp > staying_wp:
+                follow = True
+            elif n_wp < staying_wp:
+                follow = False
+            else:
+                roll = state["rng"].randint(1, 6)
+                state.setdefault("rng_log", []).append(
+                    (f"{_ldr} follow 1D6", roll))
+                follow = roll <= 3
+            if follow:
+                self._relocate_leader(state, _ldr, origin, target)
         return True
 
     # ------------------------------------------------------------------
@@ -1434,6 +1495,31 @@ class IndianBot(BaseBot):
     # ==================================================================
     #  IN-TURN LEADER MOVEMENT  (OPS: Leader Movement during Campaigns)
     # ==================================================================
+    @staticmethod
+    def _relocate_leader(state: Dict, leader: str, src: str, dst: str) -> None:
+        """Move *leader* src -> dst across the tolerated leader-state shapes
+        (same handling as follow_indian_leaders_after_move)."""
+        leaders_state = state.get("leaders")
+        leader_locs = state.get("leader_locs")
+        updated = False
+        if isinstance(leaders_state, dict):
+            if leader in leaders_state and isinstance(
+                    leaders_state.get(leader), (str, type(None))):
+                leaders_state[leader] = dst
+                updated = True
+            else:
+                keys = [k for k, v in leaders_state.items() if v == leader]
+                if keys:
+                    for k in keys:
+                        leaders_state.pop(k, None)
+                    leaders_state[dst] = leader
+                    updated = True
+        if isinstance(leader_locs, dict) and leader in leader_locs:
+            leader_locs[leader] = dst
+            updated = True
+        if updated:
+            push_history(state, f"{leader} follows the Scout: {src} -> {dst}")
+
     def _follow_leaders_after_move(self, state: Dict) -> None:
         """Apply OPS leader-movement rule after any Indian move command.
 

@@ -91,7 +91,10 @@ def execute(
 
         # remove 1 Rebellion unit (§4.4.2: cubes and Forts → Casualties;
         # Militia are not cubes → Available; Forts handled by option 3 only)
-        _REB_UNIT_TAGS = (REGULAR_PAT, REGULAR_FRE, MILITIA_A, MILITIA_U)
+        # §8.1.2 enemy-removal order (S59): Militia before the cube
+        # types ("Forts and Villages, then Militia or War Parties,
+        # then alternating Regulars and Continentals").
+        _REB_UNIT_TAGS = (MILITIA_A, MILITIA_U, REGULAR_FRE, REGULAR_PAT)
         for tag in _REB_UNIT_TAGS:
             if sp.get(tag, 0):
                 box = "casualties" if tag in (REGULAR_PAT, REGULAR_FRE) else "available"
@@ -107,7 +110,10 @@ def execute(
 
         # remove 2 Rebellion units (cubes → Casualties, Militia → Available)
         removed = 0
-        _REB_UNIT_TAGS = (REGULAR_PAT, REGULAR_FRE, MILITIA_A, MILITIA_U)
+        # §8.1.2 enemy-removal order (S59): Militia before the cube
+        # types ("Forts and Villages, then Militia or War Parties,
+        # then alternating Regulars and Continentals").
+        _REB_UNIT_TAGS = (MILITIA_A, MILITIA_U, REGULAR_FRE, REGULAR_PAT)
         for tag in _REB_UNIT_TAGS:
             while sp.get(tag, 0) and removed < 2:
                 box = "casualties" if tag in (REGULAR_PAT, REGULAR_FRE) else "available"
