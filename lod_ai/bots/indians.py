@@ -572,8 +572,22 @@ class IndianBot(BaseBot):
             self._trade(state)
         res = state["resources"].get(C.INDIANS, 0)
         if rest and res > 0:
-            _batch(rest[:res])
-            raided_any = True
+            # The first batch's raids Activate Underground War Parties
+            # (and the replenish Plunder may remove one), so a remainder
+            # space can lose its §3.4.4 Underground-WP access between
+            # batches (gate 1776:9, Session 48).  Execute the remainder
+            # one space at a time, skipping any space that no longer
+            # qualifies (§5.1.3 / the Q18 skip-unpaid pattern).
+            for tgt in rest[:res]:
+                if state["resources"].get(C.INDIANS, 0) < 1:
+                    break
+                plan_t = [(s, d) for s, d in validated_plan if d == tgt]
+                try:
+                    raid.execute(state, C.INDIANS, {}, [tgt],
+                                 move_plan=plan_t)
+                    raided_any = True
+                except (ValueError, KeyError):
+                    continue
         if not raided_any:
             return False
         self._follow_leaders_after_move(state)

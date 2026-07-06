@@ -8,6 +8,8 @@ IDs covered (32): 3 5 8 9 11 12 14 17 26 27 34 38 42 44 47 50
 from lod_ai.cards import register
 from .shared import (
     add_resource,
+    select_support_shift_spaces,
+    pick_random_spaces,
     shift_support,
     push_history,
     place_piece,
@@ -620,7 +622,12 @@ def evt_027_queens_rangers(state, shaded=False):
         if isinstance(override, list):
             cities = [sid for sid in override if sid in state.get("spaces", {})]
         else:
-            cities = [sid for sid in state.get("spaces", {}) if _is_city(sid)]
+            # §8.3.5 → §8.3.6: pop-weighted shift gain, §8.2 seeded ties
+            # (Session 48/T9: was the first two Cities in dict order).
+            all_cities = [sid for sid in state.get("spaces", {}) if _is_city(sid)]
+            cities = select_support_shift_spaces(state, all_cities, 2,
+                                                 target=-1, steps=1,
+                                                 shaded=True)
         for name in cities[:2]:
             shift_support(state, name, -1)
             place_piece(state, MILITIA_U, name, 1)
@@ -634,6 +641,10 @@ def evt_027_queens_rangers(state, shaded=False):
     else:
         targets = [sid for sid in state.get("spaces", {}) if _is_colony(sid)]
     targets = [sid for sid in targets if state.get("control", {}).get(sid) == BRITISH]
+    if not isinstance(override, list):
+        # Equal-priority qualifying Colonies → §8.2 seeded pick
+        # (Session 48/T9: was the first two in dict order).
+        targets = pick_random_spaces(state, targets, min(2, len(targets)))
 
     for name in targets[:2]:
         _place_from_pools(state, TORY, name, 2)

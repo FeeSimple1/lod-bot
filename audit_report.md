@@ -3768,3 +3768,77 @@ Remaining Piece 3 items (unchanged): event_instructions transcription
 diff vs the sheet reverse side, event_eval static-capability audit,
 the ~20 T9 dict-order card-space picks, auto_place_blockade stub,
 T7/T8 general who-benefits/second-faction-instruction layers.
+
+## Session 48: Piece 3 slice — T9 space-pick sweep + auto_place_blockade + pick_cities data bug (July 2026)
+
+Queue item 3, second slice: the Session-29 T9 catalogue of
+first/alphabetical card-space selections, worked per card text with the
+§8.3.5/§8.3.6/§8.2 treatment; plus the auto_place_blockade stub.
+
+T9 sites fixed (all previously dict/alphabetical-order):
+- Card 16: shaded pick is now largest (level+1)×Pop Opposition gain
+  (§8.3.6 semantics for the set-to-Passive-Opposition shift); unshaded
+  "two Tories anywhere" prefers a space where +2 British pieces GAINS
+  Control (§8.3.8), WI excluded; both seeded.
+- Card 19 shaded: 3 Militia via the §8.5.2-bullet-6 shape (change
+  Control, then not at Active Opposition, Cities, Pop; WI excluded).
+- Card 24 shaded: seeded ties on the City/Pop key; WI excluded; the
+  "Place one Fort anywhere" is a separate choice — it now finds a
+  selected space WITH §1.4.2 base room (a full top pick used to lose
+  the Fort silently).
+- Card 27: shaded Cities via select_support_shift_spaces (§8.3.6);
+  unshaded pair of British-controlled Colonies via §8.2.
+- Card 28: seeded ties on the max-Tories/max-Militia pick.
+- Card 33 shaded: the two adjacent free-Rally spaces via §8.2 (was the
+  first two in adjacency-list order).
+- Card 72: Reserve with Fort/Village room first (§1.4.2), seeded; the
+  docstring's "(Northwest preferred)" claim had no textual source and
+  was dropped.
+- Card 75: three of four Reserves via §8.2; the free War Path goes to
+  a chosen Reserve holding Rebellion pieces (§4.4.2) when one exists.
+  (Superseded dict-order test rewritten.)
+- Card 79: the Colony must support the action (§5.1.3) — shaded needs
+  a Village/WP to remove (Village first), unshaded needs base room.
+- Card 90 unshaded: the space now follows the piece — a Patriot Fort
+  no longer lands in the first dict-order Indian Reserve; Villages
+  prefer Reserves with War Parties; Forts prefer Colonies with own
+  pieces.
+- Card 91: both sides seeded; unshaded prefers room + most War Parties.
+- Card 96: the two free Gather/War Path Reserves via §8.2.
+
+Latent DATA bug (T9 collateral): shared.pick_cities/pick_colonies
+filtered on a space-dict "type" key that REAL states never carry
+(build_state emits piece tags + control only) — both returned [] in
+every real game.  Card 32 shaded has therefore always paid 0
+Resources, and card 90's Colony tier was always empty (Fort → first
+Reserve).  Now typed via map metadata with the dict key as a
+test-fixture fallback.
+
+auto_place_blockade stub DELETED (ROADMAP Piece 3 item): no caller,
+and its premise ("certain FNI levels auto-place Blockades in South
+Carolina and Massachusetts Ports") has no basis in §1.9 — the French
+place Blockades on Cities of their choice (naval_pressure.py).
+
+Latent bot fix (exposed by this session's trajectories, gate 1776:9):
+Indian Raid's Q18 second batch — the first batch Activates Underground
+War Parties (and the replenish Plunder may remove one), so a remainder
+space can lose §3.4.4 Underground-WP access between batches;
+raid.execute then raised and the whole turn was trapped.  The
+remainder now executes per-space, skipping spaces that no longer
+qualify (§5.1.3 / the Q18 skip-unpaid pattern).
+
+Tests: new test_t9_space_picks_s48.py (6); card-75 test rewritten to
+the rule.
+
+Verification: both roots green — 1,374 (lod_ai/tests incl. commands/)
++ 41 (tests/) = 1,415; clean-sweep gate seeds 1-10/11-20 clean with
+invariants on (after the Raid fix); soak 120 games DONE clean.
+Balance rebaselined (old → new): 1775 P 20→40, I 70→50 (the Indian
+1775 rate has now see-sawed 80→50→70→50 across S45-48 — Piece 8
+territory, not chased); 1776 P 70→75, I 15→5; 1778 B 0→5, F 65→60
+(in band).
+
+Remaining Piece 3 items: event_eval static-capability audit vs the
+four flowcharts' Event-or-Command bullets; the never-audited remainder
+of the 109 cards (cross-check audit_report session lists); T7/T8
+general layers.

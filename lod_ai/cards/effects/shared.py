@@ -93,7 +93,12 @@ def pick_cities(state, count: int = 1):
     space selection must follow §8.3.5/§8.3.6 priorities with §8.2 random
     tie-breaks (see select_support_shift_spaces / pick_random_spaces).
     """
-    cities = [n for n, info in state["spaces"].items() if info.get("type") == "City"]
+    # Session 48: real game states carry no "type" key in the space
+    # dicts — use the map metadata (dict "type" kept as a fallback for
+    # bare test fixtures).  Before this, pick_cities returned [] in
+    # every real game (e.g. card 32 shaded always paid 0 Resources).
+    cities = [n for n, info in state["spaces"].items()
+              if (_madj.space_type(n) or info.get("type")) == "City"]
     cities.sort()
     return cities[:count]
 
@@ -103,7 +108,8 @@ def pick_colonies(state, count: int = 1):
 
     Same caveat as pick_cities: full-list use only, never subset selection.
     """
-    colonies = [n for n, info in state["spaces"].items() if info.get("type") == "Colony"]
+    colonies = [n for n, info in state["spaces"].items()
+                if (_madj.space_type(n) or info.get("type")) == "Colony"]
     colonies.sort()
     return colonies[:count]
 

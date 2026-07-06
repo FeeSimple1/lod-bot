@@ -13,6 +13,7 @@ from .shared import (
     push_history,
     adjust_fni,
     select_support_shift_spaces,
+    pick_random_spaces,
 )
 
 def _remove_four_patriot_units(state):
@@ -163,12 +164,22 @@ def evt_016_mercy_warren(state, shaded=False):
     Unshaded – Place two Tories anywhere.
     Shaded   – Shift one City to Passive Opposition.
     """
+    rng = state.get("rng")
     if shaded:
         city = state.get("card16_city")
         if not city or not _is_city_late(city):
-            # Pick the first City alphabetically
-            city = next((sid for sid in sorted(state.get("spaces", {}))
-                         if _is_city_late(sid)), None)
+            # "Shift one City TO Passive Opposition" — rebel-favoring:
+            # largest (level - (-1)) x Pop gain first (§8.3.6 semantics),
+            # §8.2 seeded ties (Session 48/T9: was first-alphabetical).
+            cands = []
+            for sid in state.get("spaces", {}):
+                if not _is_city_late(sid):
+                    continue
+                lvl = state.get("support", {}).get(sid, 0)
+                gain = (lvl + 1) * map_adj.population(sid)
+                cands.append((-gain, rng.random() if rng else 0.0, sid))
+            cands.sort()
+            city = cands[0][2] if cands else None
         if city:
             # Passive Opposition = -1
             delta = -1 - state.get("support", {}).get(city, 0)
@@ -176,10 +187,31 @@ def evt_016_mercy_warren(state, shaded=False):
                 shift_support(state, city, delta)
             push_history(state, f"Card 16 shaded: {city} to Passive Opposition")
     else:
-        # "Place two Tories anywhere" — bot/player chooses location
+        # "Place two Tories anywhere" — Royalist benefit: prefer a space
+        # where +2 British pieces GAINS British Control (§8.3.8 "best
+        # furthers ... victory"), §8.2 seeded ties (Session 48/T9: was
+        # first-alphabetical).
         target = state.get("card16_target")
         if target not in state.get("spaces", {}):
-            target = next(iter(sorted(state.get("spaces", {}))), None)
+            cands = []
+            for sid, sp in state.get("spaces", {}).items():
+                if sid == WEST_INDIES_ID:
+                    continue
+                rebels = sum(q for t, q in sp.items()
+                             if isinstance(t, str) and isinstance(q, int)
+                             and q > 0 and t.startswith(("Patriot_", "French_")))
+                royal = sum(q for t, q in sp.items()
+                            if isinstance(t, str) and isinstance(q, int)
+                            and q > 0 and t.startswith(("British_", "Indian_")))
+                bri = sum(q for t, q in sp.items()
+                          if isinstance(t, str) and isinstance(q, int)
+                          and q > 0 and t.startswith("British_"))
+                already = royal > rebels and bri > 0
+                gains = (not already) and (royal + 2 > rebels)
+                cands.append((0 if gains else 1,
+                              rng.random() if rng else 0.0, sid))
+            cands.sort()
+            target = cands[0][2] if cands else None
         if target:
             place_piece(state, TORY, target, 2)
             push_history(state, f"Card 16 unshaded: 2 Tories in {target}")
@@ -219,12 +251,31 @@ def evt_019_nathan_hale(state, shaded=False):
                 if sid in state.get("spaces", {}):
                     place_piece(state, MILITIA_U, sid, 1)
         else:
-            placed = 0
-            for sid in sorted(state.get("spaces", {})):
-                if placed >= 3:
-                    break
+            # "Place three Patriot Militia anywhere" — Patriot militia
+            # placement shape (§8.5.2 bullet 6): first to change Control,
+            # then not at Active Opposition, Cities first, highest Pop;
+            # §8.2 seeded ties (Session 48/T9: was first-3 alphabetical).
+            # West Indies excluded (§1.4.2).
+            rng = state.get("rng")
+            cands = []
+            for sid, sp in state.get("spaces", {}).items():
+                if sid == WEST_INDIES_ID:
+                    continue
+                rebels = sum(q for t, q in sp.items()
+                             if isinstance(t, str) and isinstance(q, int)
+                             and q > 0 and t.startswith(("Patriot_", "French_")))
+                royal = sum(q for t, q in sp.items()
+                            if isinstance(t, str) and isinstance(q, int)
+                            and q > 0 and t.startswith(("British_", "Indian_")))
+                changes = 1 if (rebels <= royal and rebels + 1 > royal) else 0
+                no_ao = 1 if state.get("support", {}).get(sid, 0) > -2 else 0
+                is_city = 1 if _is_city_late(sid) else 0
+                pop = map_adj.population(sid)
+                cands.append((-changes, -no_ao, -is_city, -pop,
+                              rng.random() if rng else 0.0, sid))
+            cands.sort()
+            for *_k, sid in cands[:3]:
                 place_piece(state, MILITIA_U, sid, 1)
-                placed += 1
         add_resource(state, PATRIOTS, +3)
     else:
         add_resource(state, PATRIOTS, -4)
@@ -895,9 +946,30 @@ def evt_079_tuscarora_oneida(state, shaded=False):
     """
     loc = state.get("card79_colony")
     if not loc or not _is_colony_late(loc):
-        # Default to first Colony alphabetically
-        loc = next((sid for sid in sorted(state.get("spaces", {}))
-                     if _is_colony_late(sid)), "Pennsylvania")
+        # §5.1.3 implement-what-can + §8.2 seeded ties (Session 48/T9:
+        # was first-alphabetical).  Shaded: a Colony where pieces exist
+        # to remove, Village first (max effect); unshaded: a Colony with
+        # Fort/Village room (§1.4.2).
+        rng = state.get("rng")
+        cands = []
+        for sid, sp in state.get("spaces", {}).items():
+            if not _is_colony_late(sid):
+                continue
+            if shaded:
+                v = sp.get(VILLAGE, 0)
+                wp = sp.get(WARPARTY_U, 0) + sp.get(WARPARTY_A, 0)
+                if v == 0 and wp == 0:
+                    continue
+                key = (-(1 if v else 0), -min(wp, 2))
+            else:
+                bases = (sp.get(FORT_BRI, 0) + sp.get(FORT_PAT, 0)
+                         + sp.get(VILLAGE, 0))
+                if bases >= 2:
+                    continue
+                key = (0,)
+            cands.append((*key, rng.random() if rng else 0.0, sid))
+        cands.sort()
+        loc = cands[0][-1] if cands else "Pennsylvania"
     if shaded:
         remove_piece(state, VILLAGE, loc, 1, to="available")
         removed = remove_piece(state, WARPARTY_U, loc, 2, to="available")
@@ -1109,10 +1181,13 @@ def evt_096_iroquois_confederacy(state, shaded=False):
         remove_piece(state, VILLAGE, None, 1, to="available")
         push_history(state, "Card 96 shaded: removed one Indian Village")
     else:
-        # Free Gather and War Path in 2 Indian Reserve Provinces
-        reserves = [sid for sid in sorted(state.get("spaces", {}))
+        # Free Gather and War Path in 2 Indian Reserve Provinces —
+        # equal priority → §8.2 seeded pick (Session 48/T9: was the
+        # first two alphabetically).
+        reserves = [sid for sid in state.get("spaces", {})
                     if _is_reserve_late(sid)]
-        for prov in reserves[:2]:
+        chosen = pick_random_spaces(state, reserves, min(2, len(reserves)))
+        for prov in chosen:
             queue_free_op(state, INDIANS, "gather", prov)
             queue_free_op(state, INDIANS, "war_path", prov)
-        push_history(state, f"Card 96 unshaded: Gather + War Path in {reserves[:2]}")
+        push_history(state, f"Card 96 unshaded: Gather + War Path in {chosen}")

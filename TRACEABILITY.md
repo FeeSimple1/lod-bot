@@ -187,7 +187,11 @@ no citation despite likely implementations.
 - **T8 (P2)** §8.3.1 second-faction event instructions must govern how a
   faction executes actions granted by another faction's event;
   `engine._drain_free_ops` never consults `event_instructions`.
-- **T9 — swept and itemized (Session 29); fixes belong to Piece 3.**
+- **T9 — FIXED (Session 48).**  All catalogued sites reworked per card
+  text (16, 19, 24, 27, 28, 33, 72, 75, 79, 90, 91, 96 + card 80's in
+  Session 47); collateral: pick_cities/pick_colonies read a "type" key
+  real states never carry — returned [] in every real game (card 32
+  shaded always paid 0).  Original catalogue below for reference.
   Grep sweep found ~20 first/alphabetical subset selections across the
   card handlers, essentially all card-specific SPACE selections
   (§8.3.5/§8.3.6/§8.2 territory, needing per-card text reads) rather

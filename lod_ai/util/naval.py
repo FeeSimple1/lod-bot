@@ -4,7 +4,6 @@ Naval & FNI helpers.
 Includes:
     • adjust_fni(state, delta)
     • Squadron/Blockade pool helpers (West Indies + ports + Unavailable)
-    • auto_place_blockade(state)  (stub for future use)
 """
 
 from lod_ai.util.history import push_history
@@ -137,13 +136,8 @@ def move_blockade_city_to_city(state, src_city: str, dst_city: str) -> bool:
     return True
 
 
-# ──────────────────────────────────────────────────────────────
-#  Placeholder – full blockade logic not yet needed
-# ──────────────────────────────────────────────────────────────
-def auto_place_blockade(state) -> None:
-    """
-    Stub: In the full rules, certain FNI levels auto-place Blockade markers
-    in South Carolina and Massachusetts Ports.  Implement when Commands/
-    SAs reference Naval Pressure.  For now it only logs.
-    """
-    push_history(state, "[Blockade auto-placement not yet implemented]")
+# auto_place_blockade stub deleted (Session 48, ROADMAP Piece 3):
+# no caller existed and its premise was false — §1.9 has no automatic
+# Blockade placement; the FRENCH place Blockades on Cities of their
+# choice as FNI rises (Naval Pressure §4.5.3, WQ §6.5.4), which
+# special_activities/naval_pressure.py implements.

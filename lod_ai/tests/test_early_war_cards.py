@@ -382,8 +382,13 @@ def test_card72_french_settlers_help_places_royalist_pieces():
     assert state["spaces"]["Northwest"].get(TORY) == 1
 
 
-def test_card75_speech_to_six_nations_uses_reserve_list_and_northwest():
+def test_card75_speech_to_six_nations_seeded_reserves_and_warpath():
+    """Card 75: three of the four Reserves per §8.2 (Session 48: was the
+    first three in dict order), then War Path in ONE of those spaces —
+    preferring a chosen Reserve that holds Rebellion pieces (§4.4.2)."""
+    import random as _random
     state = _base_state()
+    state["rng"] = _random.Random(11)
     state["spaces"] = {
         "Northwest": {WARPARTY_U: 1, WARPARTY_A: 1, VILLAGE: 1},
         "Southwest": {},
@@ -393,12 +398,12 @@ def test_card75_speech_to_six_nations_uses_reserve_list_and_northwest():
 
     early_war.evt_075_speech_six_nations(state, shaded=False)
 
-    assert state["free_ops"] == [
-        ("INDIANS", "gather", "Northwest"),
-        ("INDIANS", "gather", "Southwest"),
-        ("INDIANS", "gather", "Quebec"),
-        ("INDIANS", "war_path", "Northwest"),
-    ]
+    gathers = [op for op in state["free_ops"] if op[1] == "gather"]
+    warpaths = [op for op in state["free_ops"] if op[1] == "war_path"]
+    gathered = [op[2] for op in gathers]
+    assert len(gathers) == 3 and len(set(gathered)) == 3
+    assert set(gathered) <= {"Northwest", "Southwest", "Quebec", "Florida"}
+    assert len(warpaths) == 1 and warpaths[0][2] in gathered
 
     early_war.evt_075_speech_six_nations(state, shaded=True)
 
