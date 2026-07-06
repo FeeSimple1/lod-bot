@@ -3652,3 +3652,46 @@ the §8.1.2-cited priorities; §4.2.2 Garrison-destination/Muster-space
 Skirmish exclusions (British) and §4.5.2 Muster exclusion (French)
 remain unenforced at engine level; survey #4's Win-the-Day free-Rally
 hardwiring is still open (not in this queue item).
+
+## Session 46: ROADMAP Piece 2 — Ch 1-7 traceability matrix + §1.9 pop-0 fixes (July 2026)
+
+Queue item 2.  New `TRACEABILITY_CH1_7.md`: numbered-section inventory
+for Manual Ch 1-7 (123 sections), mechanical lookaround-guarded
+citation scan over `lod_ai/` and both test roots, and a first hand-
+verification pass covering all of Ch 1, Ch 2 spot checks (2.2-2.3.5
+incl. the 2.3.3 pass bonuses +2 B/F +1 P/I), Ch 5, §6.3/6.4/6.6, and
+Ch 7 line-by-line (all four §7.2 margin pairs and the §7.3 sums verify
+algebraically — the ±10 offsets cancel).  Rows covered by prior
+session audits carry their citations (Garrison S38, Scout/Raid S40,
+French March S42, WQ redeploy S43, Rally/March/Partisans/CoC/Desertion
+S45).  C-series backlog C1-C10 + verification queue at the bottom of
+the file.
+
+Fixed this session (the ROADMAP-named §1.9 class):
+- C1 — "The population of that City is considered 0 for purposes of
+  calculating Support": new `util/naval.effective_population`, applied
+  at all three Total-Support/Opposition sites (victory._summarize_board,
+  base_bot._support_opposition_totals, batch_smoke reporting).
+- C2 — same rule "...and during the Resource Phase": French after-ToA
+  income no longer counts Blockaded-City population (British income
+  already excluded it).
+
+Notable open findings (backlog): C3 one-Blockade-per-City set model;
+C4 British March-to-Blockaded-City + FNI-3-Garrison verification; C5
+§1.10 Leader orphan rule has no engine hook; C6 §1.4.1 voluntary
+take-own-from-map path missing; C7 §7.1 ranking details (NP-first
+ties, placements, all-players-lose, Combined Victory) folded toward
+T11; C9 §2.3.4 executed-command criterion; C10 sweep bot pop-weighting
+sites to effective population.  Also: board/pieces.return_leaders is a
+per-WQ no-op with no textual basis (leaders live in state["leaders"])
+— delete when touched.
+
+Tests: new test_ch1_7_traceability_s46.py (3).
+
+Verification: both roots green — 1,353 (lod_ai/tests incl. commands/)
++ 41 (tests/) = 1,394; clean-sweep gate seeds 1-10/11-20 clean with
+invariants on; soak 120 games DONE clean (fresh soak.jsonl — the tool
+resumes a completed file, so stale progress must be cleared first);
+balance: 1775 and 1776 IDENTICAL to baseline (blockades are post-ToA
+only — the change bites exactly where §1.9 applies), 1778 within band
+(P 35→40, F 65→55, I 0→5, 6 winner changes) and rebaselined.

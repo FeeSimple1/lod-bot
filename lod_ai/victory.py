@@ -16,6 +16,7 @@ If your project uses different keys, adjust the look-ups below.
 
 from lod_ai.rules_consts import BRITISH, PATRIOTS, FRENCH, INDIANS, FORT_PAT, VILLAGE
 from lod_ai.map.adjacency import population as _map_population
+from lod_ai.util.naval import effective_population as _effective_population
 
 # --------------------------------------------------------------------------- #
 #  Board summarizer – converts the live map into the tallies used below       #
@@ -37,7 +38,9 @@ def _summarize_board(state) -> dict:
 
     for sid, sp in state["spaces"].items():
         lvl = state["support"].get(sid, 0)
-        pop = _map_population(sid)
+        # §1.9: a Blockaded City's population counts 0 for Support
+        # (Session 46, C1).
+        pop = _effective_population(state, sid, _map_population(sid))
         if lvl > 0:
             support_total += lvl * pop
         elif lvl < 0:

@@ -432,7 +432,10 @@ def _resource_income(state):
             rebellion_spaces += 1
 
         # City population *not* British-Controlled (for French after ToA)
-        if space_type == "City" and ctrl != BRITISH:
+        # §1.9: a Blockaded City's population is considered 0 during the
+        # Resource Phase — for the French too (Session 46, C2).
+        if (space_type == "City" and ctrl != BRITISH
+                and sid not in blockaded_cities):
             french_income += pop      # kept only post-ToA
 
     # ---------------  derive totals  ----------------------------

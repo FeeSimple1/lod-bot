@@ -71,6 +71,17 @@ def total_blockades(state) -> int:
     return west_indies_blockades(state) + len(bloc.get("on_map", set())) + unavailable_blockades(state)
 
 
+def effective_population(state, space_id: str, raw_pop: int) -> int:
+    """§1.9: "The population of that City is considered 0 for purposes
+    of calculating Support and during the Resource Phase of the Winter
+    Quarters Round."  Returns *raw_pop*, zeroed while the City is
+    Blockaded.  Non-City spaces pass through unchanged (only Cities can
+    hold Blockades)."""
+    if raw_pop and space_id in _blockade_markers(state).get("on_map", set()):
+        return 0
+    return raw_pop
+
+
 def has_blockade(state, space_id: str) -> bool:
     """Return True if *space_id* is blockaded (ports) or has squadrons (West Indies)."""
     bloc = _blockade_markers(state)

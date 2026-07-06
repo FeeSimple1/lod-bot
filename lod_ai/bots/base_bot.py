@@ -114,10 +114,12 @@ class BaseBot:
         Total Support    = sum(level × population) for spaces with level > 0
         Total Opposition = sum(|level| × population) for spaces with level < 0
         """
+        from lod_ai.util.naval import effective_population
         sup = 0
         opp = 0
         for sid, lvl in state.get("support", {}).items():
-            pop = _map_population(sid)
+            # §1.9: Blockaded-City pop counts 0 for Support (Session 46, C1)
+            pop = effective_population(state, sid, _map_population(sid))
             if lvl > 0:
                 sup += lvl * pop
             elif lvl < 0:

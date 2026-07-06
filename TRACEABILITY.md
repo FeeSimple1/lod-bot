@@ -222,4 +222,6 @@ no citation despite likely implementations.
    candidate file).
 2. §8.5 vs `patriot.py`, §8.6 vs `french.py`, §8.7 vs `indians.py`.
 3. Flowchart-node inventory (above).
-4. Ch 1–7 matrices (ROADMAP Piece 2).
+4. Ch 1–7 matrices (ROADMAP Piece 2) — DONE Session 46: see
+   `TRACEABILITY_CH1_7.md` (C-series backlog lives there; C1/C2 fixed
+   same session).
