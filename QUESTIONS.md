@@ -232,3 +232,30 @@ not generalize a precedence rule from it. To be implemented with
 queue item 3 (Raid mid-raid replenish); selection should still not
 exceed what the replenish can plausibly fund (a failed Plunder AND
 failed Trade leaves the shortfall unraidable — skip unpaid spaces).
+
+---
+
+## Q19 (Session 55, OPEN): Do Common-Cause War Parties fill the Tory
+slot in Battle loss removal?
+
+§4.2.1: "the British may utilize one or more War Parties as if they
+were Tories ... It may accompany March or Battle."  §3.6.7 removal
+priorities: "Royalists alternate removing one each British Regulars
+then Tories. Once exhausted, remove Active War Parties."
+
+Conflict: when CC War Parties are utilized "as if they were Tories"
+in a Battle, do they (a) alternate with Regulars in the Tory slot of
+§3.6.7 (sparing Regulars — lower CBC), or (b) get removed in the
+literal §3.6.7 Active-War-Party phase after cubes are exhausted
+(more Regulars die first)?  Either way they are physically War
+Parties, so presumably they return to Available and count toward no
+casualties track — but reading (a) changes WHICH British pieces die
+and therefore CBC, in the British bot's favor, in every CC Battle.
+
+Current implementation: (b), the literal §3.6.7 order (resolver's
+_remove never sees cc_wp).  Session 55 fixed the FORCE-LEVEL side
+(the resolver now receives the CC ctx and counts the WP as Tories in
+Force Level per §4.2.1) but left removal at (b) pending this ruling.
+The Playbook's Non-player British Brilliant Stroke example (§8.3.7
+note) may contain a worked CC Battle — worth checking when Piece 5
+transcribes it.

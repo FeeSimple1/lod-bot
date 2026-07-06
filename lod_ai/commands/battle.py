@@ -517,9 +517,12 @@ def _defender_loss_mods(
     def_fort_tag = FORT_BRI if def_side == "ROYALIST" else FORT_PAT
     mods -= sp.get(def_fort_tag, 0)
 
-    # -1 if Indians Defending in Indian Reserve
+    # -1 if Indians Defending in Indian Reserve (§3.6.5).  Indian
+    # pieces are War Parties AND Villages — a Village-only defense
+    # still gets the modifier (S55, B-node inventory).
     if def_side == "ROYALIST" and map_adj.space_type(sid) == "Reserve":
-        if sp.get(WARPARTY_A, 0) > 0 or sp.get(WARPARTY_U, 0) > 0:
+        if (sp.get(WARPARTY_A, 0) > 0 or sp.get(WARPARTY_U, 0) > 0
+                or sp.get(VILLAGE, 0) > 0):
             mods -= 1
 
     # -1 if Patriots/French Defending with Washington

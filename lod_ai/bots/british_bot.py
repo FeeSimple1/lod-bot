@@ -1669,9 +1669,11 @@ class BritishBot(BaseBot):
                 # fewer than 3 British cubes activates nothing, so paying a
                 # Resource to select it would be a dead move.
                 brit_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
-                if (sp.get(C.MILITIA_U, 0) > 0
-                        and sp.get(C.REGULAR_BRI, 0) > 0
-                        and brit_cubes >= 3):
+                # §3.2.3: "Activate one Militia for every three British
+                # cubes there" — cubes, not Regulars specifically; a
+                # Tory-only stack of 3+ activates too (S55, B-node
+                # inventory).
+                if sp.get(C.MILITIA_U, 0) > 0 and brit_cubes >= 3:
                     sup = self._support_level(state, sid)
                     # "first in spaces with Support" (binary presence),
                     # remaining ties seeded random (§8.2)
@@ -1909,17 +1911,23 @@ class BritishBot(BaseBot):
         # chain runs BEFORE battle.execute registers the chosen spaces in
         # _turn_affected_spaces, so register them here first (Session 55).
         state.setdefault("_turn_affected_spaces", set()).update(chosen)
+        cc_ctx = {}
         if not no_sa:
             # Common Cause before the battles -- only in the spaces actually
             # being battled (§4.2.1 "during the same ... Battle").
             used_cc = self._try_common_cause(state, spaces=chosen)
+            if used_cc:
+                cc_ctx = used_cc  # ctx with {"common_cause": {sid: n}}
 
             # If no Common Cause, execute Skirmish/Naval loop first
             if not used_cc:
                 self._apply_howe_fni(state)  # B38 Howe lowers FNI before SA
                 self._skirmish_then_naval(state)
 
-        battle.execute(state, C.BRITISH, {}, chosen)
+        # S55: hand the CC ctx to the resolver so the utilized War
+        # Parties count "as if they were Tories" (§4.2.1) in the actual
+        # Force Level, not just in the B12 selection score.
+        battle.execute(state, C.BRITISH, cc_ctx, chosen)
         return True
 
     # -------------------------------------------------------------------
@@ -1982,9 +1990,18 @@ class BritishBot(BaseBot):
         if not spaces:
             return False
         try:
-            common_cause.execute(state, C.BRITISH, {}, spaces, mode=mode,
-                                 wp_counts=wp_counts or None, preserve_wp=True)
-            return True
+            cc_ctx = common_cause.execute(
+                state, C.BRITISH, {}, spaces, mode=mode,
+                wp_counts=wp_counts or None, preserve_wp=True)
+            # S55: return the ctx (ctx["common_cause"] = {sid: n}) so the
+            # caller can hand it to battle.execute — the resolver reads
+            # cc_wp per space from it (battle.py line ~616).  Discarding
+            # it resolved every CC Battle with cc_wp=0: the bot SELECTED
+            # spaces with the CC-boosted Force Level, then FOUGHT without
+            # it (selection/resolution mismatch, the T13 class).
+            if cc_ctx.get("common_cause"):
+                return cc_ctx
+            return False
         except Exception:
             return False
 

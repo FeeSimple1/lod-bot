@@ -166,3 +166,67 @@ def test_battle_spaces_excluded_from_pre_battle_skirmish():
     assert "SKIRMISH begins in Virginia" not in hist, (
         "Skirmish must not fire in the space selected for Battle (§4.2.2)"
     )
+
+
+def test_battle_resolver_receives_common_cause_ctx():
+    """§4.2.1 (S55): the resolver must count utilized War Parties as
+    Tories in the ACTUAL Force Level, not only in the B12 selection
+    score — _try_common_cause returns the ctx and _battle forwards it."""
+    state = _fresh()
+    bot = BritishBot()
+    for sid, sp in state["spaces"].items():
+        for tag in (C.REGULAR_BRI, C.REGULAR_PAT, C.REGULAR_FRE,
+                    C.MILITIA_A, C.MILITIA_U, C.FORT_PAT, C.TORY,
+                    C.WARPARTY_A, C.WARPARTY_U, C.FORT_BRI, C.VILLAGE):
+            sp[tag] = 0
+    # 4 Regulars + 3 War Parties vs 5 Continentals: without CC the
+    # attack force is 4 + floor(3/2) = 5 (+1 half-regs mod) and loses
+    # the selection; WITH CC (3 WP as Tories) it is 4 + 3 = 7 and wins.
+    sp = state["spaces"]["Virginia"]
+    sp[C.REGULAR_BRI] = 4
+    sp[C.WARPARTY_A] = 2
+    sp[C.WARPARTY_U] = 2   # one must stay Underground (B13)
+    sp[C.REGULAR_PAT] = 5
+    state["resources"][C.BRITISH] = 5
+    state["_turn_affected_spaces"] = set()
+    refresh_control(state)
+    ok = bot._battle(state)
+    assert ok is True
+    hist = [h["msg"] if isinstance(h, dict) else str(h)
+            for h in state.get("history", [])]
+    assert any("COMMON CAUSE" in m.upper() or "COMMON_CAUSE" in m.upper()
+               for m in hist), "Common Cause should have been executed"
+    # The Continentals must take real losses — with the pre-S55 empty
+    # ctx the resolution force collapsed to 4 + half-WP and the defender
+    # often out-hit the attacker.
+    assert state["spaces"]["Virginia"].get(C.REGULAR_PAT, 0) < 5
+
+
+def test_indian_reserve_defense_modifier_counts_villages():
+    """§3.6.5 'Indians Defending in Indian Reserve -1' (S55): Villages
+    are Indian pieces — a Village-only defense still gets the modifier."""
+    from lod_ai.commands.battle import _defender_loss_mods
+    from lod_ai.map import adjacency as map_adj
+    # find a Reserve space
+    reserve = None
+    state = _fresh()
+    for sid in state["spaces"]:
+        if map_adj.space_type(sid) == "Reserve":
+            reserve = sid
+            break
+    assert reserve, "no Reserve space found"
+    sp = state["spaces"][reserve]
+    for tag in (C.WARPARTY_A, C.WARPARTY_U, C.VILLAGE, C.REGULAR_BRI,
+                C.TORY, C.FORT_BRI):
+        sp[tag] = 0
+    # §3.6.5 is the DEFENDER Loss Level table: "Indians Defending in
+    # Indian Reserve -1" lowers the DEFENDER's losses.
+    sp[C.VILLAGE] = 1
+    with_village = _defender_loss_mods(state, sp, reserve,
+                                       "REBELLION", "ROYALIST", 0)
+    sp[C.VILLAGE] = 0
+    without = _defender_loss_mods(state, sp, reserve,
+                                  "REBELLION", "ROYALIST", 0)
+    assert with_village == without - 1, (
+        "Village-only Reserve defense must apply the -1 modifier"
+    )

@@ -4146,3 +4146,48 @@ remaining passes are genuine 0-Resource states); crc-cbc improved
 wins still ~1/90 — sup-opp AND crc-cbc both remain negative on
 average.  The B-node flowchart inventory and the economy/CBC-CRC
 trajectory read continue next.
+
+## Session 55 (cont.): B-node inventory — Garrison clean; March/Battle findings (July 2026)
+
+Full B-node inventory (ROADMAP suspect 2, "never done") via three
+parallel read-only audits, findings verified against the text before
+any edit:
+
+- GARRISON (B4/B5, §8.4.1, §3.2.2): ZERO deviations — all 12 clause
+  groups verified (retention, skirmished-City exclusion, phase
+  priorities, abort-to-Muster, displacement, Blockade exclusions,
+  Limited handling).
+- MARCH (B10/B13, §8.4.3, §3.2.3): one real deviation — the
+  march-in-place Phase-3 selector required a British REGULAR in the
+  space; §3.2.3 activates "one Militia for every three British CUBES
+  there", so a 3+ Tory stack qualifies.  Fixed.  (An agent-reported
+  "CC restricted to Colonies" finding was a FALSE POSITIVE: Phase-1
+  destinations are Cities/Colonies, "Province" = non-City space, and
+  War Parties may never enter Cities (§4.2.1) — the Colony check is
+  exactly the rule.  CC's Active-first consumption already satisfies
+  "do not use the last War Party (Underground if possible)".)
+- BATTLE resolution (§3.6): two findings.
+  (1) GAME-WARPING: the British bot called battle.execute with an
+  EMPTY ctx, so the resolver read cc_wp=0 — every Common-Cause Battle
+  was SELECTED with the CC-boosted Force Level (§4.2.1 WP-as-Tories)
+  but RESOLVED without it (and the pre-activated WPs also forfeit the
+  Underground +1 attacker mod).  The selection/resolution-mismatch
+  class again (T13).  _try_common_cause now returns the CC ctx and
+  _battle forwards it; force parity restored.
+  (2) MODERATE: "Indians Defending in Indian Reserve -1" (§3.6.5)
+  fired only on War-Party presence; Villages are Indian pieces too —
+  a Village-only defense now gets the modifier.
+- NEW Q19 (QUESTIONS.md, open, non-blocking): do CC War Parties fill
+  the TORY slot in §3.6.7 loss alternation ("as if they were Tories",
+  §4.2.1) or the literal Active-WP-after-cubes slot?  Reading (a)
+  spares Regulars (lower CBC) in every CC battle.  Implementation
+  stays at the literal §3.6.7 order pending the ruling; the Playbook
+  Brilliant-Stroke example may settle it (Piece 5).
+
+Tests: +2 in test_british_84_s55.py (CC-ctx plumbing end-to-end,
+Village Reserve modifier); 3 interface asserts updated for the new
+_try_common_cause contract (ctx-or-False).  Battery: 1,402 + 101
+green; gates 1-10/11-20 clean; soak 120 invariants DONE clean;
+balance rebaselined.  90-game diagnostic: outcome mix essentially
+unchanged (British battles are only ~1/game, so CC parity moves few
+events) — the structural investigation continues.

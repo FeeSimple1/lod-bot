@@ -140,7 +140,9 @@ def test_british_common_cause_no_crash():
     }
     # Should not raise TypeError
     result = bot._try_common_cause(state)
-    assert isinstance(result, bool)
+    assert result is False or (isinstance(result, dict)
+                                     and result.get("common_cause")), (
+        "S55: _try_common_cause returns the CC ctx dict or False")
 
 
 # =========================================================================

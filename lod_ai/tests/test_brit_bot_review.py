@@ -241,7 +241,9 @@ class TestB13CommonCauseMode:
         )
         # Should not crash with mode="BATTLE" (default)
         result = bot._try_common_cause(state)
-        assert isinstance(result, bool)
+        assert result is False or (isinstance(result, dict)
+                                         and result.get("common_cause")), (
+            "S55: _try_common_cause returns the CC ctx dict or False")
 
     def test_common_cause_accepts_march_mode(self):
         """B13: When called from March, mode should be MARCH."""
@@ -258,7 +260,9 @@ class TestB13CommonCauseMode:
             support={"Boston": 1},
         )
         result = bot._try_common_cause(state, mode="MARCH")
-        assert isinstance(result, bool)
+        assert result is False or (isinstance(result, dict)
+                                         and result.get("common_cause")), (
+            "S55: _try_common_cause returns the CC ctx dict or False")
 
 
 # ==========================================================================
