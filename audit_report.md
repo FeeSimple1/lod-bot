@@ -3695,3 +3695,76 @@ resumes a completed file, so stale progress must be cleared first);
 balance: 1775 and 1776 IDENTICAL to baseline (blockades are post-ToA
 only — the change bites exactly where §1.9 applies), 1778 within band
 (P 35→40, F 65→55, I 0→5, 6 winner changes) and rebaselined.
+
+## Session 47: Piece 3 slice — T14 execution-guidance sweep, all 16 sites (July 2026)
+
+Queue item 3, first slice: every handler on the Session 28 T14 list
+verified against its card text and the per-faction Special
+Instructions, and fixed where the guidance was absent.  F83's Quebec
+City reconciliation (Session 41 note) is included.
+
+Fixed:
+- Card 80 (B/I/P executors): evt_080's default target was THE EXECUTOR
+  — British and Indian bots removed their own pieces whenever their
+  force_if_80 condition passed (neither bot preset the handler keys).
+  The executor now targets an ENEMY (§1.5.2), british_bot presets the
+  Rebel faction + its Cities (sheet B80), indians.py presets Patriots
+  + Fort-would-be-removed spaces and its condition now requires the
+  Fort to actually be reachable (≤1 Patriot unit beside it — §8.1.2
+  Forts-last, mirroring S41's P80 fix).  Removal inside each space now
+  follows the §8.1.2 friendly-removal order per faction
+  (_remove_own_faction_pieces) instead of a flat tag list.
+- Card 83: evt_083 now honors card83_target (french.py's preset was
+  never read — the min-piece scan could pick Quebec over the sheet's
+  Quebec City); P83 implemented ("Quebec City if possible to change
+  Control there, otherwise Quebec", simulated per §1.7); the
+  Fort/Village guard was requiring an EMPTY-base space — now §1.4.2's
+  < 2 bases; seeded ties for the no-guidance executors.
+- Card 88: single §8.2-seeded origin shared with an ENEMY faction
+  (was: every shared space, first-listed neighbour, "enemy" could be
+  anyone); destination via a March-priority proxy (gain own-side
+  Control, else most friendly pieces, seeded).  Full per-bot March
+  wiring stays open under T14 in TRACEABILITY.md.
+- Card 52: P/F executors remove no French Regulars (sheets P52/F52 —
+  french.py's card52_no_remove_french flag was set but never read);
+  B52 removes from spaces where Rebels outnumber the British first;
+  the +2-FL free Battle goes to the EXECUTOR (was hardwired FRENCH).
+- Card 30: shaded removal leaves 1 Regular per space (largest stacks
+  first, forced past the spare only when the quota demands — sheet
+  B30); unshaded pulls from Unavailable first (§8.1.2, was
+  Available-first) and picks its ≤3 spaces per §8.2 (was dict order);
+  the EI.BRITISH "force" directive was a layer error (S28) — now
+  "normal" (execution guidance only; key kept for the icon invariant).
+- Card 23: origin prefers Support (sheet B23), destination restricted
+  to adjacent PROVINCES (card text — was any adjacent space incl.
+  Cities; Reserves excluded while Militia move), preferring
+  non-Support, seeded ties.
+- Card 29: activation flips in §8.2-seeded space order (target's own
+  §5.1 choice; was dict order).
+- Cards 21/22/86/89/95: sheet orderings implemented — I21 non-Village
+  first (+§8.3.6 gain×Pop), I22 Village-first Colony (+ §8.1.2 enemy
+  removal order), I86/P86 Village space if possible (was hardwired
+  Massachusetts; unshaded requires Underground Militia per §5.1.3),
+  I89 Village-first / F89 Active-Support-first, B95 War Parties first.
+  Card 95 also stops placing ACTIVE Militia/WPs from Available
+  (§1.4.3: new Militia/WPs place Underground).
+- Engine latent fix: board/pieces._reclaim_one_from_map could reclaim
+  from the DESTINATION space itself (place 3 WPs with pool 2 → the
+  third "placement" recycled a WP already there and consumed the
+  count).  Reclaim now excludes the placement target.
+
+Tests: new test_t14_execution_guidance_s47.py (15).
+
+Verification: both roots green — 1,368 (lod_ai/tests incl. commands/)
++ 41 (tests/) = 1,409; clean-sweep gate seeds 1-10/11-20 clean with
+invariants on; soak 120 games DONE clean.  Balance rebaselined
+(old → new): 1775 I 50→70 (beyond band), P 30→20, B 20→10; 1776
+I 0→15, P 80→70; 1778 P 40→30, F 55→65 (both in band).  The Indian
+gains are the expected direction — the card-80 self-removal bug alone
+had Indians stripping their own pieces, and four Indian sheet
+orderings landed.  20-game caveat as always (Piece 8).
+
+Remaining Piece 3 items (unchanged): event_instructions transcription
+diff vs the sheet reverse side, event_eval static-capability audit,
+the ~20 T9 dict-order card-space picks, auto_place_blockade stub,
+T7/T8 general who-benefits/second-faction-instruction layers.

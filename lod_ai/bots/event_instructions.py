@@ -7,7 +7,13 @@ BRITISH = {
     18: "force_if_eligible_enemy",  # "If it hadn't been so stormy…" — target eligible enemy, else C&SA
     23: "force",                    # Lt Col Francis Marion
     29: "ignore_if_4_militia",      # Edward Bancroft, British Spy
-    30: "force",                    # Hessians
+    # 30 (Hessians): the sheet entry is EXECUTION guidance for when an
+    # ENEMY plays the shaded text ("leave 1 Regular per space"), not a
+    # play condition — handled in evt_030; the old "force" here was a
+    # layer error (audit Session 28; fixed Session 47).  "normal" keeps
+    # the musket-icon key (data invariant) while falling through to the
+    # standard B2 evaluation.
+    30: "normal",                   # Hessians — execution guidance only
     44: "force_if_eligible_enemy",  # Earl of Mansfield Recalled — target eligible enemy, else C&SA
     51: "force_if_51",              # Bermuda Gunpowder Plot — March to set up Battle, else C&SA
     52: "force_if_52",              # French Fleet Wrong Spot — March to set up Battle, else C&SA

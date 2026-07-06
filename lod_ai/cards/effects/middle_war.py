@@ -19,6 +19,7 @@ from .shared import (
     flip_pieces,
 )
 from lod_ai.rules_consts import (
+    ACTIVE_SUPPORT,
     WEST_INDIES_ID,
     VILLAGE,
     WARPARTY_A, WARPARTY_U,
@@ -100,6 +101,41 @@ def _faction_unit_tags(faction):
 def _space_has_any(state, sid, tags):
     sp = _safe_get_space(state, sid)
     return any(sp.get(tag, 0) > 0 for tag in tags)
+
+
+def _remove_own_faction_pieces(state, sid, faction, qty, *, to="available"):
+    """The TARGET faction removes its own pieces (§5.1) per the §8.1.2
+    friendly-removal bullet: cubes first (sparing the last
+    Tory/Continental in the space where possible), then Active before
+    Underground Militia/War Parties, and Forts/Villages last."""
+    sp = _safe_get_space(state, sid)
+    removed = 0
+
+    def _take(tag, n):
+        nonlocal removed
+        if n <= 0:
+            return
+        got = remove_piece(state, tag, sid, n, to=to)
+        removed += got
+
+    if faction == BRITISH:
+        _take(REGULAR_BRI, min(qty - removed, sp.get(REGULAR_BRI, 0)))
+        _take(TORY, min(qty - removed, max(0, sp.get(TORY, 0) - 1)))
+        _take(TORY, qty - removed)
+        _take(FORT_BRI, qty - removed)
+    elif faction == PATRIOTS:
+        _take(REGULAR_PAT, min(qty - removed, max(0, sp.get(REGULAR_PAT, 0) - 1)))
+        _take(MILITIA_A, qty - removed)
+        _take(MILITIA_U, qty - removed)
+        _take(REGULAR_PAT, qty - removed)
+        _take(FORT_PAT, qty - removed)
+    elif faction == FRENCH:
+        _take(REGULAR_FRE, qty - removed)
+    else:  # INDIANS
+        _take(WARPARTY_A, qty - removed)
+        _take(WARPARTY_U, qty - removed)
+        _take(VILLAGE, qty - removed)
+    return removed
 
 
 def _remove_from_tags(state, sid, tags, qty, *, to="available"):
@@ -1086,21 +1122,50 @@ def evt_080_confusion_slaves(state, shaded=False):
         push_history(state, "Card 80 shaded: no effect")
         return
 
-    target = state.get("card80_faction", state.get("active", BRITISH))
+    rng = state.get("rng")
+    executor = str(state.get("active", "")).upper()
+    _ENEMIES = {BRITISH: (PATRIOTS, FRENCH), INDIANS: (PATRIOTS, FRENCH),
+                PATRIOTS: (BRITISH, INDIANS), FRENCH: (BRITISH, INDIANS)}
+
+    target = state.get("card80_faction")
     if target not in {BRITISH, PATRIOTS, FRENCH, INDIANS}:
-        target = state.get("active", BRITISH)
+        # "Select one Faction" — the executor picks an ENEMY (§1.5.2;
+        # Session 47: the default was the EXECUTOR itself, so British
+        # and Indian bots removed their own pieces).  Prefer the enemy
+        # with more pieces on the map, §8.2 ties.
+        target = None
+        best_key = None
+        for fac in _ENEMIES.get(executor, (BRITISH, PATRIOTS, FRENCH, INDIANS)):
+            tags = _faction_piece_tags(fac)
+            total = sum(_safe_get_space(state, sid).get(t, 0)
+                        for sid in state.get("spaces", {}) for t in tags)
+            if total == 0:
+                continue
+            key = (-total, rng.random() if rng else 0.0)
+            if best_key is None or key < best_key:
+                best_key, target = key, fac
+        if target is None:
+            push_history(state, "Card 80 unshaded: no enemy pieces to target")
+            return
 
     pieces = _faction_piece_tags(target)
-    candidates = [
-        sid for sid in state.get("spaces", {}) if sum(_safe_get_space(state, sid).get(t, 0) for t in pieces) >= 2
-    ]
     spaces = state.get("card80_spaces")
     if isinstance(spaces, list):
         candidates = [sid for sid in spaces if sid in state.get("spaces", {})]
+    else:
+        # Two-removal spaces first (§8.1.1 max extent), §8.2 ties.
+        scored = []
+        for sid in state.get("spaces", {}):
+            have = sum(_safe_get_space(state, sid).get(t, 0) for t in pieces)
+            if have == 0:
+                continue
+            scored.append((-min(have, 2), rng.random() if rng else 0.0, sid))
+        scored.sort()
+        candidates = [sid for *_, sid in scored]
     chosen = candidates[:2]
 
     for sid in chosen:
-        _remove_from_tags(state, sid, pieces, 2)
+        _remove_own_faction_pieces(state, sid, target, 2)
         push_history(state, f"Card 80 unshaded: {target} removes 2 pieces in {sid}")
 
 
@@ -1115,62 +1180,107 @@ def evt_088_foggy(state, shaded=False):
     if mover not in {BRITISH, PATRIOTS, FRENCH, INDIANS}:
         mover = BRITISH
 
-    target = state.get("card88_target_faction")
-    targets = [BRITISH, PATRIOTS, FRENCH, INDIANS]
+    rng = state.get("rng")
+    _ENEMY88 = {BRITISH: (PATRIOTS, FRENCH), INDIANS: (PATRIOTS, FRENCH),
+                PATRIOTS: (BRITISH, INDIANS), FRENCH: (BRITISH, INDIANS)}
 
-    def _shares_space(target_faction):
+    # Sheet (all four factions): "Select A space shared with an ENEMY
+    # Faction, then move per the March instructions from that origin."
+    # Session 47: previously moved from EVERY shared space to each
+    # first-listed neighbour.  One §8.2-seeded origin; the destination
+    # uses a March-priority proxy (gain own-side Control if the moved
+    # group can, else join the most friendly pieces) — full per-bot
+    # March wiring stays open under T14 in TRACEABILITY.md.
+    target = state.get("card88_target_faction")
+    enemies = _ENEMY88.get(mover, ())
+
+    def _shared_spaces(tgt):
+        out = []
         for sid in state.get("spaces", {}):
             if not _space_has_any(state, sid, _faction_unit_tags(mover)):
                 continue
-            if _space_has_any(state, sid, _faction_piece_tags(target_faction)):
-                return True
-        return False
+            enemy_here = [f for f in enemies
+                          if _space_has_any(state, sid, _faction_piece_tags(f))]
+            if (tgt in enemy_here) or (tgt is None and enemy_here):
+                out.append(sid)
+        return out
 
-    if target not in targets or not _shares_space(target):
-        target = None
-        for fac in targets:
-            if fac != mover and _shares_space(fac):
-                target = fac
-                break
+    shared = _shared_spaces(target if target in enemies else None)
+    if not shared and target in enemies:
+        shared = _shared_spaces(None)   # override has no shared space
 
-    if not target:
-        push_history(state, "Card 88 unshaded: no shared spaces")
+    if not shared:
+        push_history(state, "Card 88 unshaded: no space shared with an enemy")
         return
 
-    destinations = state.get("card88_destinations", {})
+    shared.sort(key=lambda _s: rng.random() if rng else 0.0)
+    src = shared[0]
 
-    for src in list(state.get("spaces", {})):
-        if not _space_has_any(state, src, _faction_unit_tags(mover)):
-            continue
-        if not _space_has_any(state, src, _faction_piece_tags(target)):
-            continue
-        dest = None
-        if isinstance(destinations, dict):
-            candidate = destinations.get(src)
-            if candidate in state.get("spaces", {}) and candidate in _neighbors(src):
-                dest = candidate
-        if not dest:
-            for nbr in _neighbors(src):
-                if nbr in state.get("spaces", {}):
-                    dest = nbr
-                    break
-        if not dest:
-            continue
-        for tag in _faction_unit_tags(mover):
-            qty = _safe_get_space(state, src).get(tag, 0)
-            if qty:
-                move_piece(state, tag, src, dest, qty)
-        push_history(state, f"Card 88 unshaded: {mover} units move from {src} to {dest}")
+    my_side = ("Patriot_", "French_") if mover in (PATRIOTS, FRENCH) else ("British_", "Indian_")
+    foe_side = ("British_", "Indian_") if mover in (PATRIOTS, FRENCH) else ("Patriot_", "French_")
+
+    group = {tag: _safe_get_space(state, src).get(tag, 0)
+             for tag in _faction_unit_tags(mover)
+             if _safe_get_space(state, src).get(tag, 0)}
+    group_n = sum(group.values())
+
+    def _side_counts(sid):
+        sp = _safe_get_space(state, sid)
+        mine = sum(q for t, q in sp.items()
+                   if isinstance(t, str) and isinstance(q, int) and q > 0
+                   and t.startswith(my_side))
+        theirs = sum(q for t, q in sp.items()
+                     if isinstance(t, str) and isinstance(q, int) and q > 0
+                     and t.startswith(foe_side))
+        return mine, theirs
+
+    dest = None
+    override = state.get("card88_destinations", {})
+    if isinstance(override, dict):
+        cand = override.get(src)
+        if cand in state.get("spaces", {}) and cand in _neighbors(src):
+            dest = cand
+    if not dest:
+        d_cands = []
+        for nbr in _neighbors(src):
+            if nbr not in state.get("spaces", {}):
+                continue
+            mine, theirs = _side_counts(nbr)
+            gains_ctrl = 1 if (mine <= theirs and mine + group_n > theirs) else 0
+            d_cands.append((-gains_ctrl, -mine, rng.random() if rng else 0.0, nbr))
+        d_cands.sort()
+        dest = d_cands[0][3] if d_cands else None
+    if not dest:
+        push_history(state, f"Card 88 unshaded: no destination adjacent to {src}")
+        return
+
+    for tag, qty in group.items():
+        move_piece(state, tag, src, dest, qty)
+    push_history(state, f"Card 88 unshaded: {mover} units move from {src} to {dest}")
 
 
 # 89  WAR DAMAGES COLONIES’ ECONOMY
 @register(89)
 def evt_089_war_damages(state, shaded=False):
+    rng = state.get("rng")
+    executor = str(state.get("active", "")).upper()
     if shaded:
-        replaced = 0
+        # Sheet F89: "Select Active Support spaces first."  §8.2 ties
+        # (Session 47: was dict order).
+        names = []
         for name, sp in state.get("spaces", {}).items():
+            if not sp.get(TORY, 0):
+                continue
+            as_first = (1 if (executor == FRENCH
+                              and state.get("support", {}).get(name, 0)
+                              >= ACTIVE_SUPPORT) else 0)
+            names.append((-as_first, rng.random() if rng else 0.0, name))
+        names.sort()
+        replaced = 0
+        for *_k, name in names:
             if replaced == 3:
                 break
+            sp = state["spaces"][name]
             qty = sp.get(TORY, 0)
             if qty:
                 n = min(qty, 3 - replaced)
@@ -1179,10 +1289,21 @@ def evt_089_war_damages(state, shaded=False):
                 replaced += n
         push_history(state, f"Card 89 shaded: replaced {replaced} Tories with militia")
     else:
-        replaced = 0
+        # Sheet I89: "First in Village spaces."  §8.2 ties (Session 47:
+        # was dict order).
+        names = []
         for name, sp in state.get("spaces", {}).items():
+            if not any(sp.get(t, 0) for t in (MILITIA_U, MILITIA_A, REGULAR_PAT)):
+                continue
+            village_first = (1 if (executor == INDIANS
+                                   and sp.get(VILLAGE, 0)) else 0)
+            names.append((-village_first, rng.random() if rng else 0.0, name))
+        names.sort()
+        replaced = 0
+        for *_k, name in names:
             if replaced == 4:
                 break
+            sp = state["spaces"][name]
             for tag in (MILITIA_U, MILITIA_A, REGULAR_PAT):
                 qty = sp.get(tag, 0)
                 if qty:

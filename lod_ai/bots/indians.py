@@ -1651,12 +1651,28 @@ class IndianBot(BaseBot):
     def _force_condition_met(self, directive: str, state: Dict, card: Dict) -> bool:
         """Evaluate force_if_X directives from the Indian instruction sheet."""
         if directive == "force_if_80":
-            # Card 80 ERRATA: "Choose Patriots and select spaces where a Patriot
+            # Card 80: "Choose Patriots and select spaces where a Patriot
             # Fort would be removed. If none, choose Command & SA instead."
-            # Condition: any Patriot Fort on the map?
-            for sp in state["spaces"].values():
-                if sp.get(C.FORT_PAT, 0) > 0:
-                    return True
+            # The non-player TARGET removes its own pieces with Forts LAST
+            # (§8.1.2), so the Fort actually goes only where at most ONE
+            # Patriot unit stands beside it (2 removals reach the Fort).
+            # Session 47: the old check accepted any Fort anywhere and
+            # never preset the handler keys, so evt_080 defaulted the
+            # target to INDIANS and removed the Indians' own pieces.
+            rng = state["rng"]
+            qualifying = []
+            for sid, sp in state["spaces"].items():
+                if sp.get(C.FORT_PAT, 0) == 0:
+                    continue
+                units = (sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                         + sp.get(C.REGULAR_PAT, 0))
+                if units <= 1:
+                    qualifying.append((rng.random(), sid))
+            if qualifying:
+                qualifying.sort()
+                state["card80_faction"] = C.PATRIOTS
+                state["card80_spaces"] = [sid for _r, sid in qualifying[:2]]
+                return True
             return False
         return True  # default: play the event
 

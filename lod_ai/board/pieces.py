@@ -98,11 +98,19 @@ def _normalize_available_entry(state: Dict[str, Any], tag: str) -> None:
         pool[pool_tag] = pool.get(pool_tag, 0) + qty
 
 
-def _reclaim_one_from_map(state: Dict[str, Any], pool_tag: str) -> bool:
-    """Remove one on-map piece of *pool_tag* (or its variants) to Available."""
+def _reclaim_one_from_map(state: Dict[str, Any], pool_tag: str,
+                          exclude_loc: str | None = None) -> bool:
+    """Remove one on-map piece of *pool_tag* (or its variants) to Available.
+
+    *exclude_loc*: never reclaim from the space the placement targets —
+    taking a piece out of the destination to place it straight back is a
+    null action that still consumes the placement (Session 47).
+    """
     variants = _pool_variants(pool_tag)
     candidates: list[tuple[int, str, str]] = []
     for sid, sp in state.get("spaces", {}).items():
+        if exclude_loc is not None and sid == exclude_loc:
+            continue
         for vtag in variants:
             qty = sp.get(vtag, 0)
             if qty:
@@ -117,7 +125,8 @@ def _reclaim_one_from_map(state: Dict[str, Any], pool_tag: str) -> bool:
     return True
 
 
-def _ensure_available(state: Dict[str, Any], tag: str, qty: int) -> None:
+def _ensure_available(state: Dict[str, Any], tag: str, qty: int,
+                      exclude_loc: str | None = None) -> None:
     """Ensure at least *qty* of *tag* exist in Available, reclaiming from map if needed."""
     if qty <= 0:
         return
@@ -126,7 +135,7 @@ def _ensure_available(state: Dict[str, Any], tag: str, qty: int) -> None:
         return
     pool = state.setdefault("available", {})
     while pool.get(pool_tag, 0) < qty:
-        if not _reclaim_one_from_map(state, pool_tag):
+        if not _reclaim_one_from_map(state, pool_tag, exclude_loc):
             break
         pool = state.setdefault("available", {})
 
@@ -189,7 +198,7 @@ def place_piece(state: Dict[str, Any], tag: str, loc: str, qty: int = 1) -> int:
             return 0
         qty = min(qty, slots)
 
-    _ensure_available(state, tag, qty)
+    _ensure_available(state, tag, qty, exclude_loc=loc)
     return move_piece(state, tag, "available", loc, qty)
 
 

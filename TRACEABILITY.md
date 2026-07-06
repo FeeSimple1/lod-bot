@@ -206,10 +206,14 @@ no citation despite likely implementations.
   `battle.bot_march_sets_up_battle` (bot_battle_scores over a simulated
   all-origins March).  B52/P52 carry no battle math after the Session 28
   errata rewrite.
-- **T14 (P2)** Execution-guidance sweep across ~16 handler sites (see
-  audit_report Session 28 list) — fold into the Piece 3 card audit.
-  (Session 41 note: F83's handler picks min-piece Quebec/Quebec_City
-  while the sheet says Quebec City — reconcile here.)
+- **T14 (P2)** FIXED (Session 47) — all 16 Session-28 sites verified/
+  implemented (B23, B30+EI layer, B29/P29/I29, B52/P52, B80/I80 incl.
+  the executor-self-target bug, P83/F83 Quebec City reconciliation,
+  I86/P86, B88/P88/I88/F88, I89/F89, B95, I21, I22, +F73 side-aware
+  order).  Residual: card 88's destination uses a March-priority
+  proxy (gain Control, else most friendly pieces, seeded) rather than
+  each bot's full March planner — revisit if Piece 4 property tests
+  flag it.
 - **T15 (P3)** FIXED (Session 41): P80 (Village-would-be-removed via the
   handler's 2-removal order), F73/F95 (British Fort within the card's
   removable spaces), F83 (simulated 3-piece placement vs the §1.7

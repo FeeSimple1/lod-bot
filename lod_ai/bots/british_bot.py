@@ -253,16 +253,34 @@ class BritishBot(BaseBot):
             # Sheet: "Choose a REBEL Faction with pieces in Cities" —
             # Rebellion = Patriots + French (1.5.2). Indians are Royalist
             # and were wrongly listed here (audit Session 28).
+            # Session 47: also PRESET the handler keys — without them
+            # evt_080 used to default the target to the EXECUTOR and the
+            # British removed their own pieces.
+            rng = state["rng"]
             rebel_tags = {
                 C.PATRIOTS: [C.REGULAR_PAT, C.MILITIA_A, C.MILITIA_U, C.FORT_PAT],
                 C.FRENCH: [C.REGULAR_FRE],
             }
+            best_fac, best_key, best_cities = None, None, []
             for faction, tags in rebel_tags.items():
+                cities = []
                 for city_sid in CITIES:
                     sp = state["spaces"].get(city_sid, {})
-                    if any(sp.get(tag, 0) > 0 for tag in tags):
-                        return True
-            return False
+                    have = sum(sp.get(tag, 0) for tag in tags)
+                    if have > 0:
+                        cities.append((-min(have, 2), rng.random(), city_sid))
+                if not cities:
+                    continue
+                key = (-len(cities), rng.random())
+                if best_key is None or key < best_key:
+                    cities.sort()
+                    best_fac, best_key = faction, key
+                    best_cities = [sid for *_x, sid in cities]
+            if best_fac is None:
+                return False
+            state["card80_faction"] = best_fac
+            state["card80_spaces"] = best_cities[:2]
+            return True
 
         return True  # default: play the event
 

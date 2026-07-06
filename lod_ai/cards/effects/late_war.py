@@ -16,24 +16,38 @@ from .shared import (
 )
 
 def _remove_four_patriot_units(state):
-    """Remove up to 4 Patriot Militia/Continentals from one Colony."""
+    """Remove up to 4 Patriot Militia/Continentals from one Colony.
+
+    Sheet I22: "First in Village spaces."  Otherwise most removable
+    units (§8.1.1 max extent), §8.2 seeded ties (Session 47: was the
+    first Colony in dict order).
+    """
+    rng = state.get("rng")
+    executor = str(state.get("active", "")).upper()
+    cands = []
     for name, sp in state["spaces"].items():
         if not _is_colony_late(name):
             continue
-        pat_total = sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0)
-        pat_total += sp.get(REGULAR_PAT, 0)
-        if pat_total:
-            removed = 0
-            for tag in (
-                MILITIA_A,
-                MILITIA_U,
-                REGULAR_PAT,
-            ):
-                while sp.get(tag, 0) and removed < 4:
-                    remove_piece(state, tag, name, 1, to="available")
-                    removed += 1
-            push_history(state, f"Newburgh: removed {removed} Patriot units in {name}")
-            break
+        pat_total = (sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0)
+                     + sp.get(REGULAR_PAT, 0))
+        if not pat_total:
+            continue
+        village_first = 1 if (executor == INDIANS and sp.get(VILLAGE, 0)) else 0
+        cands.append((-village_first, -min(pat_total, 4),
+                      rng.random() if rng else 0.0, name))
+    if not cands:
+        return
+    cands.sort()
+    name = cands[0][3]
+    sp = state["spaces"][name]
+    removed = 0
+    # §8.1.2 enemy removal: cubes (Continentals) first, then Underground
+    # before Active Militia.
+    for tag in (REGULAR_PAT, MILITIA_U, MILITIA_A):
+        while sp.get(tag, 0) and removed < 4:
+            remove_piece(state, tag, name, 1, to="available")
+            removed += 1
+    push_history(state, f"Newburgh: removed {removed} Patriot units in {name}")
 
 
 # 1  WAXHAWS MASSACRE
@@ -224,9 +238,30 @@ def evt_021_sumter(state, shaded=False):
     Shaded   – Patriots free March to and free Battle in South Carolina or Georgia.
     """
     from lod_ai.util.free_ops import queue_free_op
-    colony = state.get("card21_target", "South_Carolina")
+    colony = state.get("card21_target")
     if colony not in ("South_Carolina", "Georgia"):
-        colony = "South_Carolina"
+        if shaded:
+            colony = "South_Carolina"
+        else:
+            # Sheet I21: "First in non-Village spaces."  Within that the
+            # larger possible shift x Pop (§8.3.6), §8.2 seeded ties
+            # (Session 47: was always South_Carolina).
+            rng = state.get("rng")
+            executor = str(state.get("active", "")).upper()
+            cands = []
+            for sid in ("South_Carolina", "Georgia"):
+                if sid not in state.get("spaces", {}):
+                    continue
+                sp = state["spaces"][sid]
+                nonvillage = (1 if (executor == INDIANS
+                                    and not sp.get(VILLAGE, 0)) else 0)
+                lvl = state.get("support", {}).get(sid, 0)
+                gain = max(0, min(2, 2 - lvl))
+                pop = map_adj.population(sid)
+                cands.append((-nonvillage, -(gain * pop),
+                              rng.random() if rng else 0.0, sid))
+            cands.sort()
+            colony = cands[0][3] if cands else "South_Carolina"
 
     if shaded:
         queue_free_op(state, PATRIOTS, "march",  colony)
@@ -284,29 +319,52 @@ def evt_023_francis_marion(state, shaded=False):
     else:
         # "British or Indians move all Patriot units in North Carolina or
         #  South Carolina into an adjacent Province."
+        rng = state.get("rng")
         src = state.get("card23_src")
         if src not in ("North_Carolina", "South_Carolina"):
-            # Default: pick whichever has Patriot units (NC first)
+            # Sheet B23: "If possible, move Patriots from Support to
+            # non-Support spaces" — prefer an origin at Support; §8.2
+            # seeded ties (Session 47: was NC-first).
+            s_cands = []
             for cand in ("North_Carolina", "South_Carolina"):
                 sp = state["spaces"].get(cand, {})
-                if any(sp.get(t, 0) for t in (MILITIA_A, MILITIA_U, REGULAR_PAT)):
-                    src = cand
-                    break
+                if not any(sp.get(t, 0) for t in (MILITIA_A, MILITIA_U, REGULAR_PAT)):
+                    continue
+                at_support = 1 if state.get("support", {}).get(cand, 0) > 0 else 0
+                s_cands.append((-at_support, rng.random() if rng else 0.0, cand))
+            s_cands.sort()
+            src = s_cands[0][2] if s_cands else None
         if not src:
             push_history(state, "Card 23 unshaded: no Patriot units in NC or SC")
             return
 
-        # Destination: an adjacent Province (bot/player selects)
+        # Destination: an adjacent PROVINCE (card text — Cities excluded;
+        # Reserves only when no Militia move, §3.3.1 note).  Sheet B23:
+        # prefer non-Support destinations; §8.2 seeded ties (Session 47:
+        # was the first adjacent space of any type).
+        src_sp = state["spaces"].get(src, {})
+        moving_militia = bool(src_sp.get(MILITIA_A, 0) or src_sp.get(MILITIA_U, 0))
         dst = state.get("card23_dst")
         if dst not in state.get("spaces", {}):
             meta = map_adj.space_meta(src) or {}
             adj = []
             for token in meta.get("adj", []):
                 adj.extend(token.split("|"))
-            adj = [s for s in adj if s in state.get("spaces", {})]
-            dst = adj[0] if adj else None
+            d_cands = []
+            for s in adj:
+                if s not in state.get("spaces", {}):
+                    continue
+                stype = map_adj.space_type(s)
+                if stype == "City":
+                    continue
+                if stype == "Reserve" and moving_militia:
+                    continue
+                non_support = 1 if state.get("support", {}).get(s, 0) <= 0 else 0
+                d_cands.append((-non_support, rng.random() if rng else 0.0, s))
+            d_cands.sort()
+            dst = d_cands[0][2] if d_cands else None
         if not dst:
-            push_history(state, f"Card 23 unshaded: no adjacent space for {src}")
+            push_history(state, f"Card 23 unshaded: no adjacent Province for {src}")
             return
 
         # Move all Patriot *units* (cubes only, not Forts/bases)
@@ -524,16 +582,42 @@ def evt_052_fleet_wrong_spot(state, shaded=False):
     if shaded:
         return
 
-    removed = 0
-    for name, sp in state["spaces"].items():
-        if removed == 4:
-            break
-        here = sp.get(REGULAR_FRE, 0)
-        if here:
-            move_piece(state, REGULAR_FRE, name, "available", min(here, 4 - removed))
-            removed += min(here, 4 - removed)
+    executor = str(state.get("active", "")).upper()
+    # "Remove UP TO four" — the executing Faction chooses how many.
+    # Sheets P52/F52: "Remove no French Regulars" (french.py also sets
+    # card52_no_remove_french — now honored; Session 47: the flag was
+    # never read and 4 Regulars were stripped in dict order for every
+    # executor).  Sheet B52: "If possible, remove French Regulars from
+    # spaces where Rebels outnumber present British."
+    if executor == BRITISH and not state.get("card52_no_remove_french"):
+        rng = state.get("rng")
+        cands = []
+        for name, sp in state["spaces"].items():
+            here = sp.get(REGULAR_FRE, 0)
+            if not here:
+                continue
+            rebels = sum(sp.get(t, 0) for t in
+                         (REGULAR_FRE, REGULAR_PAT, MILITIA_A, MILITIA_U,
+                          FORT_PAT))
+            brits = sum(sp.get(t, 0) for t in (REGULAR_BRI, TORY, FORT_BRI))
+            outnumber = 1 if rebels > brits else 0
+            cands.append((-outnumber, rng.random() if rng else 0.0, name))
+        cands.sort()
+        removed = 0
+        for _, _, name in cands:
+            if removed == 4:
+                break
+            here = state["spaces"][name].get(REGULAR_FRE, 0)
+            take = min(here, 4 - removed)
+            if take:
+                move_piece(state, REGULAR_FRE, name, "available", take)
+                removed += take
 
-    queue_free_op(state, FRENCH, "battle_plus2")     # anywhere
+    # "Free Battle anywhere with +2 Force Level" — the executing
+    # Faction's Battle (sheets P52/F52 route it through the Battle
+    # instructions; Session 47: was hardwired to FRENCH).
+    battler = executor if executor in (BRITISH, PATRIOTS, FRENCH) else FRENCH
+    queue_free_op(state, battler, "battle_plus2")     # anywhere
 
 # 57  FRENCH FLEET SAILS FOR THE CARIBBEAN
 @register(57)
@@ -780,9 +864,21 @@ def evt_073_sullivan(state, shaded=False):
     candidates = ["New_York", "Northwest", "Quebec"]
     if target not in candidates:
         target = None
-    # Try to find a space with a Fort or Village to remove
-    for loc in ([target] if target else candidates):
-        for tag in (FORT_BRI, FORT_PAT, VILLAGE):
+    # The executing Faction selects: remove an ENEMY Fort/Village first
+    # (sheet F73 wants the British Fort; Session 47: the fixed
+    # FORT_BRI-first order had Royalist executors removing their own
+    # side's Fort).  Own-side pieces only when nothing enemy exists
+    # (§5.1.3 implement-what-can).
+    executor = str(state.get("active", "")).upper()
+    if executor in (PATRIOTS, FRENCH):
+        tag_order = (FORT_BRI, VILLAGE, FORT_PAT)
+    elif executor == BRITISH:
+        tag_order = (FORT_PAT, VILLAGE, FORT_BRI)
+    else:                                   # INDIANS: Village last
+        tag_order = (FORT_PAT, FORT_BRI, VILLAGE)
+    locs = [target] if target else candidates
+    for tag in tag_order:
+        for loc in locs:
             sp = state.get("spaces", {}).get(loc, {})
             if sp.get(tag, 0):
                 remove_piece(state, tag, loc, 1, to="available")
@@ -968,11 +1064,12 @@ def evt_095_ohio_frontier(state, shaded=False):
         BRITISH: INDIANS,
         INDIANS: BRITISH,
     }
+    # §1.4.3: new Militia and War Parties are always placed Underground.
     coalition_units = {
-        PATRIOTS: (MILITIA_U, MILITIA_A, REGULAR_PAT),
+        PATRIOTS: (MILITIA_U, REGULAR_PAT),
         FRENCH: (REGULAR_FRE,),
         BRITISH: (REGULAR_BRI, TORY),
-        INDIANS: (WARPARTY_U, WARPARTY_A),
+        INDIANS: (WARPARTY_U,),
     }
 
     ordered_factions = [executor]
@@ -981,6 +1078,9 @@ def evt_095_ohio_frontier(state, shaded=False):
         ordered_factions.append(ally)
 
     friendly_order = tuple(tag for fac in ordered_factions for tag in coalition_units.get(fac, ()))
+    if executor == BRITISH:
+        # Sheet B95: "Place War Parties first."
+        friendly_order = (WARPARTY_U, REGULAR_BRI, TORY)
 
     placed = 0
     while placed < 3:

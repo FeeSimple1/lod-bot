@@ -373,7 +373,14 @@ def evt_029_bancroft(state, shaded=False):
     if need == 0:
         return
     flipped = 0
-    for name in list(state["spaces"]):
+    # The TARGET Faction picks which of its pieces Activate (§5.1); no
+    # sheet priority exists, so §8.2/§8.3.8 seeded-random space order
+    # (Session 47: was dict order).
+    rng = state.get("rng")
+    order = list(state["spaces"])
+    if rng is not None:
+        order.sort(key=lambda _n: rng.random())
+    for name in order:
         if flipped >= need:
             break
         here = state["spaces"][name].get(hidden_tag, 0)
@@ -386,22 +393,47 @@ def evt_029_bancroft(state, shaded=False):
 @register(30)
 def evt_030_hessians(state, shaded=False):
     """Hessians deployment or settlement."""
-    def _pull_regulars(loc: str, qty: int = 2) -> None:
-        moved = move_piece(state, REGULAR_BRI, "available", loc, qty)
-        if moved < qty:
-            move_piece(state, REGULAR_BRI, "unavailable", loc, qty - moved)
-
     if shaded:
         total = sum(sp.get(REGULAR_BRI, 0) for sp in state["spaces"].values())
         remove_qty = total // 5
         if remove_qty:
-            remove_piece(state, REGULAR_BRI, None, remove_qty, to="available")
+            # The British choose which Regulars settle.  Sheet B30: "If
+            # the shaded text is played by an enemy Faction, leave 1
+            # Regular per space if possible."  Largest stacks first,
+            # §8.2 seeded ties (Session 47: dict-order removal emptied
+            # the first spaces entirely).
+            rng = state.get("rng")
+            stacks = [(n, sp.get(REGULAR_BRI, 0))
+                      for n, sp in state["spaces"].items()
+                      if sp.get(REGULAR_BRI, 0)]
+            stacks.sort(key=lambda t: (-t[1], rng.random() if rng else 0.0))
+            remaining = remove_qty
+            for name, qty in stacks:
+                if remaining <= 0:
+                    break
+                take = min(qty - 1, remaining)      # spare 1 per space
+                if take > 0:
+                    remove_piece(state, REGULAR_BRI, name, take, to="available")
+                    remaining -= take
+            if remaining > 0:                       # forced past the spare
+                for name, _q in stacks:
+                    if remaining <= 0:
+                        break
+                    have = state["spaces"][name].get(REGULAR_BRI, 0)
+                    take = min(have, remaining)
+                    if take:
+                        remove_piece(state, REGULAR_BRI, name, take, to="available")
+                        remaining -= take
     else:
         refresh_control(state)
         eligible = [n for n, sp in state["spaces"].items()
                     if sp.get(REGULAR_BRI) and state.get("control", {}).get(n) == BRITISH]
-        for loc in eligible[:3]:
-            _pull_regulars(loc, 2)
+        # No sheet priority for the unshaded spaces → §8.2 seeded pick
+        # (Session 47: was the first three in dict order), and §8.1.2:
+        # move from Unavailable first ("from Available or Unavailable").
+        picked = pick_random_spaces(state, eligible, min(3, len(eligible)))
+        for loc in picked:
+            pull_to_map(state, REGULAR_BRI, loc, 2)
         add_resource(state, BRITISH, +2)
 
 # 32  RULE BRITANNIA!
@@ -835,12 +867,51 @@ def evt_083_carleton_negotiates(state, shaded=False):
         sp = state["spaces"].get(space, {})
         return sum(v for v in sp.values() if isinstance(v, int))
 
+    def _control_of(space: str, extra_rebels: int = 0) -> str | None:
+        """§1.7 tally as in board.control, with optional added Rebellion
+        pieces (for the P83 'change Control there' test)."""
+        sp = state["spaces"].get(space, {})
+        rebels = sum(q for t, q in sp.items()
+                     if isinstance(q, int) and isinstance(t, str)
+                     and t.startswith(("Patriot_", "French_"))) + extra_rebels
+        bri = sum(q for t, q in sp.items()
+                  if isinstance(q, int) and isinstance(t, str)
+                  and t.startswith("British_"))
+        ind = sum(q for t, q in sp.items()
+                  if isinstance(q, int) and isinstance(t, str)
+                  and t.startswith("Indian_"))
+        royal = bri + ind
+        if rebels > royal:
+            return "REBELLION"
+        if royal > rebels and bri > 0:
+            return "BRITISH"
+        return None
+
     def _pick_target() -> str | None:
         options = [sid for sid in ("Quebec", "Quebec_City") if sid in state.get("spaces", {})]
         if not options:
             return None
-        options.sort()
-        options.sort(key=_space_piece_total)
+        # Sheet F83: "Select Quebec City" — french.py presets
+        # card83_target (Session 47: the preset was never read and a
+        # min-piece scan could pick Quebec, the T14/Session-41 note).
+        override = state.get("card83_target")
+        if override in options:
+            return override
+        executor = str(state.get("active", "")).upper()
+        if executor == PATRIOTS:
+            # Sheet P83: "Play in Quebec City if possible to change
+            # Control there, otherwise in Quebec."
+            if ("Quebec_City" in options
+                    and _control_of("Quebec_City", 3) != _control_of("Quebec_City")):
+                return "Quebec_City"
+            if "Quebec" in options:
+                return "Quebec"
+            return options[0]
+        # No sheet guidance (British/Indian/human): fewest pieces,
+        # §8.2 seeded ties.
+        rng = state.get("rng")
+        options.sort(key=lambda s: (_space_piece_total(s),
+                                    rng.random() if rng else 0.0))
         return options[0]
 
     if shaded:
@@ -860,8 +931,10 @@ def evt_083_carleton_negotiates(state, shaded=False):
 
         placed = 0
 
-        # Optionally place one Fort/Village if none present yet
-        if _fort_village_total(target) == 0:
+        # Card: at most ONE of the up-to-3 pieces may be a Fort/Village;
+        # §1.4.2 allows it while the space holds < 2 bases (Session 47:
+        # the old guard required an empty-base space).
+        if _fort_village_total(target) < 2:
             fort_choice = {
                 BRITISH: FORT_BRI,
                 INDIANS: VILLAGE,
@@ -985,13 +1058,35 @@ def evt_086_stockbridge(state, shaded=False):
                an Indian piece (we choose Massachusetts).
     Shaded   – Add 3 Militia in the same space.
     """
-    target = "Massachusetts"
+    # Card: "in Massachusetts or in any one space with an Indian piece".
+    # Sheets I86/P86: "Select a Village space if possible" (a Village is
+    # an Indian piece); §8.2 seeded ties (Session 47: was hardwired to
+    # Massachusetts).  Unshaded needs Underground Militia present to
+    # have any effect (§5.1.3).
+    rng = state.get("rng")
+
+    def _pick(require_militia: bool) -> str:
+        cands = []
+        for sid, sp in state["spaces"].items():
+            if not sp.get(VILLAGE, 0):
+                continue
+            if require_militia and not sp.get(MILITIA_U, 0):
+                continue
+            cands.append((rng.random() if rng else 0.0, sid))
+        if cands:
+            return min(cands)[1]
+        return "Massachusetts"
+
     if shaded:
+        target = _pick(require_militia=False)
         place_piece(state, MILITIA_U, target, 3)
+        push_history(state, f"Card 86 shaded: 3 Militia in {target}")
     else:
-        mu = state["spaces"][target].get(MILITIA_U, 0)
+        target = _pick(require_militia=True)
+        mu = state["spaces"].get(target, {}).get(MILITIA_U, 0)
         if mu:
             flip_pieces(state, MILITIA_U, MILITIA_A, target, mu)
+            push_history(state, f"Card 86 unshaded: activated {mu} Militia in {target}")
 
 
 # 90  “THE WORLD TURNED UPSIDE DOWN”
