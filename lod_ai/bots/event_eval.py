@@ -34,6 +34,7 @@ _F = dict(
     places_british_fort=False,             # B2-3: places a British Fort on the map
     places_british_regulars=False,         # B2-3: places British Regulars on the map
     removes_blockade=False,                # B2-1: removes a Blockade marker
+    raises_fni=False,                      # P2-1/F2-1: "including by increasing FNI" (Session 49)
 )
 
 
@@ -152,12 +153,18 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     7: {
         "unshaded": _e(
+            # §1.9: lowering FNI removes a Blockade to the West
+            # Indies — B2 bullet 1 parenthetical (Session 49).
+            removes_blockade=True,
             places_british_pieces=True,
             places_british_regulars=True,  # move up to 2 British Regulars from Available
             adds_british_resources_3plus=True,
             is_effective=True,
         ),
         "shaded": _e(
+            # §1.9: raising FNI places a Blockade — P2/F2
+            # bullet-1 parenthetical (Session 49).
+            raises_fni=True,
             adds_patriot_resources_3plus=True,
             is_effective=True,
         ),
@@ -553,10 +560,16 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     34: {
         "unshaded": _e(
+            # §1.9: lowering FNI removes a Blockade to the West
+            # Indies — B2 bullet 1 parenthetical (Session 49).
+            removes_blockade=True,
             adds_british_resources_3plus=True,
             is_effective=True,
         ),
         "shaded": _e(
+            # §1.9: raising FNI places a Blockade — P2/F2
+            # bullet-1 parenthetical (Session 49).
+            raises_fni=True,
             is_effective=True,
         ),
     },
@@ -580,6 +593,9 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     36: {
         "unshaded": _e(
+            # §1.9: lowering FNI removes a Blockade to the West
+            # Indies — B2 bullet 1 parenthetical (Session 49).
+            removes_blockade=True,
             is_effective=True,
         ),
         "shaded": _e(
@@ -593,9 +609,15 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     37: {
         "unshaded": _e(
+            # §1.9: lowering FNI removes a Blockade to the West
+            # Indies — B2 bullet 1 parenthetical (Session 49).
+            removes_blockade=True,
             is_effective=True,
         ),
         "shaded": _e(
+            # §1.9: raising FNI places a Blockade — P2/F2
+            # bullet-1 parenthetical (Session 49).
+            raises_fni=True,
             is_effective=True,
         ),
     },
@@ -822,10 +844,16 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     53: {
         "unshaded": _e(
+            # §1.9: lowering FNI removes a Blockade to the West
+            # Indies — B2 bullet 1 parenthetical (Session 49).
+            removes_blockade=True,
             adds_british_resources_3plus=True,
             is_effective=True,
         ),
         "shaded": _e(
+            # §1.9: raising FNI places a Blockade — P2/F2
+            # bullet-1 parenthetical (Session 49).
+            raises_fni=True,
             is_effective=True,
         ),
     },
@@ -851,6 +879,9 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     55: {
         "unshaded": _e(
+            # §1.9: lowering FNI removes a Blockade to the West
+            # Indies — B2 bullet 1 parenthetical (Session 49).
+            removes_blockade=True,
             is_effective=True,
         ),
         "shaded": _e(
@@ -878,6 +909,9 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     57: {
         "unshaded": _e(
+            # §1.9: lowering FNI removes a Blockade to the West
+            # Indies — B2 bullet 1 parenthetical (Session 49).
+            removes_blockade=True,
             is_effective=True,
         ),
         "shaded": _e(
@@ -919,9 +953,15 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     60: {
         "unshaded": _e(
+            # §1.9: lowering FNI removes a Blockade to the West
+            # Indies — B2 bullet 1 parenthetical (Session 49).
+            removes_blockade=True,
             is_effective=True,
         ),
         "shaded": _e(
+            # §1.9: raising FNI places a Blockade — P2/F2
+            # bullet-1 parenthetical (Session 49).
+            raises_fni=True,
             is_effective=True,
         ),
     },
@@ -965,6 +1005,9 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     63: {
         "unshaded": _e(
+            # §1.9: lowering FNI removes a Blockade to the West
+            # Indies — B2 bullet 1 parenthetical (Session 49).
+            removes_blockade=True,
             is_effective=True,
         ),
         "shaded": _e(
@@ -978,6 +1021,9 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     64: {
         "unshaded": _e(
+            # §1.9: lowering FNI removes a Blockade to the West
+            # Indies — B2 bullet 1 parenthetical (Session 49).
+            removes_blockade=True,
             adds_british_resources_3plus=True,
             is_effective=True,
         ),
@@ -1023,6 +1069,9 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     67: {
         "unshaded": _e(
+            # §1.9: lowering FNI removes a Blockade to the West
+            # Indies — B2 bullet 1 parenthetical (Session 49).
+            removes_blockade=True,
             is_effective=True,
         ),
         "shaded": _e(
@@ -1047,9 +1096,15 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     69: {
         "unshaded": _e(
+            # §1.9: lowering FNI removes a Blockade to the West
+            # Indies — B2 bullet 1 parenthetical (Session 49).
+            removes_blockade=True,
             is_effective=True,
         ),
         "shaded": _e(
+            # §1.9: raising FNI places a Blockade — P2/F2
+            # bullet-1 parenthetical (Session 49).
+            raises_fni=True,
             adds_french_resources=True,
             is_effective=True,
         ),

@@ -1700,8 +1700,18 @@ class IndianBot(BaseBot):
         support, opposition = self._support_opposition_totals(state)
 
         # 1. Opposition > Support and Event shifts in Royalist favor
-        if opposition > support and eff["shifts_support_royalist"]:
-            return True
+        #    "(including by reducing FNI, but not by free Battles)" —
+        #    needs a Blockade on a Support City to un-zero (§1.9;
+        #    Session 49, mirroring the B2 fix).
+        if opposition > support:
+            if eff["shifts_support_royalist"]:
+                return True
+            if eff.get("removes_blockade"):
+                blockaded = (state.get("markers", {})
+                             .get(C.BLOCKADE, {}).get("on_map", set()))
+                if any(state.get("support", {}).get(sid, 0) > 0
+                       for sid in blockaded):
+                    return True
         # 2. Event places Village or grants free Gather
         if eff["places_village"]:
             if state.get("available", {}).get(C.VILLAGE, 0) > 0:

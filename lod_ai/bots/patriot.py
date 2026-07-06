@@ -1504,8 +1504,15 @@ class PatriotBot(BaseBot):
 
         sup, opp = self._support_opposition_totals(state)
 
-        if sup > opp and eff["shifts_support_rebel"]:
-            return True
+        if sup > opp:
+            if eff["shifts_support_rebel"]:
+                return True
+            # §8.5 bullet 1 "(including by increasing FNI...)" —
+            # dynamic §1.9 check (Session 49).
+            if eff.get("raises_fni"):
+                from lod_ai.util.naval import fni_raise_could_reduce_support
+                if fni_raise_could_reduce_support(state):
+                    return True
         if eff["places_patriot_militia_u"] and state.get("available", {}).get(C.MILITIA_U, 0) > 0:
             # P2 bullet 2 (§8.5): "places Underground Militia in at least one
             # Active Support or Village space that has none already"

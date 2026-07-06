@@ -3842,3 +3842,64 @@ Remaining Piece 3 items: event_eval static-capability audit vs the
 four flowcharts' Event-or-Command bullets; the never-audited remainder
 of the 109 cards (cross-check audit_report session lists); T7/T8
 general layers.
+
+## Session 49: Piece 3 slice — event_eval / Event-or-Command bullet audit (July 2026)
+
+The four bots' Event-or-Command bullet code (B2/P2/F2/I2) verified
+line-by-line against §8.4/§8.5/§8.6/§8.7, and the consumed
+CARD_EFFECTS flags audited across all 96 event cards (heuristic
+text-scan over the card reference + hand adjudication of 47 candidate
+rows; cards 97-109 are WQ/BS cards and correctly absent).
+
+Fixed:
+- B2 bullet 2 was DEAD: it read state["unavailable"][C.BRIT_UNAVAIL],
+  but real states key the box by the on-map tags (REGULAR_BRI/TORY) —
+  the exact class of the French F2 key bug fixed in Session 30, which
+  fixed French only.  The British bot never counted
+  "places British pieces from Unavailable" toward playing an event.
+- §1.9 FNI plumbing into bullet 1, all four factions:
+  - removes_blockade=True added to the 12 unshaded Lower-FNI sides
+    (7/34/36/37/53/55/57/60/63/64/67/69) — none carried it, so B2's
+    "including by removing a Blockade" parenthetical never fired.
+  - B2 and I2 bullet 1 now require an actual Blockade on a Support
+    City (the §1.9 pop-0 un-zeroing is what favors the Royalists);
+    the bare static flag would have fired pre-ToA with no Blockade
+    anywhere.
+  - New raises_fni flag on the 6 shaded Raise-FNI sides
+    (7/34/37/53/60/69); P2 and F2 bullet 1 ("including by increasing
+    FNI") now fire via naval.fni_raise_could_reduce_support: ToA
+    played, FNI below its ceiling, and an unblockaded Support City to
+    land on.
+- Card 72: §8.7 I2 note "(place the Village in a space that already
+  has War Parties if possible)" — Royalist executors now prefer
+  WP-holding Reserves.
+- Card-95 unshaded removes_patriot_fort verified True (I2 bullet 3);
+  49/54 shaded places_french_from_unavailable verified already True.
+
+Adjudicated-correct (no change): card 3 unshaded removes_patriot_fort
+(all Patriot pieces in NW/SW can include a Fort); card 71 unshaded
+adds_patriot_resources_3plus (variable city-pop amount CAN reach 3);
+replace-away rows (28/47/58/76/89) and count-only rows (74) were
+heuristic noise.  Deliberate under-approximation kept: card 73
+unshaded removes_patriot_fort stays False — the static flag would
+make Indians play it on any map-wide Patriot Fort and the handler
+could then only remove a friendly Fort/Village in the three card
+spaces (needs a per-card dynamic condition; noted for the remaining
+Piece 3 card audit).  is_effective is False only on "(none)" sides,
+so bullet-5 is never wrongly blocked; the dynamic §8.3.3 test already
+gates it upstream.
+
+Tests: new test_event_eval_audit_s49.py (5).  Two superseded fixtures
+rewritten: test_card_34_unshaded_no_blockade (§1.9 says lowering FNI
+DOES remove a Blockade) and test_event_availability's C.BRIT_UNAVAIL
+key; _EXPECTED_FIELDS gained raises_fni.
+
+Verification: both roots green — 1,382 (lod_ai/tests incl. commands/)
++ 41 (tests/) = 1,423; clean-sweep gate seeds 1-10/11-20 clean with
+invariants on; soak 120 games DONE clean.  Balance all three
+scenarios IN BAND (1775 P -5/B +5; 1776 P -5/I +5; 1778 F +5/I -5;
+2-5 winner changes each) — rebaselined.
+
+Remaining Piece 3: the never-audited remainder of the 109 cards
+(cross-check audit_report session lists against all 96 event
+handlers); T7/T8 general layers; T10 BS details.

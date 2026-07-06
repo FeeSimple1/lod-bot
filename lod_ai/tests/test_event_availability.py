@@ -162,7 +162,9 @@ class TestBritishEventAvailability:
         bot = BritishBot()
         state = _base_state(
             spaces={"Boston": {}},
-            unavailable={C.BRIT_UNAVAIL: 3},
+            # Session 49: the Unavailable box is keyed by on-map tags
+            # (the old C.BRIT_UNAVAIL key never exists in real states).
+            unavailable={C.REGULAR_BRI: 3},
         )
         card = {"id": 27}
         assert bot._faction_event_conditions(state, card) is True

@@ -777,12 +777,17 @@ def evt_072_french_settlers(state, shaded=False):
     # placeable Village), §8.2 seeded ties (Session 48/T9: was the
     # first Reserve in dict order).
     _rng72 = state.get("rng")
+    _roy72 = fac in (BRITISH, INDIANS)
     reserve_candidates = sorted(
         reserve_candidates,
         key=lambda sid: (
             0 if (state["spaces"][sid].get(FORT_BRI, 0)
                   + state["spaces"][sid].get(FORT_PAT, 0)
                   + state["spaces"][sid].get(VILLAGE, 0)) < 2 else 1,
+            # §8.7 I2 note: "place the Village in a space that already
+            # has War Parties if possible" (Session 49).
+            -(state["spaces"][sid].get(WARPARTY_U, 0)
+              + state["spaces"][sid].get(WARPARTY_A, 0)) if _roy72 else 0,
             _rng72.random() if _rng72 else 0.0,
         ),
     )

@@ -81,6 +81,25 @@ def effective_population(state, space_id: str, raw_pop: int) -> int:
     return raw_pop
 
 
+def fni_raise_could_reduce_support(state) -> bool:
+    """§1.9 / P2-F2 bullet 1 ("including by increasing FNI"): a raise
+    helps the Rebellion only when a Blockade could actually land on a
+    Support City — Treaty played, FNI below its ceiling, and some City
+    at Support not already Blockaded (Session 49)."""
+    if not state.get("toa_played", False):
+        return False
+    if state.get("fni_level", 0) >= fni_ceiling(state):
+        return False
+    from lod_ai.map.adjacency import space_type
+    blockaded = _blockade_markers(state).get("on_map", set())
+    for sid in state.get("spaces", {}):
+        if sid in blockaded:
+            continue
+        if space_type(sid) == "City" and state.get("support", {}).get(sid, 0) > 0:
+            return True
+    return False
+
+
 def has_blockade(state, space_id: str) -> bool:
     """Return True if *space_id* is blockaded (ports) or has squadrons (West Indies)."""
     bloc = _blockade_markers(state)

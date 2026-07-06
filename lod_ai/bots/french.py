@@ -965,8 +965,15 @@ class FrenchBot(BaseBot):
         sup, opp = self._support_opposition_totals(state)
 
         # 1. Support > Opposition and Event shifts in Rebel favor
-        if sup > opp and eff["shifts_support_rebel"]:
-            return True
+        #    "(including by increasing FNI and placing a Blockade to
+        #    reduce Support...)" — dynamic §1.9 check (Session 49).
+        if sup > opp:
+            if eff["shifts_support_rebel"]:
+                return True
+            if eff.get("raises_fni"):
+                from lod_ai.util.naval import fni_raise_could_reduce_support
+                if fni_raise_could_reduce_support(state):
+                    return True
         # 2. Places French pieces from Unavailable
         if eff["places_french_from_unavailable"]:
             # The unavailable box is keyed by the on-map tags: setup maps

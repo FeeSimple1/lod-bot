@@ -142,13 +142,30 @@ class BritishBot(BaseBot):
         sup, opp = self._support_opposition_totals(state)
 
         # 1. "Opposition > Support, and Event shifts Support/Opposition in
-        #     Royalist favor (including by removing a Blockade)?"
-        if opp > sup and (eff["shifts_support_royalist"] or eff["removes_blockade"]):
-            return True
+        #     Royalist favor (including by removing a Blockade from a
+        #     Support City by reducing FNI, but not by free Battles)?"
+        #     The Blockade half needs an actual Blockade on a City at
+        #     Support to un-zero (§1.9 pop-0; Session 49 — the static
+        #     flag alone fired pre-ToA with no Blockade anywhere).
+        if opp > sup:
+            if eff["shifts_support_royalist"]:
+                return True
+            if eff["removes_blockade"]:
+                blockaded = (state.get("markers", {})
+                             .get(C.BLOCKADE, {}).get("on_map", set()))
+                if any(self._support_level(state, sid) > 0
+                       for sid in blockaded):
+                    return True
 
         # 2. "Event places British pieces from Unavailable?"
         if eff["places_british_from_unavailable"]:
-            if state.get("unavailable", {}).get(C.BRIT_UNAVAIL, 0) > 0:
+            # Session 49: the box is keyed by the on-map tags
+            # (REGULAR_BRI / TORY) — C.BRIT_UNAVAIL never exists in real
+            # states, so this bullet was dead (same class as the French
+            # F2 key bug fixed in Session 30).
+            unavail = state.get("unavailable", {})
+            if (unavail.get(C.REGULAR_BRI, 0) > 0
+                    or unavail.get(C.TORY, 0) > 0):
                 return True
 
         # 3. "Event places Tories in Active Opposition with none, a British Fort

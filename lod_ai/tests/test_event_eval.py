@@ -16,6 +16,7 @@ assert _ALL_CARD_IDS & BRILLIANT_STROKE_CARDS == set()
 _EXPECTED_FIELDS = {
     "shifts_support_royalist",
     "shifts_support_rebel",
+    "raises_fni",
     "places_british_pieces",
     "places_patriot_militia_u",
     "places_patriot_fort",
@@ -226,7 +227,10 @@ def test_card_54_unshaded_removes_blockade():
     assert u["removes_blockade"] is True
 
 
-def test_card_34_unshaded_no_blockade():
-    """Card 34 unshaded only adds Resources and lowers FNI — no Blockade removal."""
+def test_card_34_unshaded_removes_blockade_via_fni():
+    """§1.9: "For each level the FNI is lowered the British remove one
+    Blockade to the West Indies" — card 34 unshaded lowers FNI, so it
+    CAN remove a Blockade (B2 bullet-1 parenthetical; Session 49
+    rewrote the old no-Blockade expectation)."""
     u = CARD_EFFECTS[34]["unshaded"]
-    assert u["removes_blockade"] is False
+    assert u["removes_blockade"] is True
