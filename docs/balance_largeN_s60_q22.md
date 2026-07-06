@@ -27,3 +27,12 @@ under both regimes (the S59/S60 Royalist fixes, not the tie model).
 Next instruments: Example 4 golden (Brilliant Stroke), the Indian
 1775 concentration, and exact-pick tightening of the Example 2/3
 goldens now that table parity holds.
+
+## Addendum: post-S61/S62 rerun (largeN_s62.jsonl)
+
+After the BS rebuild + Howe §1.9 + planned-aware Tory adjacency:
+P 4/25/23, B 2/22/2, F 49/31/66, I 45/22/9 — Royalist 102/300 (34%),
+British 26/300 with the Howe-scenario 1776 at 22%.  The Indian 1775
+number (45%) is §7.3 final-scoring dominance on the now-Royalist
+support race (S62 margin-source read in audit_report — rules-verified
+inputs; design-meta for Eric).
