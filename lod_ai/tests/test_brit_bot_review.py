@@ -791,10 +791,13 @@ class TestB39GageFreeRL:
 # ==========================================================================
 class TestB6MusterDieCache:
     def test_muster_die_cached_on_first_call(self):
-        """B6: Die roll should be cached and reused on subsequent calls."""
+        """B6: with 6 or fewer Available the die IS rolled, cached and
+        reused; with 7+ Available NO die is rolled (S59, Playbook
+        Example 3: "there is no need to roll the die — a D6 can't roll
+        seven or higher")."""
         bot = BritishBot()
         state = _base_state()
-        state["available"][C.REGULAR_BRI] = 10
+        state["available"][C.REGULAR_BRI] = 5
 
         # First call rolls and caches
         result1 = bot._can_muster(state)
@@ -806,11 +809,17 @@ class TestB6MusterDieCache:
         assert state["_muster_die_cached"] == cached_val
         assert result1 == result2
 
+        # 7+ Available: no roll at all, gate is True
+        state2 = _base_state()
+        state2["available"][C.REGULAR_BRI] = 7
+        assert bot._can_muster(state2) is True
+        assert "_muster_die_cached" not in state2
+
     def test_muster_die_only_one_rng_call(self):
-        """B6: Only one RNG call for the die roll, not multiple."""
+        """B6: only one RNG call for the die roll (when one is needed)."""
         bot = BritishBot()
         state = _base_state()
-        state["available"][C.REGULAR_BRI] = 10
+        state["available"][C.REGULAR_BRI] = 5
         state["rng_log"] = []
 
         bot._can_muster(state)

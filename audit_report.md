@@ -4440,3 +4440,49 @@ soak 120 invariants DONE clean; balance rebaselined.  Large-N
 (largeN_s59.jsonl): P 27/61/28, B 3/1/1, F 53/32/68, I 17/6/3 —
 statistically unchanged (Scout fires ~once/game; correctness, not a
 lever).  Examples 2-4 remain the queue head.
+
+## Session 59 (cont.): Example 3 golden — the Muster planner was blind to its own plan (July 2026)
+
+Transcribing Playbook Example 3 (British Muster+Skirmish, card #29)
+exposed and fixed the largest British-strength defect of the project:
+
+- PLANNED-AWARE MUSTER: the Tory-placement, Reward-Loyalty and Fort
+  steps all read the PRE-EXECUTION board, so the Regulars destination
+  chosen seconds earlier was invisible — no Tory pair "where Regulars
+  were just placed", no 5+-cube Fort, RL candidates missed.  All
+  steps now see the planned Regulars (and the Tory plan, where the
+  text is post-placement).  The walk-through's whole third page
+  depends on this sequencing.
+- Tory P1: a British FORT wrongly disqualified a space — the letter
+  is "where Regulars are the only British CUBES" (a Fort is not a
+  cube, Glossary; the Playbook puts the second pair in New York City
+  with its Fort).
+- Space-cap double count: the Regular space holding a Tory pair
+  consumed TWO of the four Muster slots (len(tory_plan)+
+  len(selected_spaces)); union-counted now — 4 distinct spaces as in
+  the walk-through.
+- _make_fort cube removal: took 3 Regulars; §8.1.2 alternates
+  "beginning with whichever is MOST (Regulars if even) ... without
+  removing the last Tory" — 6R/2T removes R,T,R = 2R+1T exactly as
+  printed.
+- B6 rng parity: with 7+ Available Regulars no die is rolled
+  (Playbook: "no need to roll the die"); 2 superseded die-cache tests
+  rewritten.  _ScriptedRng extended with a D3 script.
+
+Example 3 asserts the forced outcomes only (event ignored via the
+card-29 instruction, no Garrison, 4-space Muster at cost 4, no RL on
+D3=3, Fort built by 2R+1T replacement, Skirmish in New York Colony:
+2 Continentals + 1 Regular, CBC 1->2, CRC 3->5); tie-picks that the
+book resolves via the printed Random Spaces table (e.g., Connecticut)
+are deliberately not asserted — our §8.2 seeded ties are equivalent
+but mechanically different.
+
+Battery: 1,413 + 101 green (2 rewritten); gates 1-10/11-20 clean;
+soak 120 DONE clean; balance rebaselined.  LARGE-N (largeN_s59b):
+**BRITISH 6/7/7% — 20/300, CIs excluding zero for the first time in
+project history** — P 10/38/15, F 38/43/67, I 46/12/11.  Royalist
+side 30% (was ~10%).  The Muster sequencing fixes are exactly the
+"unimplemented rules" class the audit doctrine predicted, found only
+by designer ground truth.  Indians 46% in 1775 is the new outlier —
+flagged for Eric alongside the standing meta-question.  Examples 2
+and 4 remain (queue head next session).

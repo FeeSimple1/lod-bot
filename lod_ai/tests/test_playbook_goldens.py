@@ -76,13 +76,16 @@ class _ScriptedRng:
     (the Playbook's narrated dice), then falls through to the seeded
     stream for everything else."""
 
-    def __init__(self, base, script):
+    def __init__(self, base, script, script_d3=None):
         self._base = base
         self._script = list(script)
+        self._script_d3 = list(script_d3 or [])
 
     def randint(self, a, b):
         if (a, b) == (1, 6) and self._script:
             return self._script.pop(0)
+        if (a, b) == (1, 3) and self._script_d3:
+            return self._script_d3.pop(0)
         return self._base.randint(a, b)
 
     def __deepcopy__(self, memo):
@@ -91,7 +94,7 @@ class _ScriptedRng:
         # the wrapper must survive the copy WITH its remaining script.
         import copy as _c
         return _ScriptedRng(_c.deepcopy(self._base, memo),
-                            list(self._script))
+                            list(self._script), list(self._script_d3))
 
     def __getattr__(self, name):
         # Never forward dunders: deepcopy/pickle would otherwise hijack
@@ -167,3 +170,70 @@ def test_playbook_example_5_indian_scout_war_path():
         "tiebreak; Militia before Continentals per §8.1.2)"
     )
     assert st["resources"][C.INDIANS] == 1 and st["resources"][C.BRITISH] == 4
+
+
+def test_playbook_example_3_british_muster_skirmish():
+    """Playbook Example 3 (p.22-24): 1776 Medium Scenario with the
+    Militia and Rebellion Control removed from Philadelphia.  Card #29
+    (Edward Bancroft, British Spy), British 1st Eligible, musket icon.
+
+    Golden (structural asserts only where the walk-through resolves
+    ties via the printed Random Spaces table — our §8.2 seeded ties are
+    mechanically different, so exact tie-picks like "Connecticut" are
+    not asserted):
+    - Event IGNORED (instruction: fewer than 4 Militia would Activate).
+    - No Garrison (only Rebellion-controlled City has a Patriot Fort).
+    - B6 needs NO die (7 Available Regulars) — S59 parity fix.
+    - Muster in 4 spaces: 6 Regulars into one Neutral/Passive
+      control-adding City/Colony; Tories placed; D3=3 so Support+3
+      beats Opposition 5 -> NO Reward Loyalty; a Fort replaces cubes in
+      a 5+-cube Colony among the selected spaces, removing 2 Regulars
+      + 1 Tory (§8.1.2: alternate starting with the MOST — 6R/2T).
+    - Resources 5 -> 1 (4 Muster spaces).
+    - Skirmish (SA) in New York (not a Muster space): option 2 removes
+      2 Continentals + 1 British Regular.  CBC 1->2, CRC 3->5.
+    """
+    state = build_state("1776", seed=3)
+    # Alteration noted in the example
+    phl = state["spaces"]["Philadelphia"]
+    phl[C.MILITIA_U] = 0
+    phl[C.MILITIA_A] = 0
+    from lod_ai.board.control import refresh_control
+    refresh_control(state)
+    assert state["control"].get("Philadelphia") != "REBELLION"
+    # Printed-setup preconditions the walk-through relies on
+    assert state["resources"][C.BRITISH] == 5
+    assert state["available"][C.REGULAR_BRI] == 7
+    assert state.get("cbc") == 1 and state.get("crc") == 3
+    assert state["spaces"]["New_York"].get(C.REGULAR_PAT) == 3
+
+    state["rng"] = _ScriptedRng(state["rng"], [], script_d3=[3])
+    eng = Engine(initial_state=state, use_cli=False)
+    eng.set_human_factions([])
+    eng.state["ineligible_next"] = {C.INDIANS, C.PATRIOTS, C.FRENCH}
+    eng.play_card(_card(29), human_decider=None)
+
+    st = eng.state
+    hist = [h["msg"] if isinstance(h, dict) else str(h)
+            for h in st.get("history", [])]
+    joined = " | ".join(hist)
+
+    # Event ignored -> Muster command executed
+    assert "BRITISH MUSTER" in joined
+    # B6 must not have consumed a die (7 Available -> no roll)
+    assert not any(lbl == "B6 1D6" for lbl, *_ in st.get("rng_log", [])), (
+        "Playbook: 'no need to roll the die' with 7 Available Regulars"
+    )
+    # No Reward Loyalty (D3=3: Support 3+3 > Opposition 5)
+    assert "Reward Loyalty" not in joined and "reward" not in joined.lower()
+    # A Fort was built by cube replacement per §8.1.2 (2 Regulars + 1 Tory)
+    assert any("British_Fort" in m and "available →" in m for m in hist), (
+        "the Muster's third step places a Fort from Available"
+    )
+    # Resources: 5 - 4 Muster spaces = 1
+    assert st["resources"][C.BRITISH] == 1, (
+        f"expected 1 Resource after a 4-space Muster, got {st['resources'][C.BRITISH]}"
+    )
+    # Skirmish in New York Colony: 2 Continentals + 1 Regular to Casualties
+    assert st["spaces"]["New_York"].get(C.REGULAR_PAT, 0) == 1
+    assert st.get("cbc") == 2 and st.get("crc") == 5

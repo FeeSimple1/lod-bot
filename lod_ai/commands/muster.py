@@ -91,16 +91,32 @@ def _make_fort(state: Dict, space_id: str) -> None:
     if base_total >= 2:
         raise ValueError("Cannot build a Fort; stacking limit reached.")
 
-    tags = (REGULAR_BRI, TORY)
+    # §8.1.2 friendly-removal order (S59, Playbook Example 3): "first
+    # alternating Regulars and Continentals/Tories, beginning with
+    # whichever is MOST in the space (Regulars if even) but if possible
+    # without removing the last Tory" — 6R/2T removes R,T,R (2R+1T),
+    # not three Regulars.
     removed = 0
-    for tag in tags:
-        avail = space.get(tag, 0)
-        take  = min(3 - removed, avail)
-        if take:
-            remove_piece(state, tag, space_id, take)
-            removed += take
-        if removed == 3:
+    r = space.get(REGULAR_BRI, 0)
+    t = space.get(TORY, 0)
+    pick_reg = r >= t  # most first; tie -> Regulars
+    while removed < 3 and (r or t):
+        take_tory = ((not pick_reg) and t > 1) or (r == 0 and t > 0)
+        if not take_tory and r == 0 and t > 0:
+            take_tory = True  # nothing else left (may take the last Tory)
+        if take_tory and t > 0:
+            remove_piece(state, TORY, space_id, 1)
+            t -= 1
+        elif r > 0:
+            remove_piece(state, REGULAR_BRI, space_id, 1)
+            r -= 1
+        elif t > 0:
+            remove_piece(state, TORY, space_id, 1)
+            t -= 1
+        else:
             break
+        removed += 1
+        pick_reg = not pick_reg
     if removed < 3:
         raise ValueError("Need at least 3 British cubes here to build a Fort.")
     add_piece(state, FORT_BRI, space_id, 1)

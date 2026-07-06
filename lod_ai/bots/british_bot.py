@@ -1053,6 +1053,21 @@ class BritishBot(BaseBot):
         regular_destinations: List[str] = []
         if avail_regs > 0 and reg_candidates:
             regular_destinations.append(reg_candidates[0][1])
+        # S59 (Playbook Example 3): later Muster steps must see the
+        # Regulars this same Command is about to place — the walk-through
+        # puts the FIRST Tory pair "where Regulars were just placed" and
+        # builds the Fort in that 5+-cube Colony, all within one Muster.
+        # (The old planner read only the pre-execution board, so a
+        # previously-empty Regulars destination was invisible to the
+        # Tory/Fort/RL steps.)
+        _planned_regs: Dict[str, int] = {}
+        if regular_destinations:
+            _planned_regs[regular_destinations[0]] = min(
+                6, state["available"].get(C.REGULAR_BRI, 0))
+
+        def _regs_incl_planned(sid: str) -> int:
+            return (state["spaces"].get(sid, {}).get(C.REGULAR_BRI, 0)
+                    + _planned_regs.get(sid, 0))
 
         # ----- step 2: Tory placement priorities ---------------------------
         # Up to 2 Tories per space (1 if Passive Opposition).
@@ -1072,7 +1087,7 @@ class BritishBot(BaseBot):
                 return False  # Skip Active Opposition
             # Adjacency to British power check
             sp = state["spaces"].get(sid, {})
-            if sp.get(C.REGULAR_BRI, 0) > 0 or sp.get(C.FORT_BRI, 0) > 0:
+            if _regs_incl_planned(sid) > 0 or sp.get(C.FORT_BRI, 0) > 0:
                 return True
             for nbr in _adjacent(sid):
                 nsp = state["spaces"].get(nbr, {})
@@ -1090,12 +1105,16 @@ class BritishBot(BaseBot):
         for sid, sp in state["spaces"].items():
             if not _tory_eligible(sid):
                 continue
-            if sp.get(C.REGULAR_BRI, 0) > 0 and sp.get(C.TORY, 0) == 0 and sp.get(C.FORT_BRI, 0) == 0:
+            # §8.4.2: "first where Regulars are the only British CUBES"
+            # — a British Fort is not a cube (Glossary) and does NOT
+            # disqualify; Playbook Example 3 places the second pair in
+            # New York City (6 Regulars + a Fort, no Tories) (S59).
+            if _regs_incl_planned(sid) > 0 and sp.get(C.TORY, 0) == 0:
                 just_placed = 0 if sid in selected_spaces else 1
                 tory_p1.append(((just_placed,), sid))
         tory_p1.sort()
         for _, sid in tory_p1:
-            if avail_tories <= 0 or len(tory_plan) + len(selected_spaces) >= max_spaces:
+            if avail_tories <= 0 or len(set(tory_plan) | selected_spaces) >= max_spaces:  # S59: union — the Regular space may also hold a Tory pair (Playbook Ex3: 4 distinct spaces)
                 break
             n = min(_tory_max(sid), avail_tories)
             tory_plan[sid] = n
@@ -1116,7 +1135,7 @@ class BritishBot(BaseBot):
                 n = min(_tory_max(sid), avail_tories)
                 if n <= 0:
                     continue
-                royalist = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                royalist = (_regs_incl_planned(sid) + sp.get(C.TORY, 0)
                             + sp.get(C.FORT_BRI, 0) + sp.get(C.WARPARTY_A, 0)
                             + sp.get(C.WARPARTY_U, 0) + sp.get(C.VILLAGE, 0))
                 rebel_pieces = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
@@ -1136,7 +1155,7 @@ class BritishBot(BaseBot):
                 tory_p2.append(((-pop, state["rng"].random()), sid))
             tory_p2.sort()
             for _, sid in tory_p2:
-                if avail_tories <= 0 or len(tory_plan) + len(selected_spaces) >= max_spaces:
+                if avail_tories <= 0 or len(set(tory_plan) | selected_spaces) >= max_spaces:  # S59: union — the Regular space may also hold a Tory pair (Playbook Ex3: 4 distinct spaces)
                     break
                 if sid in tory_plan:
                     continue
@@ -1152,12 +1171,12 @@ class BritishBot(BaseBot):
                     continue
                 if (_MAP_DATA.get(sid, {}).get("type") == "Colony"
                         and sp.get(C.FORT_BRI, 0) == 0
-                        and (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)) < 5):
+                        and (_regs_incl_planned(sid) + sp.get(C.TORY, 0)) < 5):
                     pop = _MAP_DATA.get(sid, {}).get("population", 0)
                     tory_p3.append((-pop, sid))
             tory_p3.sort()
             for _, sid in tory_p3:
-                if avail_tories <= 0 or len(tory_plan) + len(selected_spaces) >= max_spaces:
+                if avail_tories <= 0 or len(set(tory_plan) | selected_spaces) >= max_spaces:  # S59: union — the Regular space may also hold a Tory pair (Playbook Ex3: 4 distinct spaces)
                     break
                 n = min(_tory_max(sid), avail_tories)
                 tory_plan[sid] = n
@@ -1203,8 +1222,8 @@ class BritishBot(BaseBot):
                 sid for sid, sp in state["spaces"].items()
                 if self._support_level(state, sid) < C.ACTIVE_SUPPORT
                 and self._control(state, sid) == C.BRITISH
-                and sp.get(C.REGULAR_BRI, 0) >= 1
-                and sp.get(C.TORY, 0) >= 1
+                and _regs_incl_planned(sid) >= 1
+                and (sp.get(C.TORY, 0) + tory_plan.get(sid, 0)) >= 1
             ]
             # §8.4.5: "Do not Reward Loyalty in a space if only Raid
             # and/or Propaganda markers would be removed" — a candidate
@@ -1255,7 +1274,8 @@ class BritishBot(BaseBot):
                 if _MAP_DATA.get(sid, {}).get("type") == "Colony"
                 and sp.get(C.FORT_BRI, 0) == 0
                 and (sp.get(C.FORT_PAT, 0) + sp.get(C.VILLAGE, 0) + sp.get(C.FORT_BRI, 0)) < 2
-                and (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)) >= 5
+                and (_regs_incl_planned(sid) + sp.get(C.TORY, 0)
+                     + tory_plan.get(sid, 0)) >= 5
             ]
             # See note above on B8 "first one already selected above".  When
             # at the per-Muster space cap, restrict to already-selected
@@ -2035,12 +2055,19 @@ class BritishBot(BaseBot):
         return False
 
     def _can_muster(self, state: Dict) -> bool:
-        # B6: Roll once and cache the result for this turn
+        # B6: "Available British Regulars > 1D6?"  Playbook Example 3:
+        # with 7+ Available "there is no need to roll the die — a D6
+        # can't roll seven or higher" — skip the roll entirely so the
+        # rng stream matches the physical procedure (S59).
+        avail = state["available"].get(C.REGULAR_BRI, 0)
+        if avail >= 7:
+            return True
+        # Roll once and cache the result for this turn
         if "_muster_die_cached" not in state:
             die = state["rng"].randint(1, 6)
             state["_muster_die_cached"] = die
             state.setdefault("rng_log", []).append(("B6 1D6", die))
-        return state["available"].get(C.REGULAR_BRI, 0) > state["_muster_die_cached"]
+        return avail > state["_muster_die_cached"]
 
     def _can_battle(self, state: Dict) -> bool:
         """B9 trigger, reconciled across the three references (S55):
