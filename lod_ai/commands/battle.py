@@ -91,6 +91,10 @@ def execute(
 
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).update(spaces)
+    # §4.2.2/§4.3.2/§4.3.3/§4.5.2: Skirmish and Partisans may accompany a
+    # Command "but not in a Battle space".  Record this turn's Battle
+    # spaces so the SA modules can enforce it (cleared in base_bot).
+    state.setdefault("_turn_battle_spaces", set()).update(spaces)
     # Pay Resources (actor only); allied fees handled below
     if not free:
         spend(state, faction, len(spaces))

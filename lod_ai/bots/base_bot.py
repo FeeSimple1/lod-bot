@@ -35,6 +35,10 @@ class BaseBot:
         # Spaces where a Skirmish was executed this turn (§8.4.1: no
         # Garrison moves into a skirmished City). Set by skirmish.execute.
         state.pop("_turn_skirmished_spaces", None)
+        # Spaces where a Battle was fought this turn (§4.2.2/§4.3.2/
+        # §4.3.3/§4.5.2: no Skirmish/Partisans in a Battle space).
+        # Set by battle.execute.
+        state.pop("_turn_battle_spaces", None)
 
         # Propagate slot constraints into state so command methods can check.
         if allowed:

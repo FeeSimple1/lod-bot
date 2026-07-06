@@ -482,14 +482,18 @@ def _support_phase(state):
     Support or Opposition.
 
     British (Reward Loyalty) and Patriots (Committees of Correspondence)
-    act in that order. A space may shift at most TWO levels during this
-    phase. Spaces are sorted per bot priority rules (8.4.5 / 8.5.9)
-    and skipped if only markers would be removed.
+    act in that order.  §6.4.1 and §6.4.2 each cap their own shifts at
+    two levels per space — the caps are per activity, NOT shared
+    (Session 45: a single counter was shared between RL and CoC).
+    Spaces are sorted per bot priority rules (8.4.5 / 8.5.9) and
+    skipped if only markers would be removed.
     """
 
     from collections import defaultdict
 
-    shifted = defaultdict(int)      # how many times each space has shifted
+    rl_shifted = defaultdict(int)    # §6.4.1: max two levels per space
+    coc_shifted = defaultdict(int)   # §6.4.2: separate two-level cap
+    rng = state.get("rng")
     control_map = state.get("control", {})
     if not isinstance(control_map, dict):
         control_map = {}
@@ -510,8 +514,9 @@ def _support_phase(state):
     #  and Propaganda markers, within that where the largest change in
     #  (Support – Opposition) is possible."
     brit_eligible = []
+    bri_res = state.get("resources", {}).get(BRITISH, 0)
     for sid, sp in state["spaces"].items():
-        if shifted[sid] >= 2:
+        if rl_shifted[sid] >= 2:
             continue
         if not (_ctrl(sid, sp) == BRITISH and sp.get(REGULAR_BRI) and sp.get(TORY)):
             continue
@@ -523,25 +528,30 @@ def _support_phase(state):
         n_prop = 1 if sid in propaganda_on_map else 0
         marker_count = n_raid + n_prop
         pop = map_adj.population(sid)
-        potential = (ACTIVE_SUPPORT - level) * pop
+        # §8.4.5 "largest change ... possible": §6.4.1 caps shifts at two
+        # levels per space, and the purse must pay the markers first
+        # (Session 45: was the raw uncapped distance).
+        levels = min(ACTIVE_SUPPORT - level, 2,
+                     max(0, bri_res - marker_count))
+        potential = levels * pop
 
-        brit_eligible.append(sid)
-        # Attach sort keys for this pass
-        brit_eligible[-1] = (sid, marker_count, potential)
+        # Attach sort keys for this pass (§8.2 seeded tie-break)
+        brit_eligible.append((sid, marker_count, potential,
+                              rng.random() if rng else 0.0))
 
     # §8.4.5: fewest markers first, then largest population-weighted change
-    brit_eligible.sort(key=lambda x: (x[1], -x[2]))
+    brit_eligible.sort(key=lambda x: (x[1], -x[2], x[3]))
 
     spent = 0
-    for sid, _mc, _pot in brit_eligible:
+    for sid, _mc, _pot, _tb in brit_eligible:
         sp = state["spaces"][sid]
-        if shifted[sid] >= 2:
+        if rl_shifted[sid] >= 2:
             continue
 
         level = state["support"].get(sid, 0)
         if level >= ACTIVE_SUPPORT:
             continue
-        steps_remaining = 2 - shifted[sid]
+        steps_remaining = 2 - rl_shifted[sid]
         if steps_remaining <= 0:
             continue
 
@@ -570,7 +580,7 @@ def _support_phase(state):
             level += 1
             state["support"][sid] = level
             spent += 1
-            shifted[sid] += 1
+            rl_shifted[sid] += 1
             steps_remaining -= 1
             push_history(state, f"British shifted {sid} toward Active Support (6.4.1)")
 
@@ -586,37 +596,46 @@ def _support_phase(state):
     #  within that where the largest change in (Opposition - Support)
     #  is possible."
     pat_eligible = []
+    pat_res = state.get("resources", {}).get(PATRIOTS, 0)
     for sid, sp in state["spaces"].items():
-        if shifted[sid] >= 2:
+        if coc_shifted[sid] >= 2:
             continue
-        if not (_ctrl(sid, sp) == "REBELLION" and (sp.get(MILITIA_A) or sp.get(MILITIA_U) or sp.get(REGULAR_PAT))):
+        # §6.4.2: "Rebellion Controlled spaces with Patriot pieces" — a
+        # Patriot Fort is a Patriot piece (Session 45: Fort-only spaces
+        # were excluded).
+        if not (_ctrl(sid, sp) == "REBELLION"
+                and (sp.get(MILITIA_A) or sp.get(MILITIA_U)
+                     or sp.get(REGULAR_PAT) or sp.get(FORT_PAT))):
             continue
         level = state["support"].get(sid, 0)
         if level <= ACTIVE_OPPOSITION:
-            continue
-        steps_remaining = 2 - shifted[sid]
-        if steps_remaining <= 0:
             continue
 
         n_raid = 1 if sid in raid_on_map else 0
         pop = map_adj.population(sid)
-        potential = (level - ACTIVE_OPPOSITION) * pop
+        # §8.5.9 "largest change ... possible": §6.4.2 caps shifts at two
+        # levels per space, and the purse must pay the Raid marker first
+        # (Session 45: was the raw uncapped distance).
+        levels = min(level - ACTIVE_OPPOSITION, 2,
+                     max(0, pat_res - n_raid))
+        potential = levels * pop
 
-        pat_eligible.append((sid, n_raid, potential))
+        pat_eligible.append((sid, n_raid, potential,
+                             rng.random() if rng else 0.0))
 
     # §8.5.9: fewest Raid markers first, then largest population-weighted change
-    pat_eligible.sort(key=lambda x: (x[1], -x[2]))
+    pat_eligible.sort(key=lambda x: (x[1], -x[2], x[3]))
 
     spent = 0
-    for sid, _nr, _pot in pat_eligible:
+    for sid, _nr, _pot, _tb in pat_eligible:
         sp = state["spaces"][sid]
-        if shifted[sid] >= 2:
+        if coc_shifted[sid] >= 2:
             continue
 
         level = state["support"].get(sid, 0)
         if level <= ACTIVE_OPPOSITION:
             continue
-        steps_remaining = 2 - shifted[sid]
+        steps_remaining = 2 - coc_shifted[sid]
         if steps_remaining <= 0:
             continue
 
@@ -641,7 +660,7 @@ def _support_phase(state):
             level -= 1
             state["support"][sid] = level
             spent += 1
-            shifted[sid] += 1
+            coc_shifted[sid] += 1
             steps_remaining -= 1
             push_history(state, f"Patriots shifted {sid} toward Active Opposition (6.4.2)")
 
@@ -891,25 +910,34 @@ def _patriot_desertion(state, *, bots=None, human_factions=None):
 
     # Patriots remove the rest
     if bots and PATRIOTS in bots and PATRIOTS not in human and (drop_mil or drop_con):
-        pat_removals = bots[PATRIOTS].ops_patriot_desertion_priority(state)
-        for sid, tag in pat_removals:
-            if drop_mil == 0 and drop_con == 0:
+        # §8.5.7: "Remove Militia and Continentals so as to change as
+        # little Control as possible, within that first without removing
+        # the last Patriot unit from any space."  Every removal changes
+        # the Control margins and the last-unit test, so re-score the
+        # priorities after each single piece (Session 45: the old loop
+        # scored once and removed in bulk from the top-ranked space).
+        while drop_mil > 0 or drop_con > 0:
+            pat_removals = bots[PATRIOTS].ops_patriot_desertion_priority(state)
+            pick = None
+            for sid, tag in pat_removals:
+                sp = state["spaces"].get(sid, {})
+                if sp.get(tag, 0) <= 0:
+                    continue
+                if tag in (MILITIA_U, MILITIA_A) and drop_mil > 0:
+                    pick = (sid, tag)
+                    break
+                if tag == REGULAR_PAT and drop_con > 0:
+                    pick = (sid, tag)
+                    break
+            if pick is None:
                 break
-            sp = state["spaces"].get(sid, {})
-            if tag in (MILITIA_U, MILITIA_A) and drop_mil > 0:
-                qty = sp.get(tag, 0)
-                if qty > 0:
-                    take = min(qty, drop_mil)
-                    remove_piece(state, tag, sid, take, to="available")
-                    drop_mil -= take
-                    removed += take
-            elif tag == REGULAR_PAT and drop_con > 0:
-                qty = sp.get(tag, 0)
-                if qty > 0:
-                    take = min(qty, drop_con)
-                    remove_piece(state, tag, sid, take, to="available")
-                    drop_con -= take
-                    removed += take
+            sid, tag = pick
+            remove_piece(state, tag, sid, 1, to="available")
+            if tag == REGULAR_PAT:
+                drop_con -= 1
+            else:
+                drop_mil -= 1
+            removed += 1
     else:
         # Default: iterate spaces arbitrarily
         for sid, sp in state["spaces"].items():

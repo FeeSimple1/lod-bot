@@ -3551,3 +3551,104 @@ the right instrument — flagged there rather than chased per-session.
 Remaining queue-5 items: Patriot Rally/March/Desertion/CoC block;
 any residual raw-level/first-seen sites outside the four fixed here
 (the Piece 3 card audit will catch handler-side ones).
+
+## Session 45: Patriot block — §8.5.4 March, §8.5.2 Rally, §4.3.2 Partisans, §6.4.2 CoC, §8.5.7 Desertion (July 2026)
+
+Queue item 1 — the Patriot block (survey #2/#4 + "Also" items).
+
+§8.5.4 March (patriot.py _execute_march):
+- French gate: "If French Resources exceed 0, include as many French
+  Regulars as possible" — French Regulars are now planned only while
+  the French purse can pay 1 Resource per destination they enter
+  (§3.3.2; Rochambeau's space waived per leader_capabilities).  They
+  were previously included unconditionally, so at 0 French Resources
+  march.execute's escort-fee validation raised and the bot declined
+  the ENTIRE March (the survey's "aborts entirely" finding).
+- Destination budget: the artificial 4-destination cap is gone; the
+  planner now stops at the Patriot purse (1 Resource per destination,
+  §3.3.2; 1 destination when Limited per §2.3.5).  Previously the
+  planner ignored affordability entirely, so any plan beyond the
+  purse aborted wholesale on march.execute's spend().
+- Phase 2 moves Militia ONLY ("get one Militia (Underground if
+  possible) into each space with none") — the Continental fallback is
+  removed; "first to change Control of the most Population" is now a
+  real §1.7 simulation of the placed piece (was: any non-Rebellion-
+  controlled space counted as a change), and Population no longer
+  orders the "then elsewhere" tier (seeded random per the sheet).
+- Latent fix: a failed Phase-1 gather left its tentative takes in
+  moved_from, starving later destinations of movable pieces;
+  reservations now happen only when a destination commits.
+
+§8.5.2 Rally (patriot.py _execute_rally):
+- "4+ Patriot units" now counts Patriot units only — Militia +
+  Continentals (Glossary §1.4; French Regulars are French pieces).
+  Was _rebel_group_size, which counted French Regulars.  Same fix in
+  the P9 Rally-preferred gate and the Win-the-Day selector.
+- Lonely-Fort and Fort-with-most-Militia placements now place to the
+  §3.3.1 maximum extent (#Patriot Forts + Population, via
+  rally.execute bulk_place) instead of a single Militia; §8.1.1.
+- Bullet 6 no longer pads slots with no-benefit spaces: a space that
+  neither changes Control (real §1.7 simulation) nor sits above
+  Active Opposition is skipped.
+- Bullet 2/3/4 Fort filters: the old guards admitted fortless spaces
+  at the 2-base stacking cap as "Fort spaces"; they now require an
+  actual Patriot Fort (or, for bullet 4, one built this Rally), and
+  bullet 4's "most Militia" counts this Rally's planned placements.
+- Bullet 7's origin check is now "without changing Control" (any
+  change, incl. Uncontrolled→BRITISH; was Rebellion-loss only).
+- Seeded ties (§8.2) throughout the Rally selections.
+
+§4.3.2/§4.3.3 Partisans & Skirmish:
+- Battle-space exclusion enforced: battle.execute records
+  _turn_battle_spaces (cleared per turn in base_bot); partisans.execute
+  and skirmish.execute (all three factions — §4.2.2/§4.3.3/§4.5.2)
+  refuse Battle spaces; the Patriot pickers filter them out.
+- Partisans option 3 requires only "no War Parties there" (+ Village
+  + 2 Underground Militia) — the old bot gate wrongly demanded no
+  enemy cubes, so Villages behind cube screens were never removed.
+- Options 1/2 remove Royalist UNITS only (Glossary §1.4) — they could
+  previously remove a Village or Fort.  Option 2 now requires the 2
+  Underground Militia §4.3.2 demands (the old pick with 1 raised and
+  skipped the space).  Space selection scores Village-removability
+  (option-3 feasibility), not bare Village presence.  Card 3's free
+  Partisans gate aligned (units-only + Battle-space check).
+
+§6.4.2/§8.5.9 Committees of Correspondence (+§6.4.1 RL, year_end):
+- RL and CoC now keep SEPARATE two-level-per-space caps (§6.4.1 and
+  §6.4.2 are distinct activities; one counter was shared).
+- CoC eligibility includes Patriot-Fort-only spaces ("Patriot
+  pieces").
+- Both sort potentials are now affordable-shift x Population, capped
+  at 2 levels and by the purse after markers (was raw uncapped
+  distance); seeded ties (§8.2, state-rng optional for bare tests).
+
+§8.5.7 Patriot Desertion (year_end + patriot.py):
+- The Patriot remainder is removed ONE PIECE AT A TIME with the
+  priority list re-scored after every removal (Control margins and
+  the last-unit test change as pieces leave); the old loop scored
+  once and bulk-removed from the top space, which could strip a
+  small stack bare, flip its Control, and empty it.  Seeded ties in
+  ops_patriot_desertion_priority (was alphabetical).
+
+Tests: new test_patriot_block_s45.py (14).  One superseded test
+rewritten: test_option1_fort_to_available →
+test_option1_cannot_remove_fort (§4.3.2 + Glossary units).
+
+Verification: both roots green — 1,350 (lod_ai/tests) + 41 (tests/) =
+1,391; clean-sweep gate seeds 1-10/11-20 clean with invariants on;
+soak 120 games DONE clean.  Balance rebaselined (old → new): 1775
+P 10%→30%, B 10%→20%, I 80%→50%; 1776 P 35%→80%, B 45%→20%, I 20%→0%;
+1778 P 25%→35%, B 5%→0%, F 60%→65%, I 10%→0% (in band).  The drift is
+Rebellion-ward, the expected direction (March no longer aborts, purse-
+scaled destinations, max-extent Rally, pop-weighted CoC, safer
+Desertion).  A game-log sanity check (1776 seed 3) showed no
+pathology: one 3-destination March, normal Rally cadence, sane purses.
+The 1776 Patriot 80% is a 20-game reading — Piece 8 should confirm
+before any tuning conclusions.
+
+Residual (noted, not in queue): partisans.execute's internal removal
+order is a fixed tag list (Tory → Active WP → Regular → UG WP), not
+the §8.1.2-cited priorities; §4.2.2 Garrison-destination/Muster-space
+Skirmish exclusions (British) and §4.5.2 Muster exclusion (French)
+remain unenforced at engine level; survey #4's Win-the-Day free-Rally
+hardwiring is still open (not in this queue item).

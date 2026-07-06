@@ -98,6 +98,37 @@ class PatriotBot(BaseBot):
         royalist = self._royalist_pieces_in(sp)
         return rebels > royalist
 
+    def _control_after_add(self, state: Dict, sid: str,
+                           to_add: int = 1) -> str | None:
+        """Control value (§1.7 semantics as in board.control) after
+        adding *to_add* Rebellion pieces to *sid*."""
+        sp = state["spaces"][sid]
+        rebels = self._rebel_pieces_in(sp) + to_add
+        royalist = self._royalist_pieces_in(sp)
+        bri = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+               + sp.get(C.FORT_BRI, 0))
+        if rebels > royalist:
+            return "REBELLION"
+        if royalist > rebels and bri > 0:
+            return "BRITISH"
+        return None
+
+    def _control_after_remove(self, state: Dict, sid: str,
+                              to_remove: Dict[str, int]) -> str | None:
+        """Control value (§1.7) after removing *to_remove* Rebellion
+        pieces from *sid*."""
+        sp = state["spaces"][sid]
+        rebels = sum(max(0, sp.get(t, 0) - to_remove.get(t, 0))
+                     for t in _REBEL_TAGS)
+        royalist = self._royalist_pieces_in(sp)
+        bri = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+               + sp.get(C.FORT_BRI, 0))
+        if rebels > royalist:
+            return "REBELLION"
+        if royalist > rebels and bri > 0:
+            return "BRITISH"
+        return None
+
     # ===================================================================
     #  MOVABLE PIECES HELPER (for March leave-behind rules)
     # ===================================================================
@@ -457,7 +488,8 @@ class PatriotBot(BaseBot):
                 bases = sp.get(C.FORT_PAT, 0) + sp.get(C.FORT_BRI, 0) + sp.get(C.VILLAGE, 0)
                 if bases >= 2:
                     continue
-                if self._rebel_group_size(sp) >= 4:
+                if (sp.get(C.MILITIA_U, 0) + sp.get(C.MILITIA_A, 0)
+                        + sp.get(C.REGULAR_PAT, 0)) >= 4:  # §8.5.2 Patriot units
                     is_city = 1 if _MAP_DATA.get(sid, {}).get("type") == "City" else 0
                     pop = _MAP_DATA.get(sid, {}).get("population", 0)
                     candidates.append((-is_city, -pop, sid))
@@ -552,7 +584,20 @@ class PatriotBot(BaseBot):
         phase1_dests.sort()
 
         # Build move plans for Phase 1
-        march_max = 1 if state.get("_limited") else 4
+        # §3.3.2: 1 Patriot Resource per destination; §2.3.5: a Limited
+        # Command has a single destination.  §8.5.4 itself sets no
+        # destination cap (Session 45: an artificial 4-destination cap
+        # also throttled Phase 2).
+        if state.get("bs_free"):
+            march_max = 999
+            fre_res = 999
+        else:
+            march_max = state["resources"].get(self.faction, 0)
+            fre_res = state["resources"].get(C.FRENCH, 0)
+        if state.get("_limited"):
+            march_max = 1
+        roch_loc = leader_location(state, "LEADER_ROCHAMBEAU")
+        fre_dests: Set[str] = set()
         move_plans: List[Dict] = []
         used_destinations: Set[str] = set()
         moved_from: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
@@ -579,6 +624,18 @@ class PatriotBot(BaseBot):
                     sources.append((-grp_size, src))
             sources.sort()
 
+            # §8.5.4: "If French Resources exceed 0, include as many
+            # French Regulars as possible in the moves."  §3.3.2 charges
+            # the French 1 Resource per destination they enter (waived
+            # where Rochambeau is — leader_capabilities), so French join
+            # only into destinations their purse can pay (Session 45:
+            # French Regulars were planned at 0 French Resources and the
+            # escort-fee validation in march.execute aborted the whole
+            # March).
+            _chargeable = len([d for d in fre_dests if d != roch_loc])
+            fre_ok = fre_res > 0 and (
+                dst == roch_loc or _chargeable + 1 <= fre_res)
+
             pieces_gathered = 0
             dst_plan_pieces: Dict[str, int] = {}
             plan_sources: List[Tuple[str, Dict[str, int]]] = []
@@ -604,11 +661,13 @@ class PatriotBot(BaseBot):
                 if pat_cubes > 0:
                     src_pieces[C.REGULAR_PAT] = pat_cubes
                     taken += pat_cubes
-                    # Escort French Regulars
-                    fre = min(movable.get(C.REGULAR_FRE, 0), pat_cubes, need - pieces_gathered - taken)
-                    if fre > 0:
-                        src_pieces[C.REGULAR_FRE] = fre
-                        taken += fre
+                    # Escort French Regulars 1-for-1 with Continentals
+                    # (§3.3.2), only while the French purse allows.
+                    if fre_ok:
+                        fre = min(movable.get(C.REGULAR_FRE, 0), pat_cubes, need - pieces_gathered - taken)
+                        if fre > 0:
+                            src_pieces[C.REGULAR_FRE] = fre
+                            taken += fre
 
                 for tag in [C.MILITIA_A, C.MILITIA_U]:
                     still_need = need - pieces_gathered - taken
@@ -622,17 +681,28 @@ class PatriotBot(BaseBot):
                 if taken > 0:
                     plan_sources.append((src, src_pieces))
                     pieces_gathered += taken
-                    for tag, cnt in src_pieces.items():
-                        moved_from[src][tag] += cnt
 
             # Verify we can actually gain control
             if pieces_gathered >= need:
+                # Session 45 latent fix: reserve source pieces only when
+                # the destination actually commits — a failed gather used
+                # to leave its takes in moved_from and starve later
+                # destinations of movable pieces.
                 for src, pieces in plan_sources:
                     move_plans.append({"src": src, "dst": dst, "pieces": pieces})
+                    for tag, cnt in pieces.items():
+                        moved_from[src][tag] += cnt
                 used_destinations.add(dst)
+                if any(p.get(C.REGULAR_FRE, 0) for _, p in plan_sources):
+                    fre_dests.add(dst)
 
         # ---------- Phase 2: Get 1 Militia into spaces with none ----------
-        # Find spaces with no Patriot units
+        # §8.5.4: "Then March to get one Militia (Underground if possible)
+        # into each space with none, first to change Control of the most
+        # Population, then elsewhere."  Only Militia move here (Session
+        # 45: a Continental fallback and an artificial destination cap
+        # were removed); destinations are limited by the Patriot purse
+        # (1 Resource each, §3.3.2) via march_max.
         phase2_targets = []
         for sid, sp in state["spaces"].items():
             if sid in used_destinations:
@@ -641,17 +711,17 @@ class PatriotBot(BaseBot):
                          + sp.get(C.REGULAR_PAT, 0))
             if pat_units > 0:
                 continue
-            # §8.5.4: first to change Control of the most Population, then elsewhere
-            changes_ctrl = 1 if ctrl.get(sid) != "REBELLION" else 0
+            changes_ctrl = 1 if (self._control_after_add(state, sid, 1)
+                                 != ctrl.get(sid)) else 0
             pop = _MAP_DATA.get(sid, {}).get("population", 0)
-            phase2_targets.append((-changes_ctrl, -pop, state["rng"].random(), sid))
+            phase2_targets.append((-changes_ctrl, -(pop * changes_ctrl),
+                                   state["rng"].random(), sid))
         phase2_targets.sort()
 
         for _, _, _, dst in phase2_targets:
             if len(used_destinations) >= march_max:
                 break
             adj_set = map_adj.adjacent_spaces(dst)
-            found = False
             for src in sorted(adj_set):
                 if src not in state["spaces"]:
                     continue
@@ -664,19 +734,13 @@ class PatriotBot(BaseBot):
                     move_plans.append({"src": src, "dst": dst,
                                        "pieces": {C.MILITIA_U: 1}})
                     moved_from[src][C.MILITIA_U] += 1
-                    found = True
+                    used_destinations.add(dst)
                     break
                 elif movable.get(C.MILITIA_A, 0) > 0:
                     move_plans.append({"src": src, "dst": dst,
                                        "pieces": {C.MILITIA_A: 1}})
                     moved_from[src][C.MILITIA_A] += 1
-                    found = True
-                    break
-                elif movable.get(C.REGULAR_PAT, 0) > 0:
-                    move_plans.append({"src": src, "dst": dst,
-                                       "pieces": {C.REGULAR_PAT: 1}})
-                    moved_from[src][C.REGULAR_PAT] += 1
-                    found = True
+                    used_destinations.add(dst)
                     break
 
         if not move_plans:
@@ -809,6 +873,7 @@ class PatriotBot(BaseBot):
         spaces_used: List[str] = []  # Track Rally spaces (Max max_rally)
         build_fort_set: Set[str] = set()
         place_one_set: Set[str] = set()   # Spaces that need explicit Militia placement
+        bulk_place_map: Dict[str, int] = {}  # Fort spaces: §3.3.1 bulk Militia placement
         promote_space: str | None = None
         promote_n: int | None = None
         move_plan_list: List[Tuple[str, str, int]] = []
@@ -828,16 +893,21 @@ class PatriotBot(BaseBot):
                 bases = sp.get(C.FORT_PAT, 0) + sp.get(C.FORT_BRI, 0) + sp.get(C.VILLAGE, 0)
                 if bases >= 2:
                     continue
-                # Need at least 2 Patriot-owned units (Militia or Continentals)
-                # to replace with a Fort, and 4+ total rebel pieces
+                # §8.5.2: "4+ Patriot units" — units are the Patriots' own
+                # Militia and Continentals (Glossary §1.4: not Forts or
+                # Villages; French Regulars are French pieces).  Session
+                # 45: was _rebel_group_size, which counted French
+                # Regulars.  4+ Patriot units implies the 2 removable
+                # units §3.3.1 needs for the Fort.
                 pat_units = (sp.get(C.MILITIA_U, 0) + sp.get(C.MILITIA_A, 0)
                              + sp.get(C.REGULAR_PAT, 0))
-                if self._rebel_group_size(sp) >= 4 and pat_units >= 2:
+                if pat_units >= 4:
                     is_city = 1 if _MAP_DATA.get(sid, {}).get("type") == "City" else 0
                     pop = _MAP_DATA.get(sid, {}).get("population", 0)
-                    fort_candidates.append((-is_city, -pop, sid))
+                    fort_candidates.append((-is_city, -pop,
+                                            state["rng"].random(), sid))
             fort_candidates.sort()
-            for _, _, sid in fort_candidates:
+            for *_, sid in fort_candidates:
                 if len(spaces_used) >= max_rally or avail_forts <= 0:
                     break
                 build_fort_set.add(sid)
@@ -853,21 +923,34 @@ class PatriotBot(BaseBot):
             for sid, sp in state["spaces"].items():
                 if not self._can_rally_in(state, sid):
                     continue
-                if sp.get(C.FORT_PAT, 0) == 0 and self._fort_room(sp):
+                # §8.5.2: "first at each Patriot Fort with no other
+                # Rebellion pieces" — requires an existing Patriot Fort
+                # (Session 45: the old filter also admitted fortless
+                # spaces at the 2-base stacking cap).
+                if sp.get(C.FORT_PAT, 0) == 0:
                     continue
                 # "no other Rebellion pieces" = only the Fort itself
                 other = (sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0) +
                          sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0))
                 if other == 0 and sid not in spaces_used:
                     lonely_forts.append(sid)
-            # Sort for determinism (alphabetical)
-            lonely_forts.sort()
+            # §8.2: seeded-random order among equal-priority spaces
+            lonely_forts.sort(key=lambda s: state["rng"].random())
             for sid in lonely_forts:
                 if len(spaces_used) >= max_rally or avail_militia <= 0:
                     break
+                sp = state["spaces"][sid]
+                # §3.3.1 Fort-space Rally places up to (#Patriot Forts +
+                # Population) Militia; §8.1.1 executes to the maximum
+                # extent possible (Session 45: was a single Militia).
+                extent = min(sp.get(C.FORT_PAT, 0)
+                             + _MAP_DATA.get(sid, {}).get("population", 0),
+                             avail_militia)
+                if extent <= 0:
+                    continue
                 spaces_used.append(sid)
-                place_one_set.add(sid)  # explicit placement needed at Fort spaces
-                avail_militia -= 1  # track placement against available
+                bulk_place_map[sid] = extent
+                avail_militia -= extent
 
         # --- Bullet 3: Continental placement at Fort with most Militia ---
         # §8.5.2: "then if any Continentals are Available at the Fort with
@@ -877,20 +960,33 @@ class PatriotBot(BaseBot):
         if avail_cont > 0 and len(spaces_used) < max_rally:
             best_cont_fort = None
             best_cont_mil = -1
+            best_cont_key = None
             for sid, sp in state["spaces"].items():
                 if not self._can_rally_in(state, sid):
                     continue
                 if sid in spaces_used:
                     continue  # already selected — checked separately in Bullet 4
-                if (sp.get(C.FORT_PAT, 0) == 0 and sid not in build_fort_set
-                        and self._fort_room(sp)):
+                # "at the Fort with the largest number of Militia
+                # already" — needs an existing Patriot Fort (Session 45:
+                # the old filter also admitted fortless 2-base spaces).
+                if sp.get(C.FORT_PAT, 0) == 0:
                     continue
                 mil = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
-                if mil > best_cont_mil:
+                key = (-mil, state["rng"].random())   # §8.2 seeded ties
+                if best_cont_key is None or key < best_cont_key:
+                    best_cont_key = key
                     best_cont_mil = mil
                     best_cont_fort = sid
             if best_cont_fort and best_cont_mil > 0:
                 spaces_used.append(best_cont_fort)
+                # §3.3.1/§8.1.1: place Militia there to the maximum
+                # extent (Session 45: was a single default Militia).
+                extent = min(state["spaces"][best_cont_fort].get(C.FORT_PAT, 0)
+                             + _MAP_DATA.get(best_cont_fort, {}).get("population", 0),
+                             avail_militia)
+                if extent > 0:
+                    bulk_place_map[best_cont_fort] = extent
+                    avail_militia -= extent
 
         # --- Bullet 4: Continental replacement ---
         # §8.5.2: "In the Patriot Fort space with most Militia OF THOSE
@@ -901,10 +997,15 @@ class PatriotBot(BaseBot):
             best_mil = -1
             for sid in spaces_used:
                 sp = state["spaces"].get(sid, {})
-                if (sp.get(C.FORT_PAT, 0) == 0 and sid not in build_fort_set
-                        and self._fort_room(sp)):
+                # Needs a Patriot Fort now or one built this Rally
+                # (Session 45: the old filter also admitted fortless
+                # 2-base spaces).
+                if sp.get(C.FORT_PAT, 0) == 0 and sid not in build_fort_set:
                     continue
-                mil = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                # "most Militia" counts this Rally's planned placements
+                mil = (sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                       + bulk_place_map.get(sid, 0)
+                       + (1 if sid in place_one_set else 0))
                 if mil > best_mil:
                     best_mil = mil
                     best_fort = sid
@@ -944,13 +1045,22 @@ class PatriotBot(BaseBot):
                     continue
                 if sid in spaces_used:
                     continue
-                changes_ctrl = 1 if ctrl.get(sid) != "REBELLION" else 0
+                # §8.5.2 bullet 6: "first to change Control, then in
+                # spaces not at Active Opposition" — a space that does
+                # neither is not selected (Session 45: no-benefit spaces
+                # previously padded the four slots; Control change is now
+                # simulated for the 1 placed Militia per §1.7).
+                changes_ctrl = 1 if (self._control_after_add(state, sid, 1)
+                                     != ctrl.get(sid)) else 0
                 no_active_opp = 1 if self._support_level(state, sid) > C.ACTIVE_OPPOSITION else 0
+                if not changes_ctrl and not no_active_opp:
+                    continue
                 is_city = 1 if _MAP_DATA.get(sid, {}).get("type") == "City" else 0
                 pop = _MAP_DATA.get(sid, {}).get("population", 0)
-                militia_targets.append((-changes_ctrl, -no_active_opp, -is_city, -pop, sid))
+                militia_targets.append((-changes_ctrl, -no_active_opp, -is_city,
+                                        -pop, state["rng"].random(), sid))
             militia_targets.sort()
-            for _, _, _, _, sid in militia_targets:
+            for *_, sid in militia_targets:
                 if len(spaces_used) >= max_rally:
                     break
                 spaces_used.append(sid)
@@ -968,6 +1078,7 @@ class PatriotBot(BaseBot):
             # Pick the Fort that can gather the most adjacent Active Militia
             best_gather_fort = None
             best_gather_count = 0
+            best_gather_key = None
             best_gather_moves: List[Tuple[str, str, int]] = []
 
             for fort_sid in fort_spaces_for_gather:
@@ -981,20 +1092,25 @@ class PatriotBot(BaseBot):
                     active_mil = adj_sp.get(C.MILITIA_A, 0)
                     if active_mil == 0:
                         continue
-                    # Check if removing Active Militia would lose Rebel Control
-                    can_take = active_mil
+                    # §8.5.2: "that can be moved without changing Control
+                    # of their origin spaces" — any change counts,
+                    # including Uncontrolled → BRITISH (Session 45: only
+                    # Rebellion-control loss was checked).
+                    can_take = 0
                     for n in range(active_mil, 0, -1):
-                        if not self._would_lose_rebel_control(
-                                state, adj_sid, {C.MILITIA_A: n}):
+                        if (self._control_after_remove(
+                                state, adj_sid, {C.MILITIA_A: n})
+                                == ctrl.get(adj_sid)):
                             can_take = n
                             break
-                    else:
-                        can_take = 0
                     if can_take > 0:
                         gather_moves.append((adj_sid, fort_sid, can_take))
                         gather_total += can_take
 
-                if gather_total > best_gather_count:
+                gkey = (-gather_total, state["rng"].random())  # §8.2 ties
+                if gather_total > 0 and (best_gather_key is None
+                                         or gkey < best_gather_key):
+                    best_gather_key = gkey
                     best_gather_count = gather_total
                     best_gather_fort = fort_sid
                     best_gather_moves = gather_moves
@@ -1043,6 +1159,15 @@ class PatriotBot(BaseBot):
                     kw["place_one"] = {sid}
             if sid in place_one_set:
                 kw["place_one"] = {sid}
+            if sid in bulk_place_map:
+                sp_check = state["spaces"].get(sid, {})
+                n = min(bulk_place_map[sid],
+                        sp_check.get(C.FORT_PAT, 0)
+                        + _MAP_DATA.get(sid, {}).get("population", 0))
+                if n > 0 and sp_check.get(C.FORT_PAT, 0) > 0:
+                    kw["bulk_place"] = {sid: n}
+                else:
+                    kw["place_one"] = {sid}
             if promote_space == sid:
                 kw["promote_space"] = promote_space
                 kw["promote_n"] = promote_n
@@ -1148,18 +1273,27 @@ class PatriotBot(BaseBot):
         refresh_control(state)
         candidates = []
         ctrl = state.get("control", {})
+        battle_spaces = state.get("_turn_battle_spaces", set())
         for sid, sp in state["spaces"].items():
+            if sid in battle_spaces:
+                continue  # §4.3.2: Partisans may not be in a Battle space
             if not sp.get(C.MILITIA_U, 0):
                 continue
             has_village = sp.get(C.VILLAGE, 0)
             wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
             british = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
-            enemy = has_village + wp + british
-            if enemy == 0:
-                continue
+            # §4.3.2 option 3 is the only Partisans way to remove a
+            # Village: no War Parties there and two Underground Militia.
+            village_removable = 1 if (has_village and wp == 0
+                                      and sp.get(C.MILITIA_U, 0) >= 2) else 0
+            # Options 1/2 remove Royalist UNITS (Glossary §1.4 — Forts
+            # and Villages are not units).
+            enemy_units = wp + british
+            if not village_removable and enemy_units == 0:
+                continue  # nothing Partisans could remove here
             adds_rebel_ctrl = 1 if ctrl.get(sid) != "REBELLION" else 0
             removes_brit_ctrl = 1 if ctrl.get(sid) == "BRITISH" else 0
-            key = (-has_village, -wp, -british, -adds_rebel_ctrl,
+            key = (-village_removable, -wp, -british, -adds_rebel_ctrl,
                    -removes_brit_ctrl, state["rng"].random())
             candidates.append((key, sid))
         if not candidates:
@@ -1169,14 +1303,20 @@ class PatriotBot(BaseBot):
             sp = state["spaces"][sid]
             has_village = sp.get(C.VILLAGE, 0)
             wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
-            enemy_cubes = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
-                           + sp.get(C.WARPARTY_A, 0))
-            own_militia = sp.get(C.MILITIA_U, 0) + sp.get(C.MILITIA_A, 0)
-            # §8.1 "maximum extent": option 2 nets +1 removal over option 1
-            # (sacrifice 1 own piece → remove 2 enemy) when 2+ enemy cubes
-            if has_village and enemy_cubes == 0 and not wp:
+            enemy_units = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                           + sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0))
+            ug_militia = sp.get(C.MILITIA_U, 0)
+            # §4.3.2 option 3 requires only "If no War Parties there"
+            # (plus 2 Underground Militia and a Village) — enemy cubes
+            # MAY be present (Session 45, Eric's queue: the old gate
+            # wrongly required no enemy cubes).  §8.5.1 removes a
+            # Village first.
+            if has_village and wp == 0 and ug_militia >= 2:
                 opt = 3
-            elif enemy_cubes >= 2 and own_militia >= 1:
+            # §8.1 "maximum extent": option 2 nets +1 removal over
+            # option 1 when 2+ Royalist units and 2 Underground Militia
+            # (§4.3.2 requires two to Activate).
+            elif enemy_units >= 2 and ug_militia >= 2:
                 opt = 2
             else:
                 opt = 1
@@ -1193,8 +1333,11 @@ class PatriotBot(BaseBot):
             return False
         refresh_control(state)
         ctrl = state.get("control", {})
+        battle_spaces = state.get("_turn_battle_spaces", set())
         candidates = []
         for sid, sp in state["spaces"].items():
+            if sid in battle_spaces:
+                continue  # §4.3.3: no Skirmish in a Battle space
             if not sp.get(C.REGULAR_PAT, 0):
                 continue
             has_fort = sp.get(C.FORT_BRI, 0)
@@ -1273,7 +1416,8 @@ class PatriotBot(BaseBot):
         """P9: Rally if would place Fort OR 1D6 > Underground Militia."""
         avail_forts = state["available"].get(C.FORT_PAT, 0)
         if avail_forts and any(
-            self._rebel_group_size(sp) >= 4
+            (sp.get(C.MILITIA_U, 0) + sp.get(C.MILITIA_A, 0)
+             + sp.get(C.REGULAR_PAT, 0)) >= 4   # §8.5.2 "4+ Patriot units"
             and sp.get(C.FORT_PAT, 0) == 0
             and (sp.get(C.FORT_PAT, 0) + sp.get(C.FORT_BRI, 0)
                  + sp.get(C.VILLAGE, 0)) < 2       # room (max 2 bases)
@@ -1464,9 +1608,12 @@ class PatriotBot(BaseBot):
                 total_pat = (sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
                              + sp.get(C.REGULAR_PAT, 0))
                 is_last = 1 if total_pat <= 1 else 0
-                candidates.append((changes, is_last, sid, tag))
+                # §8.2 seeded-random tie-break (Session 45: was
+                # alphabetical space order).
+                candidates.append((changes, is_last,
+                                   state["rng"].random(), sid, tag))
         candidates.sort()
-        return [(sid, tag) for _, _, sid, tag in candidates]
+        return [(sid, tag) for _, _, _, sid, tag in candidates]
 
     def ops_bs_trigger(self, state: Dict) -> bool:
         """Brilliant Stroke: Use after Treaty of Alliance when Washington is

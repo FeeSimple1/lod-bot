@@ -34,25 +34,29 @@ alphabetical/first-seen tie-breaks (8.1.1/8.2).
 1. 8.5.5 Supply pays for EVERY unsupplied space (rule: only where
    removal would change Control) and unpaid removal order reverses
    8.1.2 (year_end.py:136-156).
-2. 8.5.4 March aborts entirely when French Regulars included at 0
-   French Resources (march.py raises; no gate at patriot.py:602);
-   artificial 4-destination cap; Continental-instead-of-Militia
-   fallback.
+2. FIXED Session 45: 8.5.4 March aborts entirely when French Regulars
+   included at 0 French Resources (march.py raises; no gate at
+   patriot.py:602); artificial 4-destination cap (now purse-budgeted);
+   Continental-instead-of-Militia fallback.
 3. 8.5.1 P6 gate omits Forts/Villages from "Active Royalist pieces"
    (Glossary: cubes/Forts/Villages are always Active) — over-Battles;
    Fort-only spaces excluded from selection.
 4. Win-the-Day free Rally hardwired to the battle space; correct
-   `_best_rally_space` selector is dead code (patriot.py:388-391/438).
-   Partisans option-3 wrongly requires no enemy cubes; Battle-space
-   exclusion (4.3.2/4.3.3) unenforced for Partisans/Skirmish.
+   `_best_rally_space` selector is dead code (patriot.py:388-391/438)
+   [still open].  FIXED Session 45: Partisans option-3 wrongly
+   requires no enemy cubes; Battle-space exclusion (4.3.2/4.3.3)
+   unenforced for Partisans/Skirmish (now engine-enforced for all
+   three Skirmish factions; options 1/2 also restricted to UNITS per
+   Glossary 1.4).
 5. Systemic deterministic tie-breaks (Rally/March/Supply/Desertion/
    Redeploy) vs 8.2 seeded-random.
-Also: Rally counts French Regulars in "4+ Patriot units"; Rally bullet
-6 fills slots with no-benefit spaces; lonely-fort placements use 1
-Militia vs max-extent; 8.5.6 redeploy can pick a Patriot-less space at
-0 Continentals; Desertion bulk removal not re-scored; CoC potential
-uncapped by 2-level max, Fort-only spaces excluded, shift allowance
-shared with RL; BS first-eligible None-passthrough.
+Also: FIXED Session 45 — Rally counts French Regulars in "4+ Patriot
+units"; Rally bullet 6 fills slots with no-benefit spaces; lonely-fort
+placements use 1 Militia vs max-extent; Desertion bulk removal not
+re-scored; CoC potential uncapped by 2-level max, Fort-only spaces
+excluded, shift allowance shared with RL.  FIXED Session 43: 8.5.6
+redeploy can pick a Patriot-less space at 0 Continentals.  Still
+open: BS first-eligible None-passthrough.
 
 ## French (§8.6) — worst findings
 1. 8.6.7 Supply move-vs-pay INVERTED: never pays to hold Control-

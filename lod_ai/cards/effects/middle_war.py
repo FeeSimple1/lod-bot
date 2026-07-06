@@ -136,11 +136,17 @@ def evt_003_illinois_campaign(state, shaded=False):
         if shaded:
             place_piece(state, MILITIA_U, prov, 2)
             sp = _safe_get_space(state, prov)
-            if sp.get(MILITIA_U, 0) and _space_has_any(
-                state,
-                prov,
-                [REGULAR_BRI, TORY, WARPARTY_A, WARPARTY_U, VILLAGE, FORT_BRI],
-            ):
+            # §4.3.2 option 1 removes a Royalist UNIT (Glossary §1.4 —
+            # not a Village/Fort), and Partisans may not occur in a
+            # Battle space (Session 45: the old gate accepted
+            # Village/Fort-only provinces).
+            if (sp.get(MILITIA_U, 0)
+                    and prov not in state.get("_turn_battle_spaces", set())
+                    and _space_has_any(
+                        state,
+                        prov,
+                        [REGULAR_BRI, TORY, WARPARTY_A, WARPARTY_U],
+                    )):
                 partisans.execute(state, PATRIOTS, ctx={}, space_id=prov, option=1)
         else:
             for tag in (MILITIA_A, MILITIA_U, REGULAR_PAT, FORT_PAT):

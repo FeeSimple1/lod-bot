@@ -46,6 +46,10 @@ ROYALIST_TAGS = (
 # §4.3.2: "cubes are removed to Casualties" — only cubes.
 _CUBE_TAGS = frozenset((REGULAR_BRI, TORY))
 
+# Glossary §1.4: units = Regulars, Tories, War Parties (not Forts or
+# Villages).  Options 1/2 may remove only these.
+_UNIT_TAGS = (TORY, WARPARTY_A, REGULAR_BRI, WARPARTY_U)
+
 
 def _removal_dest(tag: str) -> str:
     """Return 'casualties' for cubes, 'available' for everything else."""
@@ -70,6 +74,12 @@ def execute(
     if option not in (1, 2, 3):
         raise ValueError("option must be 1, 2, or 3.")
 
+    # §4.3.2: Partisans "may accompany any Command but not in a Battle
+    # space".  Battle spaces for the current turn are recorded by
+    # battle.execute.
+    if space_id in state.get("_turn_battle_spaces", set()):
+        raise ValueError(f"Partisans cannot occur in Battle space {space_id}.")
+
     state["_turn_used_special"] = True
     sp = state["spaces"][space_id]
 
@@ -82,6 +92,15 @@ def execute(
     if roy_pieces == 0:
         raise ValueError("No Royalist pieces present for Partisans strike.")
 
+    # §4.3.2 options 1/2 remove Royalist UNITS — Glossary §1.4: "Units:
+    # Regulars, Tories, War Parties, Continentals and Militia but not
+    # Forts or Villages."  (Session 45: options 1/2 could previously
+    # remove a Village or Fort.)
+    roy_units = sum(sp.get(tag, 0) for tag in _UNIT_TAGS)
+    if option in (1, 2) and roy_units == 0:
+        raise ValueError(
+            "Options 1/2 remove a Royalist unit; none present (§4.3.2).")
+
     wp_present = sp.get(WARPARTY_A, 0) + sp.get(WARPARTY_U, 0) > 0
     if option == 3 and wp_present:
         raise ValueError("Option 3 only if no War Parties are present.")
@@ -93,7 +112,7 @@ def execute(
         # Activate 1 Militia U → A
         flip_pieces(state, MILITIA_U, MILITIA_A, space_id, 1)
         # Remove 1 Royalist unit (cubes → Casualties, others → Available)
-        for tag in (TORY, WARPARTY_A, REGULAR_BRI, VILLAGE, FORT_BRI, WARPARTY_U):
+        for tag in _UNIT_TAGS:
             if sp.get(tag, 0):
                 remove_piece(state, tag, space_id, 1, to=_removal_dest(tag))
                 break
@@ -105,7 +124,7 @@ def execute(
         remove_piece(state, MILITIA_A, space_id, 1, to="available")
         # Remove 2 Royalist units (cubes → Casualties, others → Available)
         removed = 0
-        for tag in (TORY, WARPARTY_A, REGULAR_BRI, VILLAGE, FORT_BRI, WARPARTY_U):
+        for tag in _UNIT_TAGS:
             while sp.get(tag, 0) and removed < 2:
                 remove_piece(state, tag, space_id, 1, to=_removal_dest(tag))
                 removed += 1

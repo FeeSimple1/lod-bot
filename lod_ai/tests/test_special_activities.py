@@ -319,15 +319,20 @@ class TestPartisans:
         assert state["casualties"].get(C.WARPARTY_A, 0) == 0
         assert state["available"].get(C.WARPARTY_A, 0) + state["available"].get(C.WARPARTY_U, 0) >= 1
 
-    def test_option1_fort_to_available(self):
-        """§4.3.2 says 'cubes are removed to Casualties' (no Forts) —
-        so a British Fort goes to Available."""
+    def test_option1_cannot_remove_fort(self):
+        """§4.3.2 options 1/2 remove a Royalist UNIT; Glossary §1.4:
+        "Units: Regulars, Tories, War Parties, Continentals and Militia
+        but not Forts or Villages."  A Fort-only space has no removable
+        unit, so option 1 must refuse (Session 45: it previously
+        removed the Fort)."""
         state = _base_state()
         _space(state, "SC", **{C.MILITIA_U: 2, C.FORT_BRI: 1})
         state["available"][C.MILITIA_A] = 5
-        partisans.execute(state, C.PATRIOTS, {}, "SC", option=1)
-        assert state["casualties"].get(C.FORT_BRI, 0) == 0
-        assert state["available"].get(C.FORT_BRI, 0) == 1
+        import pytest
+        with pytest.raises(ValueError):
+            partisans.execute(state, C.PATRIOTS, {}, "SC", option=1)
+        # Fort untouched
+        assert state["spaces"]["SC"].get(C.FORT_BRI, 0) == 1
 
     def test_option2_militia_removed_to_available(self):
         """Removed Militia (not a cube) goes to Available, not Casualties."""
