@@ -235,7 +235,7 @@ failed Trade leaves the shortfall unraidable — skip unpaid spaces).
 
 ---
 
-## Q19 (Session 55, RESOLVED BY REFERENCE same session): Do Common-Cause
+## Q19 (Session 55, RESOLVED — Eric CONFIRMED July 6 2026): Do Common-Cause
 War Parties fill the Tory slot in Battle loss removal?  YES — the
 Playbook (p.~850, "Indian War Parties can also be used in a Battle")
 is explicit: "if the Common Cause Special Activity was used — as a
@@ -243,8 +243,9 @@ Tory adding to Force Level AND ABSORBING LOSSES."  Implemented: up to
 cc_wp Active WPs fill the Tory slot of the §3.6.7 alternation, WP
 before own Tories within the slot (§8.1.2 "without removing the last
 Tory"; WP routes to Available, no casualties track — §3.6.7 "Other
-removed pieces to Available").  Flagged for Eric's confirmation but
-non-blocking: the reference is unambiguous.
+removed pieces to Available").  Eric confirmed the Playbook reading on July 6, 2026:
+"CC War Parties absorb losses as a Tory per the Playbook. Keep the
+current implementation."
 
 §4.2.1: "the British may utilize one or more War Parties as if they
 were Tories ... It may accompany March or Battle."  §3.6.7 removal
