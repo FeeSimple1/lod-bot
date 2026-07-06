@@ -20,6 +20,7 @@ _EXPECTED_FIELDS = {
     "places_british_pieces",
     "places_patriot_militia_u",
     "tories_in",  # S60: B2-3 fixed placement space(s), None = choose
+    "regulars_in",  # S63: B2-3c fixed Regular placement space(s)
     "places_patriot_fort",
     "places_french_from_unavailable",
     "places_french_on_map",
@@ -86,12 +87,13 @@ def test_card_values_are_booleans(card_id):
     for side in ("unshaded", "shaded"):
         flags = CARD_EFFECTS[card_id][side]
         for key, val in flags.items():
-            if key == "tories_in":
-                # S60: placement-target field — None or a tuple of space ids
-                assert val is None or (
+            if key in ("tories_in", "regulars_in"):
+                # S60/S63: placement-target fields — None, a tuple of
+                # space ids, or a "CITIES"/"COLONIES" sentinel.
+                assert val is None or val in ("CITIES", "COLONIES") or (
                     isinstance(val, tuple)
                     and all(isinstance(x, str) for x in val)
-                ), f"Card {card_id} {side}[tories_in] = {val!r}"
+                ), f"Card {card_id} {side}[{key}] = {val!r}"
                 continue
             assert isinstance(val, bool), (
                 f"Card {card_id} {side}[{key!r}] = {val!r} (not bool)"
@@ -122,9 +124,10 @@ def test_card_75_unshaded_grants_free_gather():
 def test_card_18_shaded_is_none():
     """Card 18 shaded is (none) — all False."""
     s = CARD_EFFECTS[18]["shaded"]
-    # tories_in defaults to None (S60 placement-target field, not a flag)
-    assert all(v is False for k, v in s.items() if k != "tories_in")
-    assert s["tories_in"] is None
+    # placement-target fields default to None (not flags)
+    assert all(v is False for k, v in s.items()
+               if k not in ("tories_in", "regulars_in"))
+    assert s["tories_in"] is None and s["regulars_in"] is None
 
 
 def test_card_6_shaded_inflicts_british_casualties():
@@ -244,3 +247,37 @@ def test_card_34_unshaded_removes_blockade_via_fni():
     rewrote the old no-Blockade expectation)."""
     u = CARD_EFFECTS[34]["unshaded"]
     assert u["removes_blockade"] is True
+
+
+def test_s63_target_aware_bullet3_examples():
+    """S63 sweep (card-42 class): fixed-target cards must test THEIR
+    spaces in B2 bullet 3, not the whole map."""
+    from lod_ai.bots.british_bot import BritishBot
+    import lod_ai.rules_consts as C
+    from lod_ai.state.setup_state import build_state
+    bot = BritishBot()
+    state = build_state("1776", seed=1)
+    # Card 85 places Regulars only in Southwest (a Reserve): bullet 3c
+    # must NOT fire even though Cities exist on the map.
+    eff = CARD_EFFECTS[85]["unshaded"]
+    assert eff["regulars_in"] == ("Southwest",)
+    # Card 66: both targets are Reserves.
+    assert CARD_EFFECTS[66]["unshaded"]["regulars_in"] == ("Florida", "Southwest")
+    # Card 2's Tories can only reach Cities; card 32's only Colonies.
+    assert CARD_EFFECTS[2]["unshaded"]["tories_in"] == "CITIES"
+    assert CARD_EFFECTS[32]["unshaded"]["tories_in"] == "COLONIES"
+    # Behavioral check with card 85 (Southwest-only placements —
+    # a Reserve, and Reserves are Always Neutral): with no Opposition
+    # lead, no AO anywhere, and empty Unavailable, NO bullet may fire —
+    # the old map-wide 3c scan returned True on any map with a City.
+    for sid in state["spaces"]:
+        state["support"][sid] = 0
+    state["unavailable"] = {}
+    card85 = {"id": 85, "dual": True}
+    assert bot._faction_event_conditions(state, card85) is False, (
+        "card 85 places only in the Southwest Reserve — bullet 3c must "
+        "not fire off unrelated Cities, 3a has no reachable AO space"
+    )
+    # And card 2 (Regulars into any one City) legitimately fires 3c.
+    card2 = {"id": 2, "dual": True}
+    assert bot._faction_event_conditions(state, card2) is True

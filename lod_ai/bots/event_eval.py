@@ -31,7 +31,8 @@ _F = dict(
     inflicts_rebel_casualties=False,       # B2-4: sends Rebel pieces to Casualties or grants free Skirmish/Battle
     places_british_from_unavailable=False,  # B2-2: places British pieces sourced from Unavailable
     places_tories=False,                   # B2-3: places Tory pieces on the map
-    tories_in=None,                        # B2-3: fixed placement space(s), None = British choose
+    tories_in=None,                        # B2-3: fixed placement space(s), None = choose; "CITIES"/"COLONIES" sentinels
+    regulars_in=None,                      # B2-3c: fixed Regular placement space(s), None = choose
     places_british_fort=False,             # B2-3: places a British Fort on the map
     places_british_regulars=False,         # B2-3: places British Regulars on the map
     removes_blockade=False,                # B2-1: removes a Blockade marker
@@ -76,6 +77,7 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     2: {
         "unshaded": _e(
+            tories_in="CITIES",  # "any one City" (S63)
             places_british_pieces=True,
             places_tories=True,            # place 2 Tories
             places_british_regulars=True,  # place 2 British Regulars
@@ -277,6 +279,7 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     15: {
         "unshaded": _e(
+            tories_in=("Virginia",),  # "Place two Tories there" (S63)
             shifts_support_royalist=True,
             places_british_pieces=True,
             places_tories=True,  # place 2 Tories in Virginia
@@ -436,6 +439,7 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     26: {
         "unshaded": _e(
+            tories_in=("North_Carolina",),  # (S63)
             places_british_pieces=True,
             places_tories=True,       # can place 2 Tories in NC
             places_british_fort=True,  # can place 1 British Fort in NC
@@ -513,6 +517,7 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     31: {
         "unshaded": _e(
+            tories_in=("South_Carolina", "Georgia"),  # (S63)
             places_british_pieces=True,
             places_tories=True,        # place 2 Tories in SC or GA
             places_british_fort=True,  # place 1 British Fort in SC or GA
@@ -530,6 +535,7 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     32: {
         "unshaded": _e(
+            tories_in="COLONIES",  # "to any Colony" (S63)
             places_british_pieces=True,
             places_tories=True,                 # place up to 2 Tories
             places_british_regulars=True,       # place up to 2 Regulars
@@ -629,6 +635,8 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     38: {
         "unshaded": _e(
+            tories_in=("Quebec", "New_York"),  # (S63)
+            regulars_in=("Quebec", "New_York"),  # only New_York is a Colony (S63)
             places_british_pieces=True,
             places_tories=True,                 # British cubes include Tories
             places_british_regulars=True,       # British cubes include Regulars
@@ -993,6 +1001,7 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     62: {
         "unshaded": _e(
+            tories_in=("New_York", "Quebec", "Northwest"),  # (S63)
             places_village=False,
             places_british_pieces=True,  # can place Tories
             places_tories=True,          # place 3 Tories (or 3 WP) in NY/Quebec/NW
@@ -1059,6 +1068,8 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     66: {
         "unshaded": _e(
+            tories_in=("Florida", "Southwest"),  # (S63)
+            regulars_in=("Florida", "Southwest"),  # both Reserves — 3c must NOT fire (S63)
             places_british_pieces=True,
             places_tories=True,            # 6 British cubes = Regulars and/or Tories
             places_british_regulars=True,  # 6 British cubes = Regulars and/or Tories
@@ -1331,6 +1342,8 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     85: {
         "unshaded": _e(
+            tories_in=("Southwest",),  # (S63)
+            regulars_in=("Southwest",),  # Reserve — 3c must NOT fire (S63)
             places_british_pieces=True,
             places_tories=True,            # 3 Regulars and/or Tories
             places_british_regulars=True,  # 3 Regulars and/or Tories
@@ -1455,6 +1468,7 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     94: {
         "unshaded": _e(
+            tories_in=("New_York",),  # (S63)
             grants_free_gather=True,
             places_british_pieces=True,
             places_tories=True,  # Tories free Muster in New York

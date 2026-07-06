@@ -226,7 +226,15 @@ class BritishBot(BaseBot):
             # space(s), bullet 3 tests THOSE spaces — a map-wide scan let
             # card 42 fire off Massachusetts while its Tory could only
             # ever land in (non-Active-Opposition) Connecticut.
-            _t_spaces = eff.get("tories_in") or state["spaces"].keys()
+            _t = eff.get("tories_in")
+            if _t == "CITIES":
+                _t_spaces = [s for s in state["spaces"]
+                             if _MAP_DATA.get(s, {}).get("type") == "City"]
+            elif _t == "COLONIES":
+                _t_spaces = [s for s in state["spaces"]
+                             if _MAP_DATA.get(s, {}).get("type") == "Colony"]
+            else:
+                _t_spaces = _t or state["spaces"].keys()
             for sid in _t_spaces:
                 sp = state["spaces"].get(sid, {})
                 if (self._support_level(state, sid) == C.ACTIVE_OPPOSITION
@@ -238,7 +246,14 @@ class BritishBot(BaseBot):
                         and state["spaces"][sid].get(C.FORT_BRI, 0) == 0):
                     return True
         if eff["places_british_regulars"] and state.get("available", {}).get(C.REGULAR_BRI, 0) > 0:
-            for sid in state["spaces"]:
+            # S63 (card-42 class): when the card names its Regular
+            # placement space(s), the bullet fires only if one of THEM is
+            # a City or Colony (cards 66/85 place only in Reserves — the
+            # old map-wide scan was trivially true on any map).  Cards
+            # that let the British choose keep the scan (they would pick
+            # a City/Colony).
+            _r_spaces = eff.get("regulars_in") or state["spaces"].keys()
+            for sid in _r_spaces:
                 if _MAP_DATA.get(sid, {}).get("type") in ("City", "Colony"):
                     return True
 

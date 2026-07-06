@@ -4628,3 +4628,24 @@ exact picks; the Example-2 Garrison draws remain structural (the
 walk-through's own note says its destination order is random).
 Battery: 1,415 + 101 green; gates 1-10/11-20 clean; soak 120 DONE
 clean; balance rebaselined.
+
+## Session 63: target-aware event sweep — the card-42 class closed (July 2026)
+
+The S60 class note executed deck-wide.  All 21 places_tories /
+places_british_regulars cards read against their printed texts; ten
+fixed-target cards populated (tories_in: 2="CITIES", 15=Virginia,
+26=North_Carolina, 31=SC/GA, 32="COLONIES", 38=Quebec/New_York,
+62=NY/Quebec/Northwest, 66=Florida/Southwest, 85=Southwest,
+94=New_York — card 42 landed in S60), and the NEW regulars_in field
+fixes B2 bullet 3c for the three cards whose Regulars can only reach
+a Reserve or mixed set (38, 66, 85): the old map-wide scan was
+TRIVIALLY TRUE on any map with a City, so cards 66/85 (Reserve-only
+placements) always fired the bullet.  Bullet 3a now resolves the
+"CITIES"/"COLONIES" sentinels; player-choice cards keep the scan
+(correct: the British would choose a qualifying space).  Cards with
+dynamic targets (27, 28, 30, 43, 46, 47, 76, 89) stay None by
+design — their reachable sets depend on board state and the scan
+approximates the choice.  Schema guards extended; behavioral test:
+card 85 fires NO bullet on a neutral board (was: always bullet 3c),
+card 2 still fires legitimately.  Battery: 1,416 + 101 green; gates
+1-10/11-20 clean; soak 120 DONE clean; balance rebaselined.
