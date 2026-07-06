@@ -663,8 +663,15 @@ class PatriotBot(BaseBot):
                     taken += pat_cubes
                     # Escort French Regulars 1-for-1 with Continentals
                     # (§3.3.2), only while the French purse allows.
+                    # §8.5.4 (S56): "If French Resources exceed 0, include
+                    # as many French Regulars as possible in the moves" —
+                    # the sentence follows the stop-at-Control clause, so
+                    # escorts are NOT capped at the remaining Control need
+                    # (they count toward Control anyway; overshoot is the
+                    # rule).  Legal max stays 1-for-1 with the moving
+                    # Continentals (§3.3.2).
                     if fre_ok:
-                        fre = min(movable.get(C.REGULAR_FRE, 0), pat_cubes, need - pieces_gathered - taken)
+                        fre = min(movable.get(C.REGULAR_FRE, 0), pat_cubes)
                         if fre > 0:
                             src_pieces[C.REGULAR_FRE] = fre
                             taken += fre
@@ -1390,9 +1397,12 @@ class PatriotBot(BaseBot):
         ]
         if not spaces:
             return False
+        # §8.5.1 PERSUASION: "first spaces with Patriot Forts" — a binary
+        # presence tier; remaining ties are seeded random per §8.2 (S56:
+        # the old sort invented a Population tiebreak).
         spaces.sort(key=lambda n: (
-            -state["spaces"][n].get(C.FORT_PAT, 0),
-            -_MAP_DATA.get(n, {}).get("population", 0),
+            0 if state["spaces"][n].get(C.FORT_PAT, 0) else 1,
+            state["rng"].random(),
         ))
         try:
             persuasion.execute(state, self.faction, {}, spaces=spaces[:3])

@@ -4290,3 +4290,30 @@ numbers recorded in QUESTIONS.md Q21; interim (a) spread kept.
 TRACEABILITY.md: all §8.6.x rows now VERIFIED with session refs.
 docs/balance_largeN_s56.md has the full read and the ranked remaining
 hypotheses for the British ~1%.
+
+## Session 56 (cont.): P-node inventory — §8.5 Patriot pass (July 2026)
+
+Two parallel audits at the S55/S56 standard over §8.5 + §3.3 + §4.3
+vs patriot.py (the S45 block's fixes all verified as holding: Rally
+gate/bullets, March purse-gating, Desertion re-scoring, CoC caps,
+battle-space exclusions, WtD rally).  One agent claim rejected as
+overbroad ("independent French in March" — §3.3.2 PROCEDURE: "French
+Regulars may accompany Continentals 1 for 1 at the Patriot's option"
+is a hard legality cap).  Two real deviations fixed:
+
+- §8.5.4 March: French escorts were capped at the RESIDUAL CONTROL
+  NEED — but "If French Resources exceed 0, include as many French
+  Regulars as possible in the moves" follows the stop-at-Control
+  clause, so escorts are exempt from the just-enough throttle (legal
+  max stays 1-for-1 with the moving Continentals, purse-gated per
+  destination with the Rochambeau discount).
+- §8.5.1 PERSUASION: "first spaces with Patriot Forts" is a binary
+  presence tier; the code invented a Population tiebreak — now §8.2
+  seeded random.
+
+Tests: test_patriot_85_s56.py (2 new).  Battery: 1,410 + 101 green;
+gates 1-10/11-20 clean; soak 120 invariants DONE clean; balance
+rebaselined.  §8.5.x TRACEABILITY rows updated below.  With this,
+ALL FOUR factions' flowcharts (§8.4-§8.7 majors) have had the
+text-verified inventory — §8.7 Indian residual rows remain the last
+gap (S51 covered Gather/March nodes; the full I-node sweep is queued).

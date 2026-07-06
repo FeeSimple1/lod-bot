@@ -49,10 +49,10 @@ no citation exists.
 | 8.4.10 | Loyalist Desertion | VERIFIED (S54) | util/year_end.py desertion | test_british_84_s54.py | Per-Tory re-scored removal with control simulation (S54). |
 | 8.4.11 | British Brilliant Stroke | UNVERIFIED | cards/effects/brilliant_stroke.py, util/year_end.py | — | Citation-scan row; verification pass queued (see below). |
 | 8.5 | Non-Player Patriot Actions | UNVERIFIED | bots/free_op_planner.py, bots/indians.py, bots/patriot.py, cards/effects/brilliant_stroke.py, engine.py, util/year_end.py | tests/test_bot_free_ops.py, tests/test_pat_bot.py, tests/test_year_end.py, tests/test_battle_selection.py | Citation-scan row; verification pass queued (see below). |
-| 8.5.1 | Patriot Battle | UNVERIFIED | bots/patriot.py | tests/test_pat_bot.py, tests/test_battle_selection.py | Citation-scan row; verification pass queued (see below). |
+| 8.5.1 | Patriot Battle | VERIFIED (S56) | bots/patriot.py | test_pat_bot.py, test_battle_selection.py, test_patriot_85_s56.py | P-node inventory S56: gate/selection/fees/SA cascade clean; PERSUASION fort tier fixed (binary + §8.2 ties). |
 | 8.5.2 | Rally | UNVERIFIED | bots/free_op_planner.py, bots/patriot.py, engine.py | tests/test_bot_free_ops.py, tests/test_pat_bot.py | Citation-scan row; verification pass queued (see below). |
 | 8.5.3 | Rabble-Rousing | UNVERIFIED | bots/patriot.py | tests/test_pat_bot.py | Citation-scan row; verification pass queued (see below). |
-| 8.5.4 | Patriot March | UNVERIFIED | bots/free_op_planner.py, bots/patriot.py, engine.py | — | Citation-scan row; verification pass queued (see below). |
+| 8.5.4 | Patriot March | VERIFIED (S45, S56) | bots/patriot.py | test_patriot_85_s56.py | S56 FIX: French escorts no longer capped at residual Control need ('as many as possible'); 1-for-1 legality cap (§3.3.2) confirmed. |
 | 8.5.5 | Patriot Supply | UNVERIFIED | cand: supply phase — locate | — | No §-citation in code. cand: supply phase — locate. |
 | 8.5.6 | Patriot Leader Redeployment | UNVERIFIED | cand: leader redeploy — locate | — | No §-citation in code. cand: leader redeploy — locate. |
 | 8.5.7 | Patriot Desertion | UNVERIFIED | cand: desertion — locate | — | No §-citation in code. cand: desertion — locate. |
