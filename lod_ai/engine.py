@@ -992,10 +992,13 @@ class Engine:
             return False
 
         self._reset_trace_on(self.state)
-        try:
-            self.dispatcher.execute(cmd, faction=faction, space=leader_space, limited=True, free=True)
-            normalize_state(self.state)
-        except Exception:
+        # §8.3.7 (S61, Playbook Example 4): execute the LimCom through
+        # the BOT'S OWN planner in limited+free mode, the Leader tied to
+        # this FIRST Command (state["_bs_leader_origin"]).  The old
+        # generic dispatcher call had no plan (no srcs/dsts) and aborted
+        # every bot March/Battle Brilliant Stroke.
+        if not self._run_bot_limcom(bot, faction, cmd,
+                                    leader_origin=leader_space):
             push_history(self.state, f"{faction} BS aborted — {cmd} failed at {leader_space}")
             return False
 
@@ -1028,6 +1031,15 @@ class Engine:
             C.FRENCH:   ("_try_skirmish", "_try_naval_pressure"),
             C.INDIANS:  ("_war_path", "_plunder", "_trade"),
         }
+        # S61 (Playbook Example 4): Howe's leader ability fires before
+        # the British SA ("Howe then uses his Leader Ability to remove
+        # the Blockade from New York City") — same hook the normal-turn
+        # SA chains use (B38).
+        if faction == C.BRITISH and hasattr(bot, "_apply_howe_fni"):
+            try:
+                bot._apply_howe_fni(self.state)
+            except Exception:
+                pass
         for name in chains.get(faction, ()):
             fn = getattr(bot, name, None)
             if fn is None:
@@ -1049,28 +1061,72 @@ class Engine:
             except Exception:
                 pass
 
+    def _run_bot_limcom(self, bot, faction: str, cmd: str,
+                        leader_origin: str | None = None) -> bool:
+        """§8.3.7 (S61): run one Brilliant-Stroke Limited Command through
+        the bot's own planner (limited + free); *leader_origin* ties the
+        Command to the Leader's space (first LimCom only — the British
+        planners read state["_bs_leader_origin"])."""
+        st = self.state
+        st["_limited"] = True
+        st["bs_free"] = True
+        if leader_origin:
+            st["_bs_leader_origin"] = leader_origin
+        try:
+            methods = {"garrison": "_garrison", "muster": "_muster",
+                       "march": "_march", "battle": "_battle",
+                       "rally": "_execute_rally", "gather": "_gather",
+                       "raid": "_raid", "scout": "_scout"}
+            fn = getattr(bot, methods.get(cmd, ""), None)
+            if fn is None:
+                return False
+            try:
+                if faction == C.BRITISH and cmd == "muster":
+                    result = bool(fn(st, tried_march=True))
+                elif faction == C.BRITISH and cmd == "march":
+                    result = bool(fn(st, tried_muster=True))
+                else:
+                    result = bool(fn(st))
+            except Exception:
+                return False
+            normalize_state(st)
+            return result
+        finally:
+            st.pop("_limited", None)
+            st.pop("bs_free", None)
+            st.pop("_bs_leader_origin", None)
+
     def _try_bs_second_limcom(self, faction: str, exclude: str) -> None:
-        """Try a second Limited Command in any eligible space except *exclude*."""
-        for sid, sp in self.state.get("spaces", {}).items():
-            if sid == exclude:
-                continue
-            # Try battle first if there are enemies
-            if faction in (C.BRITISH, C.INDIANS):
-                enemy = sum(sp.get(t, 0) for t in (C.REGULAR_PAT, C.REGULAR_FRE, C.MILITIA_A, C.MILITIA_U))
-            else:
-                enemy = sum(sp.get(t, 0) for t in (C.REGULAR_BRI, C.TORY, C.WARPARTY_A, C.WARPARTY_U))
-            own_pieces = sum(sp.get(t, 0) for t in bs.FACTION_PIECES.get(faction, ()))
-            if own_pieces == 0:
-                continue
-            self._reset_trace_on(self.state)
-            cmds = ["battle"] if enemy > 0 else ["muster" if faction in (C.BRITISH, C.FRENCH) else "rally"]
-            for cmd in cmds:
-                try:
-                    self.dispatcher.execute(cmd, faction=faction, space=sid, limited=True, free=True)
-                    normalize_state(self.state)
-                    return
-                except Exception:
-                    continue
+        """§8.3.7: "Then use the flowchart again to select the second
+        Limited Command" (S61, Playbook Example 4: the second LimCom is
+        flowchart-selected — the book's D6 rolls a 2 and the British
+        Muster in Pennsylvania by their own priorities — and has NO
+        Leader tie; the SA belongs to the first LimCom, so no SA here).
+        The old code scanned spaces alphabetically and fired dispatcher
+        battles/musters outside the flowchart entirely."""
+        bot = self.bots.get(faction)
+        if not bot:
+            return
+        self._reset_trace_on(self.state)
+        st = self.state
+        st["_limited"] = True
+        st["bs_free"] = True
+        st["_no_special"] = True
+        st.pop("_muster_die_cached", None)   # fresh flowchart pass
+        try:
+            follow = getattr(bot, "_follow_flowchart", None)
+            if follow is None:
+                follow = getattr(bot, "_after_treaty", None)
+            if follow is not None:
+                follow(st)
+                normalize_state(st)
+        except Exception:
+            pass
+        finally:
+            st.pop("_limited", None)
+            st.pop("bs_free", None)
+            st.pop("_no_special", None)
+            st.pop("_muster_die_cached", None)
 
     # ---- Human BS plan execution (for interactive play) ---------------
     def _execute_human_bs_plan(self, faction: str) -> None:

@@ -100,14 +100,38 @@ class TestBritishBsLimCom:
         assert bot.get_bs_limited_command(state) is None
 
     def test_muster_when_available_pieces(self):
-        """B6: Available Regulars/Tories exist -> muster (Boston is a City)."""
+        """B6 (S61, Playbook Example 4): the Muster die IS rolled during
+        BS LimCom selection — 7+ Available skips the roll (always
+        muster); below that the D6 decides."""
         bot = BritishBot()
         state = _base_state(
             spaces={"Boston": _sp(**{C.REGULAR_BRI: 5})},
             leader_locs={"LEADER_CLINTON": "Boston"},
             control={"Boston": C.BRITISH},
         )
+        state["available"][C.REGULAR_BRI] = 7
         assert bot.get_bs_limited_command(state) == "muster"
+
+        # 3 Available + die 4 -> "a '4' is too high" -> falls to March
+        class _Die:
+            def __init__(self, v): self._v = v
+            def randint(self, a, b): return self._v
+        state2 = _base_state(
+            spaces={"Boston": _sp(**{C.REGULAR_BRI: 5})},
+            leader_locs={"LEADER_CLINTON": "Boston"},
+            control={"Boston": C.BRITISH},
+        )
+        state2["available"][C.REGULAR_BRI] = 3
+        state2["rng"] = _Die(4)
+        assert bot.get_bs_limited_command(state2) == "march"
+        state2b = _base_state(
+            spaces={"Boston": _sp(**{C.REGULAR_BRI: 5})},
+            leader_locs={"LEADER_CLINTON": "Boston"},
+            control={"Boston": C.BRITISH},
+        )
+        state2b["available"][C.REGULAR_BRI] = 3
+        state2b["rng"] = _Die(2)
+        assert bot.get_bs_limited_command(state2b) == "muster"
 
     def test_battle_when_enemies_outnumbered(self):
         """B9: 2+ Active Rebels outnumbered by Regulars -> battle."""

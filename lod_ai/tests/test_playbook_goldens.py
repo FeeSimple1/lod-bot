@@ -322,3 +322,93 @@ def test_playbook_example_2_british_garrison_naval_pressure():
             "the expelled Militia lands in New Jersey (lowest-Pop "
             "Neutral adjacent Province)"
         )
+
+
+def test_playbook_example_4_british_brilliant_stroke():
+    """Playbook Example 4 (p.24-25): British Brilliant Stroke, card #6,
+    1776 Medium Scenario + the printed modifications, ToA in effect.
+
+    Forced core asserted (the LimCom2 destination and the RL-vs-Fort
+    D3 branch are die-dependent):
+    - The British BS fires (ToA + Howe with 4+ Regulars + player 1st
+      Eligible) and CANCELS the card (all factions end Eligible).
+    - LimCom1 (leader-tied): D6=4 kills the Muster gate (3 Available);
+      Battle needs 2+ enemy pieces (NYC has 1) -> March: Howe leads 5
+      of 6 Regulars NYC -> New Jersey (Blockade allows adjacent only),
+      1 stays (Control + not Active Support), New Jersey flips BRITISH,
+      Howe follows.
+    - SA: Skirmish first in the West Indies — 2 French + 1 British
+      Regular to Casualties (CBC 1->2, CRC 3->5), WI turns BRITISH.
+    - Howe's ability: FNI 1->0 AND the New York City Blockade returns
+      to the West Indies on its Squadron side (§1.9 — the marker MUST
+      move with the level).
+    - LimCom2 (flowchart, no leader tie): D6=2 < 3 -> Muster in ONE
+      space by the bot's priorities: 3 Regulars + 2 Tories placed, and
+      the Muster itself is FREE (§8.3.7) — any Resources spent come
+      only from Reward Loyalty (§3.2.1 exception).
+    """
+    state = build_state("1776", seed=9)
+    state["spaces"]["Philadelphia"][C.MILITIA_U] = 0
+    state["unavailable"][C.BLOCKADE] = 0
+    bloc = state["markers"][C.BLOCKADE]
+    bloc["pool"] += 1
+    state["available"][C.REGULAR_FRE] -= 6
+    state["unavailable"][C.REGULAR_FRE] += 6
+    state["toa_played"] = True
+    state["treaty_of_alliance"] = True
+    state["fni_level"] = 1
+    bloc["pool"] -= 1
+    bloc["on_map"] = {"New_York_City"}
+    ct = state["spaces"]["Charles_Town"]
+    ct[C.REGULAR_FRE] = ct.get(C.REGULAR_FRE, 0) + 4
+    state["unavailable"][C.REGULAR_FRE] -= 4
+    state["leaders"]["LEADER_ROCHAMBEAU"] = "Charles_Town"
+    if "leader_locs" in state:
+        state["leader_locs"]["LEADER_ROCHAMBEAU"] = "Charles_Town"
+    wi = state["spaces"]["West_Indies"]
+    wi[C.REGULAR_FRE] = wi.get(C.REGULAR_FRE, 0) + 3
+    wi[C.REGULAR_BRI] = wi.get(C.REGULAR_BRI, 0) + 3
+    state["unavailable"][C.REGULAR_FRE] -= 3
+    state["unavailable"][C.REGULAR_BRI] -= 3
+    conn = state["spaces"]["Connecticut_Rhode_Island"]
+    conn[C.REGULAR_BRI] = 4
+    conn[C.TORY] = 1
+    conn[C.FORT_BRI] = 1
+    state["available"][C.REGULAR_BRI] -= 4
+    state["available"][C.TORY] -= 1
+    state["available"][C.FORT_BRI] -= 1
+    from lod_ai.board.control import refresh_control
+    refresh_control(state)
+    # Printed-setup preconditions
+    assert state["available"][C.REGULAR_BRI] == 3
+    assert state["available"][C.TORY] == 9
+    assert state.get("cbc") == 1 and state.get("crc") == 3
+
+    state["rng"] = _ScriptedRng(state["rng"], [4, 2, 3], script_d3=[2, 1])
+    eng = Engine(initial_state=state, use_cli=False)
+    eng.set_human_factions([C.PATRIOTS, C.FRENCH])
+    eng.play_card(_card(6), human_decider=None)
+
+    st = eng.state
+    from lod_ai.leaders import leader_location
+    assert st.get("bs_played", {}).get(C.BRITISH) is True
+    assert all(st["eligible"].values()), "BS resolves with all Eligible"
+    # LimCom1
+    nj = st["spaces"]["New_Jersey"]
+    assert nj.get(C.REGULAR_BRI, 0) == 5 and st["control"].get("New_Jersey") == C.BRITISH
+    assert st["spaces"]["New_York_City"].get(C.REGULAR_BRI, 0) == 1
+    assert leader_location(st, "LEADER_HOWE") == "New_Jersey"
+    # SA
+    assert st["spaces"]["West_Indies"].get(C.REGULAR_FRE, 0) == 1
+    assert st["spaces"]["West_Indies"].get(C.REGULAR_BRI, 0) == 2
+    assert st.get("cbc") == 2 and st.get("crc") == 5
+    # Howe / §1.9
+    assert st.get("fni_level") == 0
+    assert "New_York_City" not in st["markers"][C.BLOCKADE]["on_map"]
+    # LimCom2: a single-space Muster placed 3 Regulars + 2 Tories
+    hist = " | ".join(h["msg"] if isinstance(h, dict) else str(h)
+                      for h in st.get("history", []))
+    assert "3×British_Regular  available →" in hist
+    assert "2×British_Tory  available →" in hist
+    # Free Muster: any spend is RL-only (0, 2 or 3 by the D3 branch)
+    assert st["resources"][C.BRITISH] >= 2

@@ -4535,3 +4535,56 @@ docs/balance_largeN_s60_q22.md — British 20->9/300 vs the uniform-tie
 S59 read: the tie DISTRIBUTION itself was worth ~11 British wins,
 measured and documented.  S53-S59 numbers are non-comparable from
 this commit.
+
+## Session 61: Example 4 golden — the Brilliant Stroke machinery rebuilt against the book (July 2026)
+
+Playbook Example 4 (British BS, card #6) transcribed; it exposed and
+fixed a stack of §8.3.7-layer deviations the S50 blind fixes could
+not see:
+
+- LimCom SELECTION (get_bs_limited_command): the B6 Muster die was
+  never rolled ("consume a die roll" comment, no roll — the book:
+  "a '4' is too high to make the British Muster"); now rolled with
+  the S59 7+-skip.  The B9 battle gate was the pre-S55 active-only
+  comparison; now the §8.4.3/§8.4.4 full comparison restricted to
+  the Leader's space.  March requires Regulars in the Leader's space
+  (§3.2.3 escorts).
+- LimCom EXECUTION: the generic dispatcher call (space=leader,
+  no plan) aborted every bot March/Battle BS; both LimComs now route
+  through the BOTS' OWN planners in limited+free mode
+  (engine._run_bot_limcom), the Leader tied to LimCom1 via
+  state["_bs_leader_origin"] (read by the British March/Muster/Battle
+  planners).  The second LimCom is now flowchart-selected
+  (_follow_flowchart under _limited+bs_free+_no_special) — the old
+  code scanned spaces alphabetically and fired dispatcher battles
+  outside the flowchart.
+- HOWE'S ABILITY §1.9 (project-lifetime bug, B38): "For each level
+  the FNI is lowered the British remove one Blockade to the West
+  Indies and flip the counter to the Squadron side" — the hook
+  lowered the level but LEFT THE MARKER, so every Howe FNI-drop
+  parked a phantom Blockade that zeroed the City's Support/income
+  forever.  Now returns the marker (§8.4.1 NP city priorities, Q22
+  ties) and fires in the BS SA chain too.
+- Limited-Muster Tory cap: the S59 union check blocked Tories from
+  joining the Muster's OWN selected space (a 1-space Limited Muster
+  could never place Tories); the cap now only blocks NEW spaces.
+- RL planned-control: Reward-Loyalty candidacy checked BOARD control,
+  so a previously-empty Regulars destination could never RL in the
+  same Muster; now simulates control with the planned pieces.
+
+Golden asserts the forced core (BS fires + cancels card, March
+NYC->NJ with 5 Regulars + Howe follow, WI Skirmish 2FR+1BR with
+CBC/CRC 2/5, §1.9 Blockade->Squadron, single-space free Muster
+placing 3R+2T); the LimCom2 destination and RL-vs-Fort D3 branch are
+die-dependent and unasserted.  2 superseded tests rewritten (BS B6
+die; walk-semantics earlier).  Battery: 1,415 + 101 green; gates
+1-10/11-20 clean; soak 120 DONE clean; balance rebaselined.
+
+LARGE-N (largeN_s61.jsonl): BRITISH 23/300 — 1/21/1: the Howe §1.9
+fix is scenario-shaped (Howe is the 1776 starting leader; 1775=Gage,
+1778=Clinton, whose games see it only after leader succession).
+Royalist side 111/300 (37%).  Indians deepen to 54% in 1775 — the
+outlier diagnostic is now the queue head.  Also noted for follow-up:
+the Playbook's ToA "French Preparations = 16" arithmetic does not
+match the S50 Available-only reading (worth a Q23 if the ToA timing
+matters to a future golden).

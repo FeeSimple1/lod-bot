@@ -69,12 +69,45 @@ class BritishBot(BaseBot):
         return leader_location(state, "LEADER_HOWE") is not None
 
     def _apply_howe_fni(self, state: Dict) -> None:
-        """B38: If Howe is British Leader, lower FNI by 1 before SAs."""
-        if self._is_howe(state):
-            fni = state.get("fni_level", 0)
-            if fni > 0:
-                state["fni_level"] = fni - 1
-                push_history(state, "Howe capability: FNI lowered by 1 before SA")
+        """B38: If Howe is British Leader, lower FNI by 1 before SAs.
+
+        §1.9 (S61, Playbook Example 4): "For each level the FNI is
+        lowered the British remove one Blockade to the West Indies and
+        flip the counter to the Squadron side."  The old hook lowered
+        the level but left the marker — a phantom Blockade kept zeroing
+        the City's Support/income forever.  City choice per the §8.4.1
+        NAVAL PRESSURE priorities (Battle City, then most Rebellion
+        pieces without a Patriot Fort, then most Support), Q22 ties.
+        """
+        if not self._is_howe(state):
+            return
+        fni = state.get("fni_level", 0)
+        if fni <= 0:
+            return
+        state["fni_level"] = fni - 1
+        bloc = state.get("markers", {}).get(C.BLOCKADE, {})
+        on_map = bloc.get("on_map", set())
+        if on_map:
+            battle_spaces = state.get("_turn_affected_spaces", set())
+            scored = []
+            for city in on_map:
+                sp = state["spaces"].get(city, {})
+                rebels = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+                          + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0))
+                no_fort = sp.get(C.FORT_PAT, 0) == 0
+                sup = state.get("support", {}).get(city, 0)
+                scored.append(((0 if city in battle_spaces else 1,
+                                -(rebels if no_fort else -1),
+                                -sup), city))
+            from lod_ai.bots.random_spaces import pick_by_priority
+            pick = pick_by_priority(state, scored, count=1)[0]
+            on_map.discard(pick)
+            bloc["pool"] = bloc.get("pool", 0) + 1
+            push_history(state,
+                         f"Howe capability: FNI lowered; Blockade {pick} "
+                         "→ West Indies (Squadron side, §1.9)")
+        else:
+            push_history(state, "Howe capability: FNI lowered by 1 before SA")
 
     # =======================================================================
     #  BRILLIANT STROKE LimCom  (§8.3.7)
@@ -106,26 +139,43 @@ class BritishBot(BaseBot):
                     and leader_space in CITIES):
                 return "garrison"
 
-        # B6: Muster — Available Regulars > 1D6?  (consume a die roll)
+        # B6: Muster — "Available Regulars > 1D6?" — the die IS rolled
+        # during Brilliant Stroke LimCom selection too (S61, Playbook
+        # Example 4: "There are three British Regulars Available, so the
+        # player rolls 1D6: a '4' is too high to make the British
+        # Muster").  S59 no-roll shortcut applies at 7+.
         avail_regs = state["available"].get(C.REGULAR_BRI, 0)
-        avail_tories = state["available"].get(C.TORY, 0)
-        if avail_regs > 0 or avail_tories > 0:
-            # Muster can always target the leader's space (City/Colony)
-            stype = _MAP_DATA.get(leader_space, {}).get("type", "")
-            if stype in ("City", "Colony"):
+        stype = _MAP_DATA.get(leader_space, {}).get("type", "")
+        if stype in ("City", "Colony"):
+            if avail_regs >= 7:
                 return "muster"
+            if avail_regs > 0:
+                die = state["rng"].randint(1, 6)
+                state.setdefault("rng_log", []).append(("BS B6 1D6", die))
+                if avail_regs > die:
+                    return "muster"
 
-        # B9: Battle — 2+ Active Rebels in leader's space outnumbered by
-        # British Regulars + Leader?
+        # B9: Battle in the leader's space — §8.4.4 trigger restricted to
+        # that space (S61: was the pre-S55 active-only comparison): at
+        # least 2 ACTIVE Rebellion pieces (Forts always Active, §1.4.3)
+        # and British Regulars + Leader outnumber ALL Rebellion pieces
+        # plus Leaders (§8.4.3).
         active_rebel = (sp.get(C.REGULAR_PAT, 0)
                         + sp.get(C.MILITIA_A, 0)
-                        + sp.get(C.REGULAR_FRE, 0))
+                        + sp.get(C.REGULAR_FRE, 0)
+                        + sp.get(C.FORT_PAT, 0))
+        all_rebel = active_rebel + sp.get(C.MILITIA_U, 0)
+        rebel_leaders = sum(
+            1 for lid in ("LEADER_WASHINGTON", "LEADER_ROCHAMBEAU",
+                          "LEADER_LAUZUN")
+            if leader_location(state, lid) == leader_space)
         regs = sp.get(C.REGULAR_BRI, 0)
-        if active_rebel >= 2 and regs > active_rebel:
+        if active_rebel >= 2 and regs + 1 > all_rebel + rebel_leaders:
             return "battle"
 
-        # B10: March — can march from leader's space if pieces exist
-        if sp.get(C.REGULAR_BRI, 0) > 0 or sp.get(C.TORY, 0) > 0:
+        # B10: March — Regulars must exist in the leader's space (Tories
+        # cannot march unescorted, §3.2.3)
+        if sp.get(C.REGULAR_BRI, 0) > 0:
             return "march"
 
         return None
@@ -1054,6 +1104,12 @@ class BritishBot(BaseBot):
             key = (neutral_priority, adds_control, tories_only, -pop)
             reg_candidates.append((key, sid))
 
+        # §8.3.7 (S61): first-LimCom leader tie — Muster in the Leader's
+        # space only, when flagged.
+        _bs_origin_m = state.get("_bs_leader_origin")
+        if _bs_origin_m:
+            reg_candidates = [(k, s) for k, s in reg_candidates
+                              if s == _bs_origin_m]
         # Q22: table-resolved ties for the single Regular destination
         regular_destinations: List[str] = []
         if avail_regs > 0 and reg_candidates:
@@ -1120,8 +1176,15 @@ class BritishBot(BaseBot):
                 tory_p1.append(((just_placed,), sid))
         tory_p1.sort()
         for _, sid in tory_p1:
-            if avail_tories <= 0 or len(set(tory_plan) | selected_spaces) >= max_spaces:  # S59: union — the Regular space may also hold a Tory pair (Playbook Ex3: 4 distinct spaces)
+            if avail_tories <= 0:
                 break
+            # S61 (Playbook Example 4): the space cap only blocks NEW
+            # spaces — Tories may always join a space this Muster already
+            # selected (a Limited Muster places Regulars AND Tories in
+            # its one space; the old S59 union-break blocked them).
+            if (sid not in tory_plan and sid not in selected_spaces
+                    and len(set(tory_plan) | selected_spaces) >= max_spaces):
+                continue
             n = min(_tory_max(sid), avail_tories)
             tory_plan[sid] = n
             avail_tories -= n
@@ -1161,8 +1224,12 @@ class BritishBot(BaseBot):
                 tory_p2.append(((-pop,), sid))
             # Q22: table-resolved ties
             for sid in pick_by_priority(state, tory_p2):
-                if avail_tories <= 0 or len(set(tory_plan) | selected_spaces) >= max_spaces:  # S59: union — the Regular space may also hold a Tory pair (Playbook Ex3: 4 distinct spaces)
+                if avail_tories <= 0:
                     break
+                # S61 (Playbook Example 4): the cap only blocks NEW spaces.
+                if (sid not in tory_plan and sid not in selected_spaces
+                        and len(set(tory_plan) | selected_spaces) >= max_spaces):
+                    continue
                 if sid in tory_plan:
                     continue
                 n = min(_tory_max(sid), avail_tories)
@@ -1182,8 +1249,12 @@ class BritishBot(BaseBot):
                     tory_p3.append((-pop, sid))
             tory_p3.sort()
             for _, sid in tory_p3:
-                if avail_tories <= 0 or len(set(tory_plan) | selected_spaces) >= max_spaces:  # S59: union — the Regular space may also hold a Tory pair (Playbook Ex3: 4 distinct spaces)
+                if avail_tories <= 0:
                     break
+                # S61 (Playbook Example 4): the cap only blocks NEW spaces.
+                if (sid not in tory_plan and sid not in selected_spaces
+                        and len(set(tory_plan) | selected_spaces) >= max_spaces):
+                    continue
                 n = min(_tory_max(sid), avail_tories)
                 tory_plan[sid] = n
                 avail_tories -= n
@@ -1223,10 +1294,29 @@ class BritishBot(BaseBot):
                 pop = _MAP_DATA.get(n, {}).get("population", 0)
                 return (already, markers, -(affordable * pop))
 
+            def _rl_control_ok(sid: str, sp: Dict) -> bool:
+                # S61 (Playbook Example 4): control must count the pieces
+                # THIS Muster is placing — a previously-empty destination
+                # is British-Controlled once the plan lands there.
+                if self._control(state, sid) == C.BRITISH:
+                    return True
+                planned = (_planned_regs.get(sid, 0)
+                           + tory_plan.get(sid, 0))
+                if planned == 0:
+                    return False
+                royal = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                         + sp.get(C.FORT_BRI, 0) + sp.get(C.WARPARTY_A, 0)
+                         + sp.get(C.WARPARTY_U, 0) + sp.get(C.VILLAGE, 0)
+                         + planned)
+                rebel = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+                         + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                         + sp.get(C.FORT_PAT, 0))
+                return royal > rebel
+
             rl_candidates = [
                 sid for sid, sp in state["spaces"].items()
                 if self._support_level(state, sid) < C.ACTIVE_SUPPORT
-                and self._control(state, sid) == C.BRITISH
+                and _rl_control_ok(sid, sp)
                 and _regs_incl_planned(sid) >= 1
                 and (sp.get(C.TORY, 0) + tory_plan.get(sid, 0)) >= 1
             ]
@@ -1405,9 +1495,15 @@ class BritishBot(BaseBot):
         """
         refresh_control(state)
 
-        # Collect origin spaces with British pieces
+        # Collect origin spaces with British pieces.  §8.3.7 (S61): the
+        # first Brilliant-Stroke LimCom is tied to the Leader — when
+        # _bs_leader_origin is set, only the Leader's space may act as a
+        # March origin (Playbook Example 4: Howe leads out of NYC).
+        _bs_origin = state.get("_bs_leader_origin")
         origins: List[str] = []
         for sid, sp in state["spaces"].items():
+            if _bs_origin and sid != _bs_origin:
+                continue
             brit = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
             if brit > 0:
                 origins.append(sid)
@@ -1921,6 +2017,13 @@ class BritishBot(BaseBot):
         if not targets:
             return False
 
+        # §8.3.7 (S61): first-LimCom leader tie — Battle only in the
+        # Leader's space, when flagged.
+        _bs_origin_b = state.get("_bs_leader_origin")
+        if _bs_origin_b:
+            targets = [t for t in targets if t[-1] == _bs_origin_b]
+            if not targets:
+                return False
         targets.sort()
         chosen = [sid for _, sid in targets]
 
