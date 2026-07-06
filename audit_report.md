@@ -4089,3 +4089,60 @@ before the S28 errata and everything since), the B-node flowchart
 inventory (never done), the B2→B6→B9 decision gates' thresholds, and
 the structural CRC>CBC starvation (rebel bots now waste few pieces).
 That is the next session's target.
+
+## Session 55: §8.4 British pass, part 2a — §8.1 pay-as-you-select, Battle/Skirmish audit (July 2026)
+
+Instrumented first (diag_s55.py, 90 games seeds 5000+): British PASS
+~4-7x/game with Resources in hand — `_pass_reason=no_valid_command` —
+plus CRC < CBC in ~29/30 games per scenario.  Root cause of the passes:
+the Muster and March planners built up-to-4-space plans with no
+reference to the purse, then aborted the WHOLE Command when the plan
+was unaffordable.  §8.1 "Paying Resource Costs" is explicit that a
+Non-player able to pay for at least SOME instructions executes them,
+paying per selected space.  Fixes, all in british_bot.py unless noted:
+
+- Muster: plan capped at the purse (min 1 space); March: destination
+  list trimmed to budget in plan order (= §8.4.3 priority order), CC
+  War-Party bookings rolled back for dropped groups.  bs_free exempt
+  (§5.1.1; the Session-51 card-15 class).  no_valid_command passes are
+  now ZERO across 15 instrumented games (were ~4/game in 1775).
+- B9 `_can_battle` reconciled to §8.4.3's precise complement: >=2
+  ACTIVE Rebellion pieces (Forts count — always Active per §1.4.3;
+  Underground Militia excluded) AND British Regulars + Leader >
+  ALL Rebellion pieces plus Rebellion Leaders (was: > Active only,
+  no Forts, no enemy Leaders — too loose on the comparison side).
+- Skirmish target choice (§8.4.1): bullet 1 ranks spaces by removable
+  Rebellion CUBES desc (Glossary: "Cube: Regular, Continental or Tory"
+  — Militia are NOT cubes and return to Available, §1.4.1); the old
+  sort used fewest-total-rebels (bullet 2's tiebreak) tier-wide, so it
+  removed 1 piece where 2 cubes (CRC!) were removable elsewhere.
+  Option choice per "removing one British Regular if necessary": 2+
+  cubes -> option 2; exactly 1 cube -> option 1 (sacrifice buys no
+  extra cube); no cubes -> bullet 2 (option 1 militia / option 3 fort).
+  §4.2.2 Regulars-required now enforced for WI too.
+- skirmish.py executor (shared): option 1/2 removal order was Active-
+  Militia-FIRST — backwards per §8.4.1; now cubes first (least-
+  represented type first, "first whichever type is least"), militia
+  only when no cubes remain.  British side only (P/F have no
+  militia tag).
+- Pre-battle SA chain: chosen Battle spaces now registered in
+  _turn_affected_spaces BEFORE the Skirmish/Naval loop so the
+  accompanying Skirmish cannot fire in a space selected for Battle
+  (§4.2.2, §8.4.4 "in a space not selected for Battle").
+- Garrison: §3.2.2 two-Resource minimum moved into _can_garrison
+  (§8.1: an unaffordable Command is skipped without burning the
+  Naval/Skirmish SA); the §8.4.1 10-Regular count no longer counts
+  the West Indies box ("in all Cities and Provinces on the map").
+
+Tests: test_british_84_s55.py (7 new); 3 superseded tests REWRITTEN to
+the rule with citations (B9 underground/comparison x2, Clinton
+skirmish now cube-first).  Battery: 1,401 + 101 green; gate 1-10 and
+11-20 clean sweeps; soak 120 invariants-on DONE clean; balance_smoke
+rebaselined (6 winner flips at 20-game scale — noise-band instrument).
+
+Post-fix diagnostic (90 games): no_valid_command passes 0 (all
+remaining passes are genuine 0-Resource states); crc-cbc improved
+(1775 -8.1 -> -5.6, 1776 -3.9 -> -3.0, 1778 -5.1 -> -4.5) but British
+wins still ~1/90 — sup-opp AND crc-cbc both remain negative on
+average.  The B-node flowchart inventory and the economy/CBC-CRC
+trajectory read continue next.

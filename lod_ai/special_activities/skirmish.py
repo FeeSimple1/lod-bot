@@ -124,29 +124,30 @@ def execute(
     push_history(state, f"{faction} SKIRMISH begins in {space_id} (option {option})")
 
     # Execute chosen option ------------------------------------------
-    if option == 1:
-        # remove 1 enemy cube (pref Active Militia if relevant)
-        if enemy_militia_tag and sp.get(enemy_militia_tag, 0):
+    def _remove_one() -> None:
+        """Remove one cube/Active Militia per §8.4.1: "Remove as many
+        Rebellion cubes as possible, first whichever type is least in
+        the space".  Cubes (Glossary: Regular, Continental or Tory) go
+        to Casualties (§1.4.1) and are preferred over Active Militia
+        (which return to Available and count toward no Casualties
+        track); among cube types, remove the least-represented type
+        first.  The old order preferred Active Militia over cubes —
+        backwards for the §8.4.1 priority (Session 55).
+        """
+        present = [tag for tag in enemy_cubes if sp.get(tag, 0)]
+        if present:
+            tag = min(present, key=lambda t: sp.get(t, 0))
+            remove_piece(state, tag, space_id, 1, to="casualties")
+        elif enemy_militia_tag and sp.get(enemy_militia_tag, 0):
             remove_piece(state, enemy_militia_tag, space_id, 1, to="available")
-        else:
-            # pick first available cube tag
-            for tag in enemy_cubes:
-                if sp.get(tag, 0):
-                    remove_piece(state, tag, space_id, 1, to="casualties")
-                    break
+
+    if option == 1:
+        _remove_one()
 
     elif option == 2:
         # remove 2 enemy cubes/Active Militia
-        removed = 0
-        while removed < 2:
-            if enemy_militia_tag and sp.get(enemy_militia_tag, 0):
-                remove_piece(state, enemy_militia_tag, space_id, 1, to="available")
-            else:
-                for tag in enemy_cubes:
-                    if sp.get(tag, 0):
-                        remove_piece(state, tag, space_id, 1, to="casualties")
-                        break
-            removed += 1
+        _remove_one()
+        _remove_one()
         # plus 1 own regular
         remove_piece(state, own_tag, space_id, 1, to="casualties")
 

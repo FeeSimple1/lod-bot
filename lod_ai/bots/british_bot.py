@@ -386,48 +386,71 @@ class BritishBot(BaseBot):
         excluded = state.get("_turn_affected_spaces", set())
 
         def _best_skirmish_option(sid, sp):
-            """B11: choose option to maximize Rebel casualties.
-            Option 2: remove 2 cubes + sacrifice 1 Regular (if 2+ enemy cubes and 1+ own Regs)
-            Option 3: remove 1 Fort + sacrifice 1 Regular (if enemy Fort and no enemy cubes)
-            Option 1: remove 1 piece (no sacrifice)
+            """§8.4.1 bullet order with the Glossary-strict reading of
+            "cubes" (Cube: Regular, Continental or Tory — Militia are NOT
+            cubes; only cubes and Forts reach the Casualties boxes,
+            §1.4.1):
+
+            bullet 1 "Remove as many Rebellion cubes as possible ...
+            removing one British Regular if necessary": 2+ cubes -> option
+            2 (the sacrifice IS necessary for the 2nd cube); exactly 1
+            cube -> option 1 (option 2 nets no extra CUBE, so the
+            sacrifice is unnecessary).
+            bullet 2 (no cubes removable): "remove one Rebellion piece" —
+            option 1 on an Active Militia, or option 3 (Fort + Regular)
+            when no cubes/Active Militia remain (§4.2.2).
             """
-            enemy_cubes = (
-                sp.get(C.REGULAR_PAT, 0)
-                + sp.get(C.REGULAR_FRE, 0)
-                + sp.get(C.MILITIA_A, 0)
-            )
+            cubes = sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+            am = sp.get(C.MILITIA_A, 0)
             own_regs = sp.get(C.REGULAR_BRI, 0)
-            # Option 2: maximize cube removal — sacrifice 1 Regular, so only 1 needed
-            if enemy_cubes >= 2 and own_regs >= 1:
+            if cubes >= 2 and own_regs >= 1:
                 return 2
-            # Option 3: remove Fort when no cubes but Fort exists
-            enemy_fort = sp.get(C.FORT_PAT, 0)
-            if enemy_cubes == 0 and enemy_fort > 0 and own_regs >= 1:
+            if cubes == 1:
+                return 1
+            if am >= 1:
+                return 1
+            if sp.get(C.FORT_PAT, 0) > 0 and own_regs >= 1:
                 return 3
             return 1
 
         def _is_city(sid):
             return _MAP_DATA.get(sid, {}).get("type") == "City"
 
-        # Build prioritized target list
-        # Score: WI first (priority 0), then exactly-1-Regular spaces (priority 1), then others (priority 2)
-        # Within each tier: first last Rebel in space (fewest total rebels),
-        # within that first in a City
+        # Build prioritized target list per §8.4.1 SKIRMISH:
+        #   location tiers: WI first, then exactly-1-Regular spaces, then
+        #   the rest ("Skirmish first in the West Indies, then where there
+        #   is exactly one British Regular, then per the highest priority
+        #   possible in the bullets below");
+        #   bullet 1: "Remove as many Rebellion cubes as possible" — rank
+        #   by removable cubes DESC (the old sort took fewest-total-rebels
+        #   first, bullet 2\'s tiebreak, and so removed 1 piece where 2
+        #   cubes were removable elsewhere — Session 55);
+        #   bullet 2 (only when no cubes removable anywhere in the tier):
+        #   "remove one Rebellion piece, first where there is only one
+        #   Rebellion piece in a space, within that first in a City";
+        #   remaining ties seeded random (§8.2).
+        # §4.2.2: needs "both British Regulars and Rebellion pieces" —
+        # incl. in the West Indies (the old code let WI through with 0
+        # Regulars).
         all_targets: List[Tuple[tuple, str]] = []
         for sid, sp in state["spaces"].items():
             if sid in excluded:
                 continue
             reg = sp.get(C.REGULAR_BRI, 0)
-            if reg == 0 and sid != WEST_INDIES:
-                continue  # need at least 1 British piece for Skirmish
-            enemy = (
-                sp.get(C.REGULAR_PAT, 0)
-                + sp.get(C.REGULAR_FRE, 0)
-                + sp.get(C.MILITIA_A, 0)
-                + sp.get(C.MILITIA_U, 0)
-                + sp.get(C.FORT_PAT, 0)
-            )
+            if reg == 0:
+                continue  # §4.2.2: British Regulars required (WI too)
+            cubes = sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+            am = sp.get(C.MILITIA_A, 0)
+            fort = sp.get(C.FORT_PAT, 0)
+            cubes_gettable = 2 if cubes >= 2 else cubes
+            enemy = cubes + am + sp.get(C.MILITIA_U, 0) + fort
             if enemy == 0:
+                continue
+            # A space where nothing can be removed is not a Skirmish
+            # target: §4.2.2 options need cubes/Active Militia, or a
+            # Patriot Fort with no cubes/Active Militia remaining.
+            if cubes_gettable == 0 and am == 0 and not (
+                    cubes + am == 0 and fort > 0):
                 continue
             # Tier
             if sid == WEST_INDIES:
@@ -436,10 +459,17 @@ class BritishBot(BaseBot):
                 tier = 1
             else:
                 tier = 2
-            # "first last Rebel in space" = fewest enemy pieces
-            # "within that first in a City"
-            city_bonus = 0 if _is_city(sid) else 1
-            all_targets.append(((tier, enemy, city_bonus), sid))
+            if cubes_gettable > 0:
+                # bullet 1: maximize cubes removed; ties seeded random
+                key = (tier, 0, -cubes_gettable, 0, 0,
+                       state["rng"].random())
+            else:
+                # bullet 2: Fort removal — only-one-piece first, then City
+                one_piece = 0 if enemy == 1 else 1
+                city_bonus = 0 if _is_city(sid) else 1
+                key = (tier, 1, 0, one_piece, city_bonus,
+                       state["rng"].random())
+            all_targets.append((key, sid))
 
         all_targets.sort()
         for _, sid in all_targets:
@@ -650,8 +680,9 @@ class BritishBot(BaseBot):
         displace_city, displace_target = self._select_displacement(
             state, dest_cities, move_map, limited=bool(limited))
 
-        # Affordability check: Garrison costs 2 Resources
-        if state["resources"].get(C.BRITISH, 0) < 2:
+        # Affordability check: Garrison costs 2 Resources (§3.2.2);
+        # free Commands exempt (bs_free).
+        if not can_afford(state, C.BRITISH, 2):
             return self._muster(state, tried_march=False)
 
         garrison.execute(
@@ -974,6 +1005,20 @@ class BritishBot(BaseBot):
 
         refresh_control(state)
         max_spaces = 1 if state.get("_limited") else 4
+        # §8.1 "Paying Resource Costs": pay-as-you-select — a Non-player
+        # with enough Resources for at least SOME instructions executes
+        # them, paying per selected space.  Cap the plan at the purse
+        # instead of building a 4-space plan and aborting it wholesale
+        # (that abort made the British PASS ~7 turns/game — Session 55).
+        # Free Commands (bs_free) are exempt (§5.1.1; Session 51).
+        if not state.get("bs_free"):
+            max_spaces = min(max_spaces,
+                             max(0, state["resources"].get(C.BRITISH, 0)))
+        if max_spaces <= 0:
+            if not tried_march:
+                self._reset_command_trace(state)
+                return self._march(state, tried_muster=True)
+            return False
 
         # ----- step 1: choose spaces for Regular placement (sorted) --------
         from lod_ai.commands.muster import _is_legal_regular_dest
@@ -1646,6 +1691,36 @@ class BritishBot(BaseBot):
                 return self._muster(state, tried_march=True)
             return False
 
+        # §8.1 "Paying Resource Costs": pay-as-you-select — trim the plan
+        # to the purse, keeping the highest-priority destinations (plan
+        # append order == §8.4.3 priority order), instead of aborting the
+        # whole March when 4 destinations exceed the purse (Session 55).
+        # Free Commands (bs_free) are exempt.  In-place activations are
+        # budgeted individually after execution (existing can_afford loop).
+        if not state.get("bs_free"):
+            budget = max(0, state["resources"].get(C.BRITISH, 0))
+            dst_order: List[str] = []
+            for mv in move_plan:
+                if mv["dst"] not in dst_order:
+                    dst_order.append(mv["dst"])
+            if len(dst_order) > budget:
+                keep = set(dst_order[:budget])
+                dropped = [mv for mv in move_plan if mv["dst"] not in keep]
+                move_plan = [mv for mv in move_plan if mv["dst"] in keep]
+                # Un-plan CC War Parties whose groups no longer March so
+                # common_cause doesn't Activate them for nothing (§4.2.1).
+                for mv in dropped:
+                    n = mv["pieces"].get(C.WARPARTY_A, 0)
+                    if n and mv["src"] in cc_spaces:
+                        cc_spaces[mv["src"]] -= n
+                        if cc_spaces[mv["src"]] <= 0:
+                            del cc_spaces[mv["src"]]
+                if not move_plan and not activate_in_place:
+                    if not tried_muster:
+                        self._reset_command_trace(state)
+                        return self._muster(state, tried_march=True)
+                    return False
+
         # B10+B13: Execute Common Cause BEFORE the March so that WP from CC
         # contribute to group sizes for adjacent Province destinations.
         # (Skip CC and all SAs if in a limited/no-SA slot.)
@@ -1829,6 +1904,11 @@ class BritishBot(BaseBot):
 
         # SA chain (skip in limited/no-SA slot)
         no_sa = state.get("_limited") or state.get("_no_special")
+        # §4.2.2 / §8.4.4: Skirmish may not take place "in a Battle ...
+        # space" / must be "in a space not selected for Battle".  The SA
+        # chain runs BEFORE battle.execute registers the chosen spaces in
+        # _turn_affected_spaces, so register them here first (Session 55).
+        state.setdefault("_turn_affected_spaces", set()).update(chosen)
         if not no_sa:
             # Common Cause before the battles -- only in the spaces actually
             # being battled (§4.2.1 "during the same ... Battle").
@@ -1915,8 +1995,18 @@ class BritishBot(BaseBot):
         # Garrison unavailable at FNI level 3
         if state.get("fni_level", 0) >= 3:
             return False
+        # §8.1 "Paying Resource Costs" + §3.2.2 (two Resources total): a
+        # Non-player that cannot pay even the minimum for the Command
+        # follows the flowchart as if unable to execute it — without
+        # burning the Naval-Pressure/Skirmish SA first (Session 55).
+        if not can_afford(state, C.BRITISH, 2):
+            return False
         refresh_control(state)
-        regs_on_map = sum(sp.get(C.REGULAR_BRI, 0) for sp in state["spaces"].values())
+        # §8.4.1: "10 or more Regulars in all Cities and Provinces on the
+        # map combined" — the West Indies box is neither (Session 55).
+        regs_on_map = sum(sp.get(C.REGULAR_BRI, 0)
+                          for sid, sp in state["spaces"].items()
+                          if sid != WEST_INDIES)
         if regs_on_map < 10:
             return False
         for name in CITIES:
@@ -1936,8 +2026,19 @@ class BritishBot(BaseBot):
         return state["available"].get(C.REGULAR_BRI, 0) > state["_muster_die_cached"]
 
     def _can_battle(self, state: Dict) -> bool:
-        """B9: '2+ Active Rebels in a space outnumbered by British Regulars + Leader'
-        Active Rebels = Continentals + Active Militia + French Regulars (no Underground).
+        """B9 trigger, reconciled across the three references (S55):
+
+        §8.4.4: "at least one space (including WI) with at least two
+        Rebellion pieces that are outnumbered by British Regulars+Leader";
+        §8.4.3 (the exact complement, most detailed): "no space (nor WI)
+        with both British and at least 2 Active Rebellion pieces where
+        British Regulars plus Leader outnumber all Rebellion pieces plus
+        Leaders"; flowchart B9 abbreviates the same.
+
+        So: >= 2 ACTIVE Rebellion pieces (cubes and Forts are always
+        Active, Glossary/§1.4.3; Underground Militia excluded from the
+        count), and British Regulars + Leader > ALL Rebellion pieces
+        (incl. Underground Militia and Forts) plus Rebellion Leaders.
         """
         refresh_control(state)
         for sid, sp in state["spaces"].items():
@@ -1945,15 +2046,23 @@ class BritishBot(BaseBot):
                 sp.get(C.REGULAR_PAT, 0)
                 + sp.get(C.MILITIA_A, 0)
                 + sp.get(C.REGULAR_FRE, 0)
+                + sp.get(C.FORT_PAT, 0)   # Forts are always Active (§1.4.3)
             )
             if active_rebel < 2:
                 continue
+            all_rebel_pieces = active_rebel + sp.get(C.MILITIA_U, 0)
+            rebel_leaders = sum(
+                1 for lid in ("LEADER_WASHINGTON", "LEADER_ROCHAMBEAU",
+                              "LEADER_LAUZUN")
+                if leader_location(state, lid) == sid
+            )
             royal = sp.get(C.REGULAR_BRI, 0)
             has_british_leader = any(
                 leader_location(state, lid) == sid
                 for lid in ("LEADER_GAGE", "LEADER_HOWE", "LEADER_CLINTON")
             )
-            if royal + (1 if has_british_leader else 0) > active_rebel:
+            if royal + (1 if has_british_leader else 0) > (
+                    all_rebel_pieces + rebel_leaders):
                 return True
         return False
 

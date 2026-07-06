@@ -31,10 +31,13 @@ def test_british_bot_turn():
     assert state.get("history")
 
 
-def test_can_battle_ignores_underground_militia():
-    """B9: '2+ Active Rebels' should NOT count Underground Militia."""
+def test_can_battle_underground_militia_s55():
+    """B9 per §8.4.3/§8.4.4 (S55): Underground Militia are excluded from
+    the ">= 2 Active Rebellion pieces" count, but INCLUDED in the
+    outnumber comparison — "British Regulars plus Leader outnumber all
+    Rebellion pieces plus Leaders" (§8.4.3)."""
     bot = BritishBot()
-    # Underground Militia only — should NOT trigger battle
+    # Underground Militia only — no 2+ Active pieces, no trigger
     state = {
         "spaces": {
             "Boston": {
@@ -52,8 +55,13 @@ def test_can_battle_ignores_underground_militia():
     }
     assert bot._can_battle(state) is False
 
-    # Now add 2 Active Militia — should trigger
+    # 2 Active Militia satisfy the Active count, but ALL Rebellion
+    # pieces = 2 + 3 Underground = 5, and 5 Regulars do not OUTNUMBER 5.
     state["spaces"]["Boston"][C.MILITIA_A] = 2
+    assert bot._can_battle(state) is False
+
+    # 6 Regulars outnumber all 5 Rebellion pieces — trigger.
+    state["spaces"]["Boston"][C.REGULAR_BRI] = 6
     assert bot._can_battle(state) is True
 
 
@@ -417,11 +425,15 @@ def test_clinton_skirmish_removes_exactly_one_extra_militia():
     skirmish.execute(state, C.BRITISH, ctx, "Boston", option=1)
 
     militia_after = state["spaces"]["Boston"][C.MILITIA_A]
-    # Option 1 removes 1 Active Militia (pref over cubes for British Skirmish)
-    # Clinton bonus: removes 1 extra Militia
-    # Total removed: 2 (1 from option + 1 from Clinton)
-    assert militia_before - militia_after == 2, (
-        f"Expected 2 Militia removed (1 option + 1 Clinton), got {militia_before - militia_after}"
+    # §8.4.1 (S55): option 1 removes a CUBE first ("Remove as many
+    # Rebellion cubes as possible" — Glossary: Militia are not cubes),
+    # so the Continental goes to Casualties; Clinton then removes
+    # exactly 1 additional Militia.
+    assert state["spaces"]["Boston"].get(C.REGULAR_PAT, 0) == 0, (
+        "Option 1 should remove the Continental (a cube) per §8.4.1"
+    )
+    assert militia_before - militia_after == 1, (
+        f"Expected exactly 1 Militia removed (Clinton bonus), got {militia_before - militia_after}"
     )
 
 

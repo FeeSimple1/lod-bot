@@ -497,9 +497,15 @@ class TestB9BattleCondition:
         # Only 1 Active Rebel → should fail
         assert bot._can_battle(state) is False
 
-        # Add 1 French Regular → 2 Active Rebels
+        # Add 1 French Regular → 2 Active Rebels, but ALL Rebellion
+        # pieces = 2 + 3 Underground = 5 (§8.4.3 S55: the outnumber
+        # comparison counts "all Rebellion pieces plus Leaders");
+        # 5 Regulars do not outnumber 5.
         state["spaces"]["Boston"][C.REGULAR_FRE] = 1
-        # 5 Regs > 2 Active Rebels → True
+        assert bot._can_battle(state) is False
+
+        # 6 Regulars outnumber all 5 → trigger.
+        state["spaces"]["Boston"][C.REGULAR_BRI] = 6
         assert bot._can_battle(state) is True
 
     def test_b9_leader_adds_to_british_force(self):
