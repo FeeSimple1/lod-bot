@@ -1153,7 +1153,11 @@ class BritishBot(BaseBot):
                 return True
             for nbr in _adjacent(sid):
                 nsp = state["spaces"].get(nbr, {})
-                if nsp and (nsp.get(C.REGULAR_BRI, 0) > 0 or nsp.get(C.FORT_BRI, 0) > 0):
+                # S62 (Playbook Example 3): the ADJACENT British power may
+                # be the Regulars this same Muster is placing — Boston
+                # qualifies via the six fresh Connecticut Regulars.
+                if nsp and (_regs_incl_planned(nbr) > 0
+                            or nsp.get(C.FORT_BRI, 0) > 0):
                     return True
             return False
 

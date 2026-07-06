@@ -4609,3 +4609,22 @@ dominance under the Rebellion-leaning board.  Every input
 is rules-verified: this is a DESIGN-META fact for Eric, not a
 fidelity finding.  Filed to the handoff's Awaiting-Eric block with
 the data.
+
+## Session 62 (cont.): Example 3 tightened to EXACT PICKS — one more planned-aware fix (July 2026)
+
+Under Q22 table parity, scripting the book's dice (reg-destination
+walk D3=3/D6=4, Tory-P2 walk D3=3/D6=5, RL D3=3) now reproduces the
+printed Example-3 Muster to the piece: 6 Regulars -> CONNECTICUT,
+Tory pairs in Connecticut/New York City/Pennsylvania, a SINGLE Tory
+in BOSTON (Passive Opposition cap), no Reward Loyalty, the Fort
+replacing exactly 2 Regulars + 1 Tory in Connecticut (4R+1T+Fort
+final), Resources 5 -> 1.  Getting there exposed the S60
+planned-aware pass's blind spot: the Tory-eligibility ADJACENCY check
+still read board Regulars — Boston qualifies via the six Regulars
+this same Muster puts in adjacent Connecticut ("have or are adjacent
+to British Regulars"); the neighbor side now uses
+_regs_incl_planned too (S62).  The Example-3 golden asserts the
+exact picks; the Example-2 Garrison draws remain structural (the
+walk-through's own note says its destination order is random).
+Battery: 1,415 + 101 green; gates 1-10/11-20 clean; soak 120 DONE
+clean; balance rebaselined.

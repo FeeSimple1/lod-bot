@@ -1,8 +1,8 @@
 {
  "games": {
   "1775:1": {
-   "cards": 28,
-   "winner": "BRITISH"
+   "cards": 62,
+   "winner": "FRENCH"
   },
   "1775:10": {
    "cards": 65,
@@ -10,11 +10,11 @@
   },
   "1775:11": {
    "cards": 63,
-   "winner": "INDIANS"
+   "winner": "FRENCH"
   },
   "1775:12": {
-   "cards": 31,
-   "winner": "FRENCH"
+   "cards": 63,
+   "winner": "INDIANS"
   },
   "1775:13": {
    "cards": 65,
@@ -37,8 +37,8 @@
    "winner": "INDIANS"
   },
   "1775:18": {
-   "cards": 19,
-   "winner": "PATRIOTS"
+   "cards": 65,
+   "winner": "INDIANS"
   },
   "1775:19": {
    "cards": 61,
@@ -54,7 +54,7 @@
   },
   "1775:3": {
    "cards": 62,
-   "winner": "INDIANS"
+   "winner": "FRENCH"
   },
   "1775:4": {
    "cards": 61,
@@ -66,7 +66,7 @@
   },
   "1775:6": {
    "cards": 64,
-   "winner": "FRENCH"
+   "winner": "INDIANS"
   },
   "1775:7": {
    "cards": 64,
@@ -153,8 +153,8 @@
    "winner": "FRENCH"
   },
   "1776:8": {
-   "cards": 19,
-   "winner": "PATRIOTS"
+   "cards": 39,
+   "winner": "FRENCH"
   },
   "1776:9": {
    "cards": 28,

@@ -207,7 +207,12 @@ def test_playbook_example_3_british_muster_skirmish():
     assert state.get("cbc") == 1 and state.get("crc") == 3
     assert state["spaces"]["New_York"].get(C.REGULAR_PAT) == 3
 
-    state["rng"] = _ScriptedRng(state["rng"], [], script_d3=[3])
+    # Book dice under Q22 table parity (S62): reg-destination walk
+    # D3=3/D6=4 -> Connecticut; Tory-P2 walk D3=3/D6=5 -> Boston; the
+    # RL/fort D3=3 (Support 3+3 beats Opposition 5 -> Fort).  Padding
+    # values cover the remaining table consumers.
+    state["rng"] = _ScriptedRng(state["rng"], [4, 5, 5, 5],
+                                script_d3=[3, 3, 3, 3])
     eng = Engine(initial_state=state, use_cli=False)
     eng.set_human_factions([])
     eng.state["ineligible_next"] = {C.INDIANS, C.PATRIOTS, C.FRENCH}
@@ -224,12 +229,21 @@ def test_playbook_example_3_british_muster_skirmish():
     assert not any(lbl == "B6 1D6" for lbl, *_ in st.get("rng_log", [])), (
         "Playbook: 'no need to roll the die' with 7 Available Regulars"
     )
-    # No Reward Loyalty (D3=3: Support 3+3 > Opposition 5)
-    assert "Reward Loyalty" not in joined and "reward" not in joined.lower()
-    # A Fort was built by cube replacement per §8.1.2 (2 Regulars + 1 Tory)
-    assert any("British_Fort" in m and "available →" in m for m in hist), (
-        "the Muster's third step places a Fort from Available"
+    # EXACT PICKS under Q22 table parity (S62): the book's table rolls
+    # reproduce the printed Muster precisely.
+    ct = st["spaces"]["Connecticut_Rhode_Island"]
+    assert ct.get(C.REGULAR_BRI, 0) == 4 and ct.get(C.TORY, 0) == 1, (
+        "Connecticut: 6 Regulars + 2 Tories placed, then the Fort "
+        "replaces 2 Regulars + 1 Tory (§8.1.2 R,T,R from 6R/2T)"
     )
+    assert ct.get(C.FORT_BRI, 0) == 1
+    assert st["spaces"]["New_York_City"].get(C.TORY, 0) == 2
+    assert st["spaces"]["Pennsylvania"].get(C.TORY, 0) == 2
+    assert st["spaces"]["Boston"].get(C.TORY, 0) == 1, (
+        "Boston is at Passive Opposition — a single Tory (§8.4.2)"
+    )
+    # No Reward Loyalty (D3=3: Support 3+3 beats Opposition 5)
+    assert "Reward Loyalty" not in joined and "reward" not in joined.lower()
     # Resources: 5 - 4 Muster spaces = 1
     assert st["resources"][C.BRITISH] == 1, (
         f"expected 1 Resource after a 4-space Muster, got {st['resources'][C.BRITISH]}"
