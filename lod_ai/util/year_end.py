@@ -254,12 +254,21 @@ def _supply_phase(state, *, bots=None, human_factions=None):
     for sid in fre_other:
         _fre_move_out(sid)
 
-    # Indians – auto‑Village
+    # Indians – auto‑Village (§6.2.1).  §8.7 note: "place the Village in
+    # a space that already has War Parties if possible"; §8.2 seeded
+    # ties (Session 51: was the first Reserve in dict order).
     if not any(sp.get(VILLAGE, 0) for sp in state["spaces"].values()):
-        reserve = next((s for s in state["spaces"] if map_adj.space_type(s) == "Reserve"), None)
-        if reserve:
-            place_with_caps(state, VILLAGE, reserve, 1)
-            push_history(state, f"Indian Supply – auto‑Village in {reserve}")
+        rng = state.get("rng")
+        reserves = [s for s in state["spaces"]
+                    if map_adj.space_type(s) == "Reserve"]
+        reserves.sort(key=lambda s: (
+            -(state["spaces"][s].get(WARPARTY_U, 0)
+              + state["spaces"][s].get(WARPARTY_A, 0)),
+            rng.random() if rng else 0.0,
+        ))
+        if reserves:
+            place_with_caps(state, VILLAGE, reserves[0], 1)
+            push_history(state, f"Indian Supply – auto‑Village in {reserves[0]}")
 
     indian_unsupplied = []
     for sid, sp in state["spaces"].items():

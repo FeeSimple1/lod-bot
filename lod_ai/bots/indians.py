@@ -663,9 +663,13 @@ class IndianBot(BaseBot):
             corn_loc = leader_location(state, "LEADER_CORNPLANTER")
             eligible_count = 0
             for sid, sp in state["spaces"].items():
-                if not self._village_room(state, sid):
+                # §3.4.1: Gather selects Provinces at Neutral/Passive only
+                # (Session 51: the worthwhile count ignored the support
+                # gate) and a 1-Village space WITH room takes a second
+                # Village (§1.4.2 — the old check excluded them).
+                if not self._gather_support_ok(state, sid):
                     continue
-                if sp.get(C.VILLAGE, 0) > 0:
+                if not self._village_room(state, sid):
                     continue
                 total_wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
                 threshold = 2 if sid == corn_loc else 3
@@ -727,8 +731,10 @@ class IndianBot(BaseBot):
                 continue
             if not self._village_room(state, sid):
                 continue
-            if sp.get(C.VILLAGE, 0) > 0:
-                continue  # already has a Village; build_village replaces 2 WP
+            # §8.7.2 bullet 1: "each space with room for one and at least
+            # three War Parties" — a 1-Village space with base room takes
+            # a SECOND Village (§1.4.2; gather.execute allows it; Session
+            # 51: such spaces were excluded).
             total_wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
             threshold = 2 if sid == corn_loc else 3
             if total_wp < threshold:
@@ -801,6 +807,7 @@ class IndianBot(BaseBot):
                     pri = 2
                 room_cands.append((pri, state["rng"].random(), sid))
             room_cands.sort()
+            self._b3_placed = 0
             placed_count = 0
             for _, _, sid in room_cands:
                 if placed_count >= 2:
@@ -816,12 +823,16 @@ class IndianBot(BaseBot):
                 # which requires an existing Village.
                 avail_wp -= 1
                 placed_count += 1
+                self._b3_placed = placed_count
 
         # --- Bullet 4: If no more WP Available, in 1 Village space move in
         #     all adjacent Active WP without adding Rebel Control, flip UG ---
         final_avail_wp = state["available"].get(C.WARPARTY_U, 0) + state["available"].get(C.WARPARTY_A, 0)
-        # Subtract what we plan to place
+        # Subtract what we plan to place — bullet 2's bulk placements AND
+        # bullet 3's single placements (Session 51: bullet 3 was not
+        # counted, so bullet 4 fired less often than §8.7.2 says).
         final_avail_wp -= sum(bulk_place.values())
+        final_avail_wp -= getattr(self, "_b3_placed", 0)
         move_plan_list: List[Tuple[str, str, int]] = []
         if final_avail_wp <= 0:
             refresh_control(state)
@@ -841,17 +852,19 @@ class IndianBot(BaseBot):
                     active_wp = nsp.get(C.WARPARTY_A, 0)
                     if active_wp == 0:
                         continue
-                    # "without adding any Rebel Control" — skip if moving
-                    # WP out would cause Rebellion to gain control in nbr
-                    # (simplified: skip if nbr would lose all Indian pieces)
-                    remaining = (nsp.get(C.WARPARTY_U, 0) + active_wp - active_wp
-                                 + nsp.get(C.VILLAGE, 0))
-                    if remaining == 0 and ctrl.get(nbr) != "REBELLION":
-                        # Moving all WP_A out might flip control
+                    # "without adding any Rebel Control" — simulate the
+                    # departure per §1.7 (Session 51: the old shortcut
+                    # only caught spaces losing ALL Indian pieces and
+                    # missed partial departures that still flipped
+                    # Control).
+                    if ctrl.get(nbr) != "REBELLION":
                         rebel_pieces = (nsp.get(C.MILITIA_A, 0) + nsp.get(C.MILITIA_U, 0)
                                         + nsp.get(C.REGULAR_PAT, 0) + nsp.get(C.REGULAR_FRE, 0)
                                         + nsp.get(C.FORT_PAT, 0))
-                        if rebel_pieces > 0:
+                        royal_after = (nsp.get(C.REGULAR_BRI, 0) + nsp.get(C.TORY, 0)
+                                       + nsp.get(C.FORT_BRI, 0) + nsp.get(C.VILLAGE, 0)
+                                       + nsp.get(C.WARPARTY_U, 0))   # Actives leave
+                        if rebel_pieces > royal_after:
                             continue  # would add Rebel Control
                     moves.append((nbr, active_wp))
                     total += active_wp
@@ -872,16 +885,22 @@ class IndianBot(BaseBot):
         if not selected:
             return False
 
-        # Resource affordability: gather costs 1 per selected space
-        # (first reserve province may be free, but check conservatively)
-        gather_cost = len(selected)
-        if not can_afford(state, C.INDIANS, gather_cost):
-            # Trim selection to what we can afford
-            affordable = max(1, state["resources"].get(C.INDIANS, 0))
-            if affordable < len(selected):
-                selected = selected[:affordable]
-            if not can_afford(state, C.INDIANS, len(selected)):
-                return False
+        # §3.4.1: 1 Resource per Province, but "Pay 0 for the first
+        # Indian Reserve Province" — gather.execute applies the same
+        # discount (Session 51: the old conservative check refused a
+        # free single-Reserve Gather at 0 Resources).
+        def _gather_cost(sel):
+            cost = len(sel)
+            if any(_MAP_DATA.get(s, {}).get("type") == "Reserve"
+                   for s in sel):
+                cost -= 1
+            return cost
+
+        res_now = state["resources"].get(C.INDIANS, 0)
+        while selected and _gather_cost(selected) > res_now:
+            selected.pop()          # trim lowest-priority picks first
+        if not selected:
+            return False
 
         # Remove spaces from build_village that aren't in selected
         build_village = build_village & set(selected)
@@ -1002,7 +1021,12 @@ class IndianBot(BaseBot):
         refresh_control(state)
         ctrl = state.get("control", {})
         indian_res = state["resources"].get(C.INDIANS, 0)
-        max_dests = min(3, indian_res)
+        # §3.4.2: "Pay 0 for the first destination where all War Parties
+        # are originating from Indian Reserve Provinces" — plan one
+        # optimistic destination past the purse; the post-plan budget
+        # check (all_reserve credit) trims it away if not free (Session
+        # 51: 0-Resource all-Reserve Marches were refused up front).
+        max_dests = min(3, indian_res + 1)
         if state.get("_limited"):
             max_dests = min(max_dests, 1)
         if max_dests <= 0:
@@ -1141,7 +1165,11 @@ class IndianBot(BaseBot):
                 current_royalist = bri + _total(sid)
                 if reb <= current_royalist:
                     continue
-                wp_needed = reb - current_royalist + 1
+                # §1.7: Rebellion Control needs rebels to EXCEED — moving
+                # in (reb - royalist) War Parties reaches equality and
+                # removes it (Session 51: +1 overshoot wasted a WP that
+                # could flip another space).
+                wp_needed = reb - current_royalist
                 adj = _adj_supply(sid)
                 total_supply = sum(n for _, n in adj)
                 if total_supply < wp_needed:

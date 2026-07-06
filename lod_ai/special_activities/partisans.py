@@ -76,8 +76,14 @@ def execute(
 
     # §4.3.2: Partisans "may accompany any Command but not in a Battle
     # space".  Battle spaces for the current turn are recorded by
-    # battle.execute.
-    if space_id in state.get("_turn_battle_spaces", set()):
+    # battle.execute.  EXEMPT card-granted free ops and Brilliant Stroke
+    # actions (bs_free): §5.1.1 Event text takes precedence (e.g. card
+    # 15 scripts free March → free Battle → "then Partisans THERE"), and
+    # §2.3.8 BS actions are "not limited by other actions on this card"
+    # (Session 51 — the S47 enforcement broke card 15's own sequence,
+    # gate 1778:14).
+    if (space_id in state.get("_turn_battle_spaces", set())
+            and not state.get("bs_free")):
         raise ValueError(f"Partisans cannot occur in Battle space {space_id}.")
 
     state["_turn_used_special"] = True

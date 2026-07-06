@@ -3956,3 +3956,50 @@ control); 1775 F 0→50 (!), I 50→15, B 15→0; 1776 F 0→35, B 20→0,
 P 70→60.  Rebaselined.  The French now actually fight the war they
 were designed to join; British/Indian early-scenario rates need
 Piece 8 reads on the new regime before any tuning talk.
+
+## Session 51: Supply residuals + Indian Gather/March nodes + card-15 regression (July 2026)
+
+Eric's continuation queue, worked in order.  WQ Supply pay-vs-move
+inversions: VERIFIED already fixed in Session 33 (survey markers
+added); remaining §8.4.7 residuals fixed — the British Supply CoC
+proxy now SIMULATES the cubes' departure (§6.4.2 needs Rebellion
+Control + Patriot pieces; the old any-rebel-piece proxy over-paid
+everywhere the two sides met) and RL-enablement is gated on expected
+Support-Phase funds ("given expected British earnings from Forts and
+Cities", §1.9-effective city pops).  BS reaction chain: VERIFIED fixed
+in Session 34 (test_bs_reaction_chain.py green).
+
+Indian node deviations (survey "Also" items, all with rule cites):
+- Gather worthwhile-count now applies the §3.4.1 support gate and
+  counts 1-Village-with-room spaces; Gather bullet 1 places SECOND
+  Villages where §1.4.2 room allows (gather.execute always permitted
+  it).
+- Gather bullet 4's "no more War Parties Available" now subtracts
+  bullet 3's placements, and its no-Rebellion-Control check simulates
+  the departure per §1.7 (the old shortcut missed partial departures).
+- Gather at 0 Resources: §3.4.1's free first Indian Reserve Province
+  honored in the affordability check (gather.execute already applied
+  the discount; the bot refused before reaching it).
+- March at 0 Resources: §3.4.2's free all-Reserve first destination
+  now reachable (the up-front purse gate blocked planning; the
+  post-plan budget already had the credit).
+- March Phase 2: the +1 control overshoot removed (§1.7 — equality
+  removes Rebellion Control; the extra WP can flip another space).
+- WQ auto-Village prefers a Reserve with War Parties (§8.7 note),
+  seeded ties.
+
+Regression caught by the gate (1778:14): Session 47's Battle-space
+exclusion blocked card 15's OWN scripted sequence (free March → free
+Battle → "then Partisans there").  §5.1.1: Event text takes precedence
+— partisans/skirmish battle-space checks now exempt card-granted free
+ops and Brilliant Stroke actions (bs_free), which §2.3.8 makes
+independent of other actions on the card.
+
+Tests: new test_indian_nodes_s51.py (6).
+
+Verification: both roots green — 1,397 (lod_ai/tests incl. commands/)
++ 41 = 1,438; gate seeds 1-20 clean invariants-on (after the card-15
+fix); soak 120 DONE clean.  Balance rebaselined: 1775 I 15→35,
+P 35→15, B 0→10; 1776 F 35→65, P 60→35; 1778 F 65→75 — the Indian
+buffs are direct (six node fixes); French continue climbing in the
+new post-ToA regime.  Piece 8 remains the instrument.

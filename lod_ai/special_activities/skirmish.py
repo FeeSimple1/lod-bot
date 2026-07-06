@@ -75,8 +75,11 @@ def execute(
 
     # §4.2.2 (British), §4.3.3 (Patriot), §4.5.2 (French): Skirmish "may
     # accompany any Command but ... not in a Battle" space.  Battle spaces
-    # for the current turn are recorded by battle.execute.
-    if space_id in state.get("_turn_battle_spaces", set()):
+    # for the current turn are recorded by battle.execute.  Card-granted
+    # free ops and Brilliant Stroke actions are exempt (§5.1.1 Event
+    # precedence / §2.3.8 independence — Session 51).
+    if (space_id in state.get("_turn_battle_spaces", set())
+            and not state.get("bs_free")):
         raise ValueError(f"Skirmish cannot occur in Battle space {space_id}.")
 
     state["_turn_used_special"] = True

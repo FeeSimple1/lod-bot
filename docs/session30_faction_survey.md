@@ -31,7 +31,7 @@ Desertion static sort can flip Control; pervasive raw-level-vs-pop and
 alphabetical/first-seen tie-breaks (8.1.1/8.2).
 
 ## Patriots (§8.5) — worst findings
-1. 8.5.5 Supply pays for EVERY unsupplied space (rule: only where
+1. FIXED Session 33: 8.5.5 Supply pays for EVERY unsupplied space (rule: only where
    removal would change Control) and unpaid removal order reverses
    8.1.2 (year_end.py:136-156).
 2. FIXED Session 45: 8.5.4 March aborts entirely when French Regulars
@@ -59,7 +59,7 @@ redeploy can pick a Patriot-less space at 0 Continentals.  Still
 open: BS first-eligible None-passthrough.
 
 ## French (§8.6) — worst findings
-1. 8.6.7 Supply move-vs-pay INVERTED: never pays to hold Control-
+1. FIXED Session 33: 8.6.7 Supply move-vs-pay INVERTED: never pays to hold Control-
    changing spaces while any Patriot Fort exists (year_end.py:157-206).
 2. 8.6.6 Win-the-Day free Patriot Rally deliberately returns None,
    contradicting 8.6.6 and resolved QUESTIONS.md Q9

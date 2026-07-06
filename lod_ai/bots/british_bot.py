@@ -2050,6 +2050,19 @@ class BritishBot(BaseBot):
 
         Returns ordered list of space IDs where British should pay Supply.
         """
+        # §8.4.7: RL enablement matters only if the British can actually
+        # spend during the Support Phase "given expected British earnings
+        # from Forts and Cities (but not the West Indies) (6.3)".
+        from lod_ai.util.naval import effective_population
+        expected = 0
+        for sid, sp in state["spaces"].items():
+            if sp.get(C.FORT_BRI, 0):
+                expected += 1
+            if (_MAP_DATA.get(sid, {}).get("type") == "City"
+                    and self._control(state, sid) == C.BRITISH):
+                expected += effective_population(
+                    state, sid, _MAP_DATA.get(sid, {}).get("population", 0))
+
         pay_spaces: List[Tuple[tuple, str]] = []
         for sid, sp in state["spaces"].items():
             if sid == C.WEST_INDIES_ID:
@@ -2062,17 +2075,27 @@ class BritishBot(BaseBot):
             if sp.get(C.FORT_BRI, 0) or (stype == "City" and self._control(state, sid) == C.BRITISH):
                 continue  # in supply, no payment needed
 
-            # Check: would removing British prevent RL?
+            # Would keeping the cubes allow Reward Loyalty (6.4.1) —
+            # and will there be anything to spend on it?
             prevents_rl = (
                 sp.get(C.REGULAR_BRI, 0) >= 1
                 and sp.get(C.TORY, 0) >= 1
                 and self._control(state, sid) == C.BRITISH
                 and self._support_level(state, sid) < C.ACTIVE_SUPPORT
+                and (state["resources"].get(C.BRITISH, 0) + expected) >= 1
             )
-            # Check: would removing British allow Committees?
-            rebel_pieces = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
-                           + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0))
-            allows_committees = rebel_pieces > 0  # removing British would let Rebels gain control
+            # Would removing the cubes allow Committees of Correspondence?
+            # §6.4.2 needs REBELLION CONTROL + Patriot pieces — simulate
+            # the cubes' departure (Session 50: the old proxy fired on
+            # any rebel piece anywhere the British stood, over-paying).
+            rebels = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+                      + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                      + sp.get(C.FORT_PAT, 0))
+            pat_pieces = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.MILITIA_A, 0)
+                          + sp.get(C.MILITIA_U, 0) + sp.get(C.FORT_PAT, 0))
+            royal_after = (sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
+                           + sp.get(C.VILLAGE, 0) + sp.get(C.FORT_BRI, 0))
+            allows_committees = (pat_pieces > 0 and rebels > royal_after)
 
             if prevents_rl or allows_committees:
                 pop = meta.get("population", 0)
