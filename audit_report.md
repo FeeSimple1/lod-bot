@@ -4486,3 +4486,34 @@ side 30% (was ~10%).  The Muster sequencing fixes are exactly the
 by designer ground truth.  Indians 46% in 1775 is the new outlier —
 flagged for Eric alongside the standing meta-question.  Examples 2
 and 4 remain (queue head next session).
+
+## Session 60: Example 2 golden + a B2 event-gate class bug (July 2026)
+
+Playbook Example 2 (British Garrison + Naval Pressure, card #42)
+transcribed.  It caught one real deviation and validated the rest:
+
+- B2 bullet 3 fired on a MAP-WIDE scan: card 42's Tory can only ever
+  be placed in Connecticut, but the check scanned all spaces for
+  "an Active Opposition space with none" and matched Massachusetts —
+  the walk-through explicitly ignores the Event ("the only space
+  where it can place a Tory (Connecticut) isn't at Active
+  Opposition").  New `tories_in` placement-target field in
+  event_eval (None = British choose, tuple = fixed targets); bullet
+  3 now tests the card's actual targets.  Card 42 populated per the
+  walk-through.  CLASS NOTE for the Piece 3 ledger: every
+  fixed-target places_tories card (lines flagged in event_eval) and
+  the places_british_regulars bullet (currently trivially true on
+  any map with Cities) need the same target-aware treatment.
+- Garrison body validated against the book: SA-first order, +1D3 at
+  FNI 0, §8.1 pay-after-first-instruction (5+1-2=4), Quebec-City
+  retention, "just enough" 2a into Philadelphia, displacement to the
+  lowest-Pop Neutral adjacent Province.  Two golden asserts were
+  RELAXED as draw-dependent-legal, not deviations: a different
+  random destination draw leaves movables for phase 2b, which may
+  legally top Philadelphia to 3 cubes and reinforce Quebec City
+  ("at least three British cubes ... beginning with those Cities
+  that have Underground Militia").
+- Schema guards extended for the non-boolean field (3 tests).
+
+Battery: 1,414 + 101 green; gates 1-10/11-20 clean; soak 120 DONE
+clean; balance rebaselined.

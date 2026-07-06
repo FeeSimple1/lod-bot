@@ -19,6 +19,7 @@ _EXPECTED_FIELDS = {
     "raises_fni",
     "places_british_pieces",
     "places_patriot_militia_u",
+    "tories_in",  # S60: B2-3 fixed placement space(s), None = choose
     "places_patriot_fort",
     "places_french_from_unavailable",
     "places_french_on_map",
@@ -85,6 +86,13 @@ def test_card_values_are_booleans(card_id):
     for side in ("unshaded", "shaded"):
         flags = CARD_EFFECTS[card_id][side]
         for key, val in flags.items():
+            if key == "tories_in":
+                # S60: placement-target field — None or a tuple of space ids
+                assert val is None or (
+                    isinstance(val, tuple)
+                    and all(isinstance(x, str) for x in val)
+                ), f"Card {card_id} {side}[tories_in] = {val!r}"
+                continue
             assert isinstance(val, bool), (
                 f"Card {card_id} {side}[{key!r}] = {val!r} (not bool)"
             )
@@ -114,7 +122,9 @@ def test_card_75_unshaded_grants_free_gather():
 def test_card_18_shaded_is_none():
     """Card 18 shaded is (none) — all False."""
     s = CARD_EFFECTS[18]["shaded"]
-    assert all(v is False for v in s.values())
+    # tories_in defaults to None (S60 placement-target field, not a flag)
+    assert all(v is False for k, v in s.items() if k != "tories_in")
+    assert s["tories_in"] is None
 
 
 def test_card_6_shaded_inflicts_british_casualties():

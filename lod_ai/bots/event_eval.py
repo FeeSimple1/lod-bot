@@ -31,6 +31,7 @@ _F = dict(
     inflicts_rebel_casualties=False,       # B2-4: sends Rebel pieces to Casualties or grants free Skirmish/Battle
     places_british_from_unavailable=False,  # B2-2: places British pieces sourced from Unavailable
     places_tories=False,                   # B2-3: places Tory pieces on the map
+    tories_in=None,                        # B2-3: fixed placement space(s), None = British choose
     places_british_fort=False,             # B2-3: places a British Fort on the map
     places_british_regulars=False,         # B2-3: places British Regulars on the map
     removes_blockade=False,                # B2-1: removes a Blockade marker
@@ -688,6 +689,11 @@ CARD_EFFECTS = {
         "unshaded": _e(
             places_british_pieces=True,
             places_tories=True,  # place 1 Tory in Connecticut
+            # S60 (Playbook Example 2): the Tory can ONLY go to
+            # Connecticut — B2 bullet 3 must test THAT space, not scan
+            # the map ("the only space where it can place a Tory
+            # (Connecticut) isn't at Active Opposition" -> ignore).
+            tories_in=("Connecticut_Rhode_Island",),
             is_effective=True,
         ),
         "shaded": _e(

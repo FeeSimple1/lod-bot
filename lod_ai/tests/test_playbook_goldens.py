@@ -237,3 +237,88 @@ def test_playbook_example_3_british_muster_skirmish():
     # Skirmish in New York Colony: 2 Continentals + 1 Regular to Casualties
     assert st["spaces"]["New_York"].get(C.REGULAR_PAT, 0) == 1
     assert st.get("cbc") == 2 and st.get("crc") == 5
+
+
+def test_playbook_example_2_british_garrison_naval_pressure():
+    """Playbook Example 2 (p.20-22): 1776 Medium Scenario, card #42
+    (British Attack Danbury), British 1st Eligible.
+
+    Forced core asserted (destination/tie picks that the book resolves
+    via the Random Spaces table or ad-hoc D6s are structural only):
+    - Event IGNORED (no B2 bullet fires) -> Garrison selected (12
+      Regulars on map; Philadelphia is Rebellion-controlled, no Fort).
+    - SA FIRST: Naval Pressure at FNI 0 -> +1D3 (scripted 1) BEFORE the
+      Command; Garrison then costs 2 -> Resources 5+1-2 = 4.
+    - Retention: Quebec City's lone Regular never moves (leaving 1
+      Royalist vs 0 Rebellion breaks the "2 more" rule and the City is
+      neither Pop 0 nor Active Support); New York City keeps >= 2
+      Regulars; New York Colony keeps >= 1 Regular.
+    - Phase 2a: Philadelphia (most Rebellion pieces without a Patriot
+      Fort) receives exactly 2 Regulars ("just enough") and flips to
+      BRITISH Control.
+    - Displacement: exactly one displaceable Rebellion piece (the
+      Philadelphia Militia or the NYC Continental — the book's D6 picks
+      Philadelphia) is expelled to an adjacent Province; if it is the
+      Philadelphia Militia, it lands in New Jersey (lowest-Pop Neutral
+      adjacent) which flips to REBELLION Control.
+    """
+    state = build_state("1776", seed=5)
+    assert state["resources"][C.BRITISH] == 5
+    ny_city = state["spaces"]["New_York_City"]
+    assert ny_city.get(C.REGULAR_BRI) == 6 and ny_city.get(C.FORT_BRI) == 1
+    assert state["spaces"]["Philadelphia"].get(C.MILITIA_U) == 1
+    assert state["spaces"]["Quebec_City"].get(C.REGULAR_BRI) == 1
+    assert state.get("fni_level", 0) == 0
+
+    state["rng"] = _ScriptedRng(state["rng"], [], script_d3=[1])
+    eng = Engine(initial_state=state, use_cli=False)
+    eng.set_human_factions([])
+    eng.state["ineligible_next"] = {C.INDIANS, C.PATRIOTS, C.FRENCH}
+    eng.play_card(_card(42), human_decider=None)
+
+    st = eng.state
+    hist = [h["msg"] if isinstance(h, dict) else str(h)
+            for h in st.get("history", [])]
+    joined = " | ".join(hist)
+
+    assert "BRITISH GARRISON" in joined, "Garrison must be selected"
+    assert "NAVAL_PRESSURE" in joined, "SA (Naval Pressure) runs first"
+    # Naval order: the SA line must precede the Garrison line
+    assert joined.index("NAVAL_PRESSURE") < joined.index("BRITISH GARRISON")
+
+    # Resources: 5 + 1 (D3) - 2 (Garrison) = 4
+    assert st["resources"][C.BRITISH] == 4, st["resources"][C.BRITISH]
+
+    phl = st["spaces"]["Philadelphia"]
+    # Phase 2a needs exactly 2 ("just enough"); the book's random
+    # destination draws then spend all movables on new Cities, while a
+    # different draw can leave movables for phase 2b to top Philadelphia
+    # to three cubes ("at least three British cubes ... beginning with
+    # those Cities that have Underground Militia") — both are the
+    # letter.  Assert the floor and the flip, not the draw.
+    assert phl.get(C.REGULAR_BRI, 0) >= 2
+    from lod_ai.board.control import refresh_control
+    refresh_control(st)
+    assert st["control"].get("Philadelphia") == C.BRITISH
+
+    # Retention
+    assert st["spaces"]["Quebec_City"].get(C.REGULAR_BRI, 0) >= 1, (
+        "Quebec City's Regular may not LEAVE (the '2 more' rule); "
+        "phase 2b may legally add to the city on other draws"
+    )
+    assert st["spaces"]["New_York_City"].get(C.REGULAR_BRI, 0) >= 2
+    assert st["spaces"]["New_York"].get(C.REGULAR_BRI, 0) >= 1
+
+    # Displacement: the Philadelphia Militia is gone from Philadelphia
+    # (expelled or, if the tie picked NYC, still Underground there).
+    displaced_phl = phl.get(C.MILITIA_U, 0) + phl.get(C.MILITIA_A, 0) == 0
+    displaced_nyc = st["spaces"]["New_York_City"].get(C.REGULAR_PAT, 0) == 0
+    assert displaced_phl or displaced_nyc, (
+        "one displaceable Rebellion piece must be expelled (§8.4.1)"
+    )
+    if displaced_phl:
+        nj = st["spaces"]["New_Jersey"]
+        assert nj.get(C.MILITIA_U, 0) + nj.get(C.MILITIA_A, 0) == 1, (
+            "the expelled Militia lands in New Jersey (lowest-Pop "
+            "Neutral adjacent Province)"
+        )

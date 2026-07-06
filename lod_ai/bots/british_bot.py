@@ -171,7 +171,13 @@ class BritishBot(BaseBot):
         # 3. "Event places Tories in Active Opposition with none, a British Fort
         #     in a Colony with none, or British Regulars in a City or Colony?"
         if eff["places_tories"] and state.get("available", {}).get(C.TORY, 0) > 0:
-            for sid, sp in state["spaces"].items():
+            # S60 (Playbook Example 2): when the card names its placement
+            # space(s), bullet 3 tests THOSE spaces — a map-wide scan let
+            # card 42 fire off Massachusetts while its Tory could only
+            # ever land in (non-Active-Opposition) Connecticut.
+            _t_spaces = eff.get("tories_in") or state["spaces"].keys()
+            for sid in _t_spaces:
+                sp = state["spaces"].get(sid, {})
                 if (self._support_level(state, sid) == C.ACTIVE_OPPOSITION
                         and sp.get(C.TORY, 0) == 0):
                     return True
