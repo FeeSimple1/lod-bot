@@ -4588,3 +4588,24 @@ outlier diagnostic is now the queue head.  Also noted for follow-up:
 the Playbook's ToA "French Preparations = 16" arithmetic does not
 match the S50 Available-only reading (worth a Q23 if the ToA timing
 matters to a future golden).
+
+## Session 62: Indian 1775 outlier — final-scoring dominance, not a bug (July 2026)
+
+Margin-source read (30x1775, seeds 5000+): 17 Indian wins, and NEARLY
+ALL are §7.3 FINAL-SCORING wins, not §7.2 victory-check wins — the
+per-condition margins are small or negative (c1 from -6 to +8, c2
+from -2 to +3; a 7.2 win needs both positive).  Mechanism: the
+S59-S61 Royalist fixes flipped the 1775 Support race (avg sup-opp
+now +9.5 across Indian wins); 1775 games reach the final Winter
+Quarters without a check win; at §7.3 netting the Indian total —
+(sup-opp-10) + (villages-3-forts), avg villages 5.9 vs forts 2.2 —
+beats everyone: the Rebellion's cond1 mirror is now negative, and
+the British share the Indians' positive cond1 but drag the
+still-negative CRC-CBC as cond2.  The Indians are simply the
+best-positioned scorer of the Royalist-leaning board the fixed
+British bot now produces — the exact mirror of the old French
+dominance under the Rebellion-leaning board.  Every input
+(§8.7 flowchart, Example-5 golden, §7.1-7.3 hand-verified in S52/53)
+is rules-verified: this is a DESIGN-META fact for Eric, not a
+fidelity finding.  Filed to the handoff's Awaiting-Eric block with
+the data.
