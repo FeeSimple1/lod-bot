@@ -115,12 +115,28 @@ def final_scoring(state) -> None:
     if not t["treaty_of_alliance"]:
         totals[FRENCH] = float("-inf")
 
-    # Rank: higher total wins; ties per §7.1: PAT > BRI > FRE > IND
+    # Rank: higher total wins.  §7.1 ties: "resolved in order of
+    # Non-players, the Patriots, British, French and Indian Factions" —
+    # the NON-PLAYER tier comes first (Session 53/C7: only the faction
+    # order was implemented; a human Patriot tying a non-player French
+    # resolved wrongly).
+    humans = state.get("human_factions", set()) or set()
     order = [PATRIOTS, BRITISH, FRENCH, INDIANS]
-    winner = max(order, key=lambda f: (totals[f], -order.index(f)))
+
+    def _tie_key(f):
+        return (totals[f], 1 if f not in humans else 0, -order.index(f))
+
+    winner = max(order, key=_tie_key)
 
     log = "Final Scoring – " + "  ".join(f"{f}:{totals[f]}" for f in order)
     push_history(state, log)
+
+    # §7.1 placements: rank all four by the same key; "if the Treaty of
+    # Alliance Event was not played, the French come in last place
+    # (regardless of their margin or whether they are a Non-player)" —
+    # already forced by the -inf total above.
+    placement = sorted(order, key=_tie_key, reverse=True)
+    push_history(state, "Placements (7.1): " + " > ".join(placement))
     push_history(state, f"Winner: {winner} (Rule 7.3)")
 
 # --------------------------------------------------------------------------- #
@@ -154,5 +170,21 @@ def check(state) -> bool:
         and fre1 > 0 and fre2 > 0
     )
     indian_win  = (ind1 > 0 and ind2 > 0)
+
+    winners = [f for f, w in ((BRITISH, british_win), (PATRIOTS, patriot_win),
+                              (FRENCH, french_win), (INDIANS, indian_win)) if w]
+    if winners:
+        humans = state.get("human_factions", set()) or set()
+        # §7.1 tie order among simultaneous passers: Non-players first,
+        # then PAT > BRI > FRE > IND (Session 53/C7).
+        order = [PATRIOTS, BRITISH, FRENCH, INDIANS]
+        winners.sort(key=lambda f: (0 if f not in humans else 1,
+                                    order.index(f)))
+        push_history(state, f"Victory Check passed by {winners[0]} (7.2)")
+        # §7.1: "If any Non-player Faction passes a victory check, all
+        # players lose equally."
+        if humans and winners[0] not in humans:
+            push_history(state,
+                         "Non-player victory — all players lose equally (7.1)")
 
     return british_win or patriot_win or french_win or indian_win
