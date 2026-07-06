@@ -4321,3 +4321,15 @@ gap (S51 covered Gather/March nodes; the full I-node sweep is queued).
 Post P-node large-N (largeN_s56b.jsonl): Rebellion 269/300 (90%) —
 P 121, F 148, I 27, B 4.  British flat at ~1% through every audited
 cluster this session.
+
+## Session 57: I-node sweep — §8.7 Indian pass CLEAN (July 2026)
+
+The last flowchart gap, at the S55/S56 standard: two parallel audits
+over §8.7 + §3.4 + §4.4 vs indians.py/year_end.py/battle.py, then
+personal spot-checks of the load-bearing claims (the I3 Support+1D6
+gate lives in the dispatcher — verified; the §8.7.9 all-but-1-UG-WP
+defender hook matches the text verbatim; Q18 replenish conformant).
+ZERO deviations — the S48/S51 Indian work covered the bodies, and
+the WQ ops were right all along.  TRACEABILITY §8.7.x rows updated.
+With this, EVERY §8.4-§8.7 row is text-verified: the four-faction
+flowchart inventory is COMPLETE.

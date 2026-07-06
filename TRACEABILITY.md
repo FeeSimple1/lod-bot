@@ -71,15 +71,15 @@ no citation exists.
 | 8.6.10 | Loyalist Desertion | VERIFIED (S56) | french.py ops_loyalist_desertion_priority | — | French one-Tory most-Control priorities verified distinct from British §8.4.10. |
 | 8.6.11 | French Brilliant Stroke | VERIFIED (S56) | french.py ops_bs_trigger | — | ToA + 4+ Regulars w/ Leader + eligibility condition verified. |
 | 8.7 | Non-Player Indian Actions | UNVERIFIED | bots/free_op_planner.py, bots/indians.py, bots/patriot.py, cards/effects/brilliant_stroke.py, commands/battle.py, engine.py, util/year_end.py | tests/test_errata_fixes.py, tests/test_indian_bot_fixes.py | Citation-scan row; verification pass queued (see below). |
-| 8.7.1 | Raid | UNVERIFIED | cand: indians.py raid (I-nodes) | — | No §-citation in code. cand: indians.py raid (I-nodes). |
-| 8.7.2 | Gather | UNVERIFIED | cand: indians.py gather + engine free-gather planner | tests/test_indian_bot_fixes.py | No §-citation in code. cand: indians.py gather + engine free-gather planner. |
-| 8.7.3 | March | UNVERIFIED | bots/free_op_planner.py, bots/indians.py, engine.py | tests/test_errata_fixes.py, tests/test_indian_bot_fixes.py | Citation-scan row; verification pass queued (see below). |
-| 8.7.4 | Scout | UNVERIFIED | cand: indians.py scout | — | No §-citation in code. cand: indians.py scout. |
-| 8.7.5 | Indian Supply | UNVERIFIED | cand: supply — locate | — | No §-citation in code. cand: supply — locate. |
-| 8.7.6 | Patriot Desertion | UNVERIFIED | cand: desertion — locate | — | No §-citation in code. cand: desertion — locate. |
-| 8.7.7 | Indian Leader Redeployment | UNVERIFIED | cand: leader redeploy — locate | — | No §-citation in code. cand: leader redeploy — locate. |
-| 8.7.8 | Indian Brilliant Stroke | UNVERIFIED | cards/effects/brilliant_stroke.py, util/year_end.py | — | Citation-scan row; verification pass queued (see below). |
-| 8.7.9 | Defending in Battle | UNVERIFIED | commands/battle.py | tests/test_indian_bot_fixes.py | Citation-scan row; verification pass queued (see below). |
+| 8.7.1 | Raid | VERIFIED (S48/S51, sweep S57) | indians.py _raid/_raid_sequence, commands/raid.py | — | I3 die gate in dispatcher; Q18 mid-raid replenish conformant; last-WP-Village retention; priorities clean. |
+| 8.7.2 | Gather | VERIFIED (S51, gate re-read S57) | indians.py gather | — | S51 body work holds; Q17 routing per ruling. |
+| 8.7.3 | March | VERIFIED (S51, gate re-read S57) | indians.py march | — | S51 nodes hold (free first-Reserve, 0-Resource all-Reserve, bullet-4 counts). |
+| 8.7.4 | Scout | VERIFIED (S57) | indians.py _scout_sequence, commands/scout.py | — | Gate, British-pays (§8.1 allied bullet), priorities clean. |
+| 8.7.5 | Indian Supply | VERIFIED (S57) | util/year_end.py | — | Control-add tier, Gather-Village tier, move-to-nearest-Village verified. |
+| 8.7.6 | Patriot Desertion | VERIFIED (S57) | indians.py + year_end.py | — | Indian-seat priorities (Village, control, last-of-type, random) verified distinct from §8.5.7/§8.4.10. |
+| 8.7.7 | Indian Leader Redeployment | VERIFIED (S57) | indians.py | — | Brant/DC most-WP; Cornplanter Neutral/Passive 2+WP w/ Village room, fallback most-WP. |
+| 8.7.8 | Indian Brilliant Stroke | VERIFIED (S57) | indians.py | — | ToA + 3+WP Leader + player-1st-or-Rebel-BS verified. |
+| 8.7.9 | Defending in Battle | VERIFIED (S57) | commands/battle.py defender hook | — | All-but-1 UG WP when Village present; 0 otherwise; hook seat routing verified. |
 | 8.8 | One-Player Victory | UNVERIFIED (T11) | — | — | No citations. Applies to human+bot seatings (human_qa covers 5 seatings but not victory-margin rules). Verify: lone player never wins mid-game Victory Phase; NP victory tie order French > Indian > Patriot; difficulty option unimplemented? |
 
 ## Flowchart nodes (B/P/F/I)
