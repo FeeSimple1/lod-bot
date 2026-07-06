@@ -4003,3 +4003,37 @@ fix); soak 120 DONE clean.  Balance rebaselined: 1775 I 15→35,
 P 35→15, B 0→10; 1776 F 35→65, P 60→35; 1778 F 65→75 — the Indian
 buffs are direct (six node fixes); French continue climbing in the
 new post-ToA regime.  Piece 8 remains the instrument.
+
+## Session 52: Human-mode QA — one full game per faction vs the bots (July 2026)
+
+Eric's directive: play each faction as the human seat across mixed
+scenarios, watch for bugs, fix as found.  Played through the LLM/policy
+harness (lod_ai/llm — the human seat walks the interactive CLI's own
+legality-filtered menus; policy = the strategy profiles in
+llm/heuristic.py).  Runner committed as human_qa_run_s52.py (dumps
+full history + anomaly report per game).
+
+| # | Scenario/seed | My seat (profile) | Result | Cards | Decisions |
+|---|---------------|-------------------|--------|-------|-----------|
+| 1 | 1775 / 11 | PATRIOTS (P-AGIT) | INDIANS win at WQ — IND(10,1) both positive, BRI(10,0) correctly excluded (§7.2 cond2 not >0) | 54 | 843 |
+| 2 | 1776 / 22 | BRITISH (B-CITY) | FRENCH win at WQ — FRE(5,4); ToA mid-game | 28 | 331 |
+| 3 | 1778 / 33 | FRENCH (F-NAVY) | PATRIOTS win at FINAL scoring (§7.3) on a 1-1 tie with French, resolved to Patriots (§7.1) | 32 | 231 |
+| 4 | 1775 / 44 | INDIANS (I-VILLAGE) | PATRIOTS win at WQ — PAT(3,1) | 28 | 241 |
+
+Findings: ZERO bot errors, zero illegal actions, zero free-op skips,
+and no history anomalies across 1,646 human-seat decisions — the only
+flagged lines were benign clamp logs (stacking/cap refusals, pool
+shortfall).  Victory determinations verified by hand against
+§7.1/§7.2/§7.3 in all four games, including the both-conditions-
+positive rule (game 1: British at (10,0) correctly do NOT win) and
+final-scoring tie order (game 3).
+
+One live confirmation of a known backlog item: game 3's PAT/FRE 1-1
+final-scoring tie resolved to Patriots — correct here BOTH by §7.1's
+Patriots-before-French order and by its Non-players-first tier (the
+French seat was the human), but the code only implements the faction
+order (C7 in TRACEABILITY_CH1_7.md): a human-Patriot vs
+non-player-French tie would resolve wrongly.  Stays with C7/T11.
+
+No fixes required — four sessions' worth of Piece 3 hardening appears
+to have left the human path and the bots stable under human-mode play.
