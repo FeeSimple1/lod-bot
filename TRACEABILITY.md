@@ -59,17 +59,17 @@ no citation exists.
 | 8.5.8 | Patriot Brilliant Stroke | UNVERIFIED | bots/patriot.py, cards/effects/brilliant_stroke.py, util/year_end.py | — | Citation-scan row; verification pass queued (see below). |
 | 8.5.9 | Committees of Correspondence | UNVERIFIED | util/year_end.py | tests/test_year_end.py | Citation-scan row; verification pass queued (see below). |
 | 8.6 | Non-Player French Actions | UNVERIFIED | bots/free_op_planner.py, bots/french.py, cards/effects/brilliant_stroke.py, engine.py, util/year_end.py | tests/test_bot_free_ops.py, tests/test_french_bot.py, tests/test_year_end.py | Citation-scan row; verification pass queued (see below). |
-| 8.6.1 | Roderigue Hortalez et Cie | UNVERIFIED | cand: french.py RH et Cie pre-ToA (cites F-nodes) | — | No §-citation in code. cand: french.py RH et Cie pre-ToA (cites F-nodes). |
-| 8.6.2 | French Agent Mobilization | UNVERIFIED | cand: french.py agent mobilization (QUESTIONS.md Q12) | — | No §-citation in code. cand: french.py agent mobilization (QUESTIONS.md Q12). |
-| 8.6.3 | Roderigue Hortalez et Cie | UNVERIFIED | cand: french.py RH et Cie post-ToA | — | No §-citation in code. cand: french.py RH et Cie post-ToA. |
-| 8.6.4 | French Muster | UNVERIFIED | cand: french.py muster | — | No §-citation in code. cand: french.py muster. |
-| 8.6.5 | French March | UNVERIFIED | bots/free_op_planner.py, engine.py | tests/test_bot_free_ops.py | Citation-scan row; verification pass queued (see below). |
-| 8.6.6 | French Battle | UNVERIFIED | bots/french.py | tests/test_french_bot.py | Citation-scan row; verification pass queued (see below). |
-| 8.6.7 | French Supply | UNVERIFIED | cand: supply — locate | — | No §-citation in code. cand: supply — locate. |
-| 8.6.8 | West Indies Battle | UNVERIFIED | cand: engine WI battle (free=True fix in CLAUDE.md) | — | No §-citation in code. cand: engine WI battle (free=True fix in CLAUDE.md). |
-| 8.6.9 | French Redeployment | UNVERIFIED | util/year_end.py | tests/test_year_end.py | Citation-scan row; verification pass queued (see below). |
-| 8.6.10 | Loyalist Desertion | UNVERIFIED | cand: desertion — locate | — | No §-citation in code. cand: desertion — locate. |
-| 8.6.11 | French Brilliant Stroke | UNVERIFIED | bots/french.py, cards/effects/brilliant_stroke.py, util/year_end.py | — | Citation-scan row; verification pass queued (see below). |
+| 8.6.1 | Roderigue Hortalez et Cie | VERIFIED (S56) | french.py _hortelez/_preparer_la_guerre | test_french_bot.py | F-node inventory S56: gate, up-to-1D3 (Q16 ruling), pre-ToA Préparer both branches clean. |
+| 8.6.2 | French Agent Mobilization | VERIFIED (S56) | french.py _agent_mobilization | test_french_86_s56.py | S56 FIX: lexicographic control-tier with simulated flip (was additive score); Quebec Militia legality cleared (§3.5.1 explicit). |
+| 8.6.3 | Roderigue Hortalez et Cie | VERIFIED (S56) | french.py _hortelez/_skirmish_loop/_try_naval_pressure | test_french_86_s56.py | SA chain order + transfer gate verified (gate hardened S56); NP no-benefit interim per Q21. |
+| 8.6.4 | French Muster | VERIFIED (S56) | french.py _muster/_can_muster | test_french_86_s56.py, test_french_bot.py | S56 FIX: fallback restricted to City/Colony with RC (§3.5.3 legality); can_afford gates (bs_free). |
+| 8.6.5 | French March | VERIFIED (S56) | french.py _march | test_french_bot.py | S42 tiers hold; §8.1 trim present; S56 bs_free exemption. OPEN Q20: as-many-as-possible vs just-enough. |
+| 8.6.6 | French Battle | VERIFIED (S56) | french.py _battle/_can_battle | test_french_86_s56.py | Naval-first SA order confirmed; S56: ally-free rescore when Patriot fee unfundable, bs_free trim, seeded pop ties; Leaders-not-pieces gate confirmed vs Glossary. |
+| 8.6.7 | French Supply | VERIFIED (S33, re-read S56) | util/year_end.py | tests/test_year_end.py | Control-change payment + RL-prevention tier + highest-Pop verified current. |
+| 8.6.8 | West Indies Battle | VERIFIED (S56) | util/year_end.py | tests/test_year_end.py | Pay-1-to-stay else Available verified. |
+| 8.6.9 | French Redeployment | VERIFIED (S56) | util/year_end.py, french.py ops_redeploy_leader | tests/test_year_end.py | Leader priorities + Blockade redistribution implemented (least-Support removal, most-Support moves). |
+| 8.6.10 | Loyalist Desertion | VERIFIED (S56) | french.py ops_loyalist_desertion_priority | — | French one-Tory most-Control priorities verified distinct from British §8.4.10. |
+| 8.6.11 | French Brilliant Stroke | VERIFIED (S56) | french.py ops_bs_trigger | — | ToA + 4+ Regulars w/ Leader + eligibility condition verified. |
 | 8.7 | Non-Player Indian Actions | UNVERIFIED | bots/free_op_planner.py, bots/indians.py, bots/patriot.py, cards/effects/brilliant_stroke.py, commands/battle.py, engine.py, util/year_end.py | tests/test_errata_fixes.py, tests/test_indian_bot_fixes.py | Citation-scan row; verification pass queued (see below). |
 | 8.7.1 | Raid | UNVERIFIED | cand: indians.py raid (I-nodes) | — | No §-citation in code. cand: indians.py raid (I-nodes). |
 | 8.7.2 | Gather | UNVERIFIED | cand: indians.py gather + engine free-gather planner | tests/test_indian_bot_fixes.py | No §-citation in code. cand: indians.py gather + engine free-gather planner. |

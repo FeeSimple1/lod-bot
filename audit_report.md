@@ -4277,3 +4277,16 @@ Tests: test_french_86_s56.py (5 new); 1 superseded test REWRITTEN to
 §8.6.4's branch structure (WI-fallback flowchart abbreviation).
 Battery: 1,408 + 101 green; gates 1-10/11-20 clean sweeps; soak 120
 invariants-on DONE clean; balance rebaselined.
+
+## Session 56 (cont.): large-N + Q21 counter-experiment (July 2026)
+
+largeN_s56.jsonl (300 games): Rebellion 281/300 (94%) — P 38/72/33,
+F 52/23/63, B 1/2/0, I 9/3/4.  The marker-conservation fix
+strengthened the French Navy (the old silent marker destruction was
+an accidental brake).  Q21 experiment (literal-letter NP targeting,
+/tmp only, reverted): Rebellion 259/300 (86%), I 26/3/8, B 1/0/3 —
+the ruling swings Indians 2x, British unaffected.  Both readings'
+numbers recorded in QUESTIONS.md Q21; interim (a) spread kept.
+TRACEABILITY.md: all §8.6.x rows now VERIFIED with session refs.
+docs/balance_largeN_s56.md has the full read and the ranked remaining
+hypotheses for the British ~1%.

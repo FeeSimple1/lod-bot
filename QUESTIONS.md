@@ -303,3 +303,11 @@ Support") demand literal stacking (a wasted marker parked on the top
 city — weaker French than the current spread)?  Deciding that needs
 the marker model changed from set to counts, touching income (§1.9),
 victory, invariants, save format, and both bots' naval logic.
+
+MEASURED (S56, 300 games seeds 5000+ each): reading (a) spread
+(committed interim) — Rebellion 281/300 (94%): P143/F138/I16/B3.
+Reading (b) literal-letter target with as-modeled failure (NP falls
+through to Skirmish when the top city is blockaded) — Rebellion
+259/300 (86%): P133/F126/I37/B4.  The ruling swings the INDIANS by
+2x and the Patriot/French mix; the British stay ~1% under both, so
+Q21 is not the British lever.  Interim (a) kept pending ruling.
