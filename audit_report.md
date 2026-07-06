@@ -4317,3 +4317,7 @@ rebaselined.  §8.5.x TRACEABILITY rows updated below.  With this,
 ALL FOUR factions' flowcharts (§8.4-§8.7 majors) have had the
 text-verified inventory — §8.7 Indian residual rows remain the last
 gap (S51 covered Gather/March nodes; the full I-node sweep is queued).
+
+Post P-node large-N (largeN_s56b.jsonl): Rebellion 269/300 (90%) —
+P 121, F 148, I 27, B 4.  British flat at ~1% through every audited
+cluster this session.

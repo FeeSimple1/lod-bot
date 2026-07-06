@@ -38,3 +38,13 @@ strengthened) French bot.  Remaining hypotheses, in order:
    simply be this weak in bot-vs-bot play (the game was designed for
    HUMAN British vs bots; the 8.4 flowchart is a defensive caretaker
    by design — Garrison/Muster-heavy, Battle-rare).
+
+## Addendum: post P-node rerun (largeN_s56b.jsonl)
+
+After the §8.5 fixes (French escorts, Persuasion tier): P 28/62/31,
+B 2/1/1, F 52/32/64, I 18/5/4 — Rebellion 269/300 (90%), Patriot
+share shifted to the French (escorted French die in Patriot battles
+→ CBC-CRC mix moves French-ward), Indians partially recover (16→27).
+British unchanged at ~1%.  Reading unchanged: the remaining fidelity
+wells are the §8.7 I-node sweep and the Playbook goldens; beyond
+those it is Eric's meta-question.
