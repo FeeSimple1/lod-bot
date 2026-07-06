@@ -4360,3 +4360,41 @@ Eric ruled both open questions on July 6, 2026:
   guards remain as invariant protection.
 QUESTIONS.md updated (Q1-Q21 now ALL RESOLVED); the four code
 comments citing pending/interim behavior now cite the rulings.
+
+## Session 58 (cont.): Playbook Example 5 golden — THREE new Indian/Scout deviations (July 2026)
+
+Piece 5 pays out exactly as hoped: the Example-5 fixture (Indian
+Scout + War Path, card #73, 1776 + noted alterations) exposes three
+real deviations that the S57 I-node sweep missed — the sweep verified
+the FLOWCHART clauses, but these live in the Scout/War-Path BODIES
+and the leader-follow layer:
+
+- D1 (game-warping, legality): the Scout move sent 3 British
+  Regulars with NO War Party and no Tory.  §3.4.3 PROCEDURE: "the
+  Indians move at least one War Party ... Activate all moving War
+  Parties.  At least one British Regular must (and Tories up to the
+  number of Regulars may) move with the War Parties"; §8.7.4: "Move
+  one War Party and the most Regulars and Tories possible".  The
+  Playbook's 2R+1T mix follows §8.1.2's alternating move selection
+  (R,T,R — begin Regulars on an even split).
+- D2 (moderate): Brant "followed the largest WP group" to QUEBEC —
+  a space not involved in the move.  The OPS leader-follow rule +
+  the Playbook: when moving WPs equal staying WPs, roll D6, 1-3
+  follows (the example rolls 2 and Brant goes to Massachusetts).
+- D3 (moderate): War Path picked New York (no Village) and removed
+  a CONTINENTAL.  §8.7.1 WAR PATH: "to remove the most Rebellion
+  pieces possible per 8.1.2, within each first in a province with at
+  least one Village" — Quebec (Village) is the tiebreak winner, and
+  §8.1.2's enemy-removal order takes Militia before Continentals.
+
+The Scout's embedded Skirmish and the fee/casualty accounting match
+the Playbook exactly (option 2, Continental to Casualties, Militia
+to Available, CBC 1->2 / CRC 3->4, Indians 2->1, British 5->4) — so
+the S55 skirmish work holds up against ground truth.
+
+Fixture: test_playbook_example_5_indian_scout_war_path, strict
+xfail with the full citation trail (flips to a loud XPASS when
+fixed).  Example 1 remains green.  Battery: 1,411 + 101 green +
+1 xfailed.  Fixes are S59's first item — they are Royalist-SIDE
+strength fixes (better Scout stacks, Brant positioning, War Path
+targeting), the first British-helping fidelity finds since S55.
