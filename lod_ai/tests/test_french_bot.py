@@ -1125,27 +1125,42 @@ def test_f16_attacking_force_excludes_own_forts():
                               attacker_faction=C.FRENCH) == 3
 
 
-def test_f10_muster_fallback_includes_west_indies():
-    """F10: Muster fallback targets should include West Indies even when
-    WI is not Rebel Controlled, per 'in 1 space with Rebel Control or
-    the West Indies'."""
+def test_f10_muster_wi_only_via_fewer_than_four_branch():
+    """§8.6.4 (S56): WI is a Muster destination ONLY via the
+    fewer-than-four-Available branch ("If fewer than four French
+    Regulars are Available and WI does not have Rebellion Control,
+    place as many Regulars as possible in WI").  In the Otherwise
+    branch the destinations are "a City or Colony with Rebellion
+    Control" — with none qualifying, the Muster instructions cannot be
+    executed and the IF NONE sends the French to Roderigue Hortalez.
+    (Flowchart F10's header "with Rebel Control or the West Indies" is
+    the abbreviation; its own bullets restate the manual's branches.)"""
     bot = FrenchBot()
     state = _full_state(toa_played=True)
-    # avail_regs >= 4 so we go to "Otherwise" branch
+    # avail_regs >= 4 -> "Otherwise" branch; no City/Colony with RC
     state["available"] = {C.REGULAR_FRE: 6}
-    # No Colony/City with Continentals AND Rebel Control
     state["spaces"] = {
         "West_Indies": {},
-        "Boston": {C.REGULAR_BRI: 3},  # No Continentals
+        "Boston": {C.REGULAR_BRI: 3},
     }
-    state["control"] = {"Boston": "BRITISH"}  # No Rebel Control anywhere
-    # WI is not Rebel Controlled either
-    # But WI should still be a valid fallback target
+    state["control"] = {"Boston": "BRITISH"}
     result = bot._muster(state)
-    # Should succeed by mustering in West Indies (the only valid target)
-    assert result is True
-    affected = state.get("_turn_affected_spaces", set())
-    assert "West_Indies" in affected
+    assert result is False, (
+        "no City/Colony with Rebellion Control -> IF NONE (Hortalez), "
+        "not a WI fallback (§8.6.4)"
+    )
+
+    # And the fewer-than-four branch DOES muster in WI.
+    state2 = _full_state(toa_played=True)
+    state2["available"] = {C.REGULAR_FRE: 3}
+    state2["spaces"] = {
+        "West_Indies": {},
+        "Boston": {C.REGULAR_BRI: 3},
+    }
+    state2["control"] = {"Boston": "BRITISH"}  # WI not Rebellion-controlled
+    result2 = bot._muster(state2)
+    assert result2 is True
+    assert "West_Indies" in state2.get("_turn_affected_spaces", set())
 
 
 # =====================================================================

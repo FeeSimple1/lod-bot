@@ -268,3 +268,38 @@ Force Level per §4.2.1) but left removal at (b) pending this ruling.
 The Playbook's Non-player British Brilliant Stroke example (§8.3.7
 note) may contain a worked CC Battle — worth checking when Piece 5
 transcribes it.
+
+---
+
+## Q20 (Session 56, OPEN, non-blocking): French March bullet 1 — "as
+many as possible" vs just-enough
+
+§8.6.5: "March with as many French Regulars and Continentals as
+possible to add Rebellion Control, first in Cities, then Colonies..."
+The British March (§8.4.3) has an explicit stop clause ("Stop moving
+groups into each destination space once British Control is
+established"); the French text does not.  Two readings: (a) move the
+MAXIMUM movable French/Continentals into each control-adding
+destination (subject to lose-no-Rebellion-Control), or (b) move just
+enough to flip Control (current implementation, mirroring the British
+pattern).  (a) would concentrate French stacks — materially stronger
+French defense and follow-up Battles.  Current behavior kept at (b)
+pending ruling.
+
+## Q21 (Session 56, OPEN, non-blocking): Blockade stacking vs the
+one-per-City set model
+
+§4.5.3 note: "There is no limit to the number of Blockades that may
+be placed on one City."  The engine models city Blockades as a SET of
+city names — stacking is unrepresentable, and (until S56) placing
+onto an already-blockaded City silently DESTROYED the marker (pool
+decremented, set.add no-op) while still raising FNI, shrinking the
+§4.5.3 FNI ceiling for the rest of the game.  S56 interim: duplicate
+placements now fail loudly; the non-player Naval Pressure target scan
+and the Win-the-Day Blockade move skip already-blockaded Cities (the
+no-benefit-selection pattern: §8.4.5 markers-only rule, S45 bullet-6
+filter).  OPEN: does the §8.6.3 NP letter ("then the City with most
+Support") demand literal stacking (a wasted marker parked on the top
+city — weaker French than the current spread)?  Deciding that needs
+the marker model changed from set to counts, touching income (§1.9),
+victory, invariants, save format, and both bots' naval logic.

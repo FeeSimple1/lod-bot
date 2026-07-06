@@ -149,6 +149,11 @@ def move_blockade_city_to_city(state, src_city: str, dst_city: str) -> bool:
     on_map = bloc.setdefault("on_map", set())
     if src_city not in on_map:
         return False
+    if dst_city in on_map:
+        # S56 marker conservation (Q21): the set model holds at most one
+        # Blockade per City — moving onto an occupied City would silently
+        # delete the marker.  Refuse instead.
+        return False
     on_map.discard(src_city)
     on_map.add(dst_city)
     push_history(state, f"Blockade moved from {src_city} to {dst_city}")

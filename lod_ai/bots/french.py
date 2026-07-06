@@ -242,12 +242,15 @@ class FrenchBot(BaseBot):
             if not no_sa:
                 self._skirmish_loop(state)                  # F12 etc.
             return True
-        # F11 fallback: Roderigue Hortalez
+        # F11 fallback: Roderigue Hortalez.  §8.6.3: the SA chain runs
+        # only "If any Resources were transferred to the Patriots" —
+        # gate the loop on the transfer (S56 hardening; latent today
+        # since _can_hortelez guarantees pay >= 1).
         if self._can_hortelez(state):
-            self._hortelez(state, before_treaty=False)
-            if not no_sa:
+            transferred = self._hortelez(state, before_treaty=False)
+            if transferred and not no_sa:
                 self._skirmish_loop(state)
-            return True
+            return bool(transferred)
         return False
 
     def _skirmish_loop(self, state: Dict) -> None:
@@ -345,8 +348,20 @@ class FrenchBot(BaseBot):
             # Find best city: battle space first, then most Support
             best_city = None
             best_score = (-1, -1)
+            on_map = bloc.get("on_map", set())
             for sid in state.get("spaces", {}):
                 if _MAP_DATA.get(sid, {}).get("type") != "City":
+                    continue
+                # No-benefit filter (S56, Q21): the engine models at most
+                # one Blockade per City; placing onto an already-blockaded
+                # City silently DESTROYED the marker (set.add no-op after
+                # pool decrement) while still raising FNI.  Skip such
+                # cities — same class as §8.4.5's "do not ... if only
+                # markers would be removed" and the S45 bullet-6 filter.
+                # Whether the §8.6.3 letter ("the City with most Support")
+                # demands literal STACKING (§4.5.3 note allows it) needs a
+                # marker-count data model — filed as Q21.
+                if sid in on_map:
                     continue
                 in_battle = 1 if sid in affected else 0
                 sup = state.get("support", {}).get(sid, 0)
@@ -376,8 +391,16 @@ class FrenchBot(BaseBot):
         In Quebec City, New York, New Hampshire, or Massachusetts;
         first to add most Rebel Control, then where most Patriot units.
         """
-        best, best_score = None, -1
+        # §8.6.2: "first to add most Rebellion Control, then where there
+        # are most Patriot units already" — LEXICOGRAPHIC tiers (S56: the
+        # old additive score rc*10+patriots let a Rebellion-held province
+        # with 10+ Patriot units outrank a flippable one), and "add
+        # Rebellion Control" is SIMULATED per §1.7 (the S37/S45 class):
+        # does this placement actually make Rebellion pieces outnumber?
+        candidates = []
         ctrl = state.get("control", {})
+        avail_militia_pre = state.get("available", {}).get(C.MILITIA_U, 0)
+        n_new = 2 if avail_militia_pre >= 2 else 1
         for prov in _VALID_PROVINCES:
             sp = state["spaces"].get(prov)
             if not sp:
@@ -385,14 +408,22 @@ class FrenchBot(BaseBot):
             # Skip provinces at Active Support (§3.5.1 restriction)
             if self._support_level(state, prov) == C.ACTIVE_SUPPORT:
                 continue
-            # first to add most Rebel Control, then most Patriot units
-            rc_shift = 1 if ctrl.get(prov) != "REBELLION" else 0
-            patriots = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0) + sp.get(C.REGULAR_PAT, 0)
-            score = rc_shift * 10 + patriots
-            if score > best_score:
-                best, best_score = prov, score
-        if not best:
+            rebel = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
+                     + sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                     + sp.get(C.FORT_PAT, 0))
+            royalist = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                        + sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
+                        + sp.get(C.FORT_BRI, 0) + sp.get(C.VILLAGE, 0))
+            adds_control = (ctrl.get(prov) != "REBELLION"
+                            and rebel + n_new > royalist)
+            patriots = (sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
+                        + sp.get(C.REGULAR_PAT, 0))
+            candidates.append(((0 if adds_control else 1, -patriots,
+                                state["rng"].random()), prov))
+        if not candidates:
             return False
+        candidates.sort()
+        best = candidates[0][1]
         # Try 2 Militia first; if Militia not available, place 1 Continental
         avail_militia = state.get("available", {}).get(C.MILITIA_U, 0)
         place_continental = avail_militia < 2
@@ -456,18 +487,25 @@ class FrenchBot(BaseBot):
                     and _MAP_DATA.get(sid, {}).get("type") in ("Colony", "City"))
             ]
             if not targets:
-                # Fallback: any space with Rebel Control or the West Indies
+                # §8.6.4 "then elsewhere" stays within the qualifying set:
+                # "a City or Colony with Rebellion Control" — and §3.5.3
+                # only allows Muster "In the selected Colony, City or West
+                # Indies", so Provinces/Reserves are illegal destinations
+                # (S56: the old fallback took ANY Rebellion-controlled
+                # space).  WI is reached via the fewer-than-four branch.
                 targets = [
                     sid for sid in state["spaces"]
-                    if ctrl.get(sid) == "REBELLION"
+                    if (ctrl.get(sid) == "REBELLION"
+                        and _MAP_DATA.get(sid, {}).get("type")
+                        in ("Colony", "City"))
                 ]
-                if wi_exists and WEST_INDIES not in targets:
-                    targets.append(WEST_INDIES)
 
         if not targets:
             return False
-        # French Muster costs 2 Resources (§3.5.3)
-        if state["resources"].get(C.FRENCH, 0) < 2:
+        # French Muster costs 2 Resources (§3.5.3); free Commands exempt
+        # (bs_free — the S51 card-15 class).
+        from lod_ai.economy.resources import can_afford
+        if not can_afford(state, C.FRENCH, 2):
             return False
         target = state["rng"].choice(targets)
         state.setdefault("_turn_affected_spaces", set()).add(target)
@@ -658,8 +696,10 @@ class FrenchBot(BaseBot):
         if move_plans:
             all_srcs = list(dict.fromkeys(p["src"] for p in move_plans))
             all_dsts = list(dict.fromkeys(p["dst"] for p in move_plans))
-            # Affordability: march costs 1 per destination
-            french_res = state["resources"].get(C.FRENCH, 0)
+            # Affordability: march costs 1 per destination (§3.5.4);
+            # free Commands exempt (bs_free — S51 class) (S56).
+            french_res = (len(all_dsts) if state.get("bs_free")
+                          else state["resources"].get(C.FRENCH, 0))
             if len(all_dsts) > french_res:
                 # Trim to affordable destinations, keeping priority order
                 all_dsts = all_dsts[:max(french_res, 0)]
@@ -747,12 +787,23 @@ class FrenchBot(BaseBot):
             att_score, def_score = battle.bot_battle_scores(
                 state, sid, "REBELLION",
                 attacker_faction=C.FRENCH, ally_involved=ally)
-            if french_here and british_pieces > 0 and att_score > def_score:
+            passes_ally_free = False
+            if french_here and british_pieces > 0 and not (att_score > def_score):
+                # S56: a space that fails WITH the ally may still pass
+                # WITHOUT it — battle.execute resolves ally-free where the
+                # Patriot fee cannot be paid, so score that case too.
+                af_att, af_def = battle.bot_battle_scores(
+                    state, sid, "REBELLION",
+                    attacker_faction=C.FRENCH, ally_involved=False)
+                passes_ally_free = af_att > af_def
+            if french_here and british_pieces > 0 and (
+                    att_score > def_score or passes_ally_free):
                 pop = _MAP_DATA.get(sid, {}).get("population", 0)
-                targets.append((pop, sid))
+                # §8.2 seeded ties beyond the Population priority (S56)
+                targets.append((-pop, state["rng"].random(), sid))
         if not targets:
             return False
-        targets.sort(reverse=True)
+        targets.sort()
         # Limited Command: cap to 1 space
         if state.get("_limited"):
             targets = targets[:1]
@@ -762,27 +813,40 @@ class FrenchBot(BaseBot):
         pat_res = state["resources"].get(C.PATRIOTS, 0)
         pat_fee_count = 0
         capped_targets = []
-        for pop, sid in targets:
+        for key in targets:
+            sid = key[-1]
             _spt = state["spaces"].get(sid, {})
             # §3.5.5: Patriot pieces = Continentals OR Active Militia
             has_pat = _spt.get(C.REGULAR_PAT, 0) > 0 or _spt.get(C.MILITIA_A, 0) > 0
-            if has_pat:
-                if pat_fee_count >= pat_res:
-                    continue  # skip — Patriots can't afford another allied fee
+            if has_pat and pat_fee_count < pat_res:
                 pat_fee_count += 1
-            capped_targets.append((pop, sid))
+                capped_targets.append(key)
+                continue
+            if has_pat:
+                # Patriots can't fund this space's fee — keep it only if
+                # it passes ALLY-FREE (battle.execute will resolve it
+                # without Patriot pieces; §3.5.5 fee is optional) (S56).
+                af_att, af_def = battle.bot_battle_scores(
+                    state, sid, "REBELLION",
+                    attacker_faction=C.FRENCH, ally_involved=False)
+                if af_att > af_def:
+                    capped_targets.append(key)
+                continue
+            capped_targets.append(key)
         targets = capped_targets
         if not targets:
             return False
-        # Affordability: battle costs 1 per space
-        french_res = state["resources"].get(C.FRENCH, 0)
-        if len(targets) > french_res:
-            targets = targets[:max(french_res, 0)]
+        # Affordability: battle costs 1 per space (§3.5.5); free Commands
+        # exempt (bs_free — S51 class) (S56).
+        if not state.get("bs_free"):
+            french_res = state["resources"].get(C.FRENCH, 0)
+            if len(targets) > french_res:
+                targets = targets[:max(french_res, 0)]
         if not targets:
             return False
         # Track affected spaces so Skirmish can exclude them
         state.setdefault("_turn_affected_spaces", set()).update(
-            sid for _, sid in targets
+            key[-1] for key in targets
         )
         no_sa = state.get("_limited") or state.get("_no_special")
         # F16: "First execute a Special Activity." SA entry at F17 (Naval Pressure)
@@ -801,9 +865,12 @@ class FrenchBot(BaseBot):
                 rally_space = PatriotBot()._best_rally_space(st)
             blockade_dest = None
             best_sup = self._support_level(st, battle_sid)
+            _bloc_on = st.get("markers", {}).get(C.BLOCKADE, {}).get("on_map", set())
             for sid2 in st["spaces"]:
                 if sid2 == battle_sid or not map_adj.is_city(sid2):
                     continue
+                if sid2 in _bloc_on:
+                    continue  # set model: moving onto it would lose the marker (S56/Q21)
                 sup = self._support_level(st, sid2)
                 if sup > best_sup:
                     best_sup = sup
@@ -811,7 +878,7 @@ class FrenchBot(BaseBot):
             return rally_space, {}, blockade_dest
 
         battle.execute(
-            state, C.FRENCH, {}, [sid for _, sid in targets],
+            state, C.FRENCH, {}, [key[-1] for key in targets],
             win_callback=_win_callback,
         )
         return True
@@ -820,7 +887,12 @@ class FrenchBot(BaseBot):
     #  FLOW‑CHART PRE‑CONDITION TESTS
     # ===================================================================
     def _can_muster(self, state: Dict) -> bool:
-        return state["available"].get(C.REGULAR_FRE, 0) > 0
+        # §8.1 "Paying Resource Costs" + §3.5.3 (two Resources total): an
+        # unaffordable Command is skipped at the gate (S56, mirrors the
+        # S55 Garrison treatment); free Commands exempt.
+        from lod_ai.economy.resources import can_afford
+        return (state["available"].get(C.REGULAR_FRE, 0) > 0
+                and can_afford(state, C.FRENCH, 2))
 
     def _can_battle(self, state: Dict) -> bool:
         """F13: Rebel cubes + Leader exceed British pieces in space with both?

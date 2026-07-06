@@ -4213,3 +4213,67 @@ Tests: +1 (CC absorption, with/without-CC differential).  Battery:
 balance rebaselined.  Large-N rerun (largeN_s55b.jsonl): unchanged
 from the s55 read (British 1/5/2% — CC battles are too rare for Q19
 to move the aggregate).
+
+## Session 56: F-node inventory — §8.6 French pass (July 2026)
+
+The Rebellion side's first full flowchart inventory (the S55 handoff's
+queue item 1), same method as the S55 B-node sweep: three parallel
+read-only audits, every finding verified against the text before any
+edit.  Eric confirmed Q19 this session (QUESTIONS.md updated).
+
+Verified-correct (not changed): the §8.6 Event gate bullets, F5/F9
+die gates, Hortalez "up to 1D3" (Q16 ruling), pre-ToA Préparer both
+branches, F15 <= gate and +2-at-zero rule, Battle SA order (Naval
+FIRST per the §8.6.6 note — no S31-class inversion here), pre-battle
+_turn_affected_spaces registration (no S55-class Skirmish leak),
+§8.6.7 supply priorities (S33 state holds), §8.6.8 WI battle, §8.6.9
+leader redeploy + Blockade redistribution, §8.6.10 French Loyalist
+Desertion priorities, §8.6.11 BS trigger, March §8.1 budget trim
+(already present).  TWO agent findings rejected as false positives
+with citations: "British Leaders missing from the F13 gate" (Glossary
+195: "Piece: ... (not a marker like Leaders or Blockades)" — and
+§8.4.3's "pieces plus Leaders" phrasing confirms Leaders are counted
+separately ONLY where the text says so; §8.6.6 says "British pieces",
+so the code is right), and the March-agent's CC finding did not recur
+here.
+
+Fixed (all cited in code):
+- §8.6.2 FAM: additive score (rc*10 + patriots) replaced with
+  LEXICOGRAPHIC tiers — a Rebellion-held province with 10+ Patriot
+  units could outrank a flippable one — and "add Rebellion Control"
+  is now SIMULATED per §1.7 (does the placement flip the count?),
+  the S37/S45 class.  §8.2 seeded ties.
+- §8.6.4/§3.5.3 Muster: the fallback tier took ANY Rebellion-
+  controlled space — Reserves/Provinces are illegal French Muster
+  destinations ("In the selected Colony, City or West Indies"); now
+  Cities/Colonies only, with WI reached via the fewer-than-four
+  branch.  Cost checks moved to can_afford (bs_free exempt, S51
+  class) and §8.1-gated in _can_muster (mirrors S55 Garrison).
+- §3.5.5 Battle: bs_free exemption on the per-space cost trim (a free
+  Battle with an empty purse truncated to zero spaces); spaces whose
+  Patriot fee the Patriots cannot fund are now RE-SCORED ally-free
+  and kept if they still pass (battle.execute already resolves them
+  ally-free — the bot was discarding winnable battles); §8.2 seeded
+  tie behind the Population priority.
+- §3.5.4 March: bs_free exemption on the destination trim.
+- MARKER CONSERVATION (Q21): city Blockades live in a SET (one per
+  City max), and _place_blockade_from_wi decremented the WI pool then
+  set.add()-ed — placing onto an already-blockaded City silently
+  DESTROYED the marker while still raising FNI (and §4.5.3's ceiling
+  shrank for the rest of the game).  The bot's NP target scan had no
+  blockaded-city exclusion, so this fired repeatedly in real games.
+  Now: NP scan and the Win-the-Day Blockade move skip blockaded
+  Cities (the no-benefit-selection pattern, §8.4.5/S45); duplicate
+  placement raises; move_blockade_city_to_city refuses occupied
+  destinations.  Whether the §8.6.3 letter demands literal STACKING
+  (§4.5.3 note) needs a count model — Q21, open, non-blocking.
+- §8.6.3 hardening: the F11 SA loop is now gated on the Hortalez
+  transfer actually happening (latent — _can_hortelez guarantees it).
+- NEW Q20 (open, non-blocking): French March bullet 1 "as many ... as
+  possible" vs the implemented just-enough (the British text has an
+  explicit stop clause; the French text does not).
+
+Tests: test_french_86_s56.py (5 new); 1 superseded test REWRITTEN to
+§8.6.4's branch structure (WI-fallback flowchart abbreviation).
+Battery: 1,408 + 101 green; gates 1-10/11-20 clean sweeps; soak 120
+invariants-on DONE clean; balance rebaselined.
