@@ -4333,3 +4333,17 @@ ZERO deviations — the S48/S51 Indian work covered the bodies, and
 the WQ ops were right all along.  TRACEABILITY §8.7.x rows updated.
 With this, EVERY §8.4-§8.7 row is text-verified: the four-faction
 flowchart inventory is COMPLETE.
+
+## Session 57 (cont.): Piece 5 begun — first Playbook golden green (July 2026)
+
+test_playbook_goldens.py: Example 1 (Non-Player British Event, card
+#28, 1776 Medium Scenario) transcribed as a replay fixture — the
+engine reproduces the designer's walk-through EXACTLY on first run
+(unshaded Event chosen via the third B2 bullet, Massachusetts
+selected, 1 Militia -> 2 Tories, Rebellion Control removed).  A
+meaningful ground-truth datapoint: the event-gate plumbing matches
+the designer's intent on a "fairly tricky case" of their choosing.
+Examples 2-5 (Garrison+expulsion, Muster+Skirmish, British Brilliant
+Stroke — the §8.3.7 exemplar, Indian Scout+War Path) are scoped with
+Playbook line ranges in the fixture header for next session.  No
+behavioral changes this commit; battery green (1,411 + 101).
