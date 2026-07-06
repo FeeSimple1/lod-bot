@@ -321,3 +321,30 @@ Blockade ... to the City with most Support" with an implicit
 not-already-blockaded qualifier (the Spread reading).  Matches the
 implementation; the set model stands (no count-model refactor);
 the loud duplicate guards stay as invariant protection.
+
+---
+
+## Q22 (Session 60, RESOLVED — Eric ruled July 6 2026): Non-player tie
+resolution — seeded uniform vs the printed Random Spaces table
+
+The engine resolved non-player ties with seeded-uniform
+state["rng"].random() sort keys; the physical procedure (Ch 8
+guidelines + Random Spaces sheet; demonstrated in Playbook Examples
+2-3) rolls D3+D6 for a start cell, scans DOWN the column (wrapping
+column-major, "when two spaces are listed in the same box, the upper
+one is selected first"), and uses a plain D6 split (1-3/4-6) when
+only two candidates remain.  The scan is NOT uniform over candidates,
+so the two models differ distributionally at instrument scale.
+
+**Eric's ruling (July 6, 2026): option (b) — implement the Random
+Spaces table ENGINE-WIDE.**  Full physical parity including the
+two-candidate D6 convention; reset the balance baselines and accept
+the migration cost; tighten the Playbook goldens to exact-pick
+asserts once parity holds.  Implementation notes: the §8.2 table
+walker already existed (lod_ai/bots/random_spaces.py — start cell,
+column-major wrap, upper-first) with three call sites (year_end,
+Indian raid, card-effect shared); the migration replaces the bots'
+remaining rng.random() sort-key ties with grouped table selection
+(shared pick_by_priority helper), ordering the 2-candidate D6 split
+by table position.  S53-S60 large-N numbers are NOT comparable
+across this change — fresh baselines required.

@@ -4517,3 +4517,21 @@ transcribed.  It caught one real deviation and validated the rest:
 
 Battery: 1,414 + 101 green; gates 1-10/11-20 clean; soak 120 DONE
 clean; balance rebaselined.
+
+## Session 60 (cont.): Q22 implemented engine-wide — baseline reset (July 2026)
+
+Eric ruled Q22 = (b): the printed Random Spaces table governs all
+non-player tie resolution.  Implemented: two-candidate D6 convention
+(1-3 = earlier in table, column-major) + table_position + grouped
+pick_by_priority added to lod_ai/bots/random_spaces.py (the §8.2
+walker itself already existed); ALL 35 seeded-uniform tie sites
+migrated (British 9, French 6, Patriot 12, Indian 8) — every
+`state["rng"].random()` tie in the four bots is gone.  One
+walk-semantics test rewritten (two-candidate cases now use the D6
+convention, three-candidate case exercises the walk).  Battery:
+1,414 + 101 green; gates 1-10/11-20 clean; soak 120 DONE clean;
+balance rebaselined.  Fresh 300-game baseline in
+docs/balance_largeN_s60_q22.md — British 20->9/300 vs the uniform-tie
+S59 read: the tie DISTRIBUTION itself was worth ~11 British wins,
+measured and documented.  S53-S59 numbers are non-comparable from
+this commit.

@@ -25,6 +25,7 @@ from lod_ai.commands import garrison, muster, march, battle
 from lod_ai.special_activities import naval_pressure, skirmish, common_cause
 from lod_ai.util.history import push_history
 from lod_ai.leaders import leader_location
+from lod_ai.bots.random_spaces import pick_by_priority
 from lod_ai.economy.resources import can_afford, spend
 from lod_ai.map import adjacency as map_adj
 from lod_ai.util.naval import has_blockade
@@ -466,19 +467,17 @@ class BritishBot(BaseBot):
             else:
                 tier = 2
             if cubes_gettable > 0:
-                # bullet 1: maximize cubes removed; ties seeded random
-                key = (tier, 0, -cubes_gettable, 0, 0,
-                       state["rng"].random())
+                # bullet 1: maximize cubes removed; ties per §8.2 table (Q22)
+                key = (tier, 0, -cubes_gettable, 0, 0)
             else:
                 # bullet 2: Fort removal — only-one-piece first, then City
                 one_piece = 0 if enemy == 1 else 1
                 city_bonus = 0 if _is_city(sid) else 1
-                key = (tier, 1, 0, one_piece, city_bonus,
-                       state["rng"].random())
+                key = (tier, 1, 0, one_piece, city_bonus)
             all_targets.append((key, sid))
 
-        all_targets.sort()
-        for _, sid in all_targets:
+        # Q22: equal-priority ties resolved by the Random Spaces table
+        for sid in pick_by_priority(state, all_targets):
             sp = state["spaces"][sid]
             opt = _best_skirmish_option(sid, sp)
             try:
@@ -822,11 +821,12 @@ class BritishBot(BaseBot):
                 1 if has_fort else 0,
                 -rebel if not has_fort else 0,
                 0 if is_nyc else 1,
-                state["rng"].random(),
             )
             targets.append((key, city, needed))
-        targets.sort()
-        return [(city, needed) for _, city, needed in targets]
+        # Q22: table-resolved ties; carry each city's "needed" through
+        need_by_city = {city: needed for _, city, needed in targets}
+        ordered = pick_by_priority(state, [(k, c) for k, c, _ in targets])
+        return [(city, need_by_city[city]) for city in ordered]
 
     def _garrison_phase2b_targets(
         self, state: Dict, incoming: Dict[str, int] | None = None,
@@ -1051,14 +1051,14 @@ class BritishBot(BaseBot):
                                 and sp.get(C.REGULAR_BRI, 0) == 0
                                 and sp.get(C.FORT_BRI, 0) == 0) else 1
             pop = _MAP_DATA.get(sid, {}).get("population", 0)
-            key = (neutral_priority, adds_control, tories_only, -pop,
-                   state["rng"].random())
+            key = (neutral_priority, adds_control, tories_only, -pop)
             reg_candidates.append((key, sid))
 
-        reg_candidates.sort()
+        # Q22: table-resolved ties for the single Regular destination
         regular_destinations: List[str] = []
         if avail_regs > 0 and reg_candidates:
-            regular_destinations.append(reg_candidates[0][1])
+            regular_destinations = pick_by_priority(
+                state, reg_candidates, count=1)
         # S59 (Playbook Example 3): later Muster steps must see the
         # Regulars this same Command is about to place — the walk-through
         # puts the FIRST Tory pair "where Regulars were just placed" and
@@ -1158,9 +1158,9 @@ class BritishBot(BaseBot):
                 if after == before:
                     continue        # placement would not change Control
                 pop = _MAP_DATA.get(sid, {}).get("population", 0)
-                tory_p2.append(((-pop, state["rng"].random()), sid))
-            tory_p2.sort()
-            for _, sid in tory_p2:
+                tory_p2.append(((-pop,), sid))
+            # Q22: table-resolved ties
+            for sid in pick_by_priority(state, tory_p2):
                 if avail_tories <= 0 or len(set(tory_plan) | selected_spaces) >= max_spaces:  # S59: union — the Regular space may also hold a Tory pair (Playbook Ex3: 4 distinct spaces)
                     break
                 if sid in tory_plan:
@@ -1221,8 +1221,7 @@ class BritishBot(BaseBot):
                     budget += 1  # Gage discount (leader_capabilities)
                 affordable = min(max_shift, max(0, budget))
                 pop = _MAP_DATA.get(n, {}).get("population", 0)
-                return (already, markers, -(affordable * pop),
-                        state["rng"].random())
+                return (already, markers, -(affordable * pop))
 
             rl_candidates = [
                 sid for sid, sp in state["spaces"].items()
@@ -1246,7 +1245,10 @@ class BritishBot(BaseBot):
             if len(all_selected) >= max_spaces:
                 rl_candidates = [s for s in rl_candidates if s in all_selected]
             if rl_candidates:
-                best_rl = min(rl_candidates, key=_rl_key)
+                # Q22: table-resolved tie among equal RL keys
+                best_rl = pick_by_priority(
+                    state, [(_rl_key(s), s) for s in rl_candidates],
+                    count=1)[0]
                 # §3.2.1: "There is no limit to the number of levels shifted
                 # when Rewarding Loyalty during Muster."
                 # Calculate maximum affordable shift levels for the best space.
@@ -1523,9 +1525,10 @@ class BritishBot(BaseBot):
                     0 if dtype == "City" else 1,
                     0 if rebel_cubes > 0 else 1,
                     -pop,
-                    state["rng"].random(),
                 )
-        control_targets = sorted(cand_best, key=cand_best.get)
+        # Q22: table-resolved ties
+        control_targets = pick_by_priority(
+            state, [(k, d) for d, k in cand_best.items()])
 
         for dst in control_targets:
             if spaces_used >= min(2, march_max):
@@ -1649,10 +1652,13 @@ class BritishBot(BaseBot):
                     tier = 0 if regs_only else 1
                     already = 0 if dst in seen_dst else 1
                     phase2_targets.append(
-                        ((tier, already, state["rng"].random()), dst))
+                        ((tier, already), dst))
                     p2_seen.add(dst)
-            phase2_targets.sort()
-            for key, dst in phase2_targets:
+            # Q22: table-resolved ties (keys re-attached for the tier read)
+            _p2_keys = dict((d, k) for k, d in phase2_targets)
+            _p2_order = pick_by_priority(state, phase2_targets)
+            for dst in _p2_order:
+                key = _p2_keys[dst]
                 if dst not in seen_dst and spaces_used >= march_max:
                     continue  # a re-used destination needs no new slot
                 tier = key[0]
@@ -1702,11 +1708,10 @@ class BritishBot(BaseBot):
                 if sp.get(C.MILITIA_U, 0) > 0 and brit_cubes >= 3:
                     sup = self._support_level(state, sid)
                     # "first in spaces with Support" (binary presence),
-                    # remaining ties seeded random (§8.2)
+                    # remaining ties via the Random Spaces table (Q22)
                     activate_targets.append(
-                        ((0 if sup > 0 else 1, state["rng"].random()), sid))
-            activate_targets.sort()
-            for _, sid in activate_targets:
+                        ((0 if sup > 0 else 1,), sid))
+            for sid in pick_by_priority(state, activate_targets):
                 if spaces_used >= march_max:
                     break
                 activate_in_place.append(sid)

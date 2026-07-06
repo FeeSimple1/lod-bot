@@ -42,6 +42,7 @@ from lod_ai.util.naval import (
     west_indies_blockades,
 )
 from lod_ai.leaders import leader_location
+from lod_ai.bots.random_spaces import pick_by_priority, choose_random_space
 from lod_ai.map import adjacency as map_adj
 from collections import defaultdict
 
@@ -415,12 +416,12 @@ class FrenchBot(BaseBot):
                             and rebel + n_new > royalist)
             patriots = (sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
                         + sp.get(C.REGULAR_PAT, 0))
-            candidates.append(((0 if adds_control else 1, -patriots,
-                                state["rng"].random()), prov))
+            candidates.append(((0 if adds_control else 1, -patriots),
+                               prov))
         if not candidates:
             return False
-        candidates.sort()
-        best = candidates[0][1]
+        # Q22: table-resolved ties
+        best = pick_by_priority(state, candidates, count=1)[0]
         # Try 2 Militia first; if Militia not available, place 1 Continental
         avail_militia = state.get("available", {}).get(C.MILITIA_U, 0)
         place_continental = avail_militia < 2
@@ -584,8 +585,13 @@ class FrenchBot(BaseBot):
             dsp = state["spaces"][dst]
             british = dsp.get(C.REGULAR_BRI, 0) + dsp.get(C.TORY, 0)
             dest_candidates.append(
-                (tier, -british, state["rng"].random(), dst, adj_sources))
-        dest_candidates.sort()
+                ((tier, -british), dst, adj_sources))
+        # Q22: table-resolved ties; re-attach adj_sources after ordering
+        _adj_by_dst = {d: a for _, d, a in dest_candidates}
+        _dst_order = pick_by_priority(
+            state, [(k, d) for k, d, _ in dest_candidates])
+        dest_candidates = [(None, None, None, d, _adj_by_dst[d])
+                           for d in _dst_order]
 
         move_plans = []
         used_from: Dict[str, int] = defaultdict(int)  # committed per source
@@ -669,11 +675,17 @@ class FrenchBot(BaseBot):
                               for b in british_spaces) if path]
                     if not dists:
                         continue
-                    key = (min(dists), state["rng"].random())
+                    key = (min(dists),)
                     if best_key is None or key < best_key:
                         best_key, best_next = key, neighbor
+                        _tied = [neighbor]
+                    elif key == best_key:
+                        _tied.append(neighbor)
                 if best_next is None:
                     continue
+                if len(_tied) > 1:
+                    # Q22: table-resolved tie among equal-distance hops
+                    best_next = choose_random_space(_tied, state["rng"]) or best_next
                 movable = fre
                 if ctrl.get(src) == "REBELLION":
                     total_rebel = self._rebel_pieces_in(sp) - used_from[src]
@@ -747,10 +759,13 @@ class FrenchBot(BaseBot):
                     if self._would_lose_rebel_control(
                             state, src, {C.REGULAR_FRE: 1}):
                         continue
-                    fallbacks.append(
-                        (state["rng"].random(), src, neighbor))
+                    fallbacks.append((src, neighbor))
         if fallbacks:
-            _, src, neighbor = min(fallbacks)
+            # Q22: equal-priority fallbacks — destination by table, then
+            # any origin serving it
+            _dests = [n for _, n in fallbacks]
+            neighbor = choose_random_space(_dests, state["rng"]) or _dests[0]
+            src = next(s for s, n in fallbacks if n == neighbor)
             march.execute(state, C.FRENCH, {}, [src], [neighbor],
                           bring_escorts=False, move_plan=[
                               {"src": src, "dst": neighbor,
@@ -797,10 +812,11 @@ class FrenchBot(BaseBot):
                     att_score > def_score or passes_ally_free):
                 pop = _MAP_DATA.get(sid, {}).get("population", 0)
                 # §8.2 seeded ties beyond the Population priority (S56)
-                targets.append((-pop, state["rng"].random(), sid))
+                targets.append(((-pop,), sid))
         if not targets:
             return False
-        targets.sort()
+        # Q22: table-resolved ties behind the Population priority
+        targets = [(None, s) for s in pick_by_priority(state, targets)]
         # Limited Command: cap to 1 space
         if state.get("_limited"):
             targets = targets[:1]
@@ -1169,11 +1185,12 @@ class FrenchBot(BaseBot):
             # Population should only tiebreak WITHIN each tier.
             ctrl_pop = -pop if changes_ctrl else 0
             last_pop = -pop if (is_last and not_active_sup) else 0
-            result.append((-int(changes_ctrl), ctrl_pop,
-                           -int(is_last) * not_active_sup, last_pop,
-                           state["rng"].random(), sid, C.TORY))
-        result.sort()
-        return [(sid, tag) for _, _, _, _, _, sid, tag in result]
+            result.append(((-int(changes_ctrl), ctrl_pop,
+                            -int(is_last) * not_active_sup, last_pop),
+                           sid))
+        # Q22: table-resolved ties within equal priority tuples
+        return [(sid, C.TORY)
+                for sid in pick_by_priority(state, result)]
 
     def ops_toa_trigger(self, state: Dict) -> bool:
         """Treaty of Alliance: Play if

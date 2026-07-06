@@ -31,6 +31,7 @@ from lod_ai.commands import raid, gather, march, scout
 from lod_ai.special_activities import plunder, war_path, trade
 from lod_ai.board.control import refresh_control
 from lod_ai.leaders import leader_location
+from lod_ai.bots.random_spaces import pick_by_priority, choose_random_space
 from lod_ai.util.history import push_history
 from lod_ai.map import adjacency as map_adj
 from lod_ai.map.adjacency import shortest_path
@@ -740,11 +741,10 @@ class IndianBot(BaseBot):
             if total_wp < threshold:
                 continue
             has_leader = 1 if sid in leader_locs else 0
-            village_cands.append((-has_leader, state["rng"].random(), sid))
-        village_cands.sort()
-
+            village_cands.append(((-has_leader,), sid))
         villages_placed = 0
-        for _, _, sid in village_cands:
+        # Q22: table-resolved ties
+        for sid in pick_by_priority(state, village_cands):
             if villages_placed >= avail_villages:
                 break
             if len(selected) >= gather_max:
@@ -766,9 +766,9 @@ class IndianBot(BaseBot):
                 has_ug = 1 if sp.get(C.WARPARTY_U, 0) > 0 else 0
                 has_leader = 1 if sid in leader_locs else 0
                 # Priority: enemies first, then no UG WP, then leader, then random
-                wp_cands.append((-enemies, has_ug, -has_leader, state["rng"].random(), sid))
-            wp_cands.sort()
-            for _, _, _, _, sid in wp_cands:
+                wp_cands.append(((-enemies, has_ug, -has_leader), sid))
+            # Q22: table-resolved ties
+            for sid in pick_by_priority(state, wp_cands):
                 if len(selected) >= gather_max:
                     break
                 if avail_wp <= 0:
@@ -805,11 +805,11 @@ class IndianBot(BaseBot):
                     pri = 1
                 else:
                     pri = 2
-                room_cands.append((pri, state["rng"].random(), sid))
-            room_cands.sort()
+                room_cands.append(((pri,), sid))
             self._b3_placed = 0
             placed_count = 0
-            for _, _, sid in room_cands:
+            # Q22: table-resolved ties
+            for sid in pick_by_priority(state, room_cands):
                 if placed_count >= 2:
                     break
                 if len(selected) >= gather_max:
@@ -990,11 +990,12 @@ class IndianBot(BaseBot):
             is_prov = 1 if _MAP_DATA.get(sid, {}).get("type") in ("Colony", "Reserve") else 0
             has_village = 1 if sp.get(C.VILLAGE, 0) >= 1 else 0
             prov_vill = is_prov * has_village
-            choices.append((fort_removable, removable, prov_vill,
-                            state["rng"].random(), sid))
+            choices.append(((-fort_removable, -removable, -prov_vill),
+                            sid))
         if not choices:
             return False
-        target = max(choices)[-1]
+        # Q22: table-resolved ties (keys negated: helper sorts ascending)
+        target = pick_by_priority(state, choices, count=1)[0]
         tsp = state["spaces"][target]
         # Select the correct War Path option per §4.4.2:
         #   option 3 = remove Patriot Fort (requires no Rebel cubes, 2+ WP_U)
@@ -1140,10 +1141,13 @@ class IndianBot(BaseBot):
                 adj = _adj_supply(sid)
                 total_supply = sum(n for _, n in adj)
                 if total_supply >= needed:
-                    candidates.append((needed, state["rng"].random(), sid, adj))
-            candidates.sort()
+                    candidates.append((needed, sid, adj))
             if candidates:
-                needed, _, target, adj = candidates[0]
+                # Q22: table-resolved tie on equal "needed"
+                _adjmap = {s: (n, a) for n, s, a in candidates}
+                target = pick_by_priority(
+                    state, [((n,), s) for n, s, _ in candidates], count=1)[0]
+                needed, adj = _adjmap[target]
                 destinations.append(target)
                 for src, max_give in adj:
                     if needed <= 0:
@@ -1188,12 +1192,14 @@ class IndianBot(BaseBot):
                 no_active = 0 if sup >= C.ACTIVE_SUPPORT else 1
                 rebel_excess = reb - current_royalist
                 candidates.append((
-                    -no_active, -rebel_excess,
-                    state["rng"].random(), sid, wp_needed, adj))
+                    (-no_active, -rebel_excess), sid, wp_needed, adj))
             if not candidates:
                 break
-            candidates.sort()
-            _, _, _, target, wp_needed, adj = candidates[0]
+            # Q22: table-resolved ties
+            _payload = {s: (w, a) for _, s, w, a in candidates}
+            target = pick_by_priority(
+                state, [(k, s) for k, s, _, _ in candidates], count=1)[0]
+            wp_needed, adj = _payload[target]
             destinations.append(target)
             for src, max_give in adj:
                 if wp_needed <= 0:
@@ -1398,12 +1404,24 @@ class IndianBot(BaseBot):
                 if not (has_fort or village_enemy or removes_ctrl):
                     continue
                 tier = 0 if has_fort else (1 if village_enemy else 2)
-                key = (tier, -(n_regs + n_tories), state["rng"].random())
+                key = (tier, -(n_regs + n_tories))
                 if best is None or key < best[0]:
                     best = (key, origin, dst, n_regs, n_tories)
+                    _scout_tied = [(dst, origin, n_regs, n_tories)]
+                elif key == best[0]:
+                    _scout_tied.append((dst, origin, n_regs, n_tories))
 
         if best is None:
             return False
+        if len(_scout_tied) > 1:
+            # Q22: table-resolved tie on the DESTINATION, then the
+            # first recorded origin serving it
+            _dsts = list(dict.fromkeys(d for d, _o, _r, _t in _scout_tied))
+            _pick = choose_random_space(_dsts, state["rng"]) or _dsts[0]
+            for d, o, nr, nt in _scout_tied:
+                if d == _pick:
+                    best = (best[0], o, d, nr, nt)
+                    break
         _, origin, target, n_regs, n_tories = best
         n_wp = 1  # Reference: "Move one War Party" — exactly 1 WP
 
@@ -1590,9 +1608,23 @@ class IndianBot(BaseBot):
             # Population tiebreaks WITHIN control-change tier only
             ctrl_pop = -pop if changes_ctrl else 0
             return (-has_village, -int(changes_ctrl), ctrl_pop,
-                    -is_last, state["rng"].random())
+                    -is_last)
 
-        return sorted(candidates, key=sort_key)
+        # Q22: table-resolved ties within equal priority tuples; group
+        # (sid, tag) pairs by key, order sids per group via the table.
+        by_key = {}
+        for pair in candidates:
+            by_key.setdefault(sort_key(pair), []).append(pair)
+        out = []
+        for key in sorted(by_key):
+            group = by_key[key]
+            sids = list(dict.fromkeys(s for s, _t in group))
+            ordered = pick_by_priority(state, [((0,), s) for s in sids])
+            for s in ordered:
+                for gs, gt in group:
+                    if gs == s:
+                        out.append((gs, gt))
+        return out
 
     def ops_redeploy(self, state: Dict) -> Dict[str, str | None]:
         """OPS: Leader redeployment destinations.

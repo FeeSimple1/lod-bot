@@ -70,12 +70,22 @@ def test_walk_follows_arrows_to_next_column():
         def randint(self, a, b):
             return self._rolls.pop(0)
 
-    # Candidates: Quebec_City (col 1, row 1) vs Philadelphia (col 2, row 2).
-    # Correct arrow order from (row 6, col 1): rows below are exhausted →
-    # top of column 2 → Philadelphia comes before wrapping to Quebec_City.
-    pick = choose_random_space(["Quebec_City", "Philadelphia"],
+    # Q22 (Eric's ruling): with EXACTLY two candidates the Playbook's
+    # D6 convention applies instead of the walk — so exercise the walk
+    # with THREE candidates.  From (row 6, col 1) the rows below are
+    # exhausted -> top of column 2 -> Philadelphia (col 2, row 2) comes
+    # before wrapping back to Quebec_City (col 1, row 1) or Boston
+    # (col 3, row 5).
+    pick = choose_random_space(["Quebec_City", "Philadelphia", "Boston"],
                                FixedRolls(1, 6))
     assert pick == "Philadelphia"
+
+    # Two-candidate D6 convention (Playbook Examples 2/3): 1-3 selects
+    # the candidate earlier in the table (column-major), 4-6 the later.
+    assert choose_random_space(["Quebec_City", "Philadelphia"],
+                               FixedRolls(2, 99)) == "Quebec_City"
+    assert choose_random_space(["Quebec_City", "Philadelphia"],
+                               FixedRolls(5, 99)) == "Philadelphia"
 
 
 # -------------------------------------------------------------- §8.3.6 ----

@@ -32,6 +32,7 @@ from lod_ai.special_activities import partisans, skirmish, persuasion
 from lod_ai.board.control import refresh_control
 from lod_ai.util.history import push_history
 from lod_ai.leaders import leader_location
+from lod_ai.bots.random_spaces import pick_by_priority, choose_random_space
 from lod_ai.map import adjacency as map_adj
 
 # ---------------------------------------------------------------------------
@@ -390,10 +391,11 @@ class PatriotBot(BaseBot):
                 has_wash = 1 if leader_location(state, "LEADER_WASHINGTON") == sid else 0
                 pop = _MAP_DATA.get(sid, {}).get("population", 0)
                 villages = sp.get(C.VILLAGE, 0)
-                targets.append((-has_wash, -pop, -villages, state["rng"].random(), sid))
+                targets.append(((-has_wash, -pop, -villages), sid))
         if not targets:
             return False
-        targets.sort()
+        # Q22: table-resolved ties
+        targets = [(None, s) for s in pick_by_priority(state, targets)]
         chosen = [sid for *_, sid in targets]
 
         # Limited Command: cap to 1 space
@@ -721,11 +723,10 @@ class PatriotBot(BaseBot):
             changes_ctrl = 1 if (self._control_after_add(state, sid, 1)
                                  != ctrl.get(sid)) else 0
             pop = _MAP_DATA.get(sid, {}).get("population", 0)
-            phase2_targets.append((-changes_ctrl, -(pop * changes_ctrl),
-                                   state["rng"].random(), sid))
-        phase2_targets.sort()
-
-        for _, _, _, dst in phase2_targets:
+            phase2_targets.append(((-changes_ctrl, -(pop * changes_ctrl)),
+                                   sid))
+        # Q22: table-resolved ties
+        for dst in pick_by_priority(state, phase2_targets):
             if len(used_destinations) >= march_max:
                 break
             adj_set = map_adj.adjacent_spaces(dst)
@@ -911,10 +912,9 @@ class PatriotBot(BaseBot):
                 if pat_units >= 4:
                     is_city = 1 if _MAP_DATA.get(sid, {}).get("type") == "City" else 0
                     pop = _MAP_DATA.get(sid, {}).get("population", 0)
-                    fort_candidates.append((-is_city, -pop,
-                                            state["rng"].random(), sid))
-            fort_candidates.sort()
-            for *_, sid in fort_candidates:
+                    fort_candidates.append(((-is_city, -pop), sid))
+            # Q22: table-resolved ties
+            for sid in pick_by_priority(state, fort_candidates):
                 if len(spaces_used) >= max_rally or avail_forts <= 0:
                     break
                 build_fort_set.add(sid)
@@ -941,9 +941,8 @@ class PatriotBot(BaseBot):
                          sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0))
                 if other == 0 and sid not in spaces_used:
                     lonely_forts.append(sid)
-            # §8.2: seeded-random order among equal-priority spaces
-            lonely_forts.sort(key=lambda s: state["rng"].random())
-            for sid in lonely_forts:
+            # Q22: equal-priority spaces ordered by the Random Spaces table
+            for sid in pick_by_priority(state, [((0,), s) for s in lonely_forts]):
                 if len(spaces_used) >= max_rally or avail_militia <= 0:
                     break
                 sp = state["spaces"][sid]
@@ -979,11 +978,18 @@ class PatriotBot(BaseBot):
                 if sp.get(C.FORT_PAT, 0) == 0:
                     continue
                 mil = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
-                key = (-mil, state["rng"].random())   # §8.2 seeded ties
+                key = (-mil,)   # Q22: ties table-resolved below
                 if best_cont_key is None or key < best_cont_key:
                     best_cont_key = key
                     best_cont_mil = mil
                     best_cont_fort = sid
+                    _cont_tied = [sid]
+                elif key == best_cont_key:
+                    _cont_tied.append(sid)
+            if best_cont_fort and len(_cont_tied) > 1:
+                # Q22: table-resolved tie among equal keys
+                best_cont_fort = (choose_random_space(_cont_tied, state["rng"])
+                                  or best_cont_fort)
             if best_cont_fort and best_cont_mil > 0:
                 spaces_used.append(best_cont_fort)
                 # §3.3.1/§8.1.1: place Militia there to the maximum
@@ -1064,10 +1070,10 @@ class PatriotBot(BaseBot):
                     continue
                 is_city = 1 if _MAP_DATA.get(sid, {}).get("type") == "City" else 0
                 pop = _MAP_DATA.get(sid, {}).get("population", 0)
-                militia_targets.append((-changes_ctrl, -no_active_opp, -is_city,
-                                        -pop, state["rng"].random(), sid))
-            militia_targets.sort()
-            for *_, sid in militia_targets:
+                militia_targets.append(
+                    ((-changes_ctrl, -no_active_opp, -is_city, -pop), sid))
+            # Q22: table-resolved ties
+            for sid in pick_by_priority(state, militia_targets):
                 if len(spaces_used) >= max_rally:
                     break
                 spaces_used.append(sid)
@@ -1114,7 +1120,7 @@ class PatriotBot(BaseBot):
                         gather_moves.append((adj_sid, fort_sid, can_take))
                         gather_total += can_take
 
-                gkey = (-gather_total, state["rng"].random())  # §8.2 ties
+                gkey = (-gather_total,)  # Q22: first-found wins equal keys
                 if gather_total > 0 and (best_gather_key is None
                                          or gkey < best_gather_key):
                     best_gather_key = gkey
@@ -1233,11 +1239,11 @@ class PatriotBot(BaseBot):
         # Active-Support tier, then Population, then seeded ties (§8.2).
         # (Session 44: was a raw support-level cascade, which wrongly
         # ranked Passive Support above Neutral etc.)
-        spaces.sort(key=lambda n: (
-            0 if self._support_level(state, n) == C.ACTIVE_SUPPORT else 1,
-            -_MAP_DATA[n].get("population", 0),
-            state["rng"].random(),
-        ))
+        # Q22: table-resolved ties behind the substantive priorities
+        spaces = pick_by_priority(state, [
+            ((0 if self._support_level(state, n) == C.ACTIVE_SUPPORT else 1,
+              -_MAP_DATA[n].get("population", 0)), n)
+            for n in spaces])
         # Limited Command: 1 space only
         if state.get("_limited"):
             spaces = spaces[:1]
@@ -1301,12 +1307,12 @@ class PatriotBot(BaseBot):
             adds_rebel_ctrl = 1 if ctrl.get(sid) != "REBELLION" else 0
             removes_brit_ctrl = 1 if ctrl.get(sid) == "BRITISH" else 0
             key = (-village_removable, -wp, -british, -adds_rebel_ctrl,
-                   -removes_brit_ctrl, state["rng"].random())
+                   -removes_brit_ctrl)
             candidates.append((key, sid))
         if not candidates:
             return False
-        candidates.sort()
-        for _, sid in candidates:
+        # Q22: table-resolved ties
+        for sid in pick_by_priority(state, candidates):
             sp = state["spaces"][sid]
             has_village = sp.get(C.VILLAGE, 0)
             wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
@@ -1354,12 +1360,12 @@ class PatriotBot(BaseBot):
                 continue
             adds_rebel_ctrl = 1 if ctrl.get(sid) != "REBELLION" else 0
             removes_brit_ctrl = 1 if ctrl.get(sid) == "BRITISH" else 0
-            key = (-has_fort, -adds_rebel_ctrl, -removes_brit_ctrl, state["rng"].random())
+            key = (-has_fort, -adds_rebel_ctrl, -removes_brit_ctrl)
             candidates.append((key, sid))
         if not candidates:
             return False
-        candidates.sort()
-        for _, sid in candidates:
+        # Q22: table-resolved ties
+        for sid in pick_by_priority(state, candidates):
             sp = state["spaces"][sid]
             has_fort = sp.get(C.FORT_BRI, 0)
             enemy_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
@@ -1400,10 +1406,10 @@ class PatriotBot(BaseBot):
         # §8.5.1 PERSUASION: "first spaces with Patriot Forts" — a binary
         # presence tier; remaining ties are seeded random per §8.2 (S56:
         # the old sort invented a Population tiebreak).
-        spaces.sort(key=lambda n: (
-            0 if state["spaces"][n].get(C.FORT_PAT, 0) else 1,
-            state["rng"].random(),
-        ))
+        # Q22: table-resolved ties behind the Fort-presence tier
+        spaces = pick_by_priority(state, [
+            ((0 if state["spaces"][n].get(C.FORT_PAT, 0) else 1,), n)
+            for n in spaces])
         try:
             persuasion.execute(state, self.faction, {}, spaces=spaces[:3])
             state["_turn_persuasion_used"] = True
@@ -1627,10 +1633,24 @@ class PatriotBot(BaseBot):
                 is_last = 1 if total_pat <= 1 else 0
                 # §8.2 seeded-random tie-break (Session 45: was
                 # alphabetical space order).
-                candidates.append((changes, is_last,
-                                   state["rng"].random(), sid, tag))
-        candidates.sort()
-        return [(sid, tag) for _, _, _, sid, tag in candidates]
+                candidates.append(((changes, is_last), (sid, tag)))
+        # Q22: table-resolved ties within equal priority tuples;
+        # sids resolved per group, tags re-attached.
+        by_key = {}
+        for key, pair in candidates:
+            by_key.setdefault(key, []).append(pair)
+        out = []
+        for key in sorted(by_key):
+            group = by_key[key]
+            sids = [s for s, _t in group]
+            ordered = pick_by_priority(state, [((0,), s) for s in sids])
+            tag_by_sid = {}
+            for s, t in group:
+                tag_by_sid.setdefault(s, []).append(t)
+            for s in ordered:
+                for t in tag_by_sid.get(s, []):
+                    out.append((s, t))
+        return out
 
     def ops_bs_trigger(self, state: Dict) -> bool:
         """Brilliant Stroke: Use after Treaty of Alliance when Washington is
