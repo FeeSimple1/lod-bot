@@ -4663,3 +4663,37 @@ tests added (Patriot battle confined to Washington's space, French
 Muster to Rochambeau's, Indian Scout origin to Brant's).  Battery:
 1,419 + 101 green; gates 1-10/11-20 clean; soak 120 DONE clean;
 balance rebaselined.
+
+## Session 65: event-flag audit — remaining flags vs printed texts (July 2026)
+
+The S63 method extended to the remaining CARD_EFFECTS flags across
+all 96 handlers: keyword heuristics shortlisted 32 flag/text
+mismatch candidates over shifts_support_*, inflicts_*_casualties,
+raises_fni, removes_blockade, places/removes_village,
+removes_patriot_fort, grants_free_gather, the resource-adders and
+the from-Unavailable families; every candidate verified against the
+full printed text.  Results:
+
+- TWO real bugs, both on card 40 semantics + one inverse:
+  40 unshaded "FNI to 0" was MISSING removes_blockade (setting FNI
+  to 0 removes every City Blockade per §1.9 — the strongest
+  blockade-clearing card in the deck could never fire B2 bullet 1);
+  40 shaded "FNI to 3" was missing raises_fni (a raise whenever
+  FNI < 3; the faction bullets' dynamic Support-City checks govern);
+  and card 54 unshaded HAD removes_blockade wrongly — moving a
+  Squadron/Blockade from the WI pool to Unavailable touches no City
+  Blockade and reduces no FNI.  1 superseded test rewritten.
+- Verified-correct despite heuristic hits (kept, no change): the
+  entire Lower/Raise-FNI family (7/34/36/37/53/55/57/60/63/64/67/69
+  — §1.9 marker-return semantics), free-Skirmish/Battle casualty
+  flags (9/14/48/51/52), absolute-support-shift wordings (16/83),
+  remove-all-pieces fort/village implications (3/75/82), self-
+  removals (6/11), long-gap placements (81), and card 71's variable
+  Patriot-resource adder (static 3plus kept as the documented
+  approximation — dynamic per-board computation would need a card
+  handler hook; early-game over-trigger only).
+- is_effective was NOT audited (judgment flag by §8.3.3; no textual
+  oracle) — noted for the Playbook goldens to catch incidentally.
+
+Battery: 1,420 + 101 green; gates 1-10/11-20 clean; soak 120 DONE
+clean; balance rebaselined.

@@ -667,9 +667,11 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     40: {
         "unshaded": _e(
+            removes_blockade=True,  # "FNI to 0" removes EVERY City Blockade (§1.9; S65)
             is_effective=True,
         ),
         "shaded": _e(
+            raises_fni=True,  # "FNI to 3" raises when FNI < 3 — the B2/F2 dynamic Support-City check governs (S65)
             is_effective=True,
         ),
     },
@@ -878,7 +880,10 @@ CARD_EFFECTS = {
     # ------------------------------------------------------------------
     54: {
         "unshaded": _e(
-            removes_blockade=True,  # move Squadron/Blockade from WI to Unavailable
+            # removes_blockade REMOVED (S65): "Move one Squadron/Blockade from
+            # West Indies to Unavailable" touches no City Blockade and does
+            # not reduce FNI — the B2 bullet-1 clause is about "removing a
+            # Blockade from a Support City by reducing FNI".  # move Squadron/Blockade from WI to Unavailable
             is_effective=True,
         ),
         "shaded": _e(

@@ -235,9 +235,12 @@ def test_card_16_unshaded_no_regulars():
 
 # removes_blockade
 def test_card_54_unshaded_removes_blockade():
-    """Card 54 unshaded moves Squadron/Blockade from WI to Unavailable."""
+    """S65 REVERSED: card 54 unshaded moves a Squadron/Blockade from the
+    WEST INDIES POOL to Unavailable — no City Blockade is removed and
+    FNI does not drop, so the B2 bullet-1 clause ("removing a Blockade
+    from a Support City by reducing FNI") does not apply."""
     u = CARD_EFFECTS[54]["unshaded"]
-    assert u["removes_blockade"] is True
+    assert u["removes_blockade"] is False
 
 
 def test_card_34_unshaded_removes_blockade_via_fni():
@@ -281,3 +284,19 @@ def test_s63_target_aware_bullet3_examples():
     # And card 2 (Regulars into any one City) legitimately fires 3c.
     card2 = {"id": 2, "dual": True}
     assert bot._faction_event_conditions(state, card2) is True
+
+
+def test_s65_fni_flag_audit_examples():
+    """S65 flag audit: card 40's absolute FNI settings and card 54's
+    pool-move were mis-flagged."""
+    # "FNI to 0" removes every City Blockade (§1.9)
+    assert CARD_EFFECTS[40]["unshaded"]["removes_blockade"] is True
+    # "FNI to 3" is a raise whenever FNI < 3 — flag set, the dynamic
+    # Support-City check in the faction bullets governs
+    assert CARD_EFFECTS[40]["shaded"]["raises_fni"] is True
+    # Moving a Squadron/Blockade from the WEST INDIES POOL to Unavailable
+    # removes no City Blockade and does not reduce FNI
+    assert CARD_EFFECTS[54]["unshaded"]["removes_blockade"] is False
+    # Sanity: the Lower-FNI family keeps the flag (§1.9 marker return)
+    for cid in (7, 34, 53, 60, 64, 69):
+        assert CARD_EFFECTS[cid]["unshaded"]["removes_blockade"] is True, cid
