@@ -32,7 +32,7 @@ no citation exists.
 | 8.3.2 | Dual-Use Events | OK | cards/effects/shared.py | — | `base_bot._execute_event` / `_is_ineffective_event`: shaded iff dual and faction in {PATRIOTS, FRENCH}; force_shaded/unshaded directives override. `select_support_shift_spaces` mirrors it for side inference. |
 | 8.3.3 | Ineffective Events | OK (T3 fixed, Session 26) | bots/base_bot.py, cards/effects/shared.py | tests/test_event_space_selection.py | No-effect simulation + net-shift-favors-enemy clause implemented (Session 21, `base_bot._is_ineffective_event`; tested). MISSING third clause: 'only effect would be to remove one or more friendly pieces without replacing them' → T3. |
 | 8.3.4 | Event Placement | PARTIAL | cards/effects/early_war.py | — | Unavailable-first fixed at cards 32u/43u/46u (Session 21); every other place/relocate site unaudited → fold into Piece 3 card audit. |
-| 8.3.5 | Events: Who/What/Where | PARTIAL (T7, P2) | bots/free_op_planner.py, bots/random_spaces.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py | tests/test_bot_free_ops.py, tests/test_early_war_cards.py, tests/test_event_space_selection.py | Shift routing → 8.3.6 OK (Session 21). Free-Command choices → faction priorities OK (free_op_planner + engine._plan_bot_free_op; card 84 Session 21). Maximise-Forts-then-pieces used for card 6. Q22 space-tie sweep CLOSED deck-wide (Session 68): every card-effect handler now resolves space ties via `random_spaces.pick_by_priority`/`pick_random_spaces` (the Random Spaces table), no rng embedded in any sort key.  STILL open → T7 (deferred to per-card Piece 3 audit): the general who-gets-benefits ordering (executing → friendly → random enemy non-player first; harm → random enemy player first) and flowchart-question-spaces-first. |
+| 8.3.5 | Events: Who/What/Where | PARTIAL (T7, P2) | bots/free_op_planner.py, bots/random_spaces.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py | tests/test_bot_free_ops.py, tests/test_early_war_cards.py, tests/test_event_space_selection.py | Shift routing → 8.3.6 OK (Session 21). Free-Command choices → faction priorities OK (free_op_planner + engine._plan_bot_free_op; card 84 Session 21). Maximise-Forts-then-pieces used for card 6. Q22 space-tie sweep CLOSED deck-wide (Session 68): every card-effect handler now resolves space ties via `random_spaces.pick_by_priority`/`pick_random_spaces` (the Random Spaces table), no rng embedded in any sort key.  **T7 who-ordering CLOSED (Session 70):** general `util/target_order.py` selector implements benefit order (executing → other friendly → random enemy Non-player first) and harm order (random enemy player first), faction ties by seeded roll (not the space table).  Routed through the clear faction-choice handlers — cards 18/44 (ineligibility harm), 80 (remove-pieces harm; replaced a non-§8.3.5 'most pieces' heuristic), 66 (French-or-Patriots benefit) — and base_bot force_if_eligible_enemy unified onto it (card 67 was already compliant).  RESIDUAL → Piece 3: full per-card audit of every who-choice across all 109 cards, and the flowchart-question-spaces-first bullet. |
 | 8.3.6 | Events that Shift Support/Opposition | OK | bots/base_bot.py, bots/random_spaces.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py | tests/test_early_war_cards.py, tests/test_event_space_selection.py | `shared.select_support_shift_spaces` (Session 21): royalist/rebel two-level key, pop-weighted, zero-gain over negative-gain; §8.2 ties; instead-execute-C&SA guard via 8.3.3 net-shift test. Tested both sides + guard (test_event_space_selection.py). |
 | 8.3.7 | Brilliant Stroke | UNVERIFIED (T10) | bots/british_bot.py, bots/french.py, bots/indians.py, bots/patriot.py, cards/effects/brilliant_stroke.py, engine.py, util/year_end.py | — | BS infrastructure exists (base_bot get_bs_limited_command + per-bot overrides, engine interrupt). Unaudited: abort-if-no-Leader-LimCom, SA-independence clause, simultaneous-BS trump order, and the §8.1 ToA numeric condition (Squadrons WI + Avail FR Regs + CBC/2 > 15). |
 | 8.3.8 | Other Event Choices | PARTIAL (T9, P2) | cards/effects/late_war.py | — | Cited at 2 late_war sites only. Default for uncovered event choices across 109 cards is frequently first/alphabetical — same class as the Session 21 finds. Audit in Piece 3. |
@@ -181,12 +181,17 @@ no citation despite likely implementations.
   passes the `all_reserve_origin` flag. Remaining under T6: the Raid
   node's mid-command "Plunder then Trade before completing" (I-flowchart)
   is unverified.
-- **T7 (P2)** §8.3.5 benefit/harm target ordering (executing → friendly →
-  random enemy non-player first; harm → random enemy player first): no
-  general implementation; per-card audit (Piece 3).  PARTIAL PROGRESS
-  (Session 68): the §8.2 *space-tie* half is now closed deck-wide — every
-  card handler resolves ties via the Random Spaces table (Q22), no rng in
-  any sort key.  The benefit/harm *who* ordering remains the Piece 3 item.
+- **T7 (P2) who-ordering IMPLEMENTED (Session 70).** §8.3.5 benefit/harm
+  faction ordering now has a general implementation: `util/target_order.py`
+  — benefits go executing → other friendly → random enemy (Non-player
+  first); harm goes random enemy (player first); equal-rank faction ties
+  by seeded roll (factions aren't on the Random Spaces table).  Routed
+  through the clear faction-choice handlers (cards 18/44/66/80) and
+  base_bot `force_if_eligible_enemy`; card 67 was already compliant.  The
+  §8.2 space-tie half closed deck-wide in Session 68 (Q22).  RESIDUAL →
+  Piece 3: exhaustive per-card who-choice audit across all 109 cards, plus
+  the §8.3.5 "flowchart-question-spaces-first" bullet (needs the trigger
+  question threaded from event_eval).  Tests: test_t7_target_ordering.py.
 - **T8 (P3) FIXED (Session 69).** §8.3.1 second-faction event
   instructions now govern how a faction executes actions granted by
   another faction's event.  `engine._drain_free_ops` threads the

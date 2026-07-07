@@ -231,15 +231,12 @@ class BaseBot:
                 elig_enemies = [e for e in self._enemy_factions()
                                 if eligible.get(e, False)]
                 if elig_enemies:
-                    # §8.3.5: harmful choice → random enemy, player first.
-                    humans = state.get("human_factions", set()) or set()
-                    pool = ([e for e in elig_enemies if e in humans]
-                            or elig_enemies)
-                    rng = state.get("rng")
-                    if rng is not None and len(pool) > 1:
-                        target = pool[rng.randrange(len(pool))]
-                    else:
-                        target = sorted(pool)[0]
+                    # §8.3.5 harmful choice → random enemy, player first
+                    # (T7 shared helper).
+                    from lod_ai.util.target_order import first_harm_target
+                    target = first_harm_target(
+                        state, self.faction, candidates=elig_enemies,
+                        default=sorted(elig_enemies)[0])
                     state[f"card{card['id']}_target_faction"] = target
                     self._execute_event(card, state)
                     return True

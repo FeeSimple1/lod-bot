@@ -7,6 +7,7 @@ IDs covered (32): 3 5 8 9 11 12 14 17 26 27 34 38 42 44 47 50
 
 from lod_ai.cards import register
 from lod_ai.bots.random_spaces import pick_by_priority
+from lod_ai.util.target_order import first_harm_target
 from .shared import (
     add_resource,
     select_support_shift_spaces,
@@ -736,8 +737,12 @@ def evt_044_mansfield_recalled(state, shaded=False):
     if not shaded:
         target = state.get("card44_target_faction")
         if target not in {BRITISH, PATRIOTS, FRENCH, INDIANS}:
+            # §8.3.5 harmful choice (ineligibility): a random enemy, player
+            # first (T7).
             active = str(state.get("active", BRITISH)).upper()
-            target = PATRIOTS if active in (BRITISH, INDIANS) else BRITISH
+            target = first_harm_target(
+                state, active,
+                default=(PATRIOTS if active in (BRITISH, INDIANS) else BRITISH))
         state.setdefault("ineligible_through_next", set()).add(target)
         push_history(state, f"Card 44 unshaded: {target} ineligible through next")
 
@@ -1145,24 +1150,17 @@ def evt_080_confusion_slaves(state, shaded=False):
         # Session 47: the default was the EXECUTOR itself, so British
         # and Indian bots removed their own pieces).  Prefer the enemy
         # with more pieces on the map, §8.2 ties.
-        target = None
-        best_total = None
-        tied = []
-        for fac in _ENEMIES.get(executor, (BRITISH, PATRIOTS, FRENCH, INDIANS)):
-            tags = _faction_piece_tags(fac)
-            total = sum(_safe_get_space(state, sid).get(t, 0)
-                        for sid in state.get("spaces", {}) for t in tags)
-            if total == 0:
-                continue
-            if best_total is None or total > best_total:
-                best_total, tied = total, [fac]
-            elif total == best_total:
-                tied.append(fac)
-        # Q22: no rng in the sort key — the Random Spaces table governs
-        # SPACE ties only, so resolve this Faction tie by seeded roll.
-        if tied:
-            target = (tied[0] if len(tied) == 1 or rng is None
-                      else tied[rng.randrange(len(tied))])
+        # §8.3.5 harmful choice: a random enemy, player first (T7) — among
+        # enemies that actually have removable pieces on the map.  (Was a
+        # "most total pieces" heuristic §8.3.5 does not sanction.)
+        with_pieces = [
+            fac for fac in _ENEMIES.get(executor,
+                                        (BRITISH, PATRIOTS, FRENCH, INDIANS))
+            if any(_safe_get_space(state, sid).get(t, 0)
+                   for sid in state.get("spaces", {})
+                   for t in _faction_piece_tags(fac))
+        ]
+        target = first_harm_target(state, executor, candidates=with_pieces)
         if target is None:
             push_history(state, "Card 80 unshaded: no enemy pieces to target")
             return

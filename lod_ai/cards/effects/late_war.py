@@ -74,6 +74,7 @@ from lod_ai.rules_consts import (
 from lod_ai.util.history import push_history
 from lod_ai.util.free_ops import queue_free_op
 from lod_ai.bots.random_spaces import pick_by_priority
+from lod_ai.util.target_order import first_harm_target, first_beneficiary
 from lod_ai.board.pieces import (
     remove_piece,
     place_marker,
@@ -227,10 +228,12 @@ def evt_018_if_not_stormy(state, shaded=False):
         return
     target = state.get("card18_target_faction")
     if target not in {BRITISH, PATRIOTS, FRENCH, INDIANS}:
-        # No explicit target (non-bot path without a CLI choice): default
-        # to an enemy of the executing faction (Glossary 1.5.2), never self.
+        # §8.3.5 harmful choice (make an enemy ineligible): a random enemy,
+        # player first (T7).  No explicit CLI/bot target → select here.
         active = str(state.get("active", PATRIOTS)).upper()
-        target = PATRIOTS if active in (BRITISH, INDIANS) else BRITISH
+        target = first_harm_target(
+            state, active,
+            default=(PATRIOTS if active in (BRITISH, INDIANS) else BRITISH))
     state.setdefault("ineligible_through_next", set()).add(target)
     push_history(state, f"Card 18 unshaded: {target} ineligible through next")
 
@@ -754,7 +757,11 @@ def evt_066_don_bernardo(state, shaded=False):
         # "French or Patriots" — player choice regardless of TOA
         fac = state.get("card66_shaded_faction", "").upper()
         if fac not in (FRENCH, PATRIOTS):
-            fac = FRENCH  # default
+            # §8.3.5 benefit (free ops to French OR Patriots): the executing
+            # Faction first, then the other friendly Faction (T7).
+            active = str(state.get("active", "")).upper()
+            fac = first_beneficiary(state, active,
+                                    candidates=(FRENCH, PATRIOTS), default=FRENCH)
         queue_free_op(state, fac, "march", "Florida")
         queue_free_op(state, fac, "battle_plus2", "Florida")
     else:
