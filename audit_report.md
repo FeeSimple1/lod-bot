@@ -4649,3 +4649,17 @@ approximates the choice.  Schema guards extended; behavioral test:
 card 85 fires NO bullet on a neutral board (was: always bullet 3c),
 card 2 still fires legitimately.  Battery: 1,416 + 101 green; gates
 1-10/11-20 clean; soak 120 DONE clean; balance rebaselined.
+
+## Session 64: §8.3.7 BS leader tie extended to all four factions (July 2026)
+
+The S61 British pattern (_bs_leader_origin) is now read by every
+bot's planners for the FIRST Brilliant-Stroke Limited Command:
+Patriot Battle/Rally/March/Rabble-Rousing (8 candidate loops),
+French Muster/March/Battle, Indian Raid (targets at or adjacent to
+the Leader per the involve-the-Leader reading), Scout (origin),
+Gather and March (7 loops).  The second LimCom remains untied per
+§8.3.7 (Leader and SA belong to the first).  Three per-faction tie
+tests added (Patriot battle confined to Washington's space, French
+Muster to Rochambeau's, Indian Scout origin to Brant's).  Battery:
+1,419 + 101 green; gates 1-10/11-20 clean; soak 120 DONE clean;
+balance rebaselined.

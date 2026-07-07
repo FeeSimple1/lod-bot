@@ -465,3 +465,109 @@ class TestFrenchBsLimCom:
             rng=random.Random(2),  # seed 2: first randint(1,6)=1; 1<3 → Muster
         )
         assert bot.get_bs_limited_command(state) == "muster"
+
+
+class TestBsLeaderTieAllFactions:
+    """§8.3.7 (S64): the FIRST BS Limited Command is tied to the Leader —
+    each bot's planner must confine itself to the Leader's space when
+    state["_bs_leader_origin"] is set (the British pattern from S61)."""
+
+    def test_patriot_battle_tied_to_washington(self):
+        from lod_ai.bots.patriot import PatriotBot
+        from lod_ai.state.setup_state import build_state
+        from lod_ai.board.control import refresh_control
+        state = build_state("1776", seed=2)
+        bot = PatriotBot()
+        for sid, sp in state["spaces"].items():
+            for tag in (C.MILITIA_A, C.MILITIA_U, C.REGULAR_PAT,
+                        C.REGULAR_FRE, C.REGULAR_BRI, C.TORY, C.FORT_PAT,
+                        C.FORT_BRI, C.WARPARTY_A, C.WARPARTY_U, C.VILLAGE):
+                sp[tag] = 0
+        # Two winnable battles; only the leader space may be selected.
+        state["spaces"]["Massachusetts"][C.REGULAR_PAT] = 6
+        state["spaces"]["Massachusetts"][C.REGULAR_BRI] = 1
+        state["spaces"]["Virginia"][C.REGULAR_PAT] = 6
+        state["spaces"]["Virginia"][C.REGULAR_BRI] = 1
+        state["leaders"]["LEADER_WASHINGTON"] = "Massachusetts"
+        if "leader_locs" in state:
+            state["leader_locs"]["LEADER_WASHINGTON"] = "Massachusetts"
+        state["resources"][C.PATRIOTS] = 5
+        state["_bs_leader_origin"] = "Massachusetts"
+        state["_limited"] = True
+        refresh_control(state)
+        assert bot._execute_battle(state) is True
+        assert state["spaces"]["Virginia"].get(C.REGULAR_BRI, 0) == 1, (
+            "the non-leader battle space must be untouched"
+        )
+        state.pop("_bs_leader_origin", None)
+        state.pop("_limited", None)
+
+    def test_french_muster_tied_to_leader_space(self):
+        from lod_ai.bots.french import FrenchBot
+        from lod_ai.state.setup_state import build_state
+        from lod_ai.board.control import refresh_control
+        state = build_state("1776", seed=2)
+        bot = FrenchBot()
+        for sid, sp in state["spaces"].items():
+            for tag in (C.MILITIA_A, C.MILITIA_U, C.REGULAR_PAT,
+                        C.REGULAR_FRE, C.REGULAR_BRI, C.TORY, C.FORT_PAT,
+                        C.FORT_BRI, C.WARPARTY_A, C.WARPARTY_U, C.VILLAGE):
+                sp[tag] = 0
+        # Two Rebellion-controlled colonies with Continentals; the tie
+        # must confine the Muster to the leader's.
+        for s in ("Massachusetts", "Virginia"):
+            state["spaces"][s][C.REGULAR_PAT] = 2
+            state["spaces"][s][C.MILITIA_A] = 2
+        state["available"][C.REGULAR_FRE] = 6
+        state["resources"][C.FRENCH] = 5
+        state["toa_played"] = True
+        state["treaty_of_alliance"] = True
+        state["leaders"]["LEADER_ROCHAMBEAU"] = "Virginia"
+        if "leader_locs" in state:
+            state["leader_locs"]["LEADER_ROCHAMBEAU"] = "Virginia"
+        state["_bs_leader_origin"] = "Virginia"
+        state["_limited"] = True
+        refresh_control(state)
+        ok = bot._muster(state)
+        assert ok is True
+        assert state["spaces"]["Virginia"].get(C.REGULAR_FRE, 0) > 0
+        assert state["spaces"]["Massachusetts"].get(C.REGULAR_FRE, 0) == 0
+        state.pop("_bs_leader_origin", None)
+        state.pop("_limited", None)
+
+    def test_indian_scout_tied_to_leader_origin(self):
+        from lod_ai.bots.indians import IndianBot
+        from lod_ai.state.setup_state import build_state
+        from lod_ai.board.control import refresh_control
+        state = build_state("1776", seed=2)
+        bot = IndianBot()
+        for sid, sp in state["spaces"].items():
+            for tag in (C.MILITIA_A, C.MILITIA_U, C.REGULAR_PAT,
+                        C.REGULAR_FRE, C.REGULAR_BRI, C.TORY, C.FORT_PAT,
+                        C.FORT_BRI, C.WARPARTY_A, C.WARPARTY_U, C.VILLAGE):
+                sp[tag] = 0
+        # Two legal Scout origins; only the leader's may act.
+        for s in ("New_York", "Quebec"):
+            state["spaces"][s][C.WARPARTY_U] = 2
+            state["spaces"][s][C.REGULAR_BRI] = 3
+            state["spaces"][s][C.TORY] = 1
+        # Fort targets adjacent to each
+        state["spaces"]["Massachusetts"][C.FORT_PAT] = 1
+        state["spaces"]["Northwest"][C.FORT_PAT] = 1
+        state["resources"][C.INDIANS] = 3
+        state["resources"][C.BRITISH] = 3
+        state["leaders"]["LEADER_BRANT"] = "Quebec"
+        if "leader_locs" in state:
+            state["leader_locs"]["LEADER_BRANT"] = "Quebec"
+        state["_bs_leader_origin"] = "Quebec"
+        state["_limited"] = True
+        refresh_control(state)
+        ok = bot._scout(state)
+        if ok:
+            hist = " | ".join(h["msg"] if isinstance(h, dict) else str(h)
+                              for h in state.get("history", []))
+            assert "SCOUT Quebec" in hist, (
+                "the Scout must originate from the Leader's space"
+            )
+        state.pop("_bs_leader_origin", None)
+        state.pop("_limited", None)

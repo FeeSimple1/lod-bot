@@ -357,6 +357,12 @@ class IndianBot(BaseBot):
         Moves 1 Underground WP into each target if needed (without stripping Villages).
         """
         targets = self._raid_targets(state)
+        # §8.3.7 (S64): first-BS-LimCom leader tie — Raid must involve
+        # the Leader: keep targets at or adjacent to the Leader's space.
+        _bs_o = state.get("_bs_leader_origin")
+        if _bs_o:
+            targets = [t for t in targets
+                       if t == _bs_o or t in _adjacent(_bs_o)]
         if not targets:
             return False
 
@@ -712,6 +718,7 @@ class IndianBot(BaseBot):
            adjacent Active War Parties possible without adding any Rebel
            Control, then flip them Underground.
         """
+        _bs_o = state.get("_bs_leader_origin")  # §8.3.7 BS LimCom1 leader tie (S64)
         corn_loc = leader_location(state, "LEADER_CORNPLANTER")
         brant_loc = leader_location(state, "LEADER_BRANT")
         dc_loc = leader_location(state, "LEADER_DRAGGING_CANOE")
@@ -728,6 +735,8 @@ class IndianBot(BaseBot):
         # --- Bullet 1: Place Villages where room and 3+ WP (2+ if Cornplanter) ---
         village_cands = []
         for sid, sp in state["spaces"].items():
+            if _bs_o and sid != _bs_o:
+                continue  # leader tie
             if not self._gather_support_ok(state, sid):
                 continue
             if not self._village_room(state, sid):
@@ -757,6 +766,8 @@ class IndianBot(BaseBot):
         if avail_wp > 0:
             wp_cands = []
             for sid, sp in state["spaces"].items():
+                if _bs_o and sid != _bs_o:
+                    continue  # leader tie
                 if not self._gather_support_ok(state, sid):
                     continue
                 if sp.get(C.VILLAGE, 0) == 0 and sid not in build_village:
@@ -789,6 +800,8 @@ class IndianBot(BaseBot):
         if remaining_avail_villages > 0 and avail_wp > 0:
             room_cands = []
             for sid, sp in state["spaces"].items():
+                if _bs_o and sid != _bs_o:
+                    continue  # leader tie
                 if not self._gather_support_ok(state, sid):
                     continue
                 if not self._village_room(state, sid):
@@ -841,6 +854,8 @@ class IndianBot(BaseBot):
             best_moves: List[Tuple[str, int]] = []
             best_total = 0
             for sid, sp in state["spaces"].items():
+                if _bs_o and sid != _bs_o:
+                    continue  # leader tie
                 if sp.get(C.VILLAGE, 0) == 0:
                     continue
                 if not self._gather_support_ok(state, sid):
@@ -1029,6 +1044,7 @@ class IndianBot(BaseBot):
         * Then to remove most Rebel Control, first where no Active Support.
         If no March possible, Gather.
         """
+        _bs_o = state.get("_bs_leader_origin")  # §8.3.7 BS LimCom1 leader tie (S64)
         refresh_control(state)
         ctrl = state.get("control", {})
         indian_res = state["resources"].get(C.INDIANS, 0)
@@ -1046,6 +1062,8 @@ class IndianBot(BaseBot):
         # ---- Snapshot of WP counts for planning (decremented as we go) ----
         wp_snap = {}
         for sid, sp in state["spaces"].items():
+            if _bs_o and sid != _bs_o:
+                continue  # leader tie
             wp_snap[sid] = [sp.get(C.WARPARTY_U, 0), sp.get(C.WARPARTY_A, 0)]
 
         def _total(sid):
@@ -1124,6 +1142,8 @@ class IndianBot(BaseBot):
         if avail_villages > 0 and len(destinations) < max_dests:
             candidates = []
             for sid in state["spaces"]:
+                if _bs_o and sid != _bs_o:
+                    continue  # leader tie
                 mdata = _MAP_DATA.get(sid, {})
                 if mdata.get("type") == "City":
                     continue
@@ -1165,6 +1185,8 @@ class IndianBot(BaseBot):
         while len(destinations) < max_dests:
             candidates = []
             for sid in state["spaces"]:
+                if _bs_o and sid != _bs_o:
+                    continue  # leader tie
                 if sid in destinations:
                     continue
                 mdata = _MAP_DATA.get(sid, {})
@@ -1377,7 +1399,10 @@ class IndianBot(BaseBot):
         ctrl = state.get("control", {})
 
         best = None  # (key, origin, dst, n_regs, n_tories)
+        _bs_o = state.get("_bs_leader_origin")  # §8.3.7 leader tie (S64)
         for origin in state["spaces"]:
+            if _bs_o and origin != _bs_o:
+                continue
             mv = self._scout_budget(state, origin)
             if mv is None:
                 continue

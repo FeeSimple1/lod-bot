@@ -474,6 +474,7 @@ class FrenchBot(BaseBot):
         ctrl = state.get("control", {})
         west_rebel = ctrl.get(WEST_INDIES) == "REBELLION"
 
+        _bs_o = state.get("_bs_leader_origin")  # §8.3.7 BS LimCom1 leader tie (S64)
         if avail_regs < 4 and not west_rebel:
             targets = [WEST_INDIES] if wi_exists else []
         else:
@@ -498,6 +499,8 @@ class FrenchBot(BaseBot):
                         in ("Colony", "City"))
                 ]
 
+        if _bs_o:
+            targets = [t for t in targets if t == _bs_o]
         if not targets:
             return False
         # French Muster costs 2 Resources (§3.5.3); free Commands exempt
@@ -561,8 +564,11 @@ class FrenchBot(BaseBot):
         # pieces."  Session 42: the Colonies tier was missing — every
         # non-City space (Reserves included) tied at one level; the rule
         # names Cities and Colonies only.  Ties seeded per §8.2.
+        _bs_o = state.get("_bs_leader_origin")  # §8.3.7 BS LimCom1 leader tie (S64)
         sources: Dict[str, int] = {}
         for sid, sp in state["spaces"].items():
+            if _bs_o and sid != _bs_o:
+                continue
             fre = sp.get(C.REGULAR_FRE, 0)
             if fre > 0:
                 sources[sid] = fre
@@ -783,7 +789,10 @@ class FrenchBot(BaseBot):
         refresh_control(state)
         targets = []
 
+        _bs_o = state.get("_bs_leader_origin")  # §8.3.7 BS LimCom1 leader tie (S64)
         for sid, sp in state["spaces"].items():
+            if _bs_o and sid != _bs_o:
+                continue
             # F16: "spaces with British where Rebel Force Level (incl.
             # Continentals if possible) + modifiers exceeds Royalist Force
             # Level + modifiers, within that first in highest Pop." Use the

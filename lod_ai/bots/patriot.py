@@ -373,7 +373,12 @@ class PatriotBot(BaseBot):
         refresh_control(state)
         french_res = state["resources"].get(C.FRENCH, 0)
         targets = []
+        # §8.3.7 (S64): first-BS-LimCom leader tie — only Washington's
+        # space may be selected when flagged (British pattern, S61).
+        _bs_o = state.get("_bs_leader_origin")
         for sid, sp in state["spaces"].items():
+            if _bs_o and sid != _bs_o:
+                continue
             # P4: "Rebel Force Level (if possible including French) +
             # modifiers exceeds the British Force Level + modifiers." Use the
             # resolver's exact Force Level / Loss-Level modifier maths
@@ -568,6 +573,7 @@ class PatriotBot(BaseBot):
         - Phase 2: get 1 Militia (Underground preferred) into each space with none,
           first to change most Control then random.
         """
+        _bs_o = state.get("_bs_leader_origin")  # §8.3.7 BS LimCom1 leader tie (S64)
         refresh_control(state)
         ctrl = state.get("control", {})
 
@@ -575,6 +581,8 @@ class PatriotBot(BaseBot):
         # Find potential destinations (not already Rebellion-controlled)
         phase1_dests = []
         for sid in state["spaces"]:
+            if _bs_o and sid != _bs_o:
+                continue  # leader tie (origins)
             if ctrl.get(sid) == "REBELLION":
                 continue
             sp = state["spaces"][sid]
@@ -714,6 +722,8 @@ class PatriotBot(BaseBot):
         # (1 Resource each, §3.3.2) via march_max.
         phase2_targets = []
         for sid, sp in state["spaces"].items():
+            if _bs_o and sid != _bs_o:
+                continue  # leader tie (origins)
             if sid in used_destinations:
                 continue
             pat_units = (sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
@@ -875,6 +885,7 @@ class PatriotBot(BaseBot):
            Control, flip all Militia at Fort Underground.
         Returns False if nothing can be done.
         """
+        _bs_o = state.get("_bs_leader_origin")  # §8.3.7 BS LimCom1 leader tie (S64)
         refresh_control(state)
         ctrl = state.get("control", {})
         max_rally = 1 if state.get("_limited") else 4
@@ -894,6 +905,8 @@ class PatriotBot(BaseBot):
         if avail_forts > 0:
             fort_candidates = []
             for sid, sp in state["spaces"].items():
+                if _bs_o and sid != _bs_o:
+                    continue  # leader tie
                 if not self._can_rally_in(state, sid):
                     continue
                 if sp.get(C.FORT_PAT, 0) > 0:
@@ -928,6 +941,8 @@ class PatriotBot(BaseBot):
         if avail_militia > 0:
             lonely_forts = []
             for sid, sp in state["spaces"].items():
+                if _bs_o and sid != _bs_o:
+                    continue  # leader tie
                 if not self._can_rally_in(state, sid):
                     continue
                 # §8.5.2: "first at each Patriot Fort with no other
@@ -968,6 +983,8 @@ class PatriotBot(BaseBot):
             best_cont_mil = -1
             best_cont_key = None
             for sid, sp in state["spaces"].items():
+                if _bs_o and sid != _bs_o:
+                    continue  # leader tie
                 if not self._can_rally_in(state, sid):
                     continue
                 if sid in spaces_used:
@@ -1035,6 +1052,8 @@ class PatriotBot(BaseBot):
         if avail_forts > 0:
             no_fort_spaces = []
             for sid, sp in state["spaces"].items():
+                if _bs_o and sid != _bs_o:
+                    continue  # leader tie
                 if not self._can_rally_in(state, sid):
                     continue
                 if sp.get(C.FORT_PAT, 0) > 0 or sid in build_fort_set:
@@ -1054,6 +1073,8 @@ class PatriotBot(BaseBot):
         if remaining_slots > 0:
             militia_targets = []
             for sid, sp in state["spaces"].items():
+                if _bs_o and sid != _bs_o:
+                    continue  # leader tie
                 if not self._can_rally_in(state, sid):
                     continue
                 if sid in spaces_used:
@@ -1227,10 +1248,12 @@ class PatriotBot(BaseBot):
         Only eligible spaces per §3.3.4: (Rebellion Control + Patriot pieces)
         or Underground Militia.
         """
+        _bs_o = state.get("_bs_leader_origin")  # §8.3.7 BS LimCom1 leader tie (S64)
         refresh_control(state)
         spaces = [
             sid for sid, sp in state["spaces"].items()
             if self._rabble_eligible(state, sid, sp)
+            and (not _bs_o or sid == _bs_o)
         ]
         if not spaces:
             return False
