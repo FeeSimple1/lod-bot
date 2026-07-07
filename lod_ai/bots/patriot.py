@@ -1544,7 +1544,12 @@ class PatriotBot(BaseBot):
         effects = CARD_EFFECTS.get(card.get("id"))
         if effects is None:
             return False
-        eff = effects["shaded"]
+        # Non-dual cards carry their single printed text under "unshaded"
+        # (S8.3.4 shaded-side selection applies to DUAL cards only), so
+        # evaluate that column for them — reading the empty "shaded" dict
+        # made all six single-sided benefit cards (52/68/72/73/92/95)
+        # invisible to this bullet list (Piece 5 coverage, Session 67).
+        eff = effects["shaded"] if card.get("dual") else effects["unshaded"]
 
         sup, opp = self._support_opposition_totals(state)
 

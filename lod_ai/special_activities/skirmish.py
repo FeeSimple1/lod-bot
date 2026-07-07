@@ -83,6 +83,7 @@ def execute(
         raise ValueError(f"Skirmish cannot occur in Battle space {space_id}.")
 
     state["_turn_used_special"] = True
+    state["_turn_special_type"] = "SKIRMISH"  # coverage (Piece 5, S67)
     sp = state["spaces"][space_id]
 
     # Determine own and enemy tags per faction

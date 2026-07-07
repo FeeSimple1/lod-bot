@@ -87,6 +87,7 @@ def execute(
         raise ValueError(f"Partisans cannot occur in Battle space {space_id}.")
 
     state["_turn_used_special"] = True
+    state["_turn_special_type"] = "PARTISANS"  # coverage (Piece 5, S67)
     sp = state["spaces"][space_id]
 
     if sp.get(MILITIA_U, 0) == 0:

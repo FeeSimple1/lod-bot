@@ -24,7 +24,7 @@ from lod_ai.rules_consts import (
 )
 from lod_ai.util.naval import move_blockades_to_unavailable, move_blockades_to_west_indies
 from lod_ai.board.control import refresh_control
-from lod_ai.map.adjacency import space_meta
+from lod_ai.map.adjacency import space_meta, space_type as _sptype
 from lod_ai.util.nonplayer_pieces import (
     ROYALIST, remove_enemy_cubes, pull_to_map,
 )
@@ -71,7 +71,7 @@ def evt_002_common_sense(state, shaded=False):
                2 Propaganda in each.
     """
     cities = [n for n, info in state["spaces"].items()
-              if info.get("type") == "City"]
+              if (_sptype(n) or info.get("type")) == "City"]
     if shaded:
         # §8.3.5 → §8.3.6: highest gain in Opposition (pop-weighted, §8.1.1);
         # §8.2 random only among equal-priority Cities.
@@ -157,7 +157,8 @@ def evt_006_benedict_arnold(state, shaded=False):
             return (min(1, sp.get(fort_tag, 0)),
                     min(2, sum(sp.get(t, 0) for t in other_tags)))
         cands = [sid for sid in spaces
-                 if (not colony_only or spaces[sid].get("type") == "Colony")
+                 if (not colony_only
+                     or (_sptype(sid) or spaces[sid].get("type")) == "Colony")
                  and key(sid) > (0, 0)]
         if not cands:
             return None
@@ -200,7 +201,7 @@ def evt_010_franklin_to_france(state, shaded=False):
         add_resource(state, PATRIOTS, 2)
     else:
         cities = [n for n, info in state["spaces"].items()
-                  if info.get("type") == "City"]
+                  if (_sptype(n) or info.get("type")) == "City"]
         # §8.3.5 → §8.3.6: highest gain in Support (pop-weighted); §8.2 ties.
         for city in select_support_shift_spaces(state, cities, 2,
                                                 target=+2, steps=1,
@@ -481,7 +482,7 @@ def evt_032_rule_britannia(state, shaded=False):
     else:
         # Any Colony takes the pieces equally → equal priority → §8.2.
         colonies = [n for n, info in state["spaces"].items()
-                    if info.get("type") == "Colony"]
+                    if (_sptype(n) or info.get("type")) == "Colony"]
         picked = pick_random_spaces(state, colonies, 1)
         if not picked:
             return
@@ -575,7 +576,7 @@ def evt_041_william_pitt(state, shaded=False):
     """
     target = +1 if not shaded else -1
     colonies = [n for n, info in state["spaces"].items()
-                if info.get("type") == "Colony"]
+                if (_sptype(n) or info.get("type")) == "Colony"]
     # §8.3.5 → §8.3.6 (pop-weighted gain; §8.2 ties). Note a Colony past the
     # target level would shift AGAINST the executing side; §8.3.6 ordering
     # ranks it below zero-gain candidates.
@@ -617,7 +618,7 @@ def evt_046_burke(state, shaded=False):
     """
     if shaded:
         cities = [n for n, info in state["spaces"].items()
-                  if info.get("type") == "City"]
+                  if (_sptype(n) or info.get("type")) == "City"]
         # §8.3.5 → §8.3.6 (pop-weighted gain; §8.2 ties).
         for city in select_support_shift_spaces(state, cities, 2,
                                                 target=-1, steps=1,
@@ -1078,7 +1079,7 @@ def evt_084_six_nations(state, shaded=False):
             return sp.get(WARPARTY_A, 0) + sp.get(WARPARTY_U, 0)
 
         def _legal(sid):
-            if spaces.get(sid, {}).get("type") != "Colony":
+            if (_sptype(sid) or spaces.get(sid, {}).get("type")) != "Colony":
                 return False
             if sid == WEST_INDIES_ID:
                 return False

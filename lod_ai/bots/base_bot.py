@@ -151,6 +151,10 @@ class BaseBot:
             shaded = card.get("dual") and self.faction in {C.PATRIOTS, C.FRENCH}
         previous_active = state.get("active")
         state["active"] = self.faction
+        # Decision-coverage: record which printed side actually executed
+        # (ROADMAP Piece 5, Session 67).  The engine copies this into
+        # _card_turn_log; harness-side aggregation only.
+        state["_turn_event_side"] = "shaded" if shaded else "unshaded"
         try:
             handler(state, shaded=shaded)
         finally:

@@ -564,6 +564,9 @@ def run_one_game(scenario: str, seed: int, *, detailed: bool = False,
 
             # Process turn log
             _process_card_turn_log(diag, engine.state)
+            from lod_ai.tools import coverage as _cov
+            if _cov.GLOBAL is not None:
+                _cov.GLOBAL.consume_turn_log(engine.state)
             if detailed:
                 _process_turn_log_large(large_data, engine.state, card.get("id"))
 

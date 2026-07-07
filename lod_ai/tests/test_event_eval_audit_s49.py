@@ -95,7 +95,7 @@ def test_p2_fni_raise_clause_dynamic():
     bot = PatriotBot()
     # Card 34 shaded raises FNI and does nothing else P2 cares about
     # (card 7 also adds +5 Patriot Resources, so bullet 4 would fire).
-    card = {"id": 34}
+    card = {"id": 34, "dual": True}
     assert CARD_EFFECTS[34]["shaded"]["raises_fni"]
 
     def base(toa):

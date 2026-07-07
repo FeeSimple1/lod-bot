@@ -57,10 +57,19 @@ def main(argv=None) -> int:
                     help="stop after this wall-time (0 = run to completion)")
     ap.add_argument("--invariants", action="store_true",
                     help="assert per-card invariants (save/load + validate)")
+    ap.add_argument("--coverage", default=None,
+                    help="aggregate decision coverage into this json (Piece 5)")
     args = ap.parse_args(argv)
 
     schedule = list(_plan(args.games, args.seed_base))
     done = _completed(args.out)
+    if args.coverage:
+        from lod_ai.tools import coverage as _cov
+        _coll = _cov.enable()
+        import os as _os
+        if _os.path.exists(args.coverage):
+            _coll.merge(_cov.Collector.load(args.coverage))
+            _coll.games = _coll.games  # resumed totals carry forward
     start = time.time()
     ran = 0
     failures = 0
@@ -84,10 +93,15 @@ def main(argv=None) -> int:
             f.write(json.dumps(rec) + "\n")
             f.flush()
             ran += 1
+            if args.coverage:
+                _coll.finish_game()
             if bad:
                 failures += 1
                 print(f"  FAIL [{scen} seed={seed}] {result['end_reason']}: "
                       f"{result['error']}  repro: {result.get('repro_command')}")
+
+    if args.coverage:
+        _coll.save(args.coverage)
 
     now_done = _completed(args.out)
     elapsed = time.time() - start

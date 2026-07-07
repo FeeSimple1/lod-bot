@@ -243,6 +243,8 @@ class Engine:
 
     def _reset_trace_on(self, target_state: dict) -> None:
         target_state["_turn_used_special"] = False
+        target_state.pop("_turn_event_side", None)
+        target_state.pop("_turn_special_type", None)
         target_state["_turn_affected_spaces"] = set()
         target_state.pop("_turn_command", None)
         target_state.pop("_turn_command_meta", None)
@@ -1530,9 +1532,11 @@ class Engine:
             if result.get('action') == 'command':
                 _log_entry['command_type'] = self.state.get('_turn_command')
                 _log_entry['used_special'] = result.get('used_special', False)
+                _log_entry['special_type'] = self.state.get('_turn_special_type')
             elif result.get('action') == 'event':
                 _log_entry['event_card_id'] = card.get('id')
-                _log_entry['event_side'] = result.get('event_side')
+                _log_entry['event_side'] = (result.get('event_side')
+                                            or self.state.get('_turn_event_side'))
             self.state.setdefault('_card_turn_log', []).append(_log_entry)
 
             # Fire the post-turn callback so the CLI can display bot

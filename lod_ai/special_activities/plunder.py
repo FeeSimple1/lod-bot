@@ -59,6 +59,7 @@ def execute(
         raise ValueError("Plunder can only follow a Raid Command this turn.")
 
     state["_turn_used_special"] = True
+    state["_turn_special_type"] = "PLUNDER"  # coverage (Piece 5, S67)
     sp = state["spaces"][province]
 
     wp_total  = sp.get(WARPARTY_U, 0) + sp.get(WARPARTY_A, 0)

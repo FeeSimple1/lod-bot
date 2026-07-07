@@ -42,6 +42,7 @@ def execute(
         raise ValueError("Only BRITISH may invoke Common Cause.")
 
     state["_turn_used_special"] = True
+    state["_turn_special_type"] = "COMMON_CAUSE"  # coverage (Piece 5, S67)
     push_history(state, f"BRITISH COMMON_CAUSE in {', '.join(spaces)}")
     wp_counts = wp_counts or {}
 

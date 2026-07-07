@@ -64,6 +64,7 @@ def execute(
         raise ValueError("option must be 1, 2, or 3.")
 
     state["_turn_used_special"] = True
+    state["_turn_special_type"] = "WAR_PATH"  # coverage (Piece 5, S67)
     sp = state["spaces"][space_id]
 
     if sp.get(WARPARTY_U, 0) == 0:

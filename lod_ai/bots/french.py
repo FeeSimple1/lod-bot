@@ -85,6 +85,8 @@ def _preparer_la_guerre(state: Dict, post_treaty: bool) -> bool:
             if state["resources"][C.FRENCH] == 0:
                 state["resources"][C.FRENCH] += 2
                 push_history(state, "Préparer la Guerre: +2 Resources (post‑Treaty bonus)")
+                state["_turn_used_special"] = True
+                state["_turn_special_type"] = "PREPARER"
                 return True
             return False
 
@@ -106,6 +108,15 @@ def _preparer_la_guerre(state: Dict, post_treaty: bool) -> bool:
         push_history(state, "Préparer la Guerre: +2 Resources (post‑Treaty bonus)")
         moved = True
 
+    if moved:
+        # §4.5.1 is a Special Activity: the engine's §2.3.4/§2.3.5 slot
+        # matrix (2nd-eligible options, LimCom no-SA rule) keys off
+        # _turn_used_special — the inline helper never set it, so every
+        # French Préparer was invisible to sequence-of-play legality
+        # AND to the Piece 5 coverage trace (Session 67, found by the
+        # 300-game coverage matrix: PREPARER 0/300 games).
+        state["_turn_used_special"] = True
+        state["_turn_special_type"] = "PREPARER"
     return moved
 
 
@@ -1054,7 +1065,12 @@ class FrenchBot(BaseBot):
         effects = CARD_EFFECTS.get(card.get("id"))
         if effects is None:
             return False  # unknown card → fall through to Command
-        eff = effects["shaded"]
+        # Non-dual cards carry their single printed text under "unshaded"
+        # (S8.3.4 shaded-side selection applies to DUAL cards only), so
+        # evaluate that column for them — reading the empty "shaded" dict
+        # made all six single-sided benefit cards (52/68/72/73/92/95)
+        # invisible to this bullet list (Piece 5 coverage, Session 67).
+        eff = effects["shaded"] if card.get("dual") else effects["unshaded"]
 
         sup, opp = self._support_opposition_totals(state)
 

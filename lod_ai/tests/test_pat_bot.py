@@ -78,7 +78,7 @@ def test_p2_event_checks_shaded_text():
     }
     # Card 41 shaded: shifts 2 Colonies toward Passive Opposition
     # (shifts_support_rebel=True).  With Support > Opposition, bullet 1 fires.
-    card_shaded = {"id": 41}
+    card_shaded = {"id": 41, "dual": True}
     state["support"] = {"Boston": 1}  # Support=1 > Opposition=0
     assert bot._faction_event_conditions(state, card_shaded) is True
 
@@ -1317,7 +1317,7 @@ def test_p2_bullet2_active_support_no_militia_returns_true():
         "available": {C.MILITIA_U: 5},
     }
     # Card 3 shaded has places_patriot_militia_u=True
-    card = {"id": 3}
+    card = {"id": 3, "dual": True}
     assert bot._faction_event_conditions(state, card) is True
 
 
@@ -1337,7 +1337,7 @@ def test_p2_bullet2_active_support_with_militia_returns_false():
     # Support > Opposition so bullet 1 would fire if shifts_support_rebel
     # Card 3 shaded does NOT shift support, so bullet 1 won't fire.
     # No forts/villages/resources flags → only bullet 2 could fire, and it shouldn't.
-    card = {"id": 3}
+    card = {"id": 3, "dual": True}
     assert bot._faction_event_conditions(state, card) is False
 
 
@@ -1352,7 +1352,7 @@ def test_p2_bullet2_village_no_militia_returns_true():
         "support": {"Quebec": C.NEUTRAL},
         "available": {C.MILITIA_U: 5},
     }
-    card = {"id": 3}
+    card = {"id": 3, "dual": True}
     assert bot._faction_event_conditions(state, card) is True
 
 
@@ -1369,7 +1369,7 @@ def test_p2_bullet2_no_qualifying_spaces_returns_false():
         "support": {"Boston": C.ACTIVE_SUPPORT, "Quebec": C.NEUTRAL},
         "available": {},
     }
-    card = {"id": 3}
+    card = {"id": 3, "dual": True}
     assert bot._faction_event_conditions(state, card) is False
 
 

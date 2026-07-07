@@ -1108,6 +1108,13 @@ CARD_EFFECTS = {
     68: {
         "unshaded": _e(
             is_effective=True,
+            # "place one friendly Fort there [Quebec] from Available":
+            # B/F/I carry Sword icons, so the only Non-player that can
+            # ever CHOOSE this card is the PATRIOTS -- whose friendly
+            # Fort is the Patriot Fort.  Flag was False, so the P2
+            # bullet never saw the benefit and card 68 never executed
+            # in 300 games (Piece 5 coverage matrix, Session 67).
+            places_patriot_fort=True,
         ),
         "shaded": dict(_NONE),
     },

@@ -74,13 +74,32 @@ C10 effective-pop fix missing on the RL side, WQ exit paths leaving
 control stale, three Q22 rng-sort-key misses in year_end, and the
 §8.3.3 net-shift gate using raw instead of §1.9 effective population.
 
-## Piece 5 — Decision coverage instrumentation
+## Piece 5 — Decision coverage instrumentation  [DONE, Session 67]
 
 Count, during soak, which flowchart branches, card sides, and
 card×executing-faction combos ever fire. Artifact: coverage matrix
 report + targeted scenario tests (or bug fixes) for every never-fired
 branch. A branch that never fires in 1,000+ games is either a
 transcription error or untested in practice.
+
+Landed (Session 67): `tools/coverage.py` collector fed from the
+engine's `_card_turn_log` (+ new `_turn_event_side` /
+`_turn_special_type` trace keys and per-SA name stamps); soak
+`--coverage out.json` aggregates; report in `docs/coverage_s67.md`.
+The 300-game matrix found: the French bot's inline Préparer never set
+`_turn_used_special` (invisible to the §2.3.4/§2.3.5 slot matrix,
+~4 uses/game); seven card handlers dead behind state-space
+`get("type")` filters (cards 2/41 never executed, five more sides
+never fired — the unswept S48 class); card 68's missing
+`places_patriot_fort` flag; and the P2/F2 bullet evaluators reading
+`effects["shaded"]` unconditionally, hiding all six single-sided
+benefit cards (52/68/72/73/92/95) from Patriot/French bots.  Steady
+state: every Ch 3 command and Ch 4 SA fires for every faction; the
+only never-fired side is card 48 shaded, which is Sword-blocked for
+every non-player and reachable only by a human (documented).
+Flowchart NODE-level counters were scoped out: every §8.4–§8.7 row is
+already text-verified (S55–S57) and golden-replayed; the remaining
+value sits in card/SA/side coverage, which is what landed.
 
 ## Piece 6 — Playbook goldens  [UNBLOCKED]
 

@@ -59,7 +59,7 @@ class TestFrenchEventAvailability:
             available={},
             unavailable={C.FRENCH_UNAVAIL: 15},
         )
-        card = {"id": 50}
+        card = {"id": 50, "dual": True}
         assert bot._faction_event_conditions(state, card) is False
 
     def test_french_regulars_in_available_returns_true(self):
@@ -70,7 +70,7 @@ class TestFrenchEventAvailability:
             available={C.REGULAR_FRE: 2},
             unavailable={C.FRENCH_UNAVAIL: 13},
         )
-        card = {"id": 50}
+        card = {"id": 50, "dual": True}
         assert bot._faction_event_conditions(state, card) is True
 
     def test_french_regulars_in_west_indies_returns_true(self):
@@ -81,7 +81,7 @@ class TestFrenchEventAvailability:
             available={},
             unavailable={C.FRENCH_UNAVAIL: 12},
         )
-        card = {"id": 50}
+        card = {"id": 50, "dual": True}
         assert bot._faction_event_conditions(state, card) is True
 
     def test_places_french_from_unavailable_no_pieces(self):
@@ -92,7 +92,7 @@ class TestFrenchEventAvailability:
             spaces={"Boston": {}},
             unavailable={},  # nothing unavailable
         )
-        card = {"id": 49}
+        card = {"id": 49, "dual": True}
         assert bot._faction_event_conditions(state, card) is False
 
     def test_places_french_from_unavailable_with_pieces(self):
@@ -106,7 +106,7 @@ class TestFrenchEventAvailability:
             spaces={"Boston": {}},
             unavailable={C.REGULAR_FRE: 5},
         )
-        card = {"id": 49}
+        card = {"id": 49, "dual": True}
         assert bot._faction_event_conditions(state, card) is True
 
 
@@ -127,7 +127,7 @@ class TestBritishEventAvailability:
             spaces={"Boston": {}, "New_York": {}},
             available={},  # no British Regulars
         )
-        card = {"id": 2}
+        card = {"id": 2, "dual": True}
         # Card 2 also has places_tories=True, so ensure no Tories either
         # to isolate the test
         assert bot._faction_event_conditions(state, card) is False
@@ -139,7 +139,7 @@ class TestBritishEventAvailability:
             spaces={"Boston": {}, "New_York": {}},
             available={C.REGULAR_BRI: 1},
         )
-        card = {"id": 2}
+        card = {"id": 2, "dual": True}
         assert bot._faction_event_conditions(state, card) is True
 
     def test_places_british_from_unavailable_no_pieces(self):
@@ -153,7 +153,7 @@ class TestBritishEventAvailability:
             unavailable={},
             available={},
         )
-        card = {"id": 27}
+        card = {"id": 27, "dual": True}
         assert bot._faction_event_conditions(state, card) is False
 
     def test_places_british_from_unavailable_with_pieces(self):
@@ -166,7 +166,7 @@ class TestBritishEventAvailability:
             # (the old C.BRIT_UNAVAIL key never exists in real states).
             unavailable={C.REGULAR_BRI: 3},
         )
-        card = {"id": 27}
+        card = {"id": 27, "dual": True}
         assert bot._faction_event_conditions(state, card) is True
 
 
@@ -195,7 +195,7 @@ class TestPatriotEventAvailability:
         # Card 4 shaded also has places_patriot_militia_u and places_village.
         # Since no Militia_U available and no Village on map, those won't
         # trigger either → isolates the fort check.
-        card = {"id": 4}
+        card = {"id": 4, "dual": True}
         assert bot._faction_event_conditions(state, card) is False
 
     def test_patriot_fort_available_returns_true(self):
@@ -205,7 +205,7 @@ class TestPatriotEventAvailability:
             spaces={"Boston": {}},
             available={C.FORT_PAT: 1},
         )
-        card = {"id": 4}
+        card = {"id": 4, "dual": True}
         assert bot._faction_event_conditions(state, card) is True
 
     def test_removes_village_none_on_map(self):
@@ -216,7 +216,7 @@ class TestPatriotEventAvailability:
             spaces={"Boston": {}, "New_York": {}},
             available={},
         )
-        card = {"id": 17}
+        card = {"id": 17, "dual": True}
         assert bot._faction_event_conditions(state, card) is False
 
     def test_removes_village_present_on_map(self):
@@ -226,7 +226,7 @@ class TestPatriotEventAvailability:
             spaces={"Boston": {C.VILLAGE: 1}, "New_York": {}},
             available={},
         )
-        card = {"id": 17}
+        card = {"id": 17, "dual": True}
         assert bot._faction_event_conditions(state, card) is True
 
 

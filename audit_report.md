@@ -4780,3 +4780,43 @@ scenarios clean WITH the new invariants; soak 120 DONE clean (the
 the pre-choice simulation gate holds at execution).  Balance
 rebaselined (winner flips expected: rabble targeting, WQ ordering,
 marker economy).  Q23 logged (Propaganda/Raid stacking).
+
+
+## Session 67 (cont.): ROADMAP Piece 5 — decision coverage (July 2026)
+
+`tools/coverage.py` + soak `--coverage`: counts card-side x faction
+events, command x faction, SA x faction, pass reasons from the
+engine's `_card_turn_log` (new `_turn_event_side`/`_turn_special_type`
+trace keys; each SA module stamps its name).  Artifact:
+docs/coverage_s67.md (300 games) with a verdict on every never-fired
+branch.  Four REAL bug classes found:
+
+- French Préparer la Guerre: the bot's inline helper never set
+  `_turn_used_special` — every Préparer (1,188/300 games once visible)
+  was invisible to the engine's §2.3.4/§2.3.5 slot matrix, so the
+  2nd-eligible faction's options after a French Command+SA turn were
+  computed from a false "no SA used".  Sequencing fidelity, not just
+  telemetry.
+- Seven early_war handlers filtered candidates via `info.get("type")`
+  on state space dicts, which NEVER carry the key (S48 pick_cities
+  collateral class, unswept): cards 2 and 41 had never executed in
+  project history; sides 6u/10u/32u/46s/84u never fired.  All revived
+  with the shared map-adjacency fallback pattern.
+- Card 68 (French in America Want Canada): `places_patriot_fort` flag
+  False although B/F/I Sword icons make PATRIOTS the only possible
+  non-player executor ("place one friendly Fort there").
+- P2/F2 bullet evaluators read `effects["shaded"]` unconditionally;
+  non-dual cards carry their single text under "unshaded", so ALL SIX
+  single-sided benefit cards (52/68/72/73/92/95 — incl. Sullivan
+  Expedition's removes-Villages, a printed P2 benefit) were invisible
+  to Patriot/French Event bullets.  B2/I2 read "unshaded" and were
+  correct on both card classes.
+
+Adjudicated legitimate: card 48 shaded (Sword-blocked for all
+non-players; human-only side), card 17u and 36s (precondition-rare;
+handlers proven by targeted tests — and 17u began firing once card 68
+could create Forts in Reserves).  Tests: +13
+(test_coverage_s67.py); 16 synthetic fixtures given their real cards'
+`dual` flag (they encoded the pre-S67 unconditional-shaded lookup).
+Battery: 1,396 + 101 green, gate 1-20 x3 clean, soak 120 DONE,
+rebaselined (P/F event-choice changes are balance-scale).

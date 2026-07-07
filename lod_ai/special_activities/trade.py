@@ -59,6 +59,7 @@ def execute(
         raise ValueError("transfer cannot be negative.")
 
     state["_turn_used_special"] = True
+    state["_turn_special_type"] = "TRADE"  # coverage (Piece 5, S67)
     sp = state["spaces"][space_id]
 
     # Eligibility checks

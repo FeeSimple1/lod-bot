@@ -93,6 +93,7 @@ def execute(
         hold a marker so we are merely rearranging.
     """
     state["_turn_used_special"] = True
+    state["_turn_special_type"] = "NAVAL_PRESSURE"  # coverage (Piece 5, S67)
 
     if faction == BRITISH:
         _exec_british(state, ctx, city_choice)
