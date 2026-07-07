@@ -440,8 +440,13 @@ def test_card91_indians_help_outside_colonies_places_and_removes():
 
     early_war.evt_091_indians_help(state, shaded=False)
 
-    assert state["spaces"]["Southwest"].get(VILLAGE) == 1
-    assert state["spaces"]["Southwest"].get(WARPARTY_U) == 2
+    # Q22 (§8.2): the two Reserves are equally eligible (same room,
+    # same War Parties), so which wins is Random-Spaces-table random.
+    # Assert the Village + 2 War Parties land together in one Reserve
+    # (Quebec starts with 1 Village).
+    dst = next(s for s in ("Southwest", "Quebec")
+               if state["spaces"][s].get(WARPARTY_U, 0) == 2)
+    assert state["spaces"][dst].get(VILLAGE) == (2 if dst == "Quebec" else 1)
 
     shaded_state = _base_state()
     shaded_state["spaces"] = {

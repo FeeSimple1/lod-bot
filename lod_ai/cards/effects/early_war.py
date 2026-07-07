@@ -4,6 +4,7 @@ from .shared import (
     pick_random_spaces, select_support_shift_spaces,
 )
 from lod_ai.util.free_ops import queue_free_op
+from lod_ai.bots.random_spaces import pick_by_priority
 from lod_ai.board.pieces import (
     move_piece,
     place_piece,
@@ -268,14 +269,12 @@ def evt_024_declaration(state, shaded=False):
         # Cities then highest Pop, §8.2 seeded ties (Session 48/T9: ties
         # fell to dict order); West Indies excluded (§1.4.2).
         rng = state.get("rng")
-        candidates = sorted(
-            (sid for sid in state["spaces"] if sid != WEST_INDIES_ID),
-            key=lambda sid: (
-                -(1 if (space_meta(sid) or {}).get("type") == "City" else 0),
-                -((space_meta(sid) or {}).get("population", 0)),
-                rng.random() if rng else 0.0,
-            ),
-        )
+        scored = [
+            ((-(1 if (space_meta(sid) or {}).get("type") == "City" else 0),
+              -((space_meta(sid) or {}).get("population", 0))), sid)
+            for sid in state["spaces"] if sid != WEST_INDIES_ID
+        ]
+        candidates = pick_by_priority(state, scored)  # Q22 (full order)
         targets = candidates[:3]
         for sid in targets:
             place_piece(state, MILITIA_U, sid, 1)
@@ -317,17 +316,17 @@ def evt_028_moores_creek(state, shaded=False):
     if shaded:
         # Most Tories for maximum replacement (§8.1.1); §8.2 seeded ties
         # (Session 48/T9: ties fell to dict order).
-        target_list = sorted(
-            preferred or list(targets.keys()),
-            key=lambda sid: (-targets[sid].get(TORY, 0),
-                             _rng28.random() if _rng28 else 0.0),
+        target_list = pick_by_priority(  # Q22
+            state,
+            [((-targets[sid].get(TORY, 0),), sid)
+             for sid in (preferred or list(targets.keys()))],
         )
     else:
         # Most Militia for maximum replacement (§8.1.1); §8.2 seeded ties.
-        target_list = sorted(
-            preferred or list(targets.keys()),
-            key=lambda sid: (-(targets[sid].get(MILITIA_U, 0) + targets[sid].get(MILITIA_A, 0)),
-                             _rng28.random() if _rng28 else 0.0),
+        target_list = pick_by_priority(  # Q22
+            state,
+            [((-(targets[sid].get(MILITIA_U, 0) + targets[sid].get(MILITIA_A, 0)),), sid)
+             for sid in (preferred or list(targets.keys()))],
         )
     target = target_list[0]
     sp = state["spaces"].get(target, {})
@@ -391,10 +390,9 @@ def evt_029_bancroft(state, shaded=False):
     # The TARGET Faction picks which of its pieces Activate (§5.1); no
     # sheet priority exists, so §8.2/§8.3.8 seeded-random space order
     # (Session 47: was dict order).
-    rng = state.get("rng")
-    order = list(state["spaces"])
-    if rng is not None:
-        order.sort(key=lambda _n: rng.random())
+    # Q22: §8.2 random order over all spaces via the Random Spaces table.
+    order = pick_random_spaces(state, list(state["spaces"]),
+                               count=len(state["spaces"]))
     for name in order:
         if flipped >= need:
             break
@@ -417,11 +415,13 @@ def evt_030_hessians(state, shaded=False):
             # Regular per space if possible."  Largest stacks first,
             # §8.2 seeded ties (Session 47: dict-order removal emptied
             # the first spaces entirely).
-            rng = state.get("rng")
             stacks = [(n, sp.get(REGULAR_BRI, 0))
                       for n, sp in state["spaces"].items()
                       if sp.get(REGULAR_BRI, 0)]
-            stacks.sort(key=lambda t: (-t[1], rng.random() if rng else 0.0))
+            # Q22: most Regulars first; equal-count ties via Random Spaces.
+            _qmap = dict(stacks)
+            stacks = [(n, _qmap[n]) for n in
+                      pick_by_priority(state, [((-q,), n) for n, q in stacks])]
             remaining = remove_qty
             for name, qty in stacks:
                 if remaining <= 0:
@@ -779,19 +779,16 @@ def evt_072_french_settlers(state, shaded=False):
     # first Reserve in dict order).
     _rng72 = state.get("rng")
     _roy72 = fac in (BRITISH, INDIANS)
-    reserve_candidates = sorted(
-        reserve_candidates,
-        key=lambda sid: (
-            0 if (state["spaces"][sid].get(FORT_BRI, 0)
-                  + state["spaces"][sid].get(FORT_PAT, 0)
-                  + state["spaces"][sid].get(VILLAGE, 0)) < 2 else 1,
-            # §8.7 I2 note: "place the Village in a space that already
-            # has War Parties if possible" (Session 49).
-            -(state["spaces"][sid].get(WARPARTY_U, 0)
-              + state["spaces"][sid].get(WARPARTY_A, 0)) if _roy72 else 0,
-            _rng72.random() if _rng72 else 0.0,
-        ),
-    )
+    def _k72(sid):
+        room = 0 if (state["spaces"][sid].get(FORT_BRI, 0)
+                     + state["spaces"][sid].get(FORT_PAT, 0)
+                     + state["spaces"][sid].get(VILLAGE, 0)) < 2 else 1
+        # §8.7 I2 note: prefer a space that already has War Parties.
+        wp = -(state["spaces"][sid].get(WARPARTY_U, 0)
+               + state["spaces"][sid].get(WARPARTY_A, 0)) if _roy72 else 0
+        return (room, wp)
+    reserve_candidates = pick_by_priority(  # Q22
+        state, [(_k72(sid), sid) for sid in reserve_candidates])
     target = reserve_candidates[0]
 
     def _available_count(tag: str) -> int:
@@ -864,15 +861,13 @@ def evt_075_speech_six_nations(state, shaded=False):
     # "free War Path in ONE of those spaces" — it strikes Rebellion
     # pieces (§4.4.2), so prefer a chosen Reserve holding any; §8.2 ties.
     _rng75 = state.get("rng")
-    wp_cands = sorted(
-        chosen,
-        key=lambda sid: (
-            0 if any(state["spaces"].get(sid, {}).get(t, 0)
-                     for t in (MILITIA_A, MILITIA_U, REGULAR_PAT,
-                               REGULAR_FRE, FORT_PAT)) else 1,
-            _rng75.random() if _rng75 else 0.0,
-        ),
-    )
+    def _k75(sid):
+        has = any(state["spaces"].get(sid, {}).get(t, 0)
+                  for t in (MILITIA_A, MILITIA_U, REGULAR_PAT,
+                            REGULAR_FRE, FORT_PAT))
+        return (0 if has else 1,)
+    wp_cands = pick_by_priority(  # Q22
+        state, [(_k75(sid), sid) for sid in chosen])
     if wp_cands:
         queue_free_op(state, INDIANS, "war_path", wp_cands[0])
 
@@ -961,10 +956,10 @@ def evt_083_carleton_negotiates(state, shaded=False):
             return options[0]
         # No sheet guidance (British/Indian/human): fewest pieces,
         # §8.2 seeded ties.
-        rng = state.get("rng")
-        options.sort(key=lambda s: (_space_piece_total(s),
-                                    rng.random() if rng else 0.0))
-        return options[0]
+        # Q22: fewest pieces; equal-count ties via the Random Spaces table.
+        ordered = pick_by_priority(
+            state, [((_space_piece_total(s),), s) for s in options])
+        return ordered[0]
 
     if shaded:
         executor = str(state.get("active", "")).upper()
@@ -1124,9 +1119,10 @@ def evt_086_stockbridge(state, shaded=False):
                 continue
             if require_militia and not sp.get(MILITIA_U, 0):
                 continue
-            cands.append((rng.random() if rng else 0.0, sid))
+            cands.append(sid)
         if cands:
-            return min(cands)[1]
+            # Q22: §8.2 random space via the Random Spaces table.
+            return pick_random_spaces(state, cands, 1)[0]
         return "Massachusetts"
 
     if shaded:
@@ -1173,9 +1169,9 @@ def evt_090_world_turned_upside_down(state, shaded=False):
                       if isinstance(t, str) and isinstance(q, int) and q > 0
                       and t.startswith(own_prefixes))
             is_colony = 1 if name in colonies else 0
-            cands.append((-is_colony, -own, rng.random() if rng else 0.0, name))
-        cands.sort()
-        return cands[0][3] if cands else None
+            cands.append(((-is_colony, -own), name))
+        picked = pick_by_priority(state, cands, count=1)  # Q22
+        return picked[0] if picked else None
 
     pool = state.setdefault("available", {})
     if patriot_side:
@@ -1190,9 +1186,9 @@ def evt_090_world_turned_upside_down(state, shaded=False):
             wps = (state["spaces"].get(name, {}).get(WARPARTY_U, 0)
                    + state["spaces"].get(name, {}).get(WARPARTY_A, 0))
             is_reserve = 1 if name in reserve_candidates else 0
-            v_cands.append((-is_reserve, -wps, rng.random() if rng else 0.0, name))
-        v_cands.sort()
-        if v_cands and place_with_caps(state, VILLAGE, v_cands[0][3]):
+            v_cands.append(((-is_reserve, -wps), name))
+        v_ordered = pick_by_priority(state, v_cands, count=1)  # Q22
+        if v_ordered and place_with_caps(state, VILLAGE, v_ordered[0]):
             return
     target = _fort_target(("British_", "Indian_"))
     if target:
@@ -1209,10 +1205,11 @@ def evt_091_indians_help(state, shaded=False):
         # Shaded: Remove one Village in one Indian Reserve Province.
         # Equal-priority Villages → §8.2 seeded (Session 48/T9: was the
         # first Reserve in dict order).
-        _rng91 = state.get("rng")
-        with_village = sorted(
-            (n for n in reserve_spaces if state["spaces"][n].get(VILLAGE, 0)),
-            key=lambda _n: _rng91.random() if _rng91 else 0.0,
+        # Q22: equal-priority Villages resolved via the Random Spaces table.
+        with_village = pick_random_spaces(
+            state,
+            [n for n in reserve_spaces if state["spaces"][n].get(VILLAGE, 0)],
+            count=len(reserve_spaces) or 1,
         )
         target = with_village[0] if with_village else None
         if target:
@@ -1229,18 +1226,15 @@ def evt_091_indians_help(state, shaded=False):
     # Room for the Village first (§1.4.2), most War Parties next (the
     # new Village lands with protection), §8.2 seeded ties (Session
     # 48/T9: was the first Reserve in dict order).
-    _rng91u = state.get("rng")
-    ordered = sorted(
-        reserve_spaces,
-        key=lambda n: (
-            0 if (state["spaces"][n].get(FORT_BRI, 0)
-                  + state["spaces"][n].get(FORT_PAT, 0)
-                  + state["spaces"][n].get(VILLAGE, 0)) < 2 else 1,
-            -(state["spaces"][n].get(WARPARTY_U, 0)
-              + state["spaces"][n].get(WARPARTY_A, 0)),
-            _rng91u.random() if _rng91u else 0.0,
-        ),
-    )
+    def _k91u(n):
+        room = 0 if (state["spaces"][n].get(FORT_BRI, 0)
+                     + state["spaces"][n].get(FORT_PAT, 0)
+                     + state["spaces"][n].get(VILLAGE, 0)) < 2 else 1
+        wp = -(state["spaces"][n].get(WARPARTY_U, 0)
+               + state["spaces"][n].get(WARPARTY_A, 0))
+        return (room, wp)
+    ordered = pick_by_priority(  # Q22
+        state, [(_k91u(n), n) for n in reserve_spaces])
     target = ordered[0]
     place_with_caps(state, VILLAGE, target)
 

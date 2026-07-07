@@ -34,12 +34,11 @@ def _remove_four_patriot_units(state):
         if not pat_total:
             continue
         village_first = 1 if (executor == INDIANS and sp.get(VILLAGE, 0)) else 0
-        cands.append((-village_first, -min(pat_total, 4),
-                      rng.random() if rng else 0.0, name))
+        cands.append(((-village_first, -min(pat_total, 4)), name))
     if not cands:
         return
-    cands.sort()
-    name = cands[0][3]
+    # Q22: substantive key only; equal-key ties via Random Spaces table.
+    name = pick_by_priority(state, cands, count=1)[0]
     sp = state["spaces"][name]
     removed = 0
     # §8.1.2 enemy removal: cubes (Continentals) first, then Underground
@@ -74,6 +73,7 @@ from lod_ai.rules_consts import (
 )
 from lod_ai.util.history import push_history
 from lod_ai.util.free_ops import queue_free_op
+from lod_ai.bots.random_spaces import pick_by_priority
 from lod_ai.board.pieces import (
     remove_piece,
     place_marker,
@@ -177,9 +177,9 @@ def evt_016_mercy_warren(state, shaded=False):
                     continue
                 lvl = state.get("support", {}).get(sid, 0)
                 gain = (lvl + 1) * map_adj.population(sid)
-                cands.append((-gain, rng.random() if rng else 0.0, sid))
-            cands.sort()
-            city = cands[0][2] if cands else None
+                cands.append(((-gain,), sid))
+            picked = pick_by_priority(state, cands, count=1)  # Q22
+            city = picked[0] if picked else None
         if city:
             # Passive Opposition = -1
             delta = -1 - state.get("support", {}).get(city, 0)
@@ -208,10 +208,9 @@ def evt_016_mercy_warren(state, shaded=False):
                           and q > 0 and t.startswith("British_"))
                 already = royal > rebels and bri > 0
                 gains = (not already) and (royal + 2 > rebels)
-                cands.append((0 if gains else 1,
-                              rng.random() if rng else 0.0, sid))
-            cands.sort()
-            target = cands[0][2] if cands else None
+                cands.append(((0 if gains else 1,), sid))
+            picked = pick_by_priority(state, cands, count=1)  # Q22
+            target = picked[0] if picked else None
         if target:
             place_piece(state, TORY, target, 2)
             push_history(state, f"Card 16 unshaded: 2 Tories in {target}")
@@ -271,10 +270,8 @@ def evt_019_nathan_hale(state, shaded=False):
                 no_ao = 1 if state.get("support", {}).get(sid, 0) > -2 else 0
                 is_city = 1 if _is_city_late(sid) else 0
                 pop = map_adj.population(sid)
-                cands.append((-changes, -no_ao, -is_city, -pop,
-                              rng.random() if rng else 0.0, sid))
-            cands.sort()
-            for *_k, sid in cands[:3]:
+                cands.append(((-changes, -no_ao, -is_city, -pop), sid))
+            for sid in pick_by_priority(state, cands, count=3):  # Q22
                 place_piece(state, MILITIA_U, sid, 1)
         add_resource(state, PATRIOTS, +3)
     else:
@@ -297,9 +294,8 @@ def evt_021_sumter(state, shaded=False):
             # Sheet I21: "First in non-Village spaces."  Within that the
             # larger possible shift x Pop (§8.3.6), §8.2 seeded ties
             # (Session 47: was always South_Carolina).
-            rng = state.get("rng")
             executor = str(state.get("active", "")).upper()
-            cands = []
+            scored = []
             for sid in ("South_Carolina", "Georgia"):
                 if sid not in state.get("spaces", {}):
                     continue
@@ -309,10 +305,11 @@ def evt_021_sumter(state, shaded=False):
                 lvl = state.get("support", {}).get(sid, 0)
                 gain = max(0, min(2, 2 - lvl))
                 pop = map_adj.population(sid)
-                cands.append((-nonvillage, -(gain * pop),
-                              rng.random() if rng else 0.0, sid))
-            cands.sort()
-            colony = cands[0][3] if cands else "South_Carolina"
+                # Q22: substantive key only (non-Village, then shift x Pop);
+                # equal-key ties resolved by the Random Spaces table.
+                scored.append(((-nonvillage, -(gain * pop)), sid))
+            picked = pick_by_priority(state, scored, count=1)
+            colony = picked[0] if picked else "South_Carolina"
 
     if shaded:
         queue_free_op(state, PATRIOTS, "march",  colony)
@@ -382,9 +379,9 @@ def evt_023_francis_marion(state, shaded=False):
                 if not any(sp.get(t, 0) for t in (MILITIA_A, MILITIA_U, REGULAR_PAT)):
                     continue
                 at_support = 1 if state.get("support", {}).get(cand, 0) > 0 else 0
-                s_cands.append((-at_support, rng.random() if rng else 0.0, cand))
-            s_cands.sort()
-            src = s_cands[0][2] if s_cands else None
+                s_cands.append(((-at_support,), cand))
+            picked = pick_by_priority(state, s_cands, count=1)  # Q22
+            src = picked[0] if picked else None
         if not src:
             push_history(state, "Card 23 unshaded: no Patriot units in NC or SC")
             return
@@ -411,9 +408,9 @@ def evt_023_francis_marion(state, shaded=False):
                 if stype == "Reserve" and moving_militia:
                     continue
                 non_support = 1 if state.get("support", {}).get(s, 0) <= 0 else 0
-                d_cands.append((-non_support, rng.random() if rng else 0.0, s))
-            d_cands.sort()
-            dst = d_cands[0][2] if d_cands else None
+                d_cands.append(((-non_support,), s))
+            picked = pick_by_priority(state, d_cands, count=1)  # Q22
+            dst = picked[0] if picked else None
         if not dst:
             push_history(state, f"Card 23 unshaded: no adjacent Province for {src}")
             return
@@ -641,8 +638,7 @@ def evt_052_fleet_wrong_spot(state, shaded=False):
     # executor).  Sheet B52: "If possible, remove French Regulars from
     # spaces where Rebels outnumber present British."
     if executor == BRITISH and not state.get("card52_no_remove_french"):
-        rng = state.get("rng")
-        cands = []
+        scored = []
         for name, sp in state["spaces"].items():
             here = sp.get(REGULAR_FRE, 0)
             if not here:
@@ -652,10 +648,11 @@ def evt_052_fleet_wrong_spot(state, shaded=False):
                           FORT_PAT))
             brits = sum(sp.get(t, 0) for t in (REGULAR_BRI, TORY, FORT_BRI))
             outnumber = 1 if rebels > brits else 0
-            cands.append((-outnumber, rng.random() if rng else 0.0, name))
-        cands.sort()
+            # Q22: substantive key only (Rebels-outnumber-British first);
+            # equal-key ties resolved by the Random Spaces table.
+            scored.append(((-outnumber,), name))
         removed = 0
-        for _, _, name in cands:
+        for name in pick_by_priority(state, scored):
             if removed == 4:
                 break
             here = state["spaces"][name].get(REGULAR_FRE, 0)
@@ -967,9 +964,9 @@ def evt_079_tuscarora_oneida(state, shaded=False):
                 if bases >= 2:
                     continue
                 key = (0,)
-            cands.append((*key, rng.random() if rng else 0.0, sid))
-        cands.sort()
-        loc = cands[0][-1] if cands else "Pennsylvania"
+            cands.append((key, sid))
+        picked = pick_by_priority(state, cands, count=1)  # Q22
+        loc = picked[0] if picked else "Pennsylvania"
     if shaded:
         remove_piece(state, VILLAGE, loc, 1, to="available")
         removed = remove_piece(state, WARPARTY_U, loc, 2, to="available")

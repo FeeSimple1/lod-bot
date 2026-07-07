@@ -6,6 +6,7 @@ IDs covered (32): 3 5 8 9 11 12 14 17 26 27 34 38 42 44 47 50
 """
 
 from lod_ai.cards import register
+from lod_ai.bots.random_spaces import pick_by_priority
 from .shared import (
     add_resource,
     select_support_shift_spaces,
@@ -1145,16 +1146,23 @@ def evt_080_confusion_slaves(state, shaded=False):
         # and Indian bots removed their own pieces).  Prefer the enemy
         # with more pieces on the map, §8.2 ties.
         target = None
-        best_key = None
+        best_total = None
+        tied = []
         for fac in _ENEMIES.get(executor, (BRITISH, PATRIOTS, FRENCH, INDIANS)):
             tags = _faction_piece_tags(fac)
             total = sum(_safe_get_space(state, sid).get(t, 0)
                         for sid in state.get("spaces", {}) for t in tags)
             if total == 0:
                 continue
-            key = (-total, rng.random() if rng else 0.0)
-            if best_key is None or key < best_key:
-                best_key, target = key, fac
+            if best_total is None or total > best_total:
+                best_total, tied = total, [fac]
+            elif total == best_total:
+                tied.append(fac)
+        # Q22: no rng in the sort key — the Random Spaces table governs
+        # SPACE ties only, so resolve this Faction tie by seeded roll.
+        if tied:
+            target = (tied[0] if len(tied) == 1 or rng is None
+                      else tied[rng.randrange(len(tied))])
         if target is None:
             push_history(state, "Card 80 unshaded: no enemy pieces to target")
             return
@@ -1170,9 +1178,8 @@ def evt_080_confusion_slaves(state, shaded=False):
             have = sum(_safe_get_space(state, sid).get(t, 0) for t in pieces)
             if have == 0:
                 continue
-            scored.append((-min(have, 2), rng.random() if rng else 0.0, sid))
-        scored.sort()
-        candidates = [sid for *_, sid in scored]
+            scored.append(((-min(have, 2),), sid))
+        candidates = pick_by_priority(state, scored)  # Q22
     chosen = candidates[:2]
 
     for sid in chosen:
@@ -1224,8 +1231,8 @@ def evt_088_foggy(state, shaded=False):
         push_history(state, "Card 88 unshaded: no space shared with an enemy")
         return
 
-    shared.sort(key=lambda _s: rng.random() if rng else 0.0)
-    src = shared[0]
+    # Q22: §8.2 random space via the Random Spaces table.
+    src = pick_random_spaces(state, shared, 1)[0]
 
     my_side = ("Patriot_", "French_") if mover in (PATRIOTS, FRENCH) else ("British_", "Indian_")
     foe_side = ("British_", "Indian_") if mover in (PATRIOTS, FRENCH) else ("Patriot_", "French_")
@@ -1258,9 +1265,9 @@ def evt_088_foggy(state, shaded=False):
                 continue
             mine, theirs = _side_counts(nbr)
             gains_ctrl = 1 if (mine <= theirs and mine + group_n > theirs) else 0
-            d_cands.append((-gains_ctrl, -mine, rng.random() if rng else 0.0, nbr))
-        d_cands.sort()
-        dest = d_cands[0][3] if d_cands else None
+            d_cands.append(((-gains_ctrl, -mine), nbr))
+        picked = pick_by_priority(state, d_cands, count=1)  # Q22
+        dest = picked[0] if picked else None
     if not dest:
         push_history(state, f"Card 88 unshaded: no destination adjacent to {src}")
         return
@@ -1285,10 +1292,10 @@ def evt_089_war_damages(state, shaded=False):
             as_first = (1 if (executor == FRENCH
                               and state.get("support", {}).get(name, 0)
                               >= ACTIVE_SUPPORT) else 0)
-            names.append((-as_first, rng.random() if rng else 0.0, name))
-        names.sort()
+            names.append(((-as_first,), name))
+        names = pick_by_priority(state, names)  # Q22
         replaced = 0
-        for *_k, name in names:
+        for name in names:
             if replaced == 3:
                 break
             sp = state["spaces"][name]
@@ -1308,10 +1315,10 @@ def evt_089_war_damages(state, shaded=False):
                 continue
             village_first = (1 if (executor == INDIANS
                                    and sp.get(VILLAGE, 0)) else 0)
-            names.append((-village_first, rng.random() if rng else 0.0, name))
-        names.sort()
+            names.append(((-village_first,), name))
+        names = pick_by_priority(state, names)  # Q22
         replaced = 0
-        for *_k, name in names:
+        for name in names:
             if replaced == 4:
                 break
             sp = state["spaces"][name]
