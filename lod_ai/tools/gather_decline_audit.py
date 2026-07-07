@@ -86,9 +86,9 @@ def run(seeds, scenarios):
             eng.set_human_factions(set())
             orig = eng._plan_bot_free_op
 
-            def wrapped(target_state, faction, op, loc, _orig=orig, _eng=eng,
-                        _scen=scen, _seed=seed):
-                res = _orig(target_state, faction, op, loc)
+            def wrapped(target_state, faction, op, loc, card_id=None,
+                        _orig=orig, _eng=eng, _scen=scen, _seed=seed):
+                res = _orig(target_state, faction, op, loc, card_id)
                 if op == "gather" and faction == C.INDIANS and res is None:
                     legal = _legal_gather_spaces(_eng, target_state)
                     card = len(target_state.get("played_cards", []))

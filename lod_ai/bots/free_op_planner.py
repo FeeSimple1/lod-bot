@@ -606,25 +606,27 @@ def plan_free_partisans(state: Dict, faction: str,
 
     def _option_for(sid) -> Optional[int]:
         sp = state["spaces"][sid]
-        if not sp.get(C.MILITIA_U, 0):
+        mu = sp.get(C.MILITIA_U, 0)
+        if not mu:
             return None
-        royalists = sum(sp.get(t, 0) for t in
-                        (C.REGULAR_BRI, C.TORY, C.WARPARTY_A, C.WARPARTY_U,
-                         C.VILLAGE, C.FORT_BRI))
-        if royalists == 0:
-            return None
+        village = sp.get(C.VILLAGE, 0)
         wp = sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0)
-        enemy_cubes = sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0) \
-            + sp.get(C.WARPARTY_A, 0)
+        # Options 1/2 remove a Royalist UNIT (Glossary §1.4 — Regulars,
+        # Tories, War Parties; NOT Forts or Villages).  Counting a Fort
+        # as removable made the planner pick option 1 in a Fort-only
+        # space, which partisans.execute rejects (planner/executor
+        # divergence, gate 1775:12).
+        roy_units = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
+                     + sp.get(C.WARPARTY_A, 0) + sp.get(C.WARPARTY_U, 0))
         # P8 "first to remove a Village" → option 3 where legal
         # (§4.3.2: no War Parties present, 2+ Underground Militia).
-        if (sp.get(C.VILLAGE, 0) and not wp
-                and sp.get(C.MILITIA_U, 0) >= 2):
+        if village and not wp and mu >= 2:
             return 3
-        # §8.1.2 maximum extent: option 2 nets one extra removal.
-        if (enemy_cubes + sp.get(C.VILLAGE, 0) + sp.get(C.FORT_BRI, 0)
-                + sp.get(C.WARPARTY_U, 0)) >= 2 \
-                and sp.get(C.MILITIA_U, 0) >= 2:
+        if roy_units == 0:
+            return None                      # nothing options 1/2 can remove
+        # §8.1.2 maximum extent: option 2 removes a second unit when 2+
+        # Royalist units are present and 2+ Underground Militia can pay.
+        if roy_units >= 2 and mu >= 2:
             return 2
         return 1
 

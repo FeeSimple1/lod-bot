@@ -33,6 +33,19 @@ from lod_ai.bots.french import FrenchBot
 from lod_ai.bots.indians import IndianBot
 
 
+def _event_instruction(faction, card_id):
+    """T8/§8.3.1: the Brown-Bess Event Instruction (if any) for *faction*
+    on *card_id* — the reverse-of-Random-Spaces-sheet directive that
+    governs how a Non-player executes an Event (or actions granted by
+    another Faction's Event).  None when the Faction has no instruction."""
+    if card_id is None:
+        return None
+    from lod_ai.bots import event_instructions as _EI
+    table = {C.BRITISH: _EI.BRITISH, C.PATRIOTS: _EI.PATRIOTS,
+             C.INDIANS: _EI.INDIANS, C.FRENCH: _EI.FRENCH}.get(faction, {})
+    return table.get(card_id)
+
+
 class Engine:
     def __init__(self, initial_state: dict | None = None, use_cli: bool = False):
         self.state = initial_state or build_state()
@@ -293,7 +306,7 @@ class Engine:
         sp = st["spaces"].get(sid, {})
         return sum(sp.get(t, 0) for t in self._enemy_tags_for(faction))
 
-    def _plan_bot_free_op(self, st, faction, op, loc):
+    def _plan_bot_free_op(self, st, faction, op, loc, card_id=None):
         """Return dispatcher kwargs for a queued bot free op, or None when
         no legal plan exists (a genuine decline)."""
         rng = st.get("rng")
@@ -325,6 +338,14 @@ class Engine:
             return {"space": pick}
 
         if op == "march":
+            # T8 / §8.3.1: when the granting card's Event Instruction
+            # for THIS (granted) faction says "March to set up Battle"
+            # (force_if_51), send the unpinned free March to a winnable
+            # Battle space (§8.3.5 overridden by the Event instruction).
+            if loc is None and \
+                    _event_instruction(faction, card_id) == "force_if_51":
+                from lod_ai.commands.battle import bot_march_battle_target
+                loc = bot_march_battle_target(st, faction) or loc
             # Per-faction free March planner transcribed from the bot
             # flowcharts (B10/P5/F14/I10; Manual 8.4.3/8.5.4/8.6.5/8.7.3):
             # faction movement restrictions, escort legality (3.2.3/
@@ -427,7 +448,7 @@ class Engine:
         # Default: pass the queued location straight through.
         return {"space": loc}
 
-    def _drain_free_ops(self, target_state: dict) -> None:
+    def _drain_free_ops(self, target_state: dict, card_id=None) -> None:
         """Execute ALL queued free ops immediately (FIFO, all factions).
 
         Called after an event handler so that free operations granted by cards
@@ -452,7 +473,7 @@ class Engine:
                 kwargs = None
                 if _fac not in self.human_factions:
                     kwargs = self._plan_bot_free_op(target_state, _fac,
-                                                    _op, _loc)
+                                                    _op, _loc, card_id)
                     if kwargs == "DECLINE_NO_PLANNER":
                         push_history(target_state,
                                      f"FREE {_op.upper()} by {_fac} — "
@@ -1364,7 +1385,7 @@ class Engine:
             handler(target_state, shaded=bool(shaded))
             # COIN rule: free ops granted by events execute immediately
             # during event resolution, never deferred to a later turn.
-            self._drain_free_ops(target_state)
+            self._drain_free_ops(target_state, card_id=card.get("id"))
         finally:
             if previous_active is None:
                 target_state.pop("active", None)
@@ -1460,7 +1481,8 @@ class Engine:
         # The engine's handle_event() drains internally, but the bot path
         # (bot.take_turn → _execute_event) bypasses handle_event, so free
         # ops queued there would otherwise remain stuck in the queue.
-        self._drain_free_ops(self.state)
+        self._drain_free_ops(self.state,
+                             card_id=card.get("id") if card else None)
 
         if result is None:
             result = {"action": "command", "used_special": bool(self.state.get("_turn_used_special"))}

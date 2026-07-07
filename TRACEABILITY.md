@@ -28,11 +28,11 @@ no citation exists.
 | 8.1.3 | Selecting Spaces | OK | — | — | Priority-loop semantics implemented across bot command methods and free_op_planner; ties → §8.2 seeded (Session 21). No section-number citation in code (cite it when next touched). |
 | 8.2 | Random Spaces | OK | bots/free_op_planner.py, bots/random_spaces.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py, engine.py | tests/test_event_space_selection.py | `bots/random_spaces.py` — seeded from state['rng'], column-major arrow walk (fixed Session 21), top-space-first in two-space boxes, re-roll per extra space (`pick_random_spaces`). Equal-chance Play Note used by `free_op_planner._rand_choice` as sanctioned stand-in. Tested: test_event_space_selection.py. |
 | 8.3 | Non-Player Events | OK | bots/base_bot.py, bots/british_bot.py, bots/free_op_planner.py, bots/french.py, bots/indians.py, bots/patriot.py, bots/random_spaces.py, cards/effects/brilliant_stroke.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py, engine.py, util/year_end.py | tests/test_bot_free_ops.py, tests/test_early_war_cards.py, tests/test_event_space_selection.py | Intro only; no normative content beyond 8.3.x below. |
-| 8.3.1 | Event Instructions | PARTIAL (T2+T8, P1) | engine.py | — | `bots/event_instructions.py` implements musket directives, BUT non-British dicts are self-described 'pared-down' — but keys verified complete vs musket icons (Session 24); CONTENT audit unblocked: sheet text = the per-faction Special Instructions sections in the flowchart reference files (Piece 3). Second-faction instructions applying to granted free actions: NOT consulted by `engine._drain_free_ops` → T8. Sword auto-ignore implemented + data-verified (T2 closed, Session 24). |
+| 8.3.1 | Event Instructions | PARTIAL (P1) | engine.py | lod_ai/tests/test_t8_second_faction_instructions.py | `bots/event_instructions.py` implements musket directives, BUT non-British dicts are self-described 'pared-down' — but keys verified complete vs musket icons (Session 24); CONTENT audit unblocked: sheet text = the per-faction Special Instructions sections in the flowchart reference files (Piece 3). **T8 CLOSED (Session 69):** `engine._drain_free_ops` now threads the resolving card id to `_plan_bot_free_op`, which consults the GRANTED faction's Event Instruction via `_event_instruction()`.  Deck-wide the only unpinned granted op with an execution-shaping instruction is card 51 (force_if_51, British unshaded / Patriot shaded): its free March now targets a winnable Battle space (`battle.bot_march_battle_target`) per §8.3.5 'to set up Battle', instead of a generic destination.  All other grants pin their location (no 2nd-faction execution change) and card 52's battle_plus2 already routes through the Battle planner.  Sword auto-ignore implemented + data-verified (T2 closed, Session 24). |
 | 8.3.2 | Dual-Use Events | OK | cards/effects/shared.py | — | `base_bot._execute_event` / `_is_ineffective_event`: shaded iff dual and faction in {PATRIOTS, FRENCH}; force_shaded/unshaded directives override. `select_support_shift_spaces` mirrors it for side inference. |
 | 8.3.3 | Ineffective Events | OK (T3 fixed, Session 26) | bots/base_bot.py, cards/effects/shared.py | tests/test_event_space_selection.py | No-effect simulation + net-shift-favors-enemy clause implemented (Session 21, `base_bot._is_ineffective_event`; tested). MISSING third clause: 'only effect would be to remove one or more friendly pieces without replacing them' → T3. |
 | 8.3.4 | Event Placement | PARTIAL | cards/effects/early_war.py | — | Unavailable-first fixed at cards 32u/43u/46u (Session 21); every other place/relocate site unaudited → fold into Piece 3 card audit. |
-| 8.3.5 | Events: Who/What/Where | PARTIAL (T7, P2) | bots/free_op_planner.py, bots/random_spaces.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py | tests/test_bot_free_ops.py, tests/test_early_war_cards.py, tests/test_event_space_selection.py | Shift routing → 8.3.6 OK (Session 21). Free-Command choices → faction priorities OK (free_op_planner + engine._plan_bot_free_op; card 84 Session 21). Maximise-Forts-then-pieces used for card 6. NOT generally implemented: who-gets-benefits ordering (executing → friendly → random enemy non-player first; harm → random enemy player first) and flowchart-question-spaces-first → T7, per-card audit in Piece 3. |
+| 8.3.5 | Events: Who/What/Where | PARTIAL (T7, P2) | bots/free_op_planner.py, bots/random_spaces.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py | tests/test_bot_free_ops.py, tests/test_early_war_cards.py, tests/test_event_space_selection.py | Shift routing → 8.3.6 OK (Session 21). Free-Command choices → faction priorities OK (free_op_planner + engine._plan_bot_free_op; card 84 Session 21). Maximise-Forts-then-pieces used for card 6. Q22 space-tie sweep CLOSED deck-wide (Session 68): every card-effect handler now resolves space ties via `random_spaces.pick_by_priority`/`pick_random_spaces` (the Random Spaces table), no rng embedded in any sort key.  STILL open → T7 (deferred to per-card Piece 3 audit): the general who-gets-benefits ordering (executing → friendly → random enemy non-player first; harm → random enemy player first) and flowchart-question-spaces-first. |
 | 8.3.6 | Events that Shift Support/Opposition | OK | bots/base_bot.py, bots/random_spaces.py, cards/effects/early_war.py, cards/effects/late_war.py, cards/effects/shared.py | tests/test_early_war_cards.py, tests/test_event_space_selection.py | `shared.select_support_shift_spaces` (Session 21): royalist/rebel two-level key, pop-weighted, zero-gain over negative-gain; §8.2 ties; instead-execute-C&SA guard via 8.3.3 net-shift test. Tested both sides + guard (test_event_space_selection.py). |
 | 8.3.7 | Brilliant Stroke | UNVERIFIED (T10) | bots/british_bot.py, bots/french.py, bots/indians.py, bots/patriot.py, cards/effects/brilliant_stroke.py, engine.py, util/year_end.py | — | BS infrastructure exists (base_bot get_bs_limited_command + per-bot overrides, engine interrupt). Unaudited: abort-if-no-Leader-LimCom, SA-independence clause, simultaneous-BS trump order, and the §8.1 ToA numeric condition (Squadrons WI + Avail FR Regs + CBC/2 > 15). |
 | 8.3.8 | Other Event Choices | PARTIAL (T9, P2) | cards/effects/late_war.py | — | Cited at 2 late_war sites only. Default for uncovered event choices across 109 cards is frequently first/alphabetical — same class as the Session 21 finds. Audit in Piece 3. |
@@ -183,10 +183,25 @@ no citation despite likely implementations.
   is unverified.
 - **T7 (P2)** §8.3.5 benefit/harm target ordering (executing → friendly →
   random enemy non-player first; harm → random enemy player first): no
-  general implementation; per-card audit (Piece 3).
-- **T8 (P2)** §8.3.1 second-faction event instructions must govern how a
-  faction executes actions granted by another faction's event;
-  `engine._drain_free_ops` never consults `event_instructions`.
+  general implementation; per-card audit (Piece 3).  PARTIAL PROGRESS
+  (Session 68): the §8.2 *space-tie* half is now closed deck-wide — every
+  card handler resolves ties via the Random Spaces table (Q22), no rng in
+  any sort key.  The benefit/harm *who* ordering remains the Piece 3 item.
+- **T8 (P3) FIXED (Session 69).** §8.3.1 second-faction event
+  instructions now govern how a faction executes actions granted by
+  another faction's event.  `engine._drain_free_ops` threads the
+  resolving card id into `_plan_bot_free_op`, which looks up the GRANTED
+  faction's Brown-Bess instruction via `_event_instruction()`.  The one
+  deck-wide unpinned grant with an execution-shaping directive is card 51
+  (force_if_51): its free March is now sent "to set up Battle" via
+  `battle.bot_march_battle_target` (the winnable Battle space with the
+  most defenders, Q22 ties).  Every other grant pins its location, and
+  card 52's battle_plus2 already routes through the Battle planner.
+  Fixing this also exposed and closed a pre-existing partisans
+  planner/executor divergence (the free-op planner counted a British Fort
+  as a removable Royalist and picked option 1 in a Fort-only space, which
+  partisans.execute rejects — gate 1775:12).  Tests:
+  test_t8_second_faction_instructions.py.
 - **T9 — FIXED (Session 48).**  All catalogued sites reworked per card
   text (16, 19, 24, 27, 28, 33, 72, 75, 79, 90, 91, 96 + card 80's in
   Session 47); collateral: pick_cities/pick_colonies read a "type" key

@@ -442,6 +442,84 @@ def bot_march_sets_up_battle(state: Dict, attacker_faction: str) -> bool:
     return False
 
 
+def bot_march_battle_target(state: Dict, attacker_faction: str):
+    """Card 51 force_if_51 EXECUTION target (§8.3.1 / §8.3.5): the free
+    March granted by the Event should be sent "to set up Battle".
+
+    Returns the space to March INTO — a space that becomes a winnable
+    Battle (attacker_score > defender_score, per bot_march_sets_up_battle
+    maths) once every eligible adjacent cube marches in — preferring the
+    one with the most defender pieces (§8.4.1 "affect the most enemy
+    pieces"); Q22 ties via the Random Spaces table.  None when no free
+    March sets up a winnable Battle (force_if_51 then falls to C&SA at
+    the event-eval layer; at execution the March plans generically).
+    """
+    from lod_ai.bots import random_spaces
+    royalist = attacker_faction == BRITISH
+    side = "ROYALIST" if royalist else "REBELLION"
+    scored = []
+    for sid in list(state.get("spaces", {})):
+        sp = state["spaces"][sid]
+        if royalist:
+            defender = (sp.get(REGULAR_PAT, 0) + sp.get(REGULAR_FRE, 0)
+                        + sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0)
+                        + sp.get(FORT_PAT, 0))
+        else:
+            defender = (sp.get(REGULAR_BRI, 0) + sp.get(TORY, 0)
+                        + sp.get(WARPARTY_A, 0) + sp.get(WARPARTY_U, 0)
+                        + sp.get(FORT_BRI, 0))
+        if defender == 0:
+            continue
+        inc: Dict[str, int] = {}
+
+        def _add(tag, n):
+            if n > 0:
+                inc[tag] = inc.get(tag, 0) + n
+
+        for origin in map_adj.adjacent_spaces(sid):
+            osp = state["spaces"].get(origin)
+            if not osp:
+                continue
+            if royalist:
+                regs = osp.get(REGULAR_BRI, 0)
+                _add(REGULAR_BRI, regs)
+                _add(TORY, min(osp.get(TORY, 0), regs))
+            else:
+                cont = osp.get(REGULAR_PAT, 0)
+                _add(REGULAR_PAT, cont)
+                _add(REGULAR_FRE, min(osp.get(REGULAR_FRE, 0), cont))
+                _add(MILITIA_A, osp.get(MILITIA_A, 0))
+                _add(MILITIA_U, osp.get(MILITIA_U, 0))
+        if not inc:
+            continue                        # no adjacent cube can March here
+        saved = {t: sp[t] for t in inc if t in sp}
+        missing = [t for t in inc if t not in sp]
+        for t, n in inc.items():
+            sp[t] = saved.get(t, 0) + n
+        try:
+            if royalist:
+                att_cubes = sp.get(REGULAR_BRI, 0) + sp.get(TORY, 0)
+            else:
+                att_cubes = (sp.get(REGULAR_PAT, 0) + sp.get(MILITIA_A, 0)
+                             + sp.get(MILITIA_U, 0))
+            win = False
+            if att_cubes > 0:
+                att, deff = bot_battle_scores(
+                    state, sid, side, attacker_faction=attacker_faction)
+                win = att > deff
+        finally:
+            for t, v in saved.items():
+                sp[t] = v
+            for t in missing:
+                sp.pop(t, None)
+        if win:
+            scored.append(((-defender,), sid))
+    if not scored:
+        return None
+    picked = random_spaces.pick_by_priority(state, scored, count=1)
+    return picked[0] if picked else None
+
+
 def _side_has_leader(state: Dict, sid: str, side: str) -> bool:
     """Return True if any leader for *side* is in space *sid*."""
     leaders = _ROYALIST_LEADERS if side == "ROYALIST" else _REBELLION_LEADERS
