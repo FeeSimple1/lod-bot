@@ -348,3 +348,41 @@ remaining rng.random() sort-key ties with grouped table selection
 (shared pick_by_priority helper), ordering the 2-candidate D6 split
 by table position.  S53-S60 large-N numbers are NOT comparable
 across this change — fresh baselines required.
+
+---
+
+## Q23 (Session 67, OPEN): Propaganda/Raid marker stacking — set model
+vs printed multi-placement
+
+The Piece 4 marker-conservation invariant exposed the model question
+Q21 settled for Blockades, now for Propaganda/Raid.  The engine models
+both as {pool, on_map:set} — at most one marker per space, stacking
+unrepresentable.  The reference disagrees in three places:
+
+* Card 1 Waxhaws (unshaded): "Place two Propaganda there."
+* Card 2 Common Sense: "Place two Propaganda markers there." /
+  shaded "Place two Propaganda markers in each."
+* Card 47 Tories Tested (shaded): "Place two Propaganda there."
+* §6.4.1/§6.4.2 pricing reads as per-marker, not per-space: "Every one
+  Resource spent removes one Raid or Propaganda marker—once no Raid or
+  Propaganda is in a space—shifts it…" (multiple removals per space
+  only make sense if a space can hold several markers).
+
+§3.3.4 Rabble-Rousing itself places only "a Propaganda marker" (cap
+NOTE is the global 12); no per-space limit is stated anywhere.
+
+INTERIM (committed, Session 67): marker-conserving set semantics — a
+placement onto an already-marked space is skipped (marker NOT
+destroyed; the pre-S67 code destroyed the marker while debiting the
+pool, cards 1/2/47 destroyed one per play, and re-Raiding a marked
+Province destroyed a Raid marker per §3.4.4 execution).  place_marker
+now places at most one per space and returns the true count.
+
+DECISION NEEDED: (a) keep the set model with skip semantics (Q21
+precedent: set model stands, loud/skip guards), accepting that cards
+1/2/47 place one marker instead of two and RL/CoC removal costs cap at
+1 Propaganda + 1 Raid per space; or (b) migrate Propaganda/Raid to
+per-space counts (schema + save format + validate + RL/CoC pricing +
+card handlers + census invariant).  (b) is a working session of
+its own.  Balance stakes unmeasured; the RL pricing difference plays
+into the British WQ economy.

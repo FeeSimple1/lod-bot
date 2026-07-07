@@ -259,7 +259,20 @@ class BaseBot:
 
         # 4. Flow-chart bullet list (British example in british_bot)
         if self._faction_event_conditions(state, card):
+            # §8.3.3 post-hoc audit (ROADMAP Piece 4): record the actual
+            # Support−Opposition difference around a bot-CHOSEN event so
+            # tools.invariants can assert the net shift never favors the
+            # enemy side.  Directive-forced events above are exempt
+            # (§8.3.1 instructions override the Ineffective test).
+            sup_b, opp_b = self._support_opposition_totals(state)
             self._execute_event(card, state)
+            sup_a, opp_a = self._support_opposition_totals(state)
+            state.setdefault("event_choice_audit", []).append({
+                "faction": self.faction,
+                "card": int(card.get("id", 0)),
+                "d_before": sup_b - opp_b,
+                "d_after": sup_a - opp_a,
+            })
             return True
         return False
 
@@ -417,12 +430,15 @@ class BaseBot:
             handler(after, shaded=shaded)
         except Exception:
             return True  # treat as ineffective if handler crashes
-        # §8.3.3 net-shift clause. Support levels are encoded ±2 Active /
-        # ±1 Passive, so pop × level sums Total Support − Total Opposition
-        # directly (§1.6.2/§1.6.3).
+        # §8.3.3 net-shift clause. Total Support − Total Opposition per
+        # §1.6.2/§1.6.3 with §1.9 blockade-zeroed population (C1
+        # precedent, Session 46; effective-pop here Session 67): a level
+        # shift on a Blockaded City moves the tracked difference by 0,
+        # and an Event that Blockades/un-Blockades a City moves it even
+        # with no level change.
         def _support_diff(st):
-            return sum(_map_population(sid) * lvl
-                       for sid, lvl in st.get("support", {}).items())
+            sup, opp = self._support_opposition_totals(st)
+            return sup - opp
         d_before, d_after = _support_diff(before), _support_diff(after)
         if self.faction in (C.BRITISH, C.INDIANS) and d_after < d_before:
             return True

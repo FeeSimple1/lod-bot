@@ -35,6 +35,7 @@ from lod_ai.rules_consts import (
 )
 
 from lod_ai.util.history   import push_history
+from lod_ai.map.adjacency  import space_type as _space_type
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent  # potentially used by callers
 from lod_ai.board.pieces      import remove_piece, add_piece, flip_pieces
@@ -114,6 +115,13 @@ def execute(
     # Validate all selections before paying
     for space_id in selected:
         sp = state["spaces"][space_id]
+        # S3.3.4: "Rabble-Rousing Commands in Provinces or Cities" — the
+        # four Indian Reserves and the West Indies are never eligible
+        # (they are Always Neutral and never hold Support or Propaganda
+        # markers, S1.6.2).  Session 67: the missing type gate let the
+        # bot shift a Reserve to Passive Opposition.
+        if _space_type(space_id) not in ("City", "Colony"):
+            raise ValueError(f"{space_id} is not a Province or City (S3.3.4).")
         rebellion_control = state.get("control", {}).get(space_id) == "REBELLION"
         has_underground = sp.get(MILITIA_U, 0) > 0
         if not (rebellion_control and _has_patriot_piece(sp) or has_underground):
@@ -134,8 +142,11 @@ def execute(
         # Validate selection criteria (re-checked for clarity)
         rebellion_control = state.get("control", {}).get(space_id) == "REBELLION"
         has_underground = sp.get(MILITIA_U, 0) > 0
-        # Place a Propaganda marker if any remain
-        if prop_state.get("pool", 0) > 0:
+        # Place a Propaganda marker if any remain and the space has none
+        # (one marker per space; a set-add on an already-marked space
+        # silently destroyed the marker while debiting the pool before
+        # Session 67 — the Session 56 Blockade-conservation class).
+        if prop_state.get("pool", 0) > 0 and space_id not in prop_state["on_map"]:
             prop_state["pool"] -= 1
             prop_state["on_map"].add(space_id)
 

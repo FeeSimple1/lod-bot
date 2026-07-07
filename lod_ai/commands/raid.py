@@ -154,10 +154,12 @@ def execute(
             raise ValueError(f"{prov}: no Underground WP to Activate.")
         flip_pieces(state, WARPARTY_U, WARPARTY_A, prov, 1)
 
-        # Place marker if pool available
-        if raids_state.get("pool", 0) > 0:
+        # Place marker if pool available and none already here (one Raid
+        # marker per space — the set model; re-raiding a marked province
+        # destroyed a marker while debiting the pool before Session 67).
+        if raids_state.get("pool", 0) > 0 and prov not in raids_state.setdefault("on_map", set()):
             raids_state["pool"] -= 1
-            raids_state.setdefault("on_map", set()).add(prov)
+            raids_state["on_map"].add(prov)
         # shift Opposition one step toward Neutral
         _shift_one_toward_neutral(state, prov)
 

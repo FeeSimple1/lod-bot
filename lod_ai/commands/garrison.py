@@ -47,7 +47,7 @@ from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.util.naval     import has_blockade as naval_has_blockade
 from lod_ai.util.adjacency import is_adjacent
 from lod_ai.map            import adjacency as map_adj
-from lod_ai.board.pieces      import remove_piece, add_piece, flip_pieces
+from lod_ai.board.pieces      import remove_piece, add_piece, flip_pieces, move_piece
 from lod_ai.economy.resources import spend, can_afford
 
 COMMAND_NAME = "GARRISON"  # auto-registered by commands/__init__.py
@@ -89,12 +89,16 @@ def _displace_rebellion(origin: str, target: str, state: Dict):
     sp_orig = state["spaces"][origin]
     sp_tgt  = state["spaces"][target]
 
+    # S3.2.2: "displace all Rebellion units to an adjacent space" is a
+    # map-to-map MOVE; pieces keep their Active/Underground facing and
+    # never transit the Available box (the pre-Session-67 remove+add
+    # implementation destroyed a Militia via the pool-variant double
+    # debit, S1.2 conservation).
     tags = (REGULAR_PAT, REGULAR_FRE, MILITIA_U, MILITIA_A)
     for tag in tags:
         n = sp_orig.get(tag, 0)
         if n:
-            remove_piece(state, tag, origin, n)
-            add_piece(state, tag, target, n)
+            move_piece(state, tag, origin, target, n)
 
 # ---------------------------------------------------------------------------
 # Public entry point

@@ -33,6 +33,7 @@ def play(scenario: str, seed: int, *, check_invariants: bool = True):
     st = build_state(scenario, seed=seed)
     eng = Engine(initial_state=st)
     eng.set_human_factions(set())
+    baseline = invariants.capture_baseline(eng.state)
     invariant_failures = []
     with contextlib.redirect_stdout(io.StringIO()):
         n = 0
@@ -46,7 +47,7 @@ def play(scenario: str, seed: int, *, check_invariants: bool = True):
                 try:
                     invariants.check_all(
                         eng.state, scenario=scenario, seed=seed, card_number=n,
-                        human_factions=set(),
+                        human_factions=set(), baseline=baseline,
                     )
                 except invariants.InvariantError as exc:
                     invariant_failures.append(str(exc))

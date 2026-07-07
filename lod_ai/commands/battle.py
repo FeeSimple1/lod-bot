@@ -590,6 +590,11 @@ def _apply_shifts_to(
 
     §3.6.8: Royalist winner shifts toward Support (positive); Rebellion
     winner shifts toward Opposition (negative)."""
+    # S1.6.1/S1.6.2: 0-Population spaces (the four Indian Reserves and
+    # the West Indies) are Always Neutral — shifts are "not possible"
+    # there and overflow to adjacent spaces per S3.6.8 (Session 67).
+    if map_adj.space_type(space_id) in ("Reserve", "Special"):
+        return remaining
     for i in range(remaining):
         cur = state.get("support", {}).get(space_id, NEUTRAL)
         if winner == "ROYALIST" and cur < ACTIVE_SUPPORT:

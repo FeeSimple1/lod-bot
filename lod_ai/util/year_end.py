@@ -258,17 +258,19 @@ def _supply_phase(state, *, bots=None, human_factions=None):
     # a space that already has War Parties if possible"; §8.2 seeded
     # ties (Session 51: was the first Reserve in dict order).
     if not any(sp.get(VILLAGE, 0) for sp in state["spaces"].values()):
-        rng = state.get("rng")
+        from lod_ai.bots.random_spaces import pick_by_priority as _pbp
         reserves = [s for s in state["spaces"]
                     if map_adj.space_type(s) == "Reserve"]
-        reserves.sort(key=lambda s: (
+        # Q22 (Session 67): equal-WP ties resolve via the Random Spaces
+        # table, not an rng sort key (this site was missed in the S60
+        # engine-wide migration).
+        picked = _pbp(state, [(
             -(state["spaces"][s].get(WARPARTY_U, 0)
-              + state["spaces"][s].get(WARPARTY_A, 0)),
-            rng.random() if rng else 0.0,
-        ))
-        if reserves:
-            place_with_caps(state, VILLAGE, reserves[0], 1)
-            push_history(state, f"Indian Supply – auto‑Village in {reserves[0]}")
+              + state["spaces"][s].get(WARPARTY_A, 0)), s)
+            for s in reserves], count=1)
+        if picked:
+            place_with_caps(state, VILLAGE, picked[0], 1)
+            push_history(state, f"Indian Supply – auto‑Village in {picked[0]}")
 
     indian_unsupplied = []
     for sid, sp in state["spaces"].items():
@@ -537,6 +539,12 @@ def _support_phase(state):
     for sid, sp in state["spaces"].items():
         if rl_shifted[sid] >= 2:
             continue
+        # §1.6.2/§6.4.1 (Session 67): the four Indian Reserves and the
+        # West Indies are Always Neutral — Support cannot be built there
+        # (pre-S67 the British paid to "shift" Quebec, corrupting the
+        # support map and wasting the WQ purse).
+        if map_adj.space_type(sid) in ("Reserve", "Special"):
+            continue
         if not (_ctrl(sid, sp) == BRITISH and sp.get(REGULAR_BRI) and sp.get(TORY)):
             continue
         level = state["support"].get(sid, 0)
@@ -546,7 +554,9 @@ def _support_phase(state):
         n_raid = 1 if sid in raid_on_map else 0
         n_prop = 1 if sid in propaganda_on_map else 0
         marker_count = n_raid + n_prop
-        pop = map_adj.population(sid)
+        # C10 (§8.1.1×§1.9): effective population (Blockaded City -> 0);
+        # the S66 fix landed on the CoC side only (Session 67).
+        pop = _eff_pop(sid)
         # §8.4.5 "largest change ... possible": §6.4.1 caps shifts at two
         # levels per space, and the purse must pay the markers first
         # (Session 45: was the raw uncapped distance).
@@ -554,15 +564,17 @@ def _support_phase(state):
                      max(0, bri_res - marker_count))
         potential = levels * pop
 
-        # Attach sort keys for this pass (§8.2 seeded tie-break)
-        brit_eligible.append((sid, marker_count, potential,
-                              rng.random() if rng else 0.0))
+        brit_eligible.append((sid, marker_count, potential))
 
-    # §8.4.5: fewest markers first, then largest population-weighted change
-    brit_eligible.sort(key=lambda x: (x[1], -x[2], x[3]))
+    # §8.4.5: fewest markers first, then largest population-weighted
+    # change; Q22 (Session 67): equal-key ties via the Random Spaces
+    # table, not an rng sort key.
+    from lod_ai.bots.random_spaces import pick_by_priority as _pbp_rl
+    _rl_order = _pbp_rl(state, [((mc, -pot), sid)
+                                for sid, mc, pot in brit_eligible])
 
     spent = 0
-    for sid, _mc, _pot, _tb in brit_eligible:
+    for sid in _rl_order:
         sp = state["spaces"][sid]
         if rl_shifted[sid] >= 2:
             continue
@@ -622,6 +634,10 @@ def _support_phase(state):
         # §6.4.2: "Rebellion Controlled spaces with Patriot pieces" — a
         # Patriot Fort is a Patriot piece (Session 45: Fort-only spaces
         # were excluded).
+        # §1.6.2/§6.4.2 (Session 67): Always-Neutral spaces cannot be
+        # shifted toward Opposition either.
+        if map_adj.space_type(sid) in ("Reserve", "Special"):
+            continue
         if not (_ctrl(sid, sp) == "REBELLION"
                 and (sp.get(MILITIA_A) or sp.get(MILITIA_U)
                      or sp.get(REGULAR_PAT) or sp.get(FORT_PAT))):
@@ -640,14 +656,16 @@ def _support_phase(state):
                      max(0, pat_res - n_raid))
         potential = levels * pop
 
-        pat_eligible.append((sid, n_raid, potential,
-                             rng.random() if rng else 0.0))
+        pat_eligible.append((sid, n_raid, potential))
 
-    # §8.5.9: fewest Raid markers first, then largest population-weighted change
-    pat_eligible.sort(key=lambda x: (x[1], -x[2], x[3]))
+    # §8.5.9: fewest Raid markers first, then largest population-weighted
+    # change; Q22 (Session 67): ties via the Random Spaces table.
+    from lod_ai.bots.random_spaces import pick_by_priority as _pbp_coc
+    _coc_order = _pbp_coc(state, [((nr, -pot), sid)
+                                  for sid, nr, pot in pat_eligible])
 
     spent = 0
-    for sid, _nr, _pot, _tb in pat_eligible:
+    for sid in _coc_order:
         sp = state["spaces"][sid]
         if coc_shifted[sid] >= 2:
             continue
@@ -1137,6 +1155,7 @@ def resolve(state, *, bots=None, human_factions=None):
     if state.get("final_winter_round", False):
         # 6.4.3 was the last phase; go straight to end-of-game scoring (Rule 7.3)
         push_history(state, "Final Winter-Quarters card – Support Phase complete")
+        board_control.refresh_control(state)  # §1.7 derived state (Session 67)
         final_scoring(state)
         return
 
@@ -1152,6 +1171,11 @@ def resolve(state, *, bots=None, human_factions=None):
 
     # 6.7  Reset Phase
     _reset_phase(state)
+    # §1.7: control is derived from piece counts; the 6.2 battles, 6.6
+    # desertions and 6.7 casualty lift all move pieces, and WQ runs
+    # outside the per-turn sandbox commit — refresh before returning
+    # (Session 67: a desertion left Boston marked BRITISH on a tie).
+    board_control.refresh_control(state)
     push_history(state, "Winter-Quarters routine complete")
 
 

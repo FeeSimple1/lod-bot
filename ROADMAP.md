@@ -46,7 +46,7 @@ Work the backlog from Pieces 1–2 plus the known items:
   session lists against all 109).
 Per agents.md: audit report first, then fixes, then validation tests.
 
-## Piece 4 — Rules-derived property tests
+## Piece 4 — Rules-derived property tests  [DONE, Session 67]
 
 Extend `tools/invariants.py` (asserted per card in gate + soak) with
 properties that encode rules rather than implementation:
@@ -57,8 +57,22 @@ properties that encode rules rather than implementation:
 - No bot-CHOSEN event nets a Support−Opposition shift favoring the
   bot's enemy side (§8.3.3) — post-hoc check on event plays.
 - Control recomputation idempotence; Total Support/Opposition track
-  equals recomputed pop-weighted sum.
+  equals recomputed pop-weighted sum.  (No stored track exists — totals
+  are computed on demand — so only the control half applies.)
 - Resources within [0, 50] (§1.7) — verify existing clamp coverage.
+
+Landed (Session 67) as `check_rules_properties` in `tools/invariants.py`,
+asserted per card in the gate, soak, and batch_smoke repro path (marker
+baselines captured at setup).  First activation caught seven live bug
+classes: Rabble-Rousing on Indian Reserves (§3.3.4 type gate missing,
+bot + command), Propaganda/Raid marker destruction on re-placement
+(place_marker + raid + rabble; Q23 logged for the stacking model),
+Garrison displacement destroying a Militia via the Available-pool
+variant double debit (move_piece/add_piece class fix), WQ Reward
+Loyalty shifting the Quebec Reserve (§1.6.2 guards on RL/CoC) with the
+C10 effective-pop fix missing on the RL side, WQ exit paths leaving
+control stale, three Q22 rng-sort-key misses in year_end, and the
+§8.3.3 net-shift gate using raw instead of §1.9 effective population.
 
 ## Piece 5 — Decision coverage instrumentation
 

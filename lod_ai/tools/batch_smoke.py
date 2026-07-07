@@ -530,6 +530,9 @@ def run_one_game(scenario: str, seed: int, *, detailed: bool = False,
         state = build_state(scenario, seed=seed)
         engine = Engine(initial_state=state, use_cli=False)
         engine.set_human_factions([])  # all bots
+        if check_invariants:
+            from lod_ai.tools import invariants as _inv
+            _census_baseline = _inv.capture_baseline(engine.state)
 
         cards_played = 0
         history_offset = len(engine.state.get('history', []))
@@ -556,7 +559,7 @@ def run_one_game(scenario: str, seed: int, *, detailed: bool = False,
                 invariants.check_all(
                     engine.state, scenario=scenario, seed=seed,
                     card_number=cards_played, human_factions=set(),
-                    dump_dir=dump_dir,
+                    dump_dir=dump_dir, baseline=_census_baseline,
                 )
 
             # Process turn log

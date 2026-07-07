@@ -181,12 +181,24 @@ def move_piece(state: Dict[str, Any], tag: str, src: str, dst: str, qty: int = 1
     src_dict = _space_dict(state, src)
     dst_dict = _space_dict(state, dst)
 
-    moved = min(qty, src_dict.get(tag, 0))
+    # The Available box holds Militia/War Parties undifferentiated (the
+    # Underground pool tag; A/U facing is an on-map state, S1.4.3): draws
+    # from Available come out of the family entry regardless of requested
+    # variant, and arrivals fold into it.  Before Session 67 a variant tag
+    # parked in Available by one helper and debited under the family tag by
+    # another destroyed a piece (S1.2 conservation).
+    src_tag = tag
+    if src == "available":
+        _normalize_available_entry(state, tag)
+        src_tag = _pool_tag(tag)
+    dst_tag = _pool_tag(tag) if dst == "available" else tag
+
+    moved = min(qty, src_dict.get(src_tag, 0))
     if moved:
-        src_dict[tag] -= moved
-        if src_dict[tag] == 0:
-            del src_dict[tag]
-        dst_dict[tag] = dst_dict.get(tag, 0) + moved
+        src_dict[src_tag] -= moved
+        if src_dict[src_tag] == 0:
+            del src_dict[src_tag]
+        dst_dict[dst_tag] = dst_dict.get(dst_tag, 0) + moved
         push_history(state, f"{moved}×{tag}  {src} → {dst}")
     return moved
 
@@ -255,6 +267,7 @@ def add_piece(state: Dict[str, Any], tag: str, loc: str, qty: int = 1) -> int:
 
     pool = state.setdefault("available", {})
     _ensure_available(state, tag, qty)
+    _normalize_available_entry(state, tag)
     pool_tag = _pool_tag(tag)
     available = pool.get(pool_tag, 0)
     if available <= 0:
@@ -262,11 +275,10 @@ def add_piece(state: Dict[str, Any], tag: str, loc: str, qty: int = 1) -> int:
         return 0
 
     to_place = min(qty, available)
+    # move_piece (via place_piece) debits the Available family entry
+    # itself; the pre-Session-67 re-debit here double-charged the pool
+    # whenever a variant tag had been parked in Available (S1.2).
     placed = place_with_caps(state, tag, loc, to_place)
-    if placed:
-        pool[pool_tag] = available - placed
-        if pool[pool_tag] == 0:
-            del pool[pool_tag]
     if placed < qty:
         push_history(state, f"(⛔ only {placed}/{qty} {tag} placed)")
     return placed
@@ -309,13 +321,18 @@ def place_marker(state, marker_tag: str, loc: str, qty: int = 1) -> int:
     Assumes markers are unlimited on-map but drawn from a pool in state["markers"].
     """
     markers = state.setdefault("markers", {}).setdefault(marker_tag, {"pool": 0, "on_map": set()})
-    available = markers.get("pool", 0)
-    placed = min(qty, available)
-    if placed:
-        markers["pool"] = available - placed
-        markers.setdefault("on_map", set()).add(loc)
-        push_history(state, f"{placed} {marker_tag} placed in {loc}")
-    return placed
+    on_map = markers.setdefault("on_map", set())
+    # One marker per space (on_map is a set).  Debiting the pool by qty
+    # while set-adding a single space, or re-adding a space that already
+    # holds the marker, silently destroyed markers before Session 67
+    # (the Session 56 Blockade-conservation class, found deck-wide by
+    # the Piece 4 marker-census invariant).
+    if loc in on_map or markers.get("pool", 0) <= 0:
+        return 0
+    markers["pool"] = markers.get("pool", 0) - 1
+    on_map.add(loc)
+    push_history(state, f"1 {marker_tag} placed in {loc}")
+    return 1
 
 def return_leaders(state) -> None:
     """
@@ -343,7 +360,8 @@ def lift_casualties(state) -> None:
     moved = 0
     for pid, cnt in list(dead_box.items()):
         if cnt:
-            state["available"][pid] = state["available"].get(pid, 0) + cnt
+            pool_tag = _pool_tag(pid)  # Available holds A/U variants folded (S1.4.3)
+            state["available"][pool_tag] = state["available"].get(pool_tag, 0) + cnt
             moved += cnt
     dead_box.clear()
 

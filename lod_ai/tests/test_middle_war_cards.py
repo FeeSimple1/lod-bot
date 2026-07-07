@@ -41,8 +41,9 @@ def test_card3_unshaded_removes_patriot_pieces():
 
     assert not state["spaces"]["Northwest"]
     assert not state["spaces"]["Southwest"]
-    assert state["available"].get(MILITIA_A) == 1
-    assert state["available"].get(MILITIA_U) == 3
+    # Available holds Militia folded to the U pool tag (S1.4.3, S67)
+    assert state["available"].get(MILITIA_A) is None
+    assert state["available"].get(MILITIA_U) == 4
     assert state["available"].get(REGULAR_PAT) == 1
     assert state["available"].get(FORT_PAT) == 1
 
@@ -283,7 +284,9 @@ def test_card11_shaded_removes_militia_places_fort():
 
     assert state["spaces"]["Virginia"].get(MILITIA_A, 0) == 0
     assert state["spaces"]["Virginia"].get(FORT_PAT, 0) == 1
-    assert state["available"].get(MILITIA_A, 0) == 1
+    # Available holds Militia folded to the U pool tag (S1.4.3, S67)
+    assert state["available"].get(MILITIA_A, 0) == 0
+    assert state["available"].get(MILITIA_U, 0) >= 1
 
 
 def test_card11_shaded_removes_militia_not_fort():

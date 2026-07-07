@@ -72,7 +72,8 @@ def test_remove_friendly_pieces_full_order():
     NP.remove_friendly_pieces(st, "X", 3, NP.ROYALIST, to="available")
     # cubes: even (1-1) → Regular, then Tory is last-other but no Regulars
     # remain → Tory; then Active WP.
-    assert st["available"] == {C.REGULAR_BRI: 1, C.TORY: 1, C.WARPARTY_A: 1}
+    # Available holds War Parties folded to the U pool tag (S1.4.3, S67)
+    assert st["available"] == {C.REGULAR_BRI: 1, C.TORY: 1, C.WARPARTY_U: 1}
     assert st["spaces"]["X"].get(C.FORT_BRI) == 1
     assert st["spaces"]["X"].get(C.WARPARTY_U) == 1
 

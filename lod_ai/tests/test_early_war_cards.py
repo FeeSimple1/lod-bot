@@ -43,7 +43,9 @@ def test_card2_common_sense_any_city_selection():
     assert state["spaces"]["Boston"].get(REGULAR_BRI) == 2
     assert state["spaces"]["Boston"].get(TORY) == 2
     assert "Boston" in state["markers"][PROPAGANDA]["on_map"]
-    assert state["markers"][PROPAGANDA]["pool"] == 8
+    # Q23 interim (Session 67): one Propaganda per space under the set
+    # model — the card text "two Propaganda markers there" awaits ruling.
+    assert state["markers"][PROPAGANDA]["pool"] == 9
     assert state["resources"]["BRITISH"] == 4
 
 
@@ -81,9 +83,10 @@ def test_card6_benedict_arnold_targets_fort_colony_underground_first():
 
     assert state["casualties"].get(FORT_PAT) == 1
     assert FORT_PAT not in state["spaces"]["Georgia"]
-    # 2 Militia removed, Underground first (§8.1.2 enemy bullet)
-    assert state["available"].get(MILITIA_U) == 1
-    assert state["available"].get(MILITIA_A) == 1
+    # 2 Militia removed, Underground first (§8.1.2 enemy bullet);
+    # Available holds Militia folded to the U pool tag (S1.4.3, S67)
+    assert state["available"].get(MILITIA_U) == 2
+    assert state["available"].get(MILITIA_A) is None
     assert state["spaces"]["Georgia"].get(MILITIA_A) == 1
     assert state["spaces"]["Georgia"].get(MILITIA_U) is None
 
@@ -207,8 +210,9 @@ def test_card24_declaration_unshaded_removes_correct_pieces():
     early_war.evt_024_declaration(state, shaded=False)
 
     assert state["available"].get(REGULAR_PAT) == 2
-    assert state["available"].get(MILITIA_U) == 1
-    assert state["available"].get(MILITIA_A) == 1
+    # Available holds Militia folded to the U pool tag (S1.4.3, S67)
+    assert state["available"].get(MILITIA_U) == 2
+    assert state["available"].get(MILITIA_A) is None
     assert state["available"].get(FORT_PAT) == 1
 
 

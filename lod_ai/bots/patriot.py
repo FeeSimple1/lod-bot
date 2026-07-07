@@ -1232,6 +1232,11 @@ class PatriotBot(BaseBot):
         """Check §3.3.4 eligibility: (Rebellion Control AND Patriot pieces) OR
         Underground Militia.  Also must not be at Active Opposition."""
         from lod_ai.rules_consts import ACTIVE_OPPOSITION
+        from lod_ai.map.adjacency import space_type
+        # S3.3.4: only Provinces or Cities may be Rabble-Roused (Reserves
+        # and the West Indies are Always Neutral, S1.6.2) — Session 67.
+        if space_type(sid) not in ("City", "Colony"):
+            return False
         if state.get("support", {}).get(sid, 0) <= ACTIVE_OPPOSITION:
             return False
         rebellion_ctrl = state.get("control", {}).get(sid) == "REBELLION"

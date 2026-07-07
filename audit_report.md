@@ -4725,3 +4725,58 @@ not Available) remains OPEN — a rarely-reachable Rally/Muster edge
 with no path in bots, events, or CLI; carried forward as a known
 low-priority gap.  Battery: 1,465 + 101 green (+4 new); gates
 1-10/11-20 clean; soak 120 DONE clean; balance rebaselined.
+
+
+## Session 67: ROADMAP Piece 4 — rules-derived property invariants (July 2026)
+
+Piece 4 landed: `check_rules_properties` in tools/invariants.py,
+asserted after every card in the gate, soak, and batch_smoke repro
+paths.  Properties: §1.2 per-family piece conservation (census across
+map + Available + Unavailable + Casualties + Out-of-play == boxed
+maxima), marker conservation vs a per-game setup baseline
+(Propaganda/Raid/Blockade incl. Unavailable), §1.6.2 Reserves/West
+Indies Always Neutral, §1.7 Resources in [0,50], §1.9 FNI in [0,3],
+§1.7 control == recomputation, and a §8.3.3 post-hoc audit (base_bot
+records Support−Opposition around every flowchart-CHOSEN event; the
+invariant asserts the net shift never favors the enemy side).
+
+First activation on gate seeds 1-2 tripped SEVEN live bug classes —
+the audit doctrine (weak factions = unimplemented rules) extends to
+"green dashboards = unasserted properties":
+
+- Rabble-Rousing had no §3.3.4 "Provinces or Cities" type gate (command
+  NOR patriot-bot eligibility): the bot shifted the NORTHWEST RESERVE
+  to Passive Opposition (§1.6.2 violation) on 1775 seed 1 card 2.
+- place_marker + Raid + Rabble destroyed markers: pool debited by qty
+  while set-adding one space, and re-placement onto a marked space
+  debited with a no-op add (the S56 Blockade class, deck-wide).  Cards
+  1/2/47 print "place two Propaganda there" → the set-vs-counts model
+  question is Q23 (OPEN, Eric); interim = conserving skip semantics.
+- Garrison displacement (§3.2.2) was remove→Available→add: the
+  Available pool holds Militia/WP folded to the U family tag, and
+  add_piece re-debited the family entry after place_piece consumed the
+  parked variant entry — one Militia DESTROYED per displacement with
+  Active militia (project-lifetime; move_piece/add_piece now draw from
+  and fold into the family entry, displacement is a direct map move
+  preserving facing).
+- WQ Reward Loyalty shifted Quebec (a Reserve) to +2, paying British
+  resources for zero-value shifts; §1.6.2 guards added to RL and CoC;
+  the S66 C10 effective-pop fix turned out to have landed on the CoC
+  side only — now on RL too.
+- WQ resolve() never refreshed control after 6.6 desertions / 6.7
+  casualty lift (both exit paths) — stale BRITISH control on a tie.
+- Q22 misses: three rng.random() sort keys survived in year_end
+  (auto-Village reserve tie, RL §8.4.5 tie, CoC §8.5.9 tie) — now
+  pick_by_priority grouped table selection.
+- §8.3.3 net-shift used raw population; §1.9 (C1 precedent) requires
+  blockade-zeroed effective population — a shift confined to a
+  Blockaded City moves the tracked difference by 0.
+
+Tests: +19 (test_rules_invariants_s67.py); 6 existing tests rewritten
+to the rule (Available holds A/U folded, S1.4.3; Q23 interim one-per-
+space markers).  Battery: 1,384 + 101 green; gate 1-20 all three
+scenarios clean WITH the new invariants; soak 120 DONE clean (the
+§8.3.3 post-hoc audit never fired across 180 invariant-checked games —
+the pre-choice simulation gate holds at execution).  Balance
+rebaselined (winner flips expected: rabble targeting, WQ ordering,
+marker economy).  Q23 logged (Propaganda/Raid stacking).
