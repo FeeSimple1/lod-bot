@@ -180,17 +180,26 @@ in TRACEABILITY.md).
   batch_smoke). Fixed via util/naval.effective_population.
 - **C2** §1.9/§6.3.4 (FIXED Session 46): French after-ToA WQ income
   counted Blockaded-City population ("...and during the Resource Phase").
-- **C3** §1.9: Blockade model stores on_map as a set — cannot represent a
-  second Blockade on the same City ("More than one Blockade may be
-  placed... no additional impact"), which skews FNI-lower/6.5.4/rearrange
-  bookkeeping.  Also flagged in the French survey (blockade 1/City cap).
-- **C4** §1.9: British March-to-Blockaded-City prohibition ("...nor to
-  Provinces adjacent to that City unless destination adjacent to
-  starting space") — verify march.execute enforces outside the
-  city-network path; FNI-Level-3-blocks-Garrison — verify garrison.
-- **C5** §1.10: Leader orphan rule — a Leader in a space with no pieces
-  of its Faction must immediately move to a friendly-piece space or
-  Available.  No engine hook exists (WQ redeploy aside, S43).
+- **C3** §1.9 (RESOLVED — Eric ruled Q21, S60): the one-per-City SET model
+  stands (the additional Blockade "has no additional impact", so the
+  count is never board-relevant); non-player placement never targets an
+  already-blockaded City, and the loud duplicate guards (S56) prevent the
+  pre-S56 silent marker loss.  No count-model refactor.
+- **C4** §1.9 (VERIFIED S66): FNI-3-blocks-Garrison present
+  (british_bot._can_garrison, fni_level>=3 -> False).  March: the
+  city-network route excludes Blockaded Cities (has_blockade in
+  march._qual_city), and the bots ONLY generate adjacent marches (all
+  destinations from map_adj.adjacent_spaces), which the rule's "unless
+  destination adjacent to starting space" exception permits — so the
+  prohibition is satisfied for every reachable bot path.  Muster
+  legality (non-Blockaded City / adjacent Colony w/ a non-Blockaded
+  City neighbour) verified in muster._is_legal_regular_dest.
+- **C5** §1.10 (FIXED S66): the orphan rule is enforced in
+  normalize_state._enforce_leader_orphan (runs after every mutation).
+  An orphaned Leader relocates to the space with the MOST of its
+  Faction's pieces (deterministic sorted-id tie, no rng — normalize
+  stays pure), else Available.  Free on the hot path (profiled: 0.009s
+  / 2000 calls).  test_leader_orphan_c5.py (4).
 - **C6** §1.4.1: Voluntary take-own-forces-from-map when the type is not
   Available (exception: British/French Regulars may not; Tories/Forts
   may) — no path anywhere (bots, events, human CLI).
@@ -198,15 +207,23 @@ in TRACEABILITY.md).
   1st-4th placement, all-players-lose-if-a-NP-passes-victory-check,
   French-last-without-ToA, Combined Victory for a both-factions player.
   Fold into T11 (§8.8 one-player victory) work.
-- **C8** §1.2/§1.4.1: Verify CAP_TABLE global piece totals against the
-  Available Forces Table (caps.py cites §1.2; the extracted Ch 1 text
-  has no §1.2).
-- **C9** §2.3.4: "Command qualifies as executed if it selects ≥1 space"
-  + the RHeC ≥1-Resource exception — engine executed/eligibility
-  flagging for zero-space or zero-effect commands is implicit; verify.
-- **C10** §8.1.1×§1.9: bot pop-weighting sites (S44/S45) use raw
-  Population; contribution-to-total semantics implies effective
-  (blockade-zeroed) population.  Sweep after C1 soaks.
+- **C8** §1.2/§1.4.1 (VERIFIED S66): piece conservation checked
+  programmatically — every scenario (1775/76/78) sums EXACTLY to the
+  MAX_* constants across spaces+available+unavailable (BRI 25, Tory 25,
+  FRE 15, PAT 20, Militia 15, WP 15, Forts 6/6, Villages 12).  CAP_TABLE
+  holds only the Fort/Village "highest-numbered box" caps; cube totals
+  are enforced by the Available pool model (conservation confirms it).
+- **C9** §2.3.4 (VERIFIED S66): engine._command_effect_count returns the
+  affected-space count and models the Roderigue-Hortalez ≥1-Resource
+  exception explicitly (HORTELEZ + pay>=1 -> counts as 1); the LimCom
+  legality check gates on affected==1, and executed/eligibility follow
+  the count.
+- **C10** §8.1.1×§1.9 (FIXED S66): the WQ Reward-Loyalty and Committees
+  potential sites (year_end._support_phase) now use EFFECTIVE population
+  (Blockaded City -> 0), so a blockaded City's RL/CoC "change in
+  Support" ranks as 0.  The remaining raw-Population bot sites are
+  within-tier RANKING keys where blockade-zeroing does not change
+  legality or, in practice, ordering — left as-is (documented).
 - **Dead-effect note**: board/pieces.return_leaders (called each WQ in
   year_end before redeploy, citing "Rule 6.1") scans spaces for leader
   TAGS, but real leaders live in state["leaders"] — a no-op in real

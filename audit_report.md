@@ -4697,3 +4697,31 @@ full printed text.  Results:
 
 Battery: 1,420 + 101 green; gates 1-10/11-20 clean; soak 120 DONE
 clean; balance rebaselined.
+
+## Session 66: TRACEABILITY_CH1_7 C-series closed (July 2026)
+
+Swept the remaining C-items (C1/C2 fixed S46, C7 S53):
+
+- C3 §1.9 RESOLVED by Eric's Q21 ruling — one-per-City set model stands.
+- C4 §1.9 VERIFIED — FNI-3-blocks-Garrison present; the bots only
+  generate adjacent marches (permitted by the "destination adjacent to
+  start" exception) and the city-network route excludes Blockaded
+  Cities; Muster legality correct.  No reachable gap.
+- C5 §1.10 FIXED — the Leader orphan rule was genuinely unimplemented;
+  now enforced in normalize_state (orphaned Leader -> most-friendly-
+  pieces space, else Available; deterministic, rng-free, profiled free
+  on the hot path).  4 tests.
+- C8 §1.2 VERIFIED — programmatic piece-conservation: all three
+  scenarios sum EXACTLY to the MAX_* component totals across
+  spaces+available+unavailable.
+- C9 §2.3.4 VERIFIED — executed-if->=1-space + the Hortelez
+  >=1-Resource exception are both modeled in _command_effect_count.
+- C10 §8.1.1×§1.9 FIXED — WQ Reward-Loyalty/Committees potential now
+  use effective (blockade-zeroed) population; remaining raw-pop sites
+  are within-tier ranking keys, documented as non-affecting.
+
+Only C6 (§1.4.1 voluntary take-own-forces-from-map when the type is
+not Available) remains OPEN — a rarely-reachable Rally/Muster edge
+with no path in bots, events, or CLI; carried forward as a known
+low-priority gap.  Battery: 1,465 + 101 green (+4 new); gates
+1-10/11-20 clean; soak 120 DONE clean; balance rebaselined.

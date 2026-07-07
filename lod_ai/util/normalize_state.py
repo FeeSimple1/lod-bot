@@ -14,6 +14,7 @@ from lod_ai.board.control import refresh_control
 from lod_ai.map import adjacency as map_adj
 from lod_ai.util.caps import enforce_global_caps
 from lod_ai.economy import resources
+from lod_ai.leaders import leader_location
 
 _MARKER_TAGS = (C.PROPAGANDA, C.RAID, C.BLOCKADE)
 
@@ -151,6 +152,90 @@ def _sanitize_pools(state: Dict) -> None:
         unavail[C.BLOCKADE] = _clamp_int(unavail.get(C.BLOCKADE, 0)) + _clamp_int(unavail.pop(C.SQUADRON))
 
 
+
+_FACTION_OF_LEADER = {
+    "LEADER_WASHINGTON": C.PATRIOTS,
+    "LEADER_ROCHAMBEAU": C.FRENCH,
+    "LEADER_LAUZUN": C.FRENCH,
+    "LEADER_GAGE": C.BRITISH,
+    "LEADER_HOWE": C.BRITISH,
+    "LEADER_CLINTON": C.BRITISH,
+    "LEADER_BRANT": C.INDIANS,
+    "LEADER_CORNPLANTER": C.INDIANS,
+    "LEADER_DRAGGING_CANOE": C.INDIANS,
+}
+
+_FACTION_PIECE_TAGS = {
+    C.BRITISH: (C.REGULAR_BRI, C.TORY, C.FORT_BRI),
+    C.PATRIOTS: (C.REGULAR_PAT, C.MILITIA_A, C.MILITIA_U, C.FORT_PAT),
+    C.FRENCH: (C.REGULAR_FRE,),
+    C.INDIANS: (C.WARPARTY_A, C.WARPARTY_U, C.VILLAGE),
+}
+
+
+def _relocate_leader(state: Dict, leader: str, dst) -> None:
+    """Write *leader*'s location to *dst* (a space id or "Available")
+    across the tolerated leader-state shapes."""
+    leaders = state.setdefault("leaders", {})
+    locs = state.setdefault("leader_locs", {})
+    # leader_locs is the preferred shape
+    locs[leader] = dst if isinstance(dst, str) else None
+    # keep the leaders dict consistent if it uses the {leader: loc} shape
+    if leader in leaders and isinstance(leaders.get(leader), (str, type(None))):
+        leaders[leader] = dst if dst != "Available" else None
+    else:
+        # reverse {space: leader} shape — drop stale entries
+        for k in [k for k, v in list(leaders.items()) if v == leader]:
+            leaders.pop(k, None)
+        if dst != "Available":
+            leaders[dst] = leader
+
+
+def _enforce_leader_orphan(state: Dict) -> None:
+    """§1.10 (C5): "If at any time the current Leader is in a space with
+    no pieces of its Faction, the owning Faction moves that Leader to
+    any space with the same Faction's pieces or to its Available Forces
+    box."  Deterministic for solitaire/bot play: relocate to the space
+    with the MOST of that Faction's pieces (ties by sorted space id — no
+    rng, so normalize_state stays pure), else Available.  Runs after
+    every mutation, so orphaning by casualty/removal self-heals."""
+    spaces = state.get("spaces", {})
+    # Cheap first pass: read on-map leaders from the canonical shapes
+    # (avoid 9× leader_location scans on this hot path).  Build the
+    # {leader: loc} view once.
+    on_map = {}
+    locs = state.get("leader_locs", {})
+    leaders_dict = state.get("leaders", {})
+    valid = set(spaces)
+    for ldr in _FACTION_OF_LEADER:
+        loc = locs.get(ldr)
+        if not (isinstance(loc, str) and loc in valid):
+            loc = leaders_dict.get(ldr)
+        if not (isinstance(loc, str) and loc in valid):
+            loc = None
+        if loc is not None:
+            on_map[ldr] = loc
+    if not on_map:
+        return
+    # Only leaders that are actually orphaned trigger the scan.
+    per_faction_best = {}  # faction -> (best_sid or None)
+    for leader, loc in on_map.items():
+        faction = _FACTION_OF_LEADER[leader]
+        tags = _FACTION_PIECE_TAGS[faction]
+        if any(spaces.get(loc, {}).get(t, 0) for t in tags):
+            continue  # not orphaned (common case)
+        if faction not in per_faction_best:
+            best, best_n = None, 0
+            for sid in sorted(spaces):
+                sp = spaces[sid]
+                n = sum(sp.get(t, 0) for t in tags)
+                if n > best_n:
+                    best, best_n = sid, n
+            per_faction_best[faction] = best
+        _relocate_leader(state, leader,
+                         per_faction_best[faction] or "Available")
+
+
 def normalize_state(state: Dict) -> None:
     """Coerce *state* into canonical shape and enforce invariants."""
     _ensure_core(state)
@@ -162,4 +247,5 @@ def normalize_state(state: Dict) -> None:
     _sanitize_pools(state)
     resources.clamp_all(state)
     refresh_control(state)
+    _enforce_leader_orphan(state)  # §1.10 (C5)
     enforce_global_caps(state)

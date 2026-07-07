@@ -501,6 +501,13 @@ def _support_phase(state):
     skipped if only markers would be removed.
     """
 
+    def _eff_pop(sid):
+        # C10 (§8.1.1×§1.9): a Blockaded City's population is 0 for the
+        # Support total, so its RL/CoC "change in Support" is 0.
+        p = map_adj.population(sid)
+        bl = state.get("markers", {}).get(BLOCKADE, {}).get("on_map", set())
+        return 0 if (p and sid in bl) else p
+
     from collections import defaultdict
 
     rl_shifted = defaultdict(int)    # §6.4.1: max two levels per space
@@ -624,7 +631,8 @@ def _support_phase(state):
             continue
 
         n_raid = 1 if sid in raid_on_map else 0
-        pop = map_adj.population(sid)
+        # C10 (§8.1.1×§1.9): effective population (Blockaded City -> 0).
+        pop = _eff_pop(sid)
         # §8.5.9 "largest change ... possible": §6.4.2 caps shifts at two
         # levels per space, and the purse must pay the Raid marker first
         # (Session 45: was the raw uncapped distance).
