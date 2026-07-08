@@ -75,7 +75,7 @@ def _normalize_markers(state: Dict) -> None:
         if tag not in normalized:
             normalized[tag] = {"pool": 0, "on_map": set()}
         pool = 0
-        on_map = set()
+        on_map: set = set()
         if isinstance(entry, dict):
             pool = entry.get("pool", 0) or 0
             om = entry.get("on_map", set())

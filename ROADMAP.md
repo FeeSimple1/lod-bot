@@ -101,7 +101,13 @@ Flowchart NODE-level counters were scoped out: every §8.4–§8.7 row is
 already text-verified (S55–S57) and golden-replayed; the remaining
 value sits in card/SA/side coverage, which is what landed.
 
-## Piece 6 — Playbook goldens  [UNBLOCKED]
+## Piece 6 — Playbook goldens  [DONE, Session 57-63]
+
+All five Non-player walk-throughs are transcribed and replay green
+in lod_ai/tests/test_playbook_goldens.py (Example 3 at exact piece
+picks).  They are the project's deepest instrument — they found the
+two biggest project-lifetime bugs after every flowchart row was
+already "verified".  Original scope notes below.
 
 The Playbook's Non-Player Examples of Play are official oracle data:
 encode each documented setup and assert the bot makes the documented
@@ -130,12 +136,20 @@ Future changes landing outside the intervals must be explained, not
 just rebaselined. (The 60-game pinned baseline stays as the fast
 canary.)
 
-## Piece 9 — Hygiene / CI hardening
+## Piece 9 — Hygiene / CI hardening  [DONE, Session 71]
 
-- CI (`ci.yml`) runs the clean-sweep gate and a bounded soak slice,
-  not just pytest.
-- Lint rule banning module-level `random` use in gameplay code
-  (`base_bot.py` still carries a stale `import random`; discipline is
-  currently by convention).
-- mypy on `lod_ai/` (gradual, starting with util/ and board/).
-- Repo cleanup per agents.md (stray artifacts, __pycache__).
+- CI (`ci.yml`) now runs, as separate jobs: pytest, the clean-sweep gate
+  (seeds 1-20 x3), the balance guardrail (seeds 1-20), a bounded soak
+  slice (60 games, --invariants), and gradual mypy (util + board).
+- Lint rule banning the process-global `random` module in gameplay code
+  (draws must use the seeded `state["rng"]`, Q22): pytest test
+  `tests/test_no_global_random.py`, with a self-test guarding the regex.
+  Gameplay code was already clean; `base_bot.py`'s truly-stale
+  `import random` (its last use went away with the T7 refactor) removed.
+- Gradual mypy: `mypy.ini` (lenient, ignore_missing_imports) + a CI
+  `typecheck` job enforcing `lod_ai/util` and `lod_ai/board` clean (two
+  missing local annotations fixed).  Widen the CI scope as more of
+  `lod_ai/` is annotated.
+- Repo cleanup: removed 8 stale, unreferenced bot-error diagnostic dumps
+  (`bot_error_log*.json`, `bot_error_analysis*.md`) and gitignored the
+  pattern; __pycache__/*.pyc/*.jsonl already ignored.

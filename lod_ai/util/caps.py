@@ -84,7 +84,7 @@ def enforce_global_caps(state: Dict) -> None:
     Every removal is logged.
     """
     # 3.1 — GLOBAL CAPS --------------------------------------------------
-    live = defaultdict(int)
+    live: defaultdict = defaultdict(int)
     for sp in state["spaces"].values():
         for tag, qty in sp.items():
             for key in CAP_TABLE:

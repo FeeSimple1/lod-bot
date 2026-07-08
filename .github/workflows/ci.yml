@@ -41,3 +41,29 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - name: Winners must match the committed baseline
         run: python -m lod_ai.tools.balance_smoke --seeds 1-20
+
+  bot-soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: pip install -r requirements-dev.txt
+      - name: Bounded soak slice — bot-only games must stay invariant-clean
+        env:
+          PYTHONHASHSEED: "0"
+        run: python -m lod_ai.tools.soak --games 60 --invariants --out soak_ci.jsonl
+
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: pip install -r requirements-dev.txt
+      - name: Gradual mypy — util and board must stay type-clean
+        run: python -m mypy lod_ai/util lod_ai/board

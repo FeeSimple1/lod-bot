@@ -1,5 +1,4 @@
 # lod_ai/bots/base_bot.py
-import random
 from typing import Dict, List, Tuple, Optional
 from lod_ai import rules_consts as C
 from lod_ai.board import pieces

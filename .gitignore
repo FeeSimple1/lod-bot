@@ -12,3 +12,8 @@ selfplay_results*.jsonl
 
 # Crash-repro / invariant dumps (regenerated; not source)
 crash_dumps/
+
+# Regenerable bot-error diagnostic dumps (Piece 9 cleanup)
+lod_ai/tools/bot_error_log*.json
+lod_ai/tools/bot_error_analysis*.md
+soak_ci*.jsonl
