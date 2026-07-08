@@ -349,6 +349,34 @@ remaining rng.random() sort-key ties with grouped table selection
 by table position.  S53-S60 large-N numbers are NOT comparable
 across this change — fresh baselines required.
 
+**Addendum (July 7, 2026, Session 70 — source-coverage confirmed,
+RESOLVED): the tie topic is fully covered by the Manual + Playbook.**
+On review of whether the Reference Documents actually SPECIFY tie
+resolution (vs. leaving it to engine convention):
+  • Multi-candidate SPACE ties — Manual §8.1.3 → §8.2: the Random
+    Spaces table (1D3 column + 1D6 row, top-of-box first, scan down the
+    column following the arrows, reroll only if needed).  Complete.
+  • Exactly-two-candidate ties — NOT in the rules text, but the Playbook
+    states the procedure explicitly (twice, near-verbatim): "Since there
+    are only two spaces to choose between, the player rolls a D6 instead
+    of using the Random Spaces table: 1-3 = X, 4-6 = Y" (e.g. 1-3=
+    Philadelphia/4-6=New York City; 1-3=Boston/4-6=Norfolk).  So counting
+    the Playbook this is a STATED rule, not a gap — the engine's
+    two-candidate D6 split is on-source.
+  • Non-space / "who" choices — §8.3.8 ("choose randomly among the
+    possibilities") and §8.3.5 (benefit/harm ordering, T7).
+  • Victory-margin ties — §7.1 (deterministic NP > P > B > F > I; French
+    last without ToA).  Tracked separately (C7).
+The ONLY detail neither source pins down is which of the two candidates
+is labelled 1-3 vs 4-6 (the Playbook just assigns 1-3 to the
+first-listed candidate in each example).  This is outcome-neutral — a
+50/50 split either way, so a single pick has identical odds regardless
+of label order; it matters only for reproducing a SPECIFIC narrated die
+roll, which the Playbook goldens already pin (all five replay green,
+Example 3 at exact picks).  Eric's ruling (July 7, 2026): the Manual +
+Playbook are sufficient basis — consider tie resolution fully RESOLVED,
+no engine change or open lead remains.
+
 ---
 
 ## Q23 (Session 67, OPEN): Propaganda/Raid marker stacking — set model
