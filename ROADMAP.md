@@ -119,14 +119,22 @@ PDF), the Event Text and Background section (useful cross-check for
 the Piece 3 card audit), and Non-Player Designer's Notes. The Event
 Instructions sheet wording is NOT in it — T12 stays blocked on Q15.
 
-## Piece 7 — Human-mode completeness
+## Piece 7 — Human-mode completeness  [AUDITED, Session 72; CLI wiring is the open item]
 
-- Enumerate every card-text player choice; diff against the override
-  keys (63 today) and CLI prompts; any card whose choice silently
-  falls through to bot selection for a human seat is a bug.
-- CLI fuzzing: random inputs through the real `_game_loop`, undo at
-  every prompt, save/load at every pause point, asserting round-trip
-  state equality (extends `tools/human_qa.py`).
+- Part 1 (card-choice audit) DONE: `docs/human_mode_audit.md` +
+  `tests/test_human_mode_completeness.py`.  Finding: the CLI event path
+  collects NO card-specific choices — it picks only the shaded/unshaded
+  side and calls `handle_event`, so for a human seat all 43 choice-
+  bearing cards resolve via the non-player handler default (36 genuine
+  free-choice gaps; 7 faction choices now §8.3.5/T7-faithful).  The
+  override keys already exist and handlers honor them; only the CLI
+  event-choice COLLECTION layer is missing.  The frozen registry gates
+  drift.  Building the 43 prompt specs is the scoped follow-up.
+- Part 2 (CLI fuzzing) already covered by `tools/human_qa.py`: it drives
+  the real `_game_loop` with a scripted provider, injects undo at WQ and
+  general prompts, and save/loads every card through
+  `invariants.check_save_load_roundtrip`, which asserts exact
+  canonical-state + RNG equality.  Green across all scenarios/seatings.
 
 ## Piece 8 — Statistical validation at scale
 
