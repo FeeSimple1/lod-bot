@@ -59,3 +59,23 @@ Royalist 99/300 (33.0%).  Every faction total sits inside its S72 CI
 (F 134->138, I 78->67, P 59->63, B 29->32) — the corrections flip
 individual games (canary rebaselined) but the aggregate picture for
 the tune-or-not call is unchanged: French ~45%, British ~10%.
+
+## Addendum: post-question-spaces rerun (largeN_s73b.jsonl) — S73 FINAL
+
+After the §8.3.5 flowchart-question-spaces-first implementation (bot
+event placements now prefer the spaces that fired the Event-or-Command
+bullet): same instrument, all 300 clean.
+
+| Faction | 1775 | 1776 | 1778 | total |
+|---|---|---|---|---|
+| FRENCH | 47 | 39 | 55 | 141 (47.0%, 41.4-52.7) |
+| INDIANS | 39 | 18 | 15 | 72 (24.0%, 19.5-29.1) |
+| PATRIOTS | 8 | 25 | 24 | 57 (19.0%, 15.0-23.8) |
+| BRITISH | 6 | 18 | 6 | 30 (10.0%, 7.1-13.9) |
+
+Royalist 102/300 (34.0%).  Third read of the day, third time inside
+the same CIs (F 46-47%, I 22-26%, P 19-21%, B 10-11%): the S73
+correctness stretch (who-choice sweep, bot tie-site conversion,
+question-spaces-first) does not move the aggregate balance.  The
+STANDING PICTURE for the tune-or-not call: French ~45-47%, Indians
+~22-26%, Patriots ~19-21%, British ~10%; Royalist share ~33-36%.
