@@ -76,7 +76,17 @@ def _validate_markers(state: Dict, valid_spaces: set[str]) -> None:
         if not isinstance(pool, int) or pool < 0:
             raise ValueError(f"Marker pool for {tag} must be non-negative int")
         on_map = entry.get("on_map", set())
-        if not isinstance(on_map, (set, frozenset)):
+        # Q23: Propaganda/Raid stack -> {sid: count>=1}; Blockade stays a set.
+        if tag in (C.PROPAGANDA, C.RAID):
+            if not isinstance(on_map, dict):
+                raise TypeError(
+                    f"state['markers']['{tag}']['on_map'] must be a dict "
+                    f"of per-space counts (Q23)")
+            for sid, cnt in on_map.items():
+                if not isinstance(cnt, int) or cnt < 1:
+                    raise ValueError(
+                        f"Marker {tag} count in {sid} must be a positive int")
+        elif not isinstance(on_map, (set, frozenset)):
             raise TypeError(f"state['markers']['{tag}']['on_map'] must be a set")
         for sid in on_map:
             if sid not in valid_spaces:

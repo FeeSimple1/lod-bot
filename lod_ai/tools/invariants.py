@@ -298,7 +298,11 @@ def marker_census(state: Dict[str, Any]) -> Dict[str, int]:
     unavail = state.get("unavailable") or {}
     for tag in (C.PROPAGANDA, C.RAID, C.BLOCKADE):
         entry = markers.get(tag) or {}
-        total = int(entry.get("pool", 0) or 0) + len(entry.get("on_map") or ())
+        om = entry.get("on_map") or ()
+        # Q23: Propaganda/Raid stack — on_map is {sid: count}.
+        on_map_total = (sum(int(v) for v in om.values())
+                        if isinstance(om, dict) else len(om))
+        total = int(entry.get("pool", 0) or 0) + on_map_total
         if tag == C.BLOCKADE:
             total += int(unavail.get(C.BLOCKADE, 0) or 0)
         out[tag] = total

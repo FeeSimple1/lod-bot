@@ -42,10 +42,10 @@ def test_card2_common_sense_any_city_selection():
 
     assert state["spaces"]["Boston"].get(REGULAR_BRI) == 2
     assert state["spaces"]["Boston"].get(TORY) == 2
-    assert "Boston" in state["markers"][PROPAGANDA]["on_map"]
-    # Q23 interim (Session 67): one Propaganda per space under the set
-    # model — the card text "two Propaganda markers there" awaits ruling.
-    assert state["markers"][PROPAGANDA]["pool"] == 9
+    # Q23 (Eric's ruling, July 10 2026): markers STACK — "two
+    # Propaganda markers there" places both.
+    assert state["markers"][PROPAGANDA]["on_map"].get("Boston") == 2
+    assert state["markers"][PROPAGANDA]["pool"] == 8
     assert state["resources"]["BRITISH"] == 4
 
 
@@ -227,7 +227,7 @@ def test_card24_declaration_shaded_places_militia_and_fort():
     assert state["spaces"]["Cambridge"].get(MILITIA_U) == 1
     assert state["spaces"]["Boston"].get(MILITIA_U) == 1
     on_map = state["markers"][PROPAGANDA]["on_map"]
-    assert {"Boston", "Albany", "Cambridge"} <= on_map
+    assert {"Boston", "Albany", "Cambridge"} <= set(on_map)  # Q23: dict
     assert state["spaces"]["Boston"].get(FORT_PAT) == 1
 
 

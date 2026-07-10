@@ -1310,8 +1310,7 @@ class BritishBot(BaseBot):
         total_support, total_opp = self._support_opposition_totals(state)
         if total_opp > total_support + die or state["available"].get(C.FORT_BRI, 0) == 0:
             # Reward Loyalty
-            raid_on_map = state.get("markers", {}).get(C.RAID, {}).get("on_map", set())
-            prop_on_map = state.get("markers", {}).get(C.PROPAGANDA, {}).get("on_map", set())
+            from lod_ai.board.pieces import marker_count as _mc
 
             def _rl_key(n):
                 # §8.4.5: "first select the space or spaces with the
@@ -1321,8 +1320,8 @@ class BritishBot(BaseBot):
                 # levels x Population (§8.1.1), and "possible" caps the
                 # levels at what the purse can pay after the markers
                 # (Session 44: was raw levels, uncapped, no §8.2 tie).
-                markers = ((1 if n in raid_on_map else 0)
-                           + (1 if n in prop_on_map else 0))
+                # Q23: stacked markers each cost 1 Resource to clear.
+                markers = _mc(state, C.RAID, n) + _mc(state, C.PROPAGANDA, n)
                 already = 0 if n in all_selected else 1
                 max_shift = C.ACTIVE_SUPPORT - self._support_level(state, n)
                 muster_count = len(all_selected) + already
@@ -1383,9 +1382,8 @@ class BritishBot(BaseBot):
                 # when Rewarding Loyalty during Muster."
                 # Calculate maximum affordable shift levels for the best space.
                 _sp_rl = state["spaces"].get(best_rl, {})
-                _rl_markers = sum(
-                    1 for m in (raid_on_map, prop_on_map) if best_rl in m
-                )
+                _rl_markers = (_mc(state, C.RAID, best_rl)
+                               + _mc(state, C.PROPAGANDA, best_rl))
                 _current_sup = self._support_level(state, best_rl)
                 _max_shift = C.ACTIVE_SUPPORT - _current_sup  # levels to reach Active Support
                 _rl_gage = 1 if leader_location(state, "LEADER_GAGE") == best_rl else 0

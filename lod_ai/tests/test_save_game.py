@@ -66,8 +66,10 @@ class TestSerializeDeserialize:
         }
         serialized = _serialize_state(state, {"BRITISH"})
         restored, hf = _deserialize_state(serialized)
-        assert isinstance(restored["markers"]["Propaganda"]["on_map"], set)
-        assert restored["markers"]["Propaganda"]["on_map"] == {"Boston", "Quebec"}
+        # Q23: Propaganda/Raid on_map round-trips as {sid: count}
+        # (legacy set input restores as count-1 dict).
+        assert restored["markers"]["Propaganda"]["on_map"] == {"Boston": 1,
+                                                               "Quebec": 1}
         assert isinstance(restored["eligible_next"], set)
         assert restored["eligible_next"] == {"BRITISH", "FRENCH"}
         assert isinstance(restored["ineligible_next"], set)
@@ -109,10 +111,13 @@ class TestSaveLoad:
         assert loaded_state.get("_scenario") == "1775" or loaded_state.get("scenario") == "1775"
         # RNG should be a Random instance
         assert isinstance(loaded_state["rng"], random.Random)
-        # Marker on_map should be sets
+        # Marker on_map: Q23 dict-of-counts for Propaganda/Raid,
+        # Q21 set for Blockade.
         for tag, entry in loaded_state.get("markers", {}).items():
             if "on_map" in entry:
-                assert isinstance(entry["on_map"], set), f"markers[{tag}].on_map should be set"
+                want = dict if tag in ("Propaganda", "Raid") else set
+                assert isinstance(entry["on_map"], want), (
+                    f"markers[{tag}].on_map should be {want.__name__}")
 
     def test_save_with_custom_filename(self, tmp_save_dir):
         state = {"rng": random.Random(1), "seed": 1}

@@ -397,8 +397,8 @@ def build_state(
         "casualties":   scen.get("casualties", {}),
         # 🔹 Marker pools -------------------------------------------------
         "markers":   {
-            PROPAGANDA: {"pool": MAX_PROPAGANDA, "on_map": set()},
-            RAID:       {"pool": MAX_RAID, "on_map": set()},
+            PROPAGANDA: {"pool": MAX_PROPAGANDA, "on_map": {}},   # Q23: counts
+            RAID:       {"pool": MAX_RAID, "on_map": {}},          # Q23: counts
             BLOCKADE:   {"pool": 0, "on_map": set()},
             # add further marker families here
         },

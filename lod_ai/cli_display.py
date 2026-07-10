@@ -170,11 +170,18 @@ def display_board_state(state: Dict[str, Any]) -> None:
 
     for tag, total in ((RC.PROPAGANDA, 12), (RC.RAID, 12)):
         entry = markers.get(tag, {"pool": total, "on_map": set()})
+        om = entry.get("on_map") or ()
         pool = entry.get("pool", total)
-        on_map = entry.get("on_map", set())
-        placed = len(on_map)
-        if on_map:
-            spaces_str = ", ".join(sorted(on_map))
+        # Q23: Propaganda/Raid stack ({sid: count}); Blockade is a set.
+        if isinstance(om, dict):
+            placed = sum(om.values())
+            spaces_str = ", ".join(
+                f"{sid} x{cnt}" if cnt > 1 else sid
+                for sid, cnt in sorted(om.items()))
+        else:
+            placed = len(om)
+            spaces_str = ", ".join(sorted(om))
+        if om:
             print(f"  {tag:12s}: {placed} on map ({pool} remaining) -- {spaces_str}")
         else:
             print(f"  {tag:12s}: 0 on map ({pool} remaining)")

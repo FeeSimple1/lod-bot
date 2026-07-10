@@ -509,9 +509,9 @@ class TestPersuasion:
         with pytest.raises(ValueError, match="1-3"):
             persuasion.execute(state, C.PATRIOTS, {}, spaces=["A", "B", "C", "D"])
 
-    def test_persuasion_no_double_propaganda_pool_loss(self, monkeypatch):
-        """§4.3.1: If a space already has a Propaganda marker, do not decrement
-        the pool again (on_map is a set, so add() is a no-op for existing entries)."""
+    def test_persuasion_stacks_propaganda_on_marked_space(self, monkeypatch):
+        """Q23 (July 10 2026): markers stack — Persuasion on a marked
+        space places ANOTHER Propaganda from the pool (conserved)."""
         monkeypatch.setattr(persuasion, "refresh_control", lambda s: None)
         monkeypatch.setattr(persuasion, "enforce_global_caps", lambda s: None)
         from lod_ai.map import adjacency
@@ -522,12 +522,11 @@ class TestPersuasion:
         _space(state, "Virginia", **{C.MILITIA_U: 3})
         state["available"][C.MILITIA_A] = 5
         # Pre-place a Propaganda marker on Virginia
-        state["markers"][C.PROPAGANDA]["on_map"].add("Virginia")
+        state["markers"][C.PROPAGANDA]["on_map"] = {"Virginia": 1}
         state["markers"][C.PROPAGANDA]["pool"] = 11  # 12 - 1 already placed
         persuasion.execute(state, C.PATRIOTS, {}, spaces=["Virginia"])
-        # Pool should NOT have been decremented — Virginia already had marker
-        assert state["markers"][C.PROPAGANDA]["pool"] == 11
-        assert "Virginia" in state["markers"][C.PROPAGANDA]["on_map"]
+        assert state["markers"][C.PROPAGANDA]["pool"] == 10
+        assert state["markers"][C.PROPAGANDA]["on_map"]["Virginia"] == 2
 
 
 # ===========================================================================

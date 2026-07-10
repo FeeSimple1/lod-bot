@@ -92,14 +92,21 @@ def test_check_rules_properties_raises_and_dumps(tmp_path):
 # Fixes the invariants forced
 # ---------------------------------------------------------------------------
 
-def test_place_marker_conserves_on_remark():
+def test_place_marker_stacks_and_conserves():
+    # Q23 (Eric's ruling, July 10 2026): Propaganda/Raid STACK — qty>1
+    # and re-placement add markers, capped only by the pool, and the
+    # census stays exact.
     from lod_ai.board.pieces import place_marker
     st = build_state("1776", seed=1)
     pool0 = st["markers"][C.PROPAGANDA]["pool"]
     assert place_marker(st, C.PROPAGANDA, "Boston", 1) == 1
-    # qty>1 and re-placement never destroy markers (one per space)
-    assert place_marker(st, C.PROPAGANDA, "Boston", 2) == 0
-    assert st["markers"][C.PROPAGANDA]["pool"] == pool0 - 1
+    assert place_marker(st, C.PROPAGANDA, "Boston", 2) == 2
+    assert st["markers"][C.PROPAGANDA]["on_map"]["Boston"] == 3
+    assert st["markers"][C.PROPAGANDA]["pool"] == pool0 - 3
+    # pool cap: asking for more than remains places what's left
+    left = st["markers"][C.PROPAGANDA]["pool"]
+    assert place_marker(st, C.PROPAGANDA, "Quebec_City", left + 5) == left
+    assert st["markers"][C.PROPAGANDA]["pool"] == 0
     assert I.marker_census(st)[C.PROPAGANDA] == C.MAX_PROPAGANDA
 
 
@@ -112,18 +119,21 @@ def test_rabble_rousing_rejects_reserves():
         rabble_rousing.execute(st, C.PATRIOTS, {}, ["Northwest"])
 
 
-def test_rabble_rousing_conserves_propaganda_on_marked_space():
+def test_rabble_rousing_stacks_propaganda_on_marked_space():
+    # Q23: a marked space gets ANOTHER marker (the S67 interim skipped;
+    # pre-S67 the marker was destroyed).  Census stays exact.
     from lod_ai.commands import rabble_rousing
     st = build_state("1775", seed=1)
     sid = "Massachusetts"
     st["spaces"][sid][C.MILITIA_U] = 2
     st["resources"][C.PATRIOTS] = 5
-    st["markers"][C.PROPAGANDA]["on_map"].add(sid)
+    st["markers"][C.PROPAGANDA]["on_map"][sid] = 1
     st["markers"][C.PROPAGANDA]["pool"] -= 1
     pool0 = st["markers"][C.PROPAGANDA]["pool"]
     sup0 = st.get("support", {}).get(sid, 0)
     rabble_rousing.execute(st, C.PATRIOTS, {}, [sid])
-    assert st["markers"][C.PROPAGANDA]["pool"] == pool0  # marker conserved
+    assert st["markers"][C.PROPAGANDA]["on_map"][sid] == 2
+    assert st["markers"][C.PROPAGANDA]["pool"] == pool0 - 1
     assert st["support"][sid] == max(-2, sup0 - 1)       # shift still happens
     assert I.marker_census(st)[C.PROPAGANDA] == C.MAX_PROPAGANDA
 

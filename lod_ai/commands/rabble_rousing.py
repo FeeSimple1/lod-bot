@@ -130,9 +130,7 @@ def execute(
     # Resource cost
     _pay_cost(state, len(selected))
 
-    # Ensure Propaganda pool exists in state
-    prop_state = state.setdefault("markers", {}).setdefault(PROPAGANDA, {"pool": 0, "on_map": set()})
-    prop_state.setdefault("on_map", set())
+    from lod_ai.board.pieces import place_marker, marker_count
 
     push_history(state, f"PATRIOTS RABBLE_ROUSING {selected}")
 
@@ -142,13 +140,10 @@ def execute(
         # Validate selection criteria (re-checked for clarity)
         rebellion_control = state.get("control", {}).get(space_id) == "REBELLION"
         has_underground = sp.get(MILITIA_U, 0) > 0
-        # Place a Propaganda marker if any remain and the space has none
-        # (one marker per space; a set-add on an already-marked space
-        # silently destroyed the marker while debiting the pool before
-        # Session 67 — the Session 56 Blockade-conservation class).
-        if prop_state.get("pool", 0) > 0 and space_id not in prop_state["on_map"]:
-            prop_state["pool"] -= 1
-            prop_state["on_map"].add(space_id)
+        # Place a Propaganda marker if any remain (§3.3.4).  Q23:
+        # markers stack — a marked space gets another; the global pool
+        # of 12 is the only cap.
+        placed_marker = place_marker(state, PROPAGANDA, space_id)
 
         # Shift support one level toward Active Opposition
         before_support = state.get("support", {}).get(space_id, NEUTRAL)
@@ -161,7 +156,8 @@ def execute(
         # Log per‑space details (optional)
         state.setdefault("log", []).append(
             f" PAT Rabble ({space_id})  support: {before_support}→{after_support}  "
-            f"prop: {'yes' if space_id in prop_state.get('on_map', set()) else 'no'}  "
+            f"prop: {'yes' if placed_marker else 'no'} "
+            f"(x{marker_count(state, PROPAGANDA, space_id)})  "
             f"militia_flip: {('yes' if not (rebellion_control and _has_patriot_piece(sp)) else 'no')}"
         )
 

@@ -32,7 +32,10 @@ def test_round_trip():
     pre_markers = {
         tag: {
             "pool": entry.get("pool", 0),
-            "on_map": set(entry.get("on_map", set())),
+            # Q23: dict of counts for Propaganda/Raid, set for Blockade
+            "on_map": (dict(entry["on_map"])
+                       if isinstance(entry.get("on_map"), dict)
+                       else set(entry.get("on_map", set()))),
         }
         for tag, entry in state.get("markers", {}).items()
     }
@@ -74,7 +77,11 @@ def test_round_trip():
         loaded_entry = loaded_state.get("markers", {}).get(tag, {})
         assert loaded_entry.get("pool", 0) == expected["pool"], f"{tag} pool mismatch"
         loaded_on_map = loaded_entry.get("on_map", set())
-        assert isinstance(loaded_on_map, set), f"{tag} on_map should be a set, got {type(loaded_on_map)}"
+        # Q23: Propaganda/Raid round-trip as {sid: count} dicts;
+        # Blockade stays a set (Q21).
+        want = dict if tag in ("Propaganda", "Raid") else set
+        assert isinstance(loaded_on_map, want), (
+            f"{tag} on_map should be {want.__name__}, got {type(loaded_on_map)}")
         assert loaded_on_map == expected["on_map"], f"{tag} on_map mismatch"
 
     # Verify RNG state preserved (should produce same next values)

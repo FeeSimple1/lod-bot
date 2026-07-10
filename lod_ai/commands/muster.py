@@ -143,13 +143,12 @@ def _reward_loyalty(state: Dict, sp: Dict, space_id: str, levels: int,
     if state.get("control", {}).get(space_id) != BRITISH:
         raise ValueError("British must Control the space to Reward Loyalty.")
 
-    # Determine marker removals and potential shift
-    marker_state = state.setdefault("markers", {})
-    markers_here = []
+    # Determine marker removals and potential shift.  Q23: markers
+    # stack — every stacked marker must be paid for (1 Resource each).
+    from lod_ai.board.pieces import marker_count, remove_piece as _rm_marker
+    markers_here = []          # one entry per MARKER, not per tag
     for marker in (PROPAGANDA, RAID):
-        entry = marker_state.setdefault(marker, {"pool": 0, "on_map": set()})
-        if space_id in entry.get("on_map", set()):
-            markers_here.append(marker)
+        markers_here.extend([marker] * marker_count(state, marker, space_id))
 
     current = _support_value(state, space_id)
     shift_levels = min(levels, ACTIVE_SUPPORT - current)
@@ -167,10 +166,7 @@ def _reward_loyalty(state: Dict, sp: Dict, space_id: str, levels: int,
 
     # Remove markers first (each already included in cost)
     for marker in markers_here:
-        entry = marker_state.setdefault(marker, {"pool": 0, "on_map": set()})
-        if space_id in entry.get("on_map", set()):
-            entry["on_map"].discard(space_id)
-            entry["pool"] = entry.get("pool", 0) + 1
+        _rm_marker(state, marker, space_id, 1, to="available")
 
     # Apply shift
     target  = current + shift_levels
@@ -318,11 +314,9 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
                 if rl_ok:
                     # Pre-check affordability: compute RL cost and verify
                     # the bot can afford it after muster payment.
-                    marker_state_check = state.get("markers", {})
+                    from lod_ai.board.pieces import marker_count as _mc
                     _markers_count = sum(
-                        1 for m in (PROPAGANDA, RAID)
-                        if target in marker_state_check.get(m, {}).get("on_map", set())
-                    )
+                        _mc(state, m, target) for m in (PROPAGANDA, RAID))
                     _current_sup = _support_value(state, target)
                     _shift = min(reward_levels, ACTIVE_SUPPORT - _current_sup)
                     _discount = 1 if rl_free_first and _shift > 0 else 0

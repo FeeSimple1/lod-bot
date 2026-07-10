@@ -144,7 +144,7 @@ def execute(
                      state["spaces"][src], state["spaces"][dst],
                      src, dst)
 
-    raids_state = state.setdefault("markers", {}).setdefault(RAID, {"pool": 0, "on_map": set()})
+    from lod_ai.board.pieces import place_marker
 
     for prov in selected:
         sp = state["spaces"][prov]
@@ -154,12 +154,11 @@ def execute(
             raise ValueError(f"{prov}: no Underground WP to Activate.")
         flip_pieces(state, WARPARTY_U, WARPARTY_A, prov, 1)
 
-        # Place marker if pool available and none already here (one Raid
-        # marker per space — the set model; re-raiding a marked province
-        # destroyed a marker while debiting the pool before Session 67).
-        if raids_state.get("pool", 0) > 0 and prov not in raids_state.setdefault("on_map", set()):
-            raids_state["pool"] -= 1
-            raids_state["on_map"].add(prov)
+        # Place a Raid marker (§3.4.4).  Q23: markers stack — re-Raiding
+        # a marked Province adds another marker; the global pool is the
+        # only cap (the pre-S67 code destroyed a marker here, and the
+        # S67 interim skipped the placement).
+        place_marker(state, RAID, prov)
         # shift Opposition one step toward Neutral
         _shift_one_toward_neutral(state, prov)
 

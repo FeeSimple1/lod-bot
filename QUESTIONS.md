@@ -379,8 +379,23 @@ no engine change or open lead remains.
 
 ---
 
-## Q23 (Session 67, OPEN): Propaganda/Raid marker stacking — set model
-vs printed multi-placement
+## Q23 (Session 67, RESOLVED — Eric ruled July 10 2026): Propaganda/Raid
+marker stacking — set model vs printed multi-placement
+
+**Eric's ruling (July 10, 2026): markers STACK — option (b), per-space
+counts.**  Implemented Session 74: `markers[tag]["on_map"]` is a
+`{space_id: count}` dict for Propaganda and Raid (Blockade keeps the
+Q21 set model), capped only by the global pool of 12.  Cards 1/2/47
+place both markers; §3.4.4 re-Raids and §3.3.4/§4.3.1 re-placements
+add a marker; §6.4.1/§6.4.2 Reward Loyalty / Committees of
+Correspondence pay 1 Resource PER MARKER before any shift (the
+"once no Raid or Propaganda is in a space" reading), including the
+§8.4.5/§8.5.9 only-markers skip and the Muster-RL cost; the WQ Reset
+returns full stacks to the pool.  Save format: counts round-trip as
+JSON dicts; legacy set/list saves load as count-1.  Census invariant
+sums stacked counts.  Gates: lod_ai/tests/test_q23_marker_stacking.py.
+
+--- original question (for the record) ---
 
 The Piece 4 marker-conservation invariant exposed the model question
 Q21 settled for Blockades, now for Propaganda/Raid.  The engine models

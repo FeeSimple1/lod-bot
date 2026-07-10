@@ -62,33 +62,53 @@ def _normalize_support(state: Dict, valid_spaces: Iterable[str]) -> None:
         support[sid] = max(-2, min(2, int(support[sid])))
 
 
+def _count_model(tag) -> bool:
+    # Q23: Propaganda/Raid stack (on_map = {sid: count}); Blockade keeps
+    # the Q21 one-per-space set model.
+    return tag in (C.PROPAGANDA, C.RAID)
+
+
 def _normalize_markers(state: Dict) -> None:
     markers = state.setdefault("markers", {})
     normalized: Dict[str, Dict] = {}
 
+    def _fresh(tag):
+        return {"pool": 0, "on_map": {} if _count_model(tag) else set()}
+
+    def _add(tag, sid, count=1):
+        om = normalized[tag]["on_map"]
+        if isinstance(om, dict):
+            om[sid] = om.get(sid, 0) + max(1, int(count))
+        else:
+            om.add(sid)
+
     # seed defaults
     for tag in _MARKER_TAGS:
-        normalized[tag] = {"pool": 0, "on_map": set()}
+        normalized[tag] = _fresh(tag)
 
     # adapt legacy marker structures
     for tag, entry in markers.items():
         if tag not in normalized:
-            normalized[tag] = {"pool": 0, "on_map": set()}
+            normalized[tag] = _fresh(tag)
         pool = 0
-        on_map: set = set()
+        found: Dict[str, int] = {}
         if isinstance(entry, dict):
             pool = entry.get("pool", 0) or 0
-            om = entry.get("on_map", set())
+            om = entry.get("on_map", ())
             if isinstance(om, dict):
-                om = om.keys()
-            if isinstance(om, (list, tuple, set, frozenset)):
-                on_map.update(om)
+                for sid, cnt in om.items():
+                    found[sid] = found.get(sid, 0) + max(1, _clamp_int(cnt) or 1)
+            elif isinstance(om, (list, tuple, set, frozenset)):
+                for sid in om:
+                    found[sid] = found.get(sid, 0) + 1
         elif isinstance(entry, (set, list, tuple)):
-            on_map.update(entry)
+            for sid in entry:
+                found[sid] = found.get(sid, 0) + 1
         elif isinstance(entry, int):
             pool = entry
         normalized[tag]["pool"] = _clamp_int(normalized[tag]["pool"] + pool)
-        normalized[tag]["on_map"].update(on_map)
+        for sid, cnt in found.items():
+            _add(tag, sid, cnt)
 
     # fold in any per-space counters and remove them from spaces
     for sid, sp in state.get("spaces", {}).items():
@@ -101,7 +121,7 @@ def _normalize_markers(state: Dict) -> None:
             if tag == C.BLOCKADE and sid == C.WEST_INDIES_ID:
                 normalized[tag]["pool"] += _clamp_int(count)
             elif count > 0:
-                normalized[tag]["on_map"].add(sid)
+                _add(tag, sid, count if _count_model(tag) else 1)
 
         # legacy lowercase blockade key
         if C.BLOCKADE_KEY in sp:
@@ -120,7 +140,8 @@ def _normalize_markers(state: Dict) -> None:
                 normalized[C.BLOCKADE]["on_map"].add(sid)
 
     for tag, entry in normalized.items():
-        entry["on_map"] = set(entry["on_map"])
+        if not _count_model(tag):
+            entry["on_map"] = set(entry["on_map"])
         normalized[tag] = entry
 
     state["markers"] = normalized

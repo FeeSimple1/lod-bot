@@ -83,12 +83,21 @@ def _deserialize_state(data: dict) -> tuple[dict, set]:
     else:
         data["rng"] = random.Random()
 
-    # Restore sets for marker on_map fields
+    # Restore marker on_map fields (Q23: Propaganda/Raid are dicts of
+    # per-space counts and survive JSON natively; legacy list saves
+    # become count-1 dicts.  Blockade stays a set.)
     markers = data.get("markers", {})
+    from lod_ai.rules_consts import PROPAGANDA as _PROP, RAID as _RAID
     for tag in markers:
         entry = markers[tag]
-        if "on_map" in entry and isinstance(entry["on_map"], list):
-            entry["on_map"] = set(entry["on_map"])
+        om = entry.get("on_map")
+        if tag in (_PROP, _RAID):
+            if isinstance(om, list):
+                entry["on_map"] = {sid: 1 for sid in om}   # legacy save
+            elif isinstance(om, dict):
+                entry["on_map"] = {sid: int(cnt) for sid, cnt in om.items()}
+        elif isinstance(om, list):
+            entry["on_map"] = set(om)
 
     # Restore sets for eligibility tracking fields
     for key in ("eligible_next", "ineligible_next", "remain_eligible",

@@ -15,6 +15,23 @@ def _norm(tag: str) -> str:
     return tag
 
 _MARKERS = {PROPAGANDA, RAID, BLOCKADE}
+# Q23 (Eric's ruling, July 10 2026): Propaganda and Raid markers STACK —
+# on_map is a {space_id: count} dict for these tags, capped only by the
+# global pool (cards 1/2/47 place two; §6.4.1/6.4.2 price removals per
+# marker).  Blockades keep the Q21 set model (one per City).
+_COUNT_MARKERS = {PROPAGANDA, RAID}
+
+
+def _marker_entry(state, tag):
+    """Return state["markers"][tag], coercing legacy set/list on_map to
+    the Q23 count model for stacking marker types."""
+    count_model = tag in _COUNT_MARKERS
+    entry = state.setdefault("markers", {}).setdefault(
+        tag, {"pool": 0, "on_map": {} if count_model else set()})
+    om = entry.setdefault("on_map", {} if count_model else set())
+    if count_model and not isinstance(om, dict):
+        entry["on_map"] = {sid: 1 for sid in om}
+    return entry
 _BASE_TAGS = {C.FORT_BRI, C.FORT_PAT, C.VILLAGE}
 
 _POOL_FAMILY = {
@@ -218,9 +235,32 @@ def remove_piece(state: Dict[str, Any], tag: str, loc: str | None,
                  qty: int = 1, to: str = "available") -> int:
     tag = _norm(tag)
     if tag in _MARKERS:
-        markers = state.setdefault("markers", {}).setdefault(tag, {"pool": 0, "on_map": set()})
+        markers = _marker_entry(state, tag)
         removed = 0
-        on_map = markers.setdefault("on_map", set())
+        on_map = markers["on_map"]
+        if tag in _COUNT_MARKERS:
+            # Q23 count model: remove up to qty markers.
+            if loc:
+                take = min(qty, on_map.get(loc, 0))
+                if take:
+                    if on_map[loc] - take:
+                        on_map[loc] -= take
+                    else:
+                        del on_map[loc]
+                    markers["pool"] = markers.get("pool", 0) + take
+                    push_history(state, f"{take} {tag} removed from {loc}")
+                return take
+            while removed < qty and on_map:
+                sid = next(iter(on_map))
+                take = min(qty - removed, on_map[sid])
+                if on_map[sid] - take:
+                    on_map[sid] -= take
+                else:
+                    del on_map[sid]
+                markers["pool"] = markers.get("pool", 0) + take
+                removed += take
+                push_history(state, f"{take} {tag} removed from {sid}")
+            return removed
         if loc:
             if loc in on_map and removed < qty:
                 on_map.discard(loc)
@@ -317,22 +357,40 @@ def place_with_caps(state: Dict[str, Any], tag: str, loc: str, qty: int = 1) -> 
 # --------------------------------------------------------------------------- #
 def place_marker(state, marker_tag: str, loc: str, qty: int = 1) -> int:
     """
-    Place up to *qty* markers in *loc* respecting caps.
-    Assumes markers are unlimited on-map but drawn from a pool in state["markers"].
+    Place up to *qty* markers in *loc*, drawn from the marker's pool.
+
+    Q23 (July 10 2026): Propaganda and Raid markers STACK — the only cap
+    is the global pool, so multi-placements (cards 1/2/47's "two
+    Propaganda") and re-Raids of a marked Province each add a marker.
+    Blockades keep the Q21 one-per-space set model.  Both models
+    conserve markers exactly (the pre-S67 code destroyed one per
+    already-marked placement).
     """
-    markers = state.setdefault("markers", {}).setdefault(marker_tag, {"pool": 0, "on_map": set()})
-    on_map = markers.setdefault("on_map", set())
-    # One marker per space (on_map is a set).  Debiting the pool by qty
-    # while set-adding a single space, or re-adding a space that already
-    # holds the marker, silently destroyed markers before Session 67
-    # (the Session 56 Blockade-conservation class, found deck-wide by
-    # the Piece 4 marker-census invariant).
-    if loc in on_map or markers.get("pool", 0) <= 0:
+    markers = _marker_entry(state, marker_tag)
+    on_map = markers["on_map"]
+    pool = markers.get("pool", 0)
+    if marker_tag in _COUNT_MARKERS:
+        n = min(qty, pool)
+        if n <= 0:
+            return 0
+        markers["pool"] = pool - n
+        on_map[loc] = on_map.get(loc, 0) + n
+        push_history(state, f"{n} {marker_tag} placed in {loc}")
+        return n
+    if loc in on_map or pool <= 0:
         return 0
-    markers["pool"] = markers.get("pool", 0) - 1
+    markers["pool"] = pool - 1
     on_map.add(loc)
     push_history(state, f"1 {marker_tag} placed in {loc}")
     return 1
+
+
+def marker_count(state, marker_tag: str, loc: str) -> int:
+    """Markers of *marker_tag* currently in *loc* (0/1 for set-model)."""
+    om = (state.get("markers", {}).get(marker_tag, {}) or {}).get("on_map")
+    if isinstance(om, dict):
+        return int(om.get(loc, 0))
+    return 1 if om and loc in om else 0
 
 def return_leaders(state) -> None:
     """

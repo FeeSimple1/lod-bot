@@ -58,8 +58,7 @@ def execute(
     state["_turn_special_type"] = "PERSUASION"  # coverage (Piece 5, S67)
     push_history(state, f"PATRIOTS PERSUASION {spaces}")
 
-    marker_state = state.setdefault("markers", {}).setdefault(PROPAGANDA, {"pool": 0, "on_map": set()})
-    marks_pool: set[str] = marker_state.setdefault("on_map", set())
+    from lod_ai.board.pieces import place_marker
     added_resources = 0
     added_markers   = 0
 
@@ -83,10 +82,8 @@ def execute(
 
 
         # ---- Place Propaganda marker if pool available -----------------
-        if marker_state.get("pool", 0) > 0 and len(marks_pool) < MAX_PROPAGANDA and sid not in marks_pool:
-            marker_state["pool"] -= 1
-            marker_state["on_map"].add(sid)
-            added_markers += 1
+        # Q23: markers stack; the global pool is the only cap.
+        added_markers += place_marker(state, PROPAGANDA, sid)
 
     refresh_control(state)
     enforce_global_caps(state)

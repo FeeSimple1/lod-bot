@@ -522,9 +522,13 @@ def _support_phase(state):
     def _ctrl(sid, sp):
         return control_map.get(sid)
 
-    markers = state.setdefault("markers", {})
-    raid_on_map = markers.setdefault(RAID, {"pool": 0, "on_map": set()}).setdefault("on_map", set())
-    propaganda_on_map = markers.setdefault(PROPAGANDA, {"pool": 0, "on_map": set()}).setdefault("on_map", set())
+    # Q23: Propaganda/Raid stack — on_map is {sid: count}; §6.4.1/6.4.2
+    # price removals PER MARKER ("Every one Resource spent removes one
+    # Raid or Propaganda marker—once no Raid or Propaganda is in a
+    # space—shifts it").
+    from lod_ai.board.pieces import _marker_entry as _mentry
+    raid_on_map = _mentry(state, RAID)["on_map"]
+    propaganda_on_map = _mentry(state, PROPAGANDA)["on_map"]
 
     # ---------------------------------------------------------------
     # 6.4.1  Reward Loyalty  (British)
@@ -551,8 +555,8 @@ def _support_phase(state):
         if level >= ACTIVE_SUPPORT:
             continue
 
-        n_raid = 1 if sid in raid_on_map else 0
-        n_prop = 1 if sid in propaganda_on_map else 0
+        n_raid = raid_on_map.get(sid, 0)
+        n_prop = propaganda_on_map.get(sid, 0)
         marker_count = n_raid + n_prop
         # C10 (§8.1.1×§1.9): effective population (Blockaded City -> 0);
         # the S66 fix landed on the CoC side only (Session 67).
@@ -589,18 +593,18 @@ def _support_phase(state):
         # §8.4.5: "Do not Reward Loyalty in a space if only Raid and/or
         # Propaganda markers would be removed."
         # Must be able to afford all marker removals PLUS at least 1 shift.
-        n_raid = 1 if sid in raid_on_map else 0
-        n_prop = 1 if sid in propaganda_on_map else 0
+        n_raid = raid_on_map.get(sid, 0)
+        n_prop = propaganda_on_map.get(sid, 0)
         min_cost = n_raid + n_prop + 1
         if not resources.can_afford(state, BRITISH, min_cost):
             continue
 
-        # Remove Raid or Propaganda marker if present (costs 1 each)
-        # Per §6.4.1: marker removal does NOT count against the 2-shift cap
+        # Remove ALL Raid and Propaganda markers (1 Resource each; Q23:
+        # stacked markers each cost 1 — "once no Raid or Propaganda is
+        # in a space").  Per §6.4.1 removals do NOT count against the
+        # 2-shift cap.
         for marker_tag, on_map in ((RAID, raid_on_map), (PROPAGANDA, propaganda_on_map)):
-            if not resources.can_afford(state, BRITISH, 1):
-                break
-            if sid in on_map:
+            while on_map.get(sid, 0) and resources.can_afford(state, BRITISH, 1):
                 resources.spend(state, BRITISH, 1)
                 remove_piece(state, marker_tag, sid, 1, to="available")
                 push_history(state, f"British removed {marker_tag} in {sid} (6.4.1)")
@@ -646,7 +650,7 @@ def _support_phase(state):
         if level <= ACTIVE_OPPOSITION:
             continue
 
-        n_raid = 1 if sid in raid_on_map else 0
+        n_raid = raid_on_map.get(sid, 0)
         # C10 (§8.1.1×§1.9): effective population (Blockaded City -> 0).
         pop = _eff_pop(sid)
         # §8.5.9 "largest change ... possible": §6.4.2 caps shifts at two
@@ -680,14 +684,15 @@ def _support_phase(state):
         # §8.5.9: "Do not execute Committees of Correspondence in a space
         # if only Raid markers would be removed."
         # Must be able to afford marker removal PLUS at least 1 shift.
-        n_raid = 1 if sid in raid_on_map else 0
+        n_raid = raid_on_map.get(sid, 0)
         min_cost = n_raid + 1
         if not resources.can_afford(state, PATRIOTS, min_cost):
             continue
 
-        # remove Raid markers first (cost 1 each)
-        # Per §6.4.2: marker removal does NOT count against the 2-shift cap
-        if sid in raid_on_map and resources.can_afford(state, PATRIOTS, 1):
+        # Remove ALL Raid markers first (1 Resource each; Q23: stacked
+        # markers each cost 1).  Per §6.4.2 removals do NOT count
+        # against the 2-shift cap.
+        while raid_on_map.get(sid, 0) and resources.can_afford(state, PATRIOTS, 1):
             resources.spend(state, PATRIOTS, 1)
             remove_piece(state, RAID, sid, 1, to="available")
             push_history(state, f"Patriots removed Raid in {sid} (6.4.2)")
@@ -1059,10 +1064,11 @@ def _reset_phase(state):
     # Remove all Raid & Propaganda markers (support both marker-map and per-space storage)
     markers = state.setdefault("markers", {})
     for tag in (RAID, PROPAGANDA):
-        entry = markers.setdefault(tag, {"pool": 0, "on_map": set()})
-        on_map = entry.get("on_map", set())
-        if not isinstance(on_map, set):
-            on_map = set(on_map or [])
+        entry = markers.setdefault(tag, {"pool": 0, "on_map": {}})
+        on_map = entry.get("on_map") or {}
+        # Q23: {sid: count} — a plain set/list is a legacy count-1 form.
+        if not isinstance(on_map, dict):
+            on_map = {sid: 1 for sid in on_map}
 
         removed = 0
 
@@ -1075,13 +1081,14 @@ def _reset_phase(state):
                 sp.pop(tag, None)          # TESTS EXPECT KEY TO BE GONE
                 if cnt > 0:
                     removed += cnt
-                on_map.discard(sid)        # avoid double-count if also tracked in markers.on_map
+                on_map.pop(sid, None)      # avoid double-count if also tracked in markers.on_map
 
-        # If markers are tracked via markers[tag]["on_map"], remove 1 per remaining sid.
-        removed += len(on_map)
+        # Markers tracked via markers[tag]["on_map"]: return every
+        # stacked marker to the pool (Q23 counts).
+        removed += sum(on_map.values())
 
         entry["pool"] = int(entry.get("pool", 0) or 0) + removed
-        entry["on_map"] = set()
+        entry["on_map"] = {}
 
     # Mark all factions Eligible (§6.7 step 2)
     state["eligible"] = {BRITISH: True, PATRIOTS: True, FRENCH: True, INDIANS: True}
