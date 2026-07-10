@@ -18,8 +18,9 @@ match this registry.  Wiring status:
     17, 19, 21, 23, 25, 27, 29, 31, 35, 47, 50, 59, 73, 76, 77, 79, 81,
     83, 84, 93.  (Note: card 29's value is a FACTION, not a space —
     audit-table correction recorded in docs/human_mode_audit.md.)
-  * NOT yet wired: 4, 14, 18, 26, 38, 44, 48, 52, 55, 62, 66, 67, 74,
-    80, 85, 87, 88 (sub-option / faction-target / piece-mix batches).
+  * WIRED (batch 2, sub-option cards): 14, 26, 38, 52, 55, 62.
+  * NOT yet wired: 4, 18, 44, 48, 66, 67, 74, 80, 85, 87, 88
+    (faction-target / piece-mix batches).
 
 This gate stops the audit from silently drifting while the remaining
 batches are built out.

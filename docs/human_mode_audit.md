@@ -69,9 +69,14 @@ against card text and the handler's expected value shape.
   (PATRIOTS or INDIANS), not a space id — it is collected as a
   two-option pick.  The "26 pure space-selection" headline count is
   unchanged.
-* **Not yet wired:** 4, 14, 18, 26, 38, 44, 48, 52, 55, 62, 66, 67, 74,
-  80, 85, 87, 88 (sub-option, faction-target and piece-mix batches —
-  next up).
+* **Batch 2 — WIRED (Session 73):** the sub-option cards 14, 26, 38,
+  52, 55, 62.  Adds the `mix` prompt kind (piece-mix as a count split,
+  e.g. card 38's 4 British Regulars/Tories).  Card 14 prompts the full
+  chain (destination -> Scout/March -> source -> follow-up), offering
+  only operations with a legal source; card 52's remove-or-not choice
+  only exists for a BRITISH executor (the handler's own gate).
+* **Not yet wired:** 4, 18, 44, 48, 66, 67, 74, 80, 85, 87, 88
+  (faction-target and piece-mix batches — next up).
 
 ## The registry
 

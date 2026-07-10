@@ -40,7 +40,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from lod_ai.cli_utils import choose_multiple, choose_one_or_back
+from lod_ai.cli_utils import choose_count, choose_multiple, choose_one_or_back
 from lod_ai.map import adjacency as map_adj
 from lod_ai.board import control
 from lod_ai.rules_consts import (
@@ -111,12 +111,12 @@ class Step:
     prompt: str
     options: OptionsFn
     side: Optional[bool] = None    # None = both sides; True shaded; False unshaded
-    kind: str = "one"              # "one" | "multi" | "repeat"
+    kind: str = "one"              # "one" | "multi" | "repeat" | "mix"
     decider: Optional[str] = None  # None = the executing faction decides
     min_sel: int = 1               # "multi" only
     max_sel: Optional[int] = None  # "multi" only; None = no cap
     exact: bool = False            # "multi": pick exactly min(max_sel, len(opts))
-    count: int = 1                 # "repeat": number of picks (repetition OK)
+    count: int = 1                 # "repeat": picks (repetition OK); "mix": total
     min_options: int = 1           # skip the step below this many candidates
 
 
@@ -173,6 +173,13 @@ def collect_event_choices(engine, executor: str, card: dict, shaded: bool) -> Di
                                         max_sel=cap)
         elif step.kind == "repeat":
             value = _pick_repeat(label, opts, step.count)
+        elif step.kind == "mix":
+            # opts = [(label_a, tag_a), (label_b, tag_b)]; the value is a
+            # {tag: count} dict summing to step.count (the handler's shape).
+            (lab_a, tag_a), (lab_b, tag_b) = opts[0], opts[1]
+            n = choose_count(f"{label} — how many {lab_a}? (rest: {lab_b})",
+                             min_val=0, max_val=step.count)
+            value = {tag_a: n, tag_b: step.count - n}
         else:
             value = choose_one_or_back(f"{label}:", opts)
         overrides[f"card{card_id}_{step.key}"] = value
@@ -399,8 +406,120 @@ def _c93_targets(state, executor, picks):
     return _ids(s for s in _spaces(state) if _is_colony(s) and _adj_reserve(s))
 
 
+def _c14_dests(state, executor, picks):
+    return _ids(s for s in ("North_Carolina", "Southwest") if s in _spaces(state))
+
+
+def _c14_scout_srcs(state, dest):
+    out = []
+    for s in _adj_in_play(state, dest):
+        if _is_city(s):
+            continue
+        if _sp(state, s).get(REGULAR_BRI, 0) and _has_any(
+                state, s, (WARPARTY_U, WARPARTY_A)):
+            out.append(s)
+    return out
+
+
+def _c14_march_srcs(state, dest):
+    return [s for s in _adj_in_play(state, dest)
+            if _has_any(state, s, (WARPARTY_U, WARPARTY_A))]
+
+
+def _c14_ops(state, executor, picks):
+    dest = picks.get("dest")
+    if not dest:
+        return []
+    out = []
+    if _c14_scout_srcs(state, dest):
+        out.append(("Scout (1 War Party + 1 British Regular)", "SCOUT"))
+    if _c14_march_srcs(state, dest):
+        out.append(("March (1 War Party)", "MARCH"))
+    return out
+
+
+def _c14_srcs(state, executor, picks):
+    dest = picks.get("dest")
+    if not dest:
+        return []
+    if picks.get("op") == "SCOUT":
+        return _ids(_c14_scout_srcs(state, dest))
+    return _ids(_c14_march_srcs(state, dest))
+
+
+def _c14_followups(state, executor, picks):
+    return [("Indians War Path", "WAR_PATH"),
+            ("British free Battle", "BRITISH_BATTLE")]
+
+
+def _c14_shaded_srcs(state, executor, picks):
+    dest = picks.get("dest")
+    if not dest:
+        return []
+    return _ids(s for s in _adj_in_play(state, dest)
+                if _has_any(state, s, _PATRIOT_UNITS))
+
+
+def _c26_srcs(state, executor, picks):
+    if "North_Carolina" not in _spaces(state):
+        return []
+    return _ids(s for s in _adj_in_play(state, "North_Carolina")
+                if _has_any(state, s, _PATRIOT_UNITS))
+
+
+def _c26_choices(state, executor, picks):
+    return [("Place 1 British Fort", "FORT"), ("Place 2 Tories", "TORIES")]
+
+
+def _c38_shaded_choices(state, executor, picks):
+    if "New_York" not in _spaces(state):
+        return []
+    return [("3 Militia in New York", "MILITIA"),
+            ("3 War Parties in New York", "WARPARTY")]
+
+
+def _c38_spaces(state, executor, picks):
+    return _ids(s for s in ("Quebec", "New_York") if s in _spaces(state))
+
+
+def _mix_bri_tory(state, executor, picks):
+    return [("British Regulars", REGULAR_BRI), ("Tories", TORY)]
+
+
+def _c52_options(state, executor, picks):
+    # The removal branch only exists for a BRITISH executor (sheets
+    # P52/F52 skip it; the handler checks executor == BRITISH).
+    if executor != BRITISH:
+        return []
+    return [("Remove up to 4 French Regulars (max, priority spaces)", False),
+            ("Remove none", True)]
+
+
+def _c55_options(state, executor, picks):
+    return [("Yes — free Battle in West Indies", True), ("No", False)]
+
+
+def _c62_shaded_choices(state, executor, picks):
+    out = []
+    if "Quebec" in _spaces(state):
+        out.append(("3 French Regulars in Quebec", "FRENCH_QUEBEC"))
+    if "Northwest" in _spaces(state):
+        out.append(("3 Militia in Northwest", "MILITIA_NORTHWEST"))
+    return out
+
+
+def _c62_targets(state, executor, picks):
+    return _ids(s for s in ("New_York", "Quebec", "Northwest")
+                if s in _spaces(state))
+
+
+def _c62_unshaded_choices(state, executor, picks):
+    return [("3 War Parties", "WARPARTY"), ("3 Tories", "TORIES")]
+
+
 # ---------------------------------------------------------------------------
-# The wired registry (Piece 7 batch 1: 26 space-selection cards)
+# The wired registry (Piece 7 batch 1: 26 space-selection cards;
+# batch 2: the sub-option cards 14, 26, 38, 52, 55, 62)
 # ---------------------------------------------------------------------------
 
 EVENT_CHOICES: Dict[int, Tuple[Step, ...]] = {
@@ -424,6 +543,20 @@ EVENT_CHOICES: Dict[int, Tuple[Step, ...]] = {
         Step("spaces", "Replace a Patriot unit with a Fort in up to 2 spaces",
              _c11_spaces, side=True, kind="multi", min_sel=1, max_sel=2,
              decider=PATRIOTS),
+    ),
+    14: (
+        # Shaded: Patriots free March to NC/SW, then free Battle there.
+        Step("dest", "Free March + Battle: destination", _c14_dests,
+             side=True, decider=PATRIOTS),
+        Step("src", "March from which adjacent space?", _c14_shaded_srcs,
+             side=True, decider=PATRIOTS),
+        # Unshaded: Indians free Scout or March to NC/SW, then a follow-up.
+        Step("dest", "Indian Scout/March destination", _c14_dests,
+             side=False, decider=INDIANS),
+        Step("op", "Which operation?", _c14_ops, side=False, decider=INDIANS),
+        Step("src", "From which adjacent space?", _c14_srcs, side=False,
+             decider=INDIANS),
+        Step("followup", "Then:", _c14_followups, side=False),
     ),
     15: (
         Step("colony", "Free March / Battle / Partisans: which Colony?",
@@ -461,6 +594,12 @@ EVENT_CHOICES: Dict[int, Tuple[Step, ...]] = {
         Step("cities", "Choose 2 Cities", _cities, kind="multi", max_sel=2,
              exact=True),
     ),
+    26: (
+        Step("src", "Free March to North Carolina from which space?",
+             _c26_srcs, side=True, decider=PATRIOTS),
+        Step("choice", "In North Carolina:", _c26_choices, side=False,
+             decider=BRITISH, min_options=2),
+    ),
     27: (
         Step("cities", "Shift + place Militia in 2 Cities", _cities,
              side=True, kind="multi", max_sel=2, exact=True),
@@ -475,6 +614,14 @@ EVENT_CHOICES: Dict[int, Tuple[Step, ...]] = {
         Step("target", "Fort + 2 Tories in which space?", _sc_ga, side=False),
         Step("target", "2 Militia + Partisans in which space?", _sc_ga,
              side=True, decider=PATRIOTS),
+    ),
+    38: (
+        Step("shaded_choice", "Place in New York:", _c38_shaded_choices,
+             side=True, min_options=2),
+        Step("unshaded_space", "Reinforce which space?", _c38_spaces,
+             side=False, decider=BRITISH),
+        Step("unshaded_mix", "Place 4 British cubes", _mix_bri_tory,
+             side=False, kind="mix", count=4, decider=BRITISH, min_options=2),
     ),
     35: (
         Step("target", "Remove 2 Patriot pieces + Activate Militia where?",
@@ -492,9 +639,24 @@ EVENT_CHOICES: Dict[int, Tuple[Step, ...]] = {
         Step("colony", "Place 2 Continentals + 2 French Regulars in which Colony?",
              _c50_colonies, side=True),
     ),
+    52: (
+        Step("no_remove_french", "French Regulars:", _c52_options,
+             side=False, min_options=2),
+    ),
+    55: (
+        Step("do_battle", "French free Battle in West Indies?", _c55_options,
+             side=False, decider=FRENCH, min_options=2),
+    ),
     59: (
         Step("space", "Remove 2 Continentals + 2 French Regulars from which space?",
              _c59_spaces, side=False),
+    ),
+    62: (
+        Step("shaded_choice", "Place which?", _c62_shaded_choices, side=True),
+        Step("target", "Place 3 pieces in which space?", _c62_targets,
+             side=False),
+        Step("unshaded_choice", "Which pieces?", _c62_unshaded_choices,
+             side=False, min_options=2),
     ),
     73: (
         Step("space", "Remove a Fort/Village in which space?", _c73_spaces,

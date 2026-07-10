@@ -84,27 +84,41 @@ def test_wired_cards_and_keys_match_frozen_registry():
                 f"registry {sorted(reg_keys)}")
 
 
-def test_batch1_covers_the_26_space_selection_cards():
+def test_wired_batches_cover_expected_cards():
     assert sorted(EVENT_CHOICES) == [
-        5, 7, 9, 11, 15, 16, 17, 19, 21, 23, 25, 27, 29, 31, 35, 47,
-        50, 59, 73, 76, 77, 79, 81, 83, 84, 93]
+        5, 7, 9, 11, 14, 15, 16, 17, 19, 21, 23, 25, 26, 27, 29, 31,
+        35, 38, 47, 50, 52, 55, 59, 62, 73, 76, 77, 79, 81, 83, 84, 93]
+
+
+# Non-space option values the handlers accept (enums, flags, factions,
+# piece tags for mixes).
+_ENUM_VALUES = {
+    "SCOUT", "MARCH", "WAR_PATH", "BRITISH_BATTLE",       # 14
+    "FORT", "TORIES",                                      # 26 / 62
+    "MILITIA", "WARPARTY",                                 # 38 / 62
+    "FRENCH_QUEBEC", "MILITIA_NORTHWEST",                  # 62
+    True, False,                                           # 52 / 55
+    C.PATRIOTS, C.INDIANS,                                 # 29
+    C.REGULAR_BRI, C.TORY,                                 # mixes
+}
 
 
 def test_candidate_builders_return_in_play_legal_picks():
     state = _rich_state()
     for cid, steps in EVENT_CHOICES.items():
-        picks = {}
-        for step in steps:
-            opts = step.options(state, C.PATRIOTS, picks)
-            for label, value in opts:
-                assert isinstance(label, str) and label
-                if cid == 29:
-                    assert value in (C.PATRIOTS, C.INDIANS)
-                else:
-                    assert value in state["spaces"], (
-                        f"card {cid}/{step.key}: {value} not in play")
-            if opts:
-                picks[step.key] = opts[0][1]
+        for want_shaded in (False, True):
+            picks = {}
+            for step in steps:
+                if step.side is not None and step.side != want_shaded:
+                    continue
+                opts = step.options(state, C.PATRIOTS, picks)
+                for label, value in opts:
+                    assert isinstance(label, str) and label
+                    assert value in state["spaces"] or value in _ENUM_VALUES, (
+                        f"card {cid}/{step.key}: {value!r} neither in play "
+                        f"nor a known enum")
+                if opts:
+                    picks[step.key] = opts[0][1]
 
 
 def test_collection_shapes_match_handler_expectations():
@@ -129,8 +143,11 @@ def test_collection_shapes_match_handler_expectations():
                             assert len(value) == step.count
                         if step.max_sel:
                             assert len(value) <= step.max_sel
+                    elif step.kind == "mix":
+                        assert isinstance(value, dict)
+                        assert sum(value.values()) == step.count
                     else:
-                        assert isinstance(value, str) and value
+                        assert isinstance(value, (str, bool)) and value != ""
     finally:
         cli_utils.set_input_provider(provider)
 
@@ -174,6 +191,17 @@ def test_handler_honors_collected_colony_override_card79():
     CARD_HANDLERS[79](state, shaded=True)
     assert state["spaces"]["Georgia"].get(C.VILLAGE, 0) == v0 - 1, (
         "card79_colony override must direct the removal")
+
+
+def test_handler_honors_sub_option_override_card26():
+    state = _rich_state()
+    avail = state.get("available", {}).get(C.TORY, 0)
+    t0 = state["spaces"]["North_Carolina"].get(C.TORY, 0)
+    state["card26_choice"] = "TORIES"
+    CARD_HANDLERS[26](state, shaded=False)
+    t1 = state["spaces"]["North_Carolina"].get(C.TORY, 0)
+    assert t1 - t0 == min(2, avail), (
+        "card26_choice=TORIES must place Tories, not the default Fort")
 
 
 def test_bot_decider_steps_are_skipped_for_bot_factions():
