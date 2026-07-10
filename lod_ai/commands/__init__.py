@@ -6,7 +6,7 @@ lod_ai.commands.REGISTRY["MARCH"](state, faction, ctx, …)
 from importlib import import_module
 from pathlib import Path
 
-REGISTRY = {}
+REGISTRY: dict = {}
 
 def _autodiscover():
     pkg_path = Path(__file__).parent

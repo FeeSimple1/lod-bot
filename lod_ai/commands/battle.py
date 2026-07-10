@@ -27,7 +27,7 @@ Win the Day (§3.6.8) includes:
 """
 
 from __future__ import annotations
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from lod_ai.rules_consts import (
     # Pieces
@@ -293,7 +293,8 @@ def _half(n: int) -> int:
 
 
 def force_level(sp: Dict, side: str, is_defending: bool, *, cc_wp: int = 0,
-                attacker_faction: str = None, ally_involved: bool = True) -> int:
+                attacker_faction: Optional[str] = None,
+                ally_involved: bool = True) -> int:
     """S3.6.2-3.6.3 Force Level for *side* in space dict *sp*.
 
     Module-level so bot planners (e.g. the British B12 Battle selection) can
@@ -333,7 +334,7 @@ def force_level(sp: Dict, side: str, is_defending: bool, *, cc_wp: int = 0,
 
 
 def bot_battle_scores(state: Dict, sid: str, attacker_side: str = "ROYALIST",
-                      *, attacker_faction: str = None,
+                      *, attacker_faction: Optional[str] = None,
                       ally_involved: bool = True, cc_wp: int = 0) -> tuple:
     """B12/P4 selection score: (attacker_score, defender_score) where each is
     Force Level + the manual's Loss-Level modifiers (3.6.5/3.6.6), using the
@@ -530,7 +531,7 @@ def _side_has_leader(state: Dict, sid: str, side: str) -> bool:
 def _defender_loss_mods(
     state: Dict, sp: Dict, sid: str,
     att_side: str, def_side: str, cc_wp: int,
-    attacker_faction: str = None, ally_involved: bool = True,
+    attacker_faction: Optional[str] = None, ally_involved: bool = True,
 ) -> int:
     """Compute modifiers applied to the attacker's roll to determine
     how many losses the *defender* takes."""
