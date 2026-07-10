@@ -1569,13 +1569,19 @@ class PatriotBot(BaseBot):
         if eff["places_patriot_militia_u"] and state.get("available", {}).get(C.MILITIA_U, 0) > 0:
             # P2 bullet 2 (§8.5): "places Underground Militia in at least one
             # Active Support or Village space that has none already"
+            matches = []
             for sid, sp in state["spaces"].items():
                 has_militia = (sp.get(C.MILITIA_U, 0) + sp.get(C.MILITIA_A, 0)) > 0
                 if has_militia:
                     continue
                 sup = state.get("support", {}).get(sid, 0)
                 if sup == C.ACTIVE_SUPPORT or sp.get(C.VILLAGE, 0) > 0:
-                    return True
+                    matches.append(sid)
+            if matches:
+                # §8.3.5: implement first in the spaces that answered
+                # the "Event or Command?" question.
+                state["_event_q_spaces"] = set(matches)
+                return True
         if eff["places_patriot_fort"]:
             if state.get("available", {}).get(C.FORT_PAT, 0) > 0:
                 return True

@@ -236,16 +236,23 @@ class BritishBot(BaseBot):
                              if _MAP_DATA.get(s, {}).get("type") == "Colony"]
             else:
                 _t_spaces = _t or state["spaces"].keys()
-            for sid in _t_spaces:
-                sp = state["spaces"].get(sid, {})
+            matches = [
+                sid for sid in _t_spaces
                 if (self._support_level(state, sid) == C.ACTIVE_OPPOSITION
-                        and sp.get(C.TORY, 0) == 0):
-                    return True
+                    and state["spaces"].get(sid, {}).get(C.TORY, 0) == 0)]
+            if matches:
+                # §8.3.5: implement first in the spaces that answered
+                # the "Event or Command?" question.
+                state["_event_q_spaces"] = set(matches)
+                return True
         if eff["places_british_fort"] and state.get("available", {}).get(C.FORT_BRI, 0) > 0:
-            for sid in state["spaces"]:
+            matches = [
+                sid for sid in state["spaces"]
                 if (_MAP_DATA.get(sid, {}).get("type") == "Colony"
-                        and state["spaces"][sid].get(C.FORT_BRI, 0) == 0):
-                    return True
+                    and state["spaces"][sid].get(C.FORT_BRI, 0) == 0)]
+            if matches:
+                state["_event_q_spaces"] = set(matches)
+                return True
         if eff["places_british_regulars"] and state.get("available", {}).get(C.REGULAR_BRI, 0) > 0:
             # S63 (card-42 class): when the card names its Regular
             # placement space(s), the bullet fires only if one of THEM is
@@ -254,9 +261,11 @@ class BritishBot(BaseBot):
             # that let the British choose keep the scan (they would pick
             # a City/Colony).
             _r_spaces = eff.get("regulars_in") or state["spaces"].keys()
-            for sid in _r_spaces:
-                if _MAP_DATA.get(sid, {}).get("type") in ("City", "Colony"):
-                    return True
+            matches = [sid for sid in _r_spaces
+                       if _MAP_DATA.get(sid, {}).get("type") in ("City", "Colony")]
+            if matches:
+                state["_event_q_spaces"] = set(matches)
+                return True
 
         # 4. "Event inflicts Rebel Casualties (including free Skirmish or Battle)?"
         if eff["inflicts_rebel_casualties"]:

@@ -157,6 +157,10 @@ class BaseBot:
         try:
             handler(state, shaded=shaded)
         finally:
+            # §8.3.5 flowchart-question spaces bias ONLY this Event's
+            # space selection — clear before free ops drain (their
+            # choices use the Faction's own priorities instead).
+            state.pop("_event_q_spaces", None)
             if previous_active is None:
                 state.pop("active", None)
             else:
@@ -258,6 +262,10 @@ class BaseBot:
             return False
 
         # 4. Flow-chart bullet list (British example in british_bot)
+        # A space-conditioned bullet records its matching spaces in
+        # state["_event_q_spaces"] (§8.3.5 question-spaces-first);
+        # clear any stale set from a previous decision first.
+        state.pop("_event_q_spaces", None)
         if self._faction_event_conditions(state, card):
             # §8.3.3 post-hoc audit (ROADMAP Piece 4): record the actual
             # Support−Opposition difference around a bot-CHOSEN event so

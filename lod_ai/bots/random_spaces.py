@@ -131,6 +131,22 @@ def choose_random_space(candidates, rng=None):
     return None
 
 
+def _event_question_spaces(state):
+    """§8.3.5 flowchart-question spaces: when a bot plays an Event
+    because of one of the "Event or Command?" questions, "select as
+    many spaces as possible that match that question before selecting
+    other spaces (if any)".  The deciding bot's bullet sets
+    ``state["_event_q_spaces"]`` (the FULL matching set) and
+    base_bot._execute_event clears it right after the handler runs, so
+    the bias scopes to that one Event resolution and never leaks into
+    free-Command planning (§8.3.5's free-Command bullet uses the
+    Faction's own priorities instead)."""
+    if not isinstance(state, dict):
+        return None
+    qs = state.get("_event_q_spaces")
+    return qs if qs else None
+
+
 def pick_by_priority(state, scored, count=None):
     """Q22 engine-wide tie resolution (Eric's ruling, July 2026).
 
@@ -139,8 +155,18 @@ def pick_by_priority(state, scored, count=None):
     Returns up to *count* space_ids (all, if None): keys ascending;
     EQUAL-key groups are resolved by the Random Spaces procedure,
     re-rolling for each additional pick within a group.
+
+    When §8.3.5 flowchart-question spaces are active, question-matching
+    spaces rank before all others — the Manual places that bullet ABOVE
+    the per-Event piece/shift priorities.
     """
     rng = state.get("rng") if isinstance(state, dict) else None
+    qs = _event_question_spaces(state)
+    if qs:
+        scored = [
+            ((0 if sid in qs else 1,)
+             + (tuple(key) if isinstance(key, tuple) else (key,)), sid)
+            for key, sid in scored]
     groups: dict = {}
     order: list = []
     for key, sid in scored:
@@ -177,7 +203,23 @@ def pick_random_spaces(state, candidates, count=1):
     (`free_op_planner._rand_choice`). Candidates that do not appear on the
     table (synthetic test spaces) are selected by seeded equal-chance roll,
     which §8.2's Play Note sanctions.
+
+    §8.3.5 flowchart-question spaces (if active) are exhausted before
+    any other candidate is considered.
     """
+    qs = _event_question_spaces(state)
+    if qs:
+        cands = set(candidates)
+        first = [c for c in cands if c in qs]
+        rest = [c for c in cands if c not in qs]
+        picked = _pick_random(state, first, count)
+        if len(picked) < count:
+            picked += _pick_random(state, rest, count - len(picked))
+        return picked
+    return _pick_random(state, candidates, count)
+
+
+def _pick_random(state, candidates, count):
     remaining = sorted(set(candidates))
     picked: list[str] = []
     rng = state.get("rng") if isinstance(state, dict) else None
