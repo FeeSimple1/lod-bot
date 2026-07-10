@@ -39,3 +39,23 @@ Royalist 104/300):
    this is the game as designed or a target for house tuning is
    Eric's open judgment call (see HANDOFF_2026-07-10_S72.md) — this
    refresh is the input to that call, not a recommendation.
+
+## Addendum: post-S73 rerun (largeN_s73.jsonl)
+
+After the S73 who-choice sweep (cards 29/48/67/74/87 onto §8.3.5
+target order) and the last-15-bot-tie-sites Q22 conversion (card-80
+presets, British garrison 2b / displacement, leader redeploys,
+Cornplanter, loyalist desertion): same instrument, seeds 5000+, all
+300 clean.
+
+| Faction | 1775 | 1776 | 1778 | total |
+|---|---|---|---|---|
+| FRENCH | 48 | 30 | 60 | 138 (46.0%, 40.4-51.7) |
+| INDIANS | 37 | 21 | 9 | 67 (22.3%, 18.0-27.4) |
+| PATRIOTS | 8 | 29 | 26 | 63 (21.0%, 16.8-26.0) |
+| BRITISH | 7 | 20 | 5 | 32 (10.7%, 7.7-14.7) |
+
+Royalist 99/300 (33.0%).  Every faction total sits inside its S72 CI
+(F 134->138, I 78->67, P 59->63, B 29->32) — the corrections flip
+individual games (canary rebaselined) but the aggregate picture for
+the tune-or-not call is unchanged: French ~45%, British ~10%.
