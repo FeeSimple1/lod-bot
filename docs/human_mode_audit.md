@@ -75,8 +75,23 @@ against card text and the handler's expected value shape.
   chain (destination -> Scout/March -> source -> follow-up), offering
   only operations with a legal source; card 52's remove-or-not choice
   only exists for a BRITISH executor (the handler's own gate).
-* **Not yet wired:** 4, 18, 44, 48, 66, 67, 74, 80, 85, 87, 88
-  (faction-target and piece-mix batches — next up).
+* **Batch 3 — WIRED (Session 73):** the remaining faction-target and
+  piece-mix cards 4, 18, 44, 48, 66, 67, 74, 80, 85, 87, 88.  Adds
+  callable deciders (card 80: the TARGETED faction picks the two spaces
+  it removes its own pieces from) and the `map` prompt kind (card 88:
+  one destination per possible §8.2-random origin).  Deciders were
+  pinned against the printed card text: the executor decides unless the
+  card names a faction ("Indians free Gather...", "British may
+  place...", "British replace...") — cards 7 and 19 were corrected to
+  executor-decided in this pass.
+
+**ALL 43 choice-bearing cards are now human-wired.**  The Piece 7 gap
+is closed: a human playing any Event is prompted for every choice its
+handler honors, and bot-owned choices keep their rules-faithful
+defaults.  Residual (out of Piece 7 scope): free operations GRANTED to
+a human faction by an event (e.g. card 15's Patriot March/Battle/
+Partisans) are still bot-planned in `_drain_free_ops` rather than
+wizarded — logged as the natural Piece 7 follow-up.
 
 ## The registry
 

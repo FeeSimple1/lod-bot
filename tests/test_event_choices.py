@@ -84,22 +84,23 @@ def test_wired_cards_and_keys_match_frozen_registry():
                 f"registry {sorted(reg_keys)}")
 
 
-def test_wired_batches_cover_expected_cards():
-    assert sorted(EVENT_CHOICES) == [
-        5, 7, 9, 11, 14, 15, 16, 17, 19, 21, 23, 25, 26, 27, 29, 31,
-        35, 38, 47, 50, 52, 55, 59, 62, 73, 76, 77, 79, 81, 83, 84, 93]
+def test_all_43_registry_cards_are_wired():
+    assert sorted(EVENT_CHOICES) == sorted(CHOICE_REGISTRY)
 
 
 # Non-space option values the handlers accept (enums, flags, factions,
-# piece tags for mixes).
+# piece tags for mixes and card 87).
 _ENUM_VALUES = {
     "SCOUT", "MARCH", "WAR_PATH", "BRITISH_BATTLE",       # 14
     "FORT", "TORIES",                                      # 26 / 62
-    "MILITIA", "WARPARTY",                                 # 38 / 62
+    "MILITIA", "WARPARTY", "CONTINENTAL",                  # 4 / 38 / 62 / 85
+    "FORT_PAT", "FORT_BRI", "VILLAGE",                     # 4
     "FRENCH_QUEBEC", "MILITIA_NORTHWEST",                  # 62
     True, False,                                           # 52 / 55
-    C.PATRIOTS, C.INDIANS,                                 # 29
-    C.REGULAR_BRI, C.TORY,                                 # mixes
+    C.PATRIOTS, C.INDIANS, C.BRITISH, C.FRENCH,            # faction picks
+    C.REGULAR_BRI, C.REGULAR_FRE, C.REGULAR_PAT, C.TORY,   # mixes / 87
+    C.MILITIA_U, C.MILITIA_A, C.WARPARTY_U, C.WARPARTY_A,
+    C.FORT_BRI, C.FORT_PAT, C.VILLAGE,
 }
 
 
@@ -114,9 +115,13 @@ def test_candidate_builders_return_in_play_legal_picks():
                 opts = step.options(state, C.PATRIOTS, picks)
                 for label, value in opts:
                     assert isinstance(label, str) and label
-                    assert value in state["spaces"] or value in _ENUM_VALUES, (
-                        f"card {cid}/{step.key}: {value!r} neither in play "
-                        f"nor a known enum")
+                    if step.kind == "map":
+                        assert label in state["spaces"]
+                        assert all(d in state["spaces"] for d in value)
+                    else:
+                        assert value in state["spaces"] or value in _ENUM_VALUES, (
+                            f"card {cid}/{step.key}: {value!r} neither in "
+                            f"play nor a known enum")
                 if opts:
                     picks[step.key] = opts[0][1]
 
@@ -146,6 +151,11 @@ def test_collection_shapes_match_handler_expectations():
                     elif step.kind == "mix":
                         assert isinstance(value, dict)
                         assert sum(value.values()) == step.count
+                    elif step.kind == "map":
+                        assert isinstance(value, dict) and value
+                        for origin, dest in value.items():
+                            assert origin in eng.state["spaces"]
+                            assert dest in eng.state["spaces"]
                     else:
                         assert isinstance(value, (str, bool)) and value != ""
     finally:
@@ -202,6 +212,15 @@ def test_handler_honors_sub_option_override_card26():
     t1 = state["spaces"]["North_Carolina"].get(C.TORY, 0)
     assert t1 - t0 == min(2, avail), (
         "card26_choice=TORIES must place Tories, not the default Fort")
+
+
+def test_handler_honors_faction_override_card18():
+    state = _rich_state()
+    state["active"] = C.PATRIOTS
+    state["card18_target_faction"] = C.FRENCH   # even an ally is legal
+    CARD_HANDLERS[18](state, shaded=False)
+    assert C.FRENCH in state.get("ineligible_through_next", set()), (
+        "card18_target_faction must direct the ineligibility")
 
 
 def test_bot_decider_steps_are_skipped_for_bot_factions():

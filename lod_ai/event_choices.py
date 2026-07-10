@@ -104,6 +104,22 @@ def _ids(sids) -> List[Tuple[str, str]]:
 # options callable: (state, executor, picks) -> [(label, value), ...]
 OptionsFn = Callable[[dict, str, Dict[str, Any]], List[Tuple[str, Any]]]
 
+_FACTIONS = (BRITISH, PATRIOTS, FRENCH, INDIANS)
+_ENEMIES = {BRITISH: (PATRIOTS, FRENCH), INDIANS: (PATRIOTS, FRENCH),
+            PATRIOTS: (BRITISH, INDIANS), FRENCH: (BRITISH, INDIANS)}
+_PIECE_TAGS = {
+    BRITISH: (REGULAR_BRI, TORY, FORT_BRI),
+    PATRIOTS: (REGULAR_PAT, MILITIA_U, MILITIA_A, FORT_PAT),
+    FRENCH: (REGULAR_FRE,),
+    INDIANS: (WARPARTY_U, WARPARTY_A, VILLAGE),
+}
+_UNIT_TAGS = {
+    BRITISH: (REGULAR_BRI, TORY),
+    PATRIOTS: (REGULAR_PAT, MILITIA_U, MILITIA_A),
+    FRENCH: (REGULAR_FRE,),
+    INDIANS: (WARPARTY_U, WARPARTY_A),
+}
+
 
 @dataclass(frozen=True)
 class Step:
@@ -111,8 +127,11 @@ class Step:
     prompt: str
     options: OptionsFn
     side: Optional[bool] = None    # None = both sides; True shaded; False unshaded
-    kind: str = "one"              # "one" | "multi" | "repeat" | "mix"
-    decider: Optional[str] = None  # None = the executing faction decides
+    kind: str = "one"              # "one" | "multi" | "repeat" | "mix" | "map"
+    # None = the executing faction decides; a faction constant, or a
+    # callable (state, executor, picks) -> faction for pick-dependent
+    # deciders (e.g. card 80: the targeted faction places its removals).
+    decider: Any = None
     min_sel: int = 1               # "multi" only
     max_sel: Optional[int] = None  # "multi" only; None = no cap
     exact: bool = False            # "multi": pick exactly min(max_sel, len(opts))
@@ -148,7 +167,8 @@ def collect_event_choices(engine, executor: str, card: dict, shaded: bool) -> Di
     for step in steps:
         if step.side is not None and step.side != shaded:
             continue
-        decider = step.decider or executor
+        decider = step.decider(state, executor, picks) if callable(step.decider) \
+            else (step.decider or executor)
         if decider != executor and decider not in humans:
             # The choice belongs to a bot faction -> its rules-faithful
             # handler default decides, same as on a bot-executed event.
@@ -180,6 +200,16 @@ def collect_event_choices(engine, executor: str, card: dict, shaded: bool) -> Di
             n = choose_count(f"{label} — how many {lab_a}? (rest: {lab_b})",
                              min_val=0, max_val=step.count)
             value = {tag_a: n, tag_b: step.count - n}
+        elif step.kind == "map":
+            # opts = [(origin, (dest, dest, ...)), ...]; the value maps each
+            # origin to a chosen destination (e.g. card 88's destinations).
+            value = {}
+            for origin, dests in opts:
+                if not dests:
+                    continue
+                value[origin] = choose_one_or_back(
+                    f"{label} — from {origin}, move to:",
+                    [(d, d) for d in dests])
         else:
             value = choose_one_or_back(f"{label}:", opts)
         overrides[f"card{card_id}_{step.key}"] = value
@@ -517,12 +547,139 @@ def _c62_unshaded_choices(state, executor, picks):
     return [("3 War Parties", "WARPARTY"), ("3 Tories", "TORIES")]
 
 
+def _c4_bases(state, executor, picks):
+    return [("Patriot Fort", "FORT_PAT"), ("British Fort", "FORT_BRI"),
+            ("Village", "VILLAGE")]
+
+
+def _c4_units(state, executor, picks):
+    return [("3 Militia", "MILITIA"), ("3 War Parties", "WARPARTY")]
+
+
+def _all_factions(state, executor, picks):
+    return [(f.title(), f) for f in _FACTIONS]
+
+
+def _c48_factions(state, executor, picks):
+    out = []
+    for fac in (PATRIOTS, FRENCH, INDIANS):
+        tags = _UNIT_TAGS[fac]
+        if any(sp.get(REGULAR_BRI, 0) and any(sp.get(t, 0) for t in tags)
+               for sp in _spaces(state).values()):
+            out.append((fac.title(), fac))
+    return out
+
+
+def _c66_factions(state, executor, picks):
+    return [("French", FRENCH), ("Patriots", PATRIOTS)]
+
+
+def _c66_targets(state, executor, picks):
+    return _ids(s for s in ("Florida", "Southwest") if s in _spaces(state))
+
+
+def _c67_factions(state, executor, picks):
+    if state.get("toa_played"):
+        fr = "French (free Muster)"
+    else:
+        fr = "French (pre-Treaty: benefit passes to Patriots)"
+    return [(fr, FRENCH), ("Patriots (free Rally)", PATRIOTS)]
+
+
+def _c74_recipients(state, executor, picks):
+    return [("Indians", INDIANS), ("British", BRITISH)]
+
+
+def _c74_spaces(state, executor, picks):
+    out = []
+    for sid, sp in _spaces(state).items():
+        wp = sp.get(WARPARTY_A, 0) + sp.get(WARPARTY_U, 0)
+        mil = sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0)
+        if wp >= 1 and mil >= 1 and wp + mil >= 3:
+            out.append(sid)
+    return _ids(out)
+
+
+def _fac_pieces_on_map(state, fac):
+    tags = _PIECE_TAGS[fac]
+    return sum(sp.get(t, 0) for sp in _spaces(state).values() for t in tags)
+
+
+def _c80_factions(state, executor, picks):
+    # "Select one Faction" — any Faction with removable pieces; enemies
+    # of the executor listed first (the only picks a player would want).
+    enemies = _ENEMIES.get(executor, ())
+    ordered = list(enemies) + [f for f in _FACTIONS if f not in enemies]
+    return [(f"{f.title()} ({_fac_pieces_on_map(state, f)} pieces on map)", f)
+            for f in ordered if _fac_pieces_on_map(state, f)]
+
+
+def _c80_spaces(state, executor, picks):
+    fac = picks.get("faction")
+    if not fac:
+        return []
+    tags = _PIECE_TAGS[fac]
+    return _ids(s for s in _spaces(state) if _has_any(state, s, tags))
+
+
+def _c80_decider(state, executor, picks):
+    # "That Faction must remove two of its own pieces in each of two
+    # spaces" — the targeted faction chooses where (own-piece removal).
+    return picks.get("faction") or executor
+
+
+def _c85_choices(state, executor, picks):
+    return [("2 Militia", "MILITIA"), ("2 Continentals", "CONTINENTAL")]
+
+
+def _c87_pieces(state, executor, picks):
+    sp = _sp(state, "Pennsylvania")
+    order = (WARPARTY_U, WARPARTY_A, MILITIA_U, MILITIA_A, REGULAR_PAT,
+             REGULAR_BRI, REGULAR_FRE, TORY, FORT_BRI, FORT_PAT, VILLAGE)
+    return [(f"{t} (x{sp.get(t, 0)})", t) for t in order if sp.get(t, 0)]
+
+
+def _c88_factions(state, executor, picks):
+    my_tags = _UNIT_TAGS.get(executor, ())
+    out = []
+    for fac in _ENEMIES.get(executor, ()):
+        fac_tags = _PIECE_TAGS[fac]
+        if any(_has_any(state, sid, my_tags) and _has_any(state, sid, fac_tags)
+               for sid in _spaces(state)):
+            out.append((fac.title(), fac))
+    return out
+
+
+def _c88_dest_map(state, executor, picks):
+    # One (origin, destinations) entry per space shared with the chosen
+    # faction: the engine moves from ONE §8.2-random shared origin, so
+    # the player pre-picks a destination for each possible origin.
+    fac = picks.get("target_faction")
+    if not fac:
+        return []
+    my_tags = _UNIT_TAGS.get(executor, ())
+    fac_tags = _PIECE_TAGS[fac]
+    out = []
+    for sid in _spaces(state):
+        if _has_any(state, sid, my_tags) and _has_any(state, sid, fac_tags):
+            dests = tuple(_adj_in_play(state, sid))
+            if dests:
+                out.append((sid, dests))
+    return out
+
+
 # ---------------------------------------------------------------------------
-# The wired registry (Piece 7 batch 1: 26 space-selection cards;
-# batch 2: the sub-option cards 14, 26, 38, 52, 55, 62)
+# The wired registry (Piece 7: all 43 choice-bearing cards —
+# batch 1 space-selection, batch 2 sub-option, batch 3 faction/mix)
 # ---------------------------------------------------------------------------
 
 EVENT_CHOICES: Dict[int, Tuple[Step, ...]] = {
+    4: (
+        Step("base", "Place which base in Massachusetts?", _c4_bases,
+             side=True, min_options=3),
+        Step("units", "Place which units in Massachusetts?", _c4_units,
+             side=True, min_options=2),
+    ),
     5: (
         Step("dest", "Free March + Battle: destination space", _c5_dests,
              side=True, decider=PATRIOTS),
@@ -530,8 +687,8 @@ EVENT_CHOICES: Dict[int, Tuple[Step, ...]] = {
              decider=PATRIOTS),
     ),
     7: (
-        Step("dest", "Move up to 2 Regulars from Available to", _c7_dests,
-             side=False, decider=BRITISH),
+        Step("dest", "Move up to 2 British Regulars from Available to",
+             _c7_dests, side=False),
     ),
     9: (
         Step("spaces", "Skirmish in up to 3 spaces", _c9_spaces(BRITISH),
@@ -572,9 +729,13 @@ EVENT_CHOICES: Dict[int, Tuple[Step, ...]] = {
         Step("space", "Remove a Patriot Fort from which Reserve?", _c17_spaces,
              side=False),
     ),
+    18: (
+        Step("target_faction", "Make which Faction Ineligible through next card?",
+             _all_factions, side=False, min_options=4),
+    ),
     19: (
         Step("targets", "Place 3 Militia (spaces may repeat)", _c19_targets,
-             side=True, kind="repeat", count=3, decider=PATRIOTS),
+             side=True, kind="repeat", count=3),
     ),
     21: (
         Step("target", "Shift which space 2 levels toward Active Support?",
@@ -629,11 +790,19 @@ EVENT_CHOICES: Dict[int, Tuple[Step, ...]] = {
         Step("shaded_target", "Remove all Tories in New York or one adjacent space",
              _c35_shaded_targets, side=True),
     ),
+    44: (
+        Step("target_faction", "Make which Faction Ineligible through next card?",
+             _all_factions, side=False, min_options=4),
+    ),
     47: (
         Step("colony", "Place 3 Tories in which British-controlled Colony?",
              _c47_unshaded, side=False),
         Step("colony", "Replace all Tories (+2 Propaganda) in which Colony?",
              _c47_shaded, side=True),
+    ),
+    48: (
+        Step("faction", "Which non-British Faction moves its units?",
+             _c48_factions, side=True),
     ),
     50: (
         Step("colony", "Place 2 Continentals + 2 French Regulars in which Colony?",
@@ -657,6 +826,47 @@ EVENT_CHOICES: Dict[int, Tuple[Step, ...]] = {
              side=False),
         Step("unshaded_choice", "Which pieces?", _c62_unshaded_choices,
              side=False, min_options=2),
+    ),
+    66: (
+        Step("shaded_faction", "Free March + Battle (+2) in Florida for whom?",
+             _c66_factions, side=True, min_options=2),
+        Step("target", "Place 6 British cubes in which space?", _c66_targets,
+             side=False),
+        Step("mix", "Place 6 British cubes", _mix_bri_tory, side=False,
+             kind="mix", count=6, min_options=2),
+    ),
+    67: (
+        Step("faction", "Free Rally/Muster + stay Eligible for whom?",
+             _c67_factions, side=True, min_options=2),
+    ),
+    74: (
+        Step("recipient", "Who gains 1 Resource per 2 Villages?",
+             _c74_recipients, side=False, min_options=2),
+        Step("spaces", "Remove War Party/Militia mix in 2 spaces",
+             _c74_spaces, side=True, kind="multi", max_sel=2, exact=True),
+    ),
+    80: (
+        Step("faction", "Select one Faction (removes 2 own pieces in each of 2 spaces)",
+             _c80_factions, side=False),
+        Step("spaces", "Remove its pieces in which 2 spaces?", _c80_spaces,
+             side=False, kind="multi", max_sel=2, exact=True,
+             decider=_c80_decider),
+    ),
+    85: (
+        Step("shaded_choice", "Place which with the 2 French Regulars?",
+             _c85_choices, side=True, min_options=2),
+        Step("mix", "Place 3 British cubes in Southwest", _mix_bri_tory,
+             side=False, kind="mix", count=3, decider=BRITISH, min_options=2),
+    ),
+    87: (
+        Step("piece", "Remove which piece in Pennsylvania?", _c87_pieces,
+             side=False),
+    ),
+    88: (
+        Step("target_faction", "Disengage from which enemy Faction?",
+             _c88_factions, side=False),
+        Step("destinations", "Destinations per possible origin",
+             _c88_dest_map, side=False, kind="map"),
     ),
     73: (
         Step("space", "Remove a Fort/Village in which space?", _c73_spaces,

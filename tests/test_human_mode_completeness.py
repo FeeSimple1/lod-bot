@@ -19,8 +19,13 @@ match this registry.  Wiring status:
     83, 84, 93.  (Note: card 29's value is a FACTION, not a space —
     audit-table correction recorded in docs/human_mode_audit.md.)
   * WIRED (batch 2, sub-option cards): 14, 26, 38, 52, 55, 62.
-  * NOT yet wired: 4, 18, 44, 48, 66, 67, 74, 80, 85, 87, 88
-    (faction-target / piece-mix batches).
+  * WIRED (batch 3, faction-target / piece-mix cards): 4, 18, 44, 48,
+    66, 67, 74, 80, 85, 87, 88.
+
+ALL 43 cards are wired (Session 73); tests/test_event_choices.py
+asserts EVENT_CHOICES covers this registry exactly.  Residual out of
+scope: event-GRANTED free ops for a human faction are still bot-planned
+(see docs/human_mode_audit.md).
 
 This gate stops the audit from silently drifting while the remaining
 batches are built out.
