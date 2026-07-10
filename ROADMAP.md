@@ -119,17 +119,24 @@ PDF), the Event Text and Background section (useful cross-check for
 the Piece 3 card audit), and Non-Player Designer's Notes. The Event
 Instructions sheet wording is NOT in it — T12 stays blocked on Q15.
 
-## Piece 7 — Human-mode completeness  [AUDITED, Session 72; CLI wiring is the open item]
+## Piece 7 — Human-mode completeness  [DONE, Session 73]
 
-- Part 1 (card-choice audit) DONE: `docs/human_mode_audit.md` +
-  `tests/test_human_mode_completeness.py`.  Finding: the CLI event path
-  collects NO card-specific choices — it picks only the shaded/unshaded
-  side and calls `handle_event`, so for a human seat all 43 choice-
-  bearing cards resolve via the non-player handler default (36 genuine
-  free-choice gaps; 7 faction choices now §8.3.5/T7-faithful).  The
-  override keys already exist and handlers honor them; only the CLI
-  event-choice COLLECTION layer is missing.  The frozen registry gates
-  drift.  Building the 43 prompt specs is the scoped follow-up.
+- Part 1 (card-choice audit, S72) + CLI wiring (S73) DONE:
+  `lod_ai/event_choices.py` collects every choice-bearing card's player
+  choices from a human Event player (space pickers, sub-options,
+  faction targets, piece mixes, card 88's per-origin destination map)
+  and applies them as the `card<N>_*` overrides the handlers already
+  honor.  All 43 registry cards wired in three batches; candidate menus
+  mirror each handler's own legality filters; choices the card text
+  assigns to a named faction prompt only when that faction is a human
+  seat (bot deciders keep their §8.3.x-faithful handler defaults).
+  Gates: `tests/test_human_mode_completeness.py` (frozen registry) +
+  `tests/test_event_choices.py` (registry-exact wiring, shapes,
+  override-honor spot checks).
+- Residual follow-up (out of the audited scope): free operations
+  GRANTED to a human faction by an event (e.g. card 15's Patriot
+  March/Battle/Partisans) are still bot-planned in `_drain_free_ops`
+  rather than wizarded for the human seat.
 - Part 2 (CLI fuzzing) already covered by `tools/human_qa.py`: it drives
   the real `_game_loop` with a scripted provider, injects undo at WQ and
   general prompts, and save/loads every card through
