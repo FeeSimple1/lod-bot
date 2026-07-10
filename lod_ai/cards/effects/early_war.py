@@ -24,6 +24,7 @@ from lod_ai.rules_consts import (
     ACTIVE_SUPPORT,
 )
 from lod_ai.util.naval import move_blockades_to_unavailable, move_blockades_to_west_indies
+from lod_ai.util.target_order import first_harm_target
 from lod_ai.board.control import refresh_control
 from lod_ai.map.adjacency import space_meta, space_type as _sptype
 from lod_ai.util.nonplayer_pieces import (
@@ -364,13 +365,15 @@ def evt_029_bancroft(state, shaded=False):
     # "Patriots or Indians" — choose ONE faction
     target_fac = state.get("card29_target", "").upper()
     if target_fac not in (PATRIOTS, INDIANS):
-        # Bot default per ruling: British/Indian bot targets Patriots,
-        # Patriot/French bot targets Indians.
+        # §8.3.5 harm choice (Activating pieces), restricted to the two
+        # named candidates (T7).  For every executor exactly one of
+        # {PATRIOTS, INDIANS} is an enemy, so this reproduces the prior
+        # default (British/Indian -> Patriots, Patriot/French -> Indians)
+        # with the rule as the citation rather than a hardcoded table.
         active = str(state.get("active", "")).upper()
-        if active in (BRITISH, INDIANS):
-            target_fac = PATRIOTS
-        else:
-            target_fac = INDIANS
+        target_fac = first_harm_target(state, active,
+                                       candidates=(PATRIOTS, INDIANS),
+                                       default=INDIANS)
 
     if target_fac == PATRIOTS:
         hidden_tag, active_tag, label = MILITIA_U, MILITIA_A, "Militia"

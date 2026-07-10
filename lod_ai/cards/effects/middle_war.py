@@ -7,7 +7,7 @@ IDs covered (32): 3 5 8 9 11 12 14 17 26 27 34 38 42 44 47 50
 
 from lod_ai.cards import register
 from lod_ai.bots.random_spaces import pick_by_priority
-from lod_ai.util.target_order import first_harm_target
+from lod_ai.util.target_order import first_beneficiary, first_harm_target
 from .shared import (
     add_resource,
     select_support_shift_spaces,
@@ -992,9 +992,16 @@ def evt_074_chickasaw(state, shaded=False):
     """
     if not shaded:
         villages = sum(sp.get(VILLAGE, 0) for sp in state.get("spaces", {}).values())
-        recipient = state.get("card74_recipient", INDIANS)
+        recipient = state.get("card74_recipient")
         if recipient not in {INDIANS, BRITISH}:
-            recipient = INDIANS
+            # "Indians or British add one Resource..." — §8.3.5 benefit
+            # order (executing Faction, then friendly, then random enemy
+            # NP first), restricted to the two named candidates (T7).
+            # Was: unconditional INDIANS (wrong for a British executor).
+            active = str(state.get("active", "")).upper()
+            recipient = first_beneficiary(state, active,
+                                          candidates=(INDIANS, BRITISH),
+                                          default=INDIANS)
         add_resource(state, recipient, villages // 2)
         push_history(state, f"Card 74 unshaded: {recipient} +{villages // 2}")
         return

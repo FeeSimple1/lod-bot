@@ -26,6 +26,7 @@ from lod_ai.special_activities import naval_pressure, skirmish, common_cause
 from lod_ai.util.history import push_history
 from lod_ai.leaders import leader_location
 from lod_ai.bots.random_spaces import pick_by_priority
+from lod_ai.util.target_order import harm_target_order
 from lod_ai.economy.resources import can_afford, spend
 from lod_ai.map import adjacency as map_adj
 from lod_ai.util.naval import has_blockade
@@ -345,30 +346,36 @@ class BritishBot(BaseBot):
             # Session 47: also PRESET the handler keys — without them
             # evt_080 used to default the target to the EXECUTOR and the
             # British removed their own pieces.
-            rng = state["rng"]
             rebel_tags = {
                 C.PATRIOTS: [C.REGULAR_PAT, C.MILITIA_A, C.MILITIA_U, C.FORT_PAT],
                 C.FRENCH: [C.REGULAR_FRE],
             }
-            best_fac, best_key, best_cities = None, None, []
-            for faction, tags in rebel_tags.items():
-                cities = []
+
+            def _city_scores(tags):
+                out = []
                 for city_sid in CITIES:
                     sp = state["spaces"].get(city_sid, {})
                     have = sum(sp.get(tag, 0) for tag in tags)
                     if have > 0:
-                        cities.append((-min(have, 2), rng.random(), city_sid))
-                if not cities:
-                    continue
-                key = (-len(cities), rng.random())
-                if best_key is None or key < best_key:
-                    cities.sort()
-                    best_fac, best_key = faction, key
-                    best_cities = [sid for *_x, sid in cities]
-            if best_fac is None:
+                        # §8.1.1 max extent: 2-removal Cities first.
+                        out.append(((-min(have, 2),), city_sid))
+                return out
+
+            # Sheet: "Choose a Rebel Faction with pieces in Cities" — no
+            # further priority stated, so §8.3.5 harm order (a random
+            # enemy, player first; T7) among qualifying rebels.  (Was a
+            # non-sheet most-cities heuristic with rng-in-key ties; city
+            # ties likewise now the §8.2 table per Q22.)
+            qualifying = [f for f, tags in rebel_tags.items()
+                          if _city_scores(tags)]
+            order = harm_target_order(state, C.BRITISH,
+                                      candidates=qualifying)
+            if not order:
                 return False
+            best_fac = order[0]
             state["card80_faction"] = best_fac
-            state["card80_spaces"] = best_cities[:2]
+            state["card80_spaces"] = pick_by_priority(
+                state, _city_scores(rebel_tags[best_fac]), count=2)
             return True
 
         return True  # default: play the event
@@ -910,7 +917,8 @@ class BritishBot(BaseBot):
         departures (a City can be an origin in the same Command) count
         against them.  Excluded:
         Blockaded Cities (§3.2.2) and skirmished Cities (§8.4.1).
-        Ties within each priority are seeded random (§8.2; formerly
+        Ties within each priority resolve via the §8.2 Random Spaces
+        table (Q22; formerly rng-in-key seeded uniform, before that
         alphabetical).
 
         Returns list of (city, regulars_needed), sorted by priority.
@@ -918,7 +926,6 @@ class BritishBot(BaseBot):
         incoming = incoming or {}
         outgoing = outgoing or {}
         skirmished = state.get("_turn_skirmished_spaces", set())
-        rng = state["rng"]
         targets: List[Tuple[tuple, str, int]] = []
         for city in CITIES:
             sp = state["spaces"].get(city, {})
@@ -943,15 +950,25 @@ class BritishBot(BaseBot):
 
             # First priority: 1+ Regular if without Active Support
             if not at_active_support and regs == 0:
-                targets.append(((0, 0, rng.random()), city, 1))
+                targets.append(((0, 0), city, 1))
             # Second priority: 3+ cubes first where Underground Militia
             if brit_cubes < 3:
                 need = 3 - brit_cubes
                 underground_prio = 0 if has_underground else 1
-                targets.append(((1, underground_prio, rng.random()), city, need))
+                targets.append(((1, underground_prio), city, need))
 
-        targets.sort()
-        return [(city, need) for _, city, need in targets]
+        # Q22: order equal-priority groups via the §8.2 table.  A City
+        # may appear under BOTH priorities (with different needs), so
+        # group by substantive key and table-order within each group.
+        groups: Dict[tuple, Dict[str, int]] = {}
+        for key, city, need in targets:
+            groups.setdefault(key, {})[city] = need
+        out: List[Tuple[str, int]] = []
+        for key in sorted(groups):
+            entries = groups[key]
+            for city in pick_by_priority(state, [((), c) for c in entries]):
+                out.append((city, entries[city]))
+        return out
 
     def _select_displacement(
         self, state: Dict, dest_cities: List[str],
@@ -984,9 +1001,7 @@ class BritishBot(BaseBot):
                     net_by_city[dst] = net_by_city.get(dst, 0) + n
                     net_by_city[origin] = net_by_city.get(origin, 0) - n
 
-        rng = state["rng"]
-        best_city = None
-        best_city_key = None
+        city_scores = []
         for city in candidates:
             sp = state["spaces"].get(city, {})
             # garrison.execute rejects Patriot-Fort / Blockaded / non-
@@ -1012,20 +1027,18 @@ class BritishBot(BaseBot):
             ) > 0
             if not (royalist > rebel_total and brit_present):
                 continue  # won't be British-Controlled after moves
-            key = (-rebels, rng.random())
-            if best_city_key is None or key < best_city_key:
-                best_city_key = key
-                best_city = city
+            city_scores.append(((-rebels,), city))
 
+        picked = pick_by_priority(state, city_scores, count=1)  # Q22
+        best_city = picked[0] if picked else None
         if not best_city:
             return (None, None)
 
         # Pick Colony/Province target: must be ADJACENT to the city.
         # Priority: most Opposition, least Support, lowest Pop (§8.4.1);
-        # remaining ties seeded random (§8.2).
+        # remaining ties via the §8.2 table (Q22).
         adj_spaces = _adjacent(best_city)
-        best_province = None
-        best_key = None
+        prov_scores = []
         for sid in adj_spaces:
             if sid not in state["spaces"]:
                 continue
@@ -1039,12 +1052,11 @@ class BritishBot(BaseBot):
             # separates the remaining ties (Session 44: were raw levels).
             opp = max(0, -support_level) * pop
             sup = max(0, support_level) * pop
-            # minimize: most opp, least support, lowest pop, seeded tie-break
-            key = (-opp, sup, pop, rng.random())
-            if best_key is None or key < best_key:
-                best_key = key
-                best_province = sid
+            # minimize: most opp, least support, lowest pop
+            prov_scores.append(((-opp, sup, pop), sid))
 
+        picked = pick_by_priority(state, prov_scores, count=1)  # Q22
+        best_province = picked[0] if picked else None
         return (best_city, best_province) if best_province else (None, None)
 
     # =======================================================================
@@ -2401,17 +2413,15 @@ class BritishBot(BaseBot):
         anywhere the Leader goes to Available (None).  Ties seeded per
         §8.2.  (Session 43: the old scan could return a British-less
         dict-order space when no Regulars were on the map.)"""
-        rng = state["rng"]
-        best_key, best_sid = None, None
+        scored = []
         for sid, sp in state["spaces"].items():
             brit = (sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0)
                     + sp.get(C.FORT_BRI, 0))
             if brit == 0:
                 continue  # §6.5.2: not a legal redeploy space
-            key = (-sp.get(C.REGULAR_BRI, 0), rng.random())
-            if best_key is None or key < best_key:
-                best_key, best_sid = key, sid
-        return best_sid
+            scored.append(((-sp.get(C.REGULAR_BRI, 0),), sid))
+        picked = pick_by_priority(state, scored, count=1)  # Q22 §8.2 ties
+        return picked[0] if picked else None
 
     def bot_loyalist_desertion(self, state: Dict, count: int) -> List[Tuple[str, int]]:
         """§8.4.10: "Remove Tories so as to change the least Control
@@ -2420,11 +2430,10 @@ class BritishBot(BaseBot):
         priorities re-computed after every single Tory — the old static
         margin sort bulk-removed from one space and could flip Control
         mid-batch (Session 54, the §8.5.7 fix pattern from Session 45).
-        Control changes are §1.7 simulations; §8.2 seeded ties.
+        Control changes are §1.7 simulations; §8.2 table ties (Q22).
 
         Returns a list of (space_id, 1) removals totaling ≤ *count*.
         """
-        rng = state["rng"]
         snap = {sid: dict(sp) for sid, sp in state["spaces"].items()}
 
         def _ctl(sp):
@@ -2444,7 +2453,7 @@ class BritishBot(BaseBot):
 
         removals: List[Tuple[str, int]] = []
         for _ in range(count):
-            best_key, best_sid = None, None
+            scored = []
             for sid, sp in snap.items():
                 if sp.get(C.TORY, 0) == 0:
                     continue
@@ -2452,9 +2461,9 @@ class BritishBot(BaseBot):
                 after[C.TORY] -= 1
                 changes = 1 if _ctl(after) != _ctl(sp) else 0
                 is_last = 1 if sp.get(C.TORY, 0) == 1 else 0
-                key = (changes, is_last, rng.random())
-                if best_key is None or key < best_key:
-                    best_key, best_sid = key, sid
+                scored.append(((changes, is_last), sid))
+            picked = pick_by_priority(state, scored, count=1)  # Q22
+            best_sid = picked[0] if picked else None
             if best_sid is None:
                 break
             snap[best_sid][C.TORY] -= 1

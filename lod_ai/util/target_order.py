@@ -54,7 +54,10 @@ def beneficiary_order(state, executing_faction, candidates=None):
     enemies = list(_ENEMIES.get(e, ()))
     nps = [x for x in enemies if x not in humans]
     players = [x for x in enemies if x in humans]
-    order = [e, _ALLY[e]] + _seeded_order(state, nps) + _seeded_order(state, players)
+    # Unknown executor (bare test states without "active"): no friendly
+    # ordering exists -- fall through to the caller's default.
+    head = [e, _ALLY[e]] if e in _ALLY else []
+    order = head + _seeded_order(state, nps) + _seeded_order(state, players)
     if candidates is not None:
         cand = {str(f).upper() for f in candidates}
         order = [f for f in order if f in cand]

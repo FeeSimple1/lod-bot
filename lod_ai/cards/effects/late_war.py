@@ -575,16 +575,20 @@ def evt_048_god_save_king(state, shaded=False):
         }
         chosen_fac = state.get("card48_faction", "").upper()
         if chosen_fac not in faction_unit_map:
-            # Bot default: pick the first non-British faction with units
-            # in a space containing British Regulars (§8.3.8 random in
-            # practice; deterministic fallback here).
-            for fac, tags in faction_unit_map.items():
-                for sp in state.get("spaces", {}).values():
-                    if sp.get(REGULAR_BRI, 0) and any(sp.get(t, 0) for t in tags):
-                        chosen_fac = fac
-                        break
-                if chosen_fac:
-                    break
+            # "A non-British Faction moves units..." — §8.3.5 benefit
+            # order (executing Faction, then friendly, then a random
+            # enemy NP first), restricted to non-British factions that
+            # actually have units co-located with British Regulars (T7).
+            # Was: first-fit dict order (PATRIOTS even when the
+            # executing INDIANS qualified).
+            qualifying = [
+                fac for fac, tags in faction_unit_map.items()
+                if any(sp.get(REGULAR_BRI, 0) and any(sp.get(t, 0) for t in tags)
+                       for sp in state.get("spaces", {}).values())
+            ]
+            active = str(state.get("active", "")).upper()
+            chosen_fac = first_beneficiary(state, active,
+                                           candidates=qualifying)
         if not chosen_fac:
             push_history(state, "Card 48 shaded: no non-British faction present")
             return
@@ -801,13 +805,16 @@ def evt_067_de_grasse(state, shaded=False):
         # Rally is a Patriot Command (3.3) and Muster here is a French
         # Command that requires the Treaty of Alliance (3.5.2), so the
         # faction choice determines the legal op (a French "rally" can
-        # never execute). 8.3.5: when there is a choice of who gets
-        # Event benefits, select the executing Faction first, then the
-        # other friendly Faction.
+        # never execute).  §8.3.5 benefit order via T7 (executing
+        # Faction, then friendly, then a random enemy NP first) — a
+        # Royalist executor previously hardwired FRENCH instead of the
+        # seeded random-enemy pick its sibling card 66 uses.
         fac = state.get("card67_faction", "").upper()
         if fac not in (FRENCH, PATRIOTS):
             active = str(state.get("active", "")).upper()
-            fac = active if active in (FRENCH, PATRIOTS) else FRENCH
+            fac = first_beneficiary(state, active,
+                                    candidates=(FRENCH, PATRIOTS),
+                                    default=FRENCH)
         if fac == FRENCH and not state.get("toa_played"):
             # French cannot Muster before the Treaty (3.5.2) and may
             # never Rally (3.3): the benefit passes to the Patriots.
@@ -1067,12 +1074,38 @@ def evt_087_lenape(state, shaded=False):
         remove_piece(state, chosen, loc, 1, to="available")
         push_history(state, f"Card 87 unshaded: removed 1 {chosen} in {loc}")
     else:
-        # Bot fallback: remove first piece found (units before bases)
-        for tag in (WARPARTY_U, WARPARTY_A, MILITIA_U, MILITIA_A, REGULAR_PAT,
-                    REGULAR_BRI, REGULAR_FRE, TORY, FORT_BRI, FORT_PAT, VILLAGE):
-            if sp.get(tag, 0):
-                remove_piece(state, tag, loc, 1, to="available")
-                push_history(state, f"Card 87 unshaded: removed 1 {tag} in {loc}")
+        # "Remove one piece" (any faction's) — implicitly a §8.3.5 harm
+        # choice of WHOSE piece: a random enemy, player first (T7), the
+        # ally then own pieces only when no enemy piece is present
+        # (§5.1.3 implement-what-can).  Within a faction keep the
+        # units-before-bases order.  (Was a fixed executor-blind tag
+        # order that removed friendly Indian War Parties first for a
+        # Royalist executor.)
+        from lod_ai.util.target_order import harm_target_order
+        faction_tags = {
+            INDIANS: (WARPARTY_U, WARPARTY_A, VILLAGE),
+            PATRIOTS: (MILITIA_U, MILITIA_A, REGULAR_PAT, FORT_PAT),
+            BRITISH: (REGULAR_BRI, TORY, FORT_BRI),
+            FRENCH: (REGULAR_FRE,),
+        }
+        executor = str(state.get("active", "")).upper()
+        _ALLY = {BRITISH: INDIANS, INDIANS: BRITISH,
+                 PATRIOTS: FRENCH, FRENCH: PATRIOTS}
+        order = list(harm_target_order(state, executor))
+        if executor in _ALLY:
+            order += [_ALLY[executor], executor]
+        else:
+            order += [BRITISH, PATRIOTS, FRENCH, INDIANS]
+        done = False
+        for fac in order:
+            for tag in faction_tags.get(fac, ()):
+                if sp.get(tag, 0):
+                    remove_piece(state, tag, loc, 1, to="available")
+                    push_history(
+                        state, f"Card 87 unshaded: removed 1 {tag} in {loc}")
+                    done = True
+                    break
+            if done:
                 break
     # Remain Eligible
     executor = state.get("active")

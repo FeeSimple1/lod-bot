@@ -32,7 +32,8 @@ from lod_ai.special_activities import partisans, skirmish, persuasion
 from lod_ai.board.control import refresh_control
 from lod_ai.util.history import push_history
 from lod_ai.leaders import leader_location
-from lod_ai.bots.random_spaces import pick_by_priority, choose_random_space
+from lod_ai.bots.random_spaces import (pick_by_priority, choose_random_space,
+                                       pick_random_spaces)
 from lod_ai.map import adjacency as map_adj
 
 # ---------------------------------------------------------------------------
@@ -1531,7 +1532,10 @@ class PatriotBot(BaseBot):
                     qualifying.append(sid)
             if qualifying:
                 state["card80_faction"] = C.INDIANS
-                state["card80_spaces"] = qualifying[:2]
+                # Equal-priority spaces -> §8.2 table (Q22; was dict
+                # order).
+                state["card80_spaces"] = pick_random_spaces(
+                    state, qualifying, 2)
                 return True
             return False
         return True  # default: play the event
@@ -1631,20 +1635,18 @@ class PatriotBot(BaseBot):
         Continentals.  §6.5.2 scopes legal targets to spaces with the
         Faction's own pieces — at 0 Continentals the pick falls back to
         any Patriot-piece space, and with no Patriot pieces anywhere
-        Washington goes to Available (None).  Ties seeded per §8.2.
+        Washington goes to Available (None).  §8.2 table ties (Q22).
         (Session 43: the old scan could return a Patriot-less
         dict-order space at 0 Continentals.)"""
-        rng = state["rng"]
-        best_key, best = None, None
+        scored = []
         for sid, sp in state["spaces"].items():
             pat_pieces = (sp.get(C.REGULAR_PAT, 0) + sp.get(C.MILITIA_A, 0)
                           + sp.get(C.MILITIA_U, 0) + sp.get(C.FORT_PAT, 0))
             if pat_pieces == 0:
                 continue  # §6.5.2: not a legal redeploy space
-            key = (-sp.get(C.REGULAR_PAT, 0), rng.random())
-            if best_key is None or key < best_key:
-                best_key, best = key, sid
-        return best
+            scored.append(((-sp.get(C.REGULAR_PAT, 0),), sid))
+        picked = pick_by_priority(state, scored, count=1)  # Q22
+        return picked[0] if picked else None
 
     def ops_patriot_desertion_priority(self, state: Dict) -> List[Tuple[str, str]]:
         """Patriot Desertion: Remove so as to change least Control,

@@ -31,7 +31,8 @@ from lod_ai.commands import raid, gather, march, scout
 from lod_ai.special_activities import plunder, war_path, trade
 from lod_ai.board.control import refresh_control
 from lod_ai.leaders import leader_location
-from lod_ai.bots.random_spaces import pick_by_priority, choose_random_space
+from lod_ai.bots.random_spaces import (pick_by_priority, choose_random_space,
+                                       pick_random_spaces)
 from lod_ai.util.history import push_history
 from lod_ai.map import adjacency as map_adj
 from lod_ai.map.adjacency import shortest_path
@@ -1668,21 +1669,19 @@ class IndianBot(BaseBot):
             # §8.2.  (Session 43: the old scan returned a dict-order
             # space with no Indian pieces when no War Parties were on
             # the map, and broke most-WP ties by dict order.)
-            best_key, best_sid = None, None
+            scored = []
             for sid, sp in state["spaces"].items():
                 n = sp.get(C.WARPARTY_U, 0) + sp.get(C.WARPARTY_A, 0)
                 if n + sp.get(C.VILLAGE, 0) == 0:
                     continue
-                key = (-n, rng.random())
-                if best_key is None or key < best_key:
-                    best_key, best_sid = key, sid
-            return best_sid
+                scored.append(((-n,), sid))
+            picked = pick_by_priority(state, scored, count=1)  # Q22 §8.2
+            return picked[0] if picked else None
 
         for leader in ("LEADER_BRANT", "LEADER_DRAGGING_CANOE"):
             result[leader] = _most_wp_space()
 
-        corn_target = None
-        corn_key = None
+        corn_candidates = []
         for sid, sp in state["spaces"].items():
             mdata = _MAP_DATA.get(sid, {})
             if mdata.get("type") == "City":
@@ -1695,13 +1694,11 @@ class IndianBot(BaseBot):
                 continue
             if not self._village_room(state, sid):
                 continue
-            # Ties among qualifying Provinces seeded per §8.2 (was
-            # first-seen dict order).
-            key = rng.random()
-            if corn_key is None or key < corn_key:
-                corn_key, corn_target = key, sid
-        if corn_target is None:
-            corn_target = _most_wp_space()
+            corn_candidates.append(sid)
+        # Equal-priority qualifying Provinces -> §8.2 table (Q22; was
+        # rng-in-key seeded uniform, before that first-seen dict order).
+        picked = pick_random_spaces(state, corn_candidates, 1)
+        corn_target = picked[0] if picked else _most_wp_space()
         result["LEADER_CORNPLANTER"] = corn_target
 
         return result
@@ -1844,7 +1841,6 @@ class IndianBot(BaseBot):
             # Session 47: the old check accepted any Fort anywhere and
             # never preset the handler keys, so evt_080 defaulted the
             # target to INDIANS and removed the Indians' own pieces.
-            rng = state["rng"]
             qualifying = []
             for sid, sp in state["spaces"].items():
                 if sp.get(C.FORT_PAT, 0) == 0:
@@ -1852,11 +1848,13 @@ class IndianBot(BaseBot):
                 units = (sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
                          + sp.get(C.REGULAR_PAT, 0))
                 if units <= 1:
-                    qualifying.append((rng.random(), sid))
+                    qualifying.append(sid)
             if qualifying:
-                qualifying.sort()
                 state["card80_faction"] = C.PATRIOTS
-                state["card80_spaces"] = [sid for _r, sid in qualifying[:2]]
+                # Equal-priority spaces -> §8.2 table (Q22; was seeded
+                # uniform order).
+                state["card80_spaces"] = pick_random_spaces(
+                    state, qualifying, 2)
                 return True
             return False
         return True  # default: play the event

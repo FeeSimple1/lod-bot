@@ -32,24 +32,26 @@ def _state(spaces, support=None, control=None, resources=10):
 
 def test_garrison_displacement_weighted_opposition():
     """§8.4.1 via §8.1.1: Province with most Opposition = level x Pop.
-    Passive Opposition at Pop 2 (2) beats Active Opposition at Pop 1
-    (2? no — equals 2 vs 2)…  use Pop 2 Active (4) vs Pop 1 Active (2)
-    reversed by raw levels tie: raw levels said tie; weighted prefers
-    the Pop 2 Province.  Boston's neighbours: Massachusetts (Pop 2) and
-    Connecticut_Rhode_Island (Pop 1)."""
+    Equal raw levels, different Populations: New York (Pop 2, Active
+    Opposition -> 4) must deterministically beat New Jersey (Pop 1,
+    Active Opposition -> 2).  Raw levels would call this a tie and fall
+    to §8.2 — the weighted key makes it substantive.  (Session 73: the
+    old version used Boston's neighbours, which are BOTH Pop 2 — a
+    genuine §8.2 tie that only passed under the pre-Q22 rng-in-key
+    model's seed.)"""
     bot = BritishBot()
     st = _state(
         spaces={
-            "Boston": {C.REGULAR_BRI: 6, C.MILITIA_A: 2},
-            "Massachusetts": {},
-            "Connecticut_Rhode_Island": {},
+            "New_York_City": {C.REGULAR_BRI: 6, C.MILITIA_A: 2},
+            "New_York": {},
+            "New_Jersey": {},
         },
-        support={"Massachusetts": C.ACTIVE_OPPOSITION,
-                 "Connecticut_Rhode_Island": C.ACTIVE_OPPOSITION},
+        support={"New_York": C.ACTIVE_OPPOSITION,
+                 "New_Jersey": C.ACTIVE_OPPOSITION},
     )
-    city, prov = bot._select_displacement(st, ["Boston"], {})
-    assert city == "Boston"
-    assert prov == "Massachusetts", (
+    city, prov = bot._select_displacement(st, ["New_York_City"], {})
+    assert city == "New_York_City"
+    assert prov == "New_York", (
         "equal levels: the higher-Population Province contributes more "
         "Opposition (level x Pop) and must win")
 

@@ -1154,30 +1154,25 @@ class FrenchBot(BaseBot):
         """Redeploy the French Leader to a space with French Regulars and
         Continentals if possible, within that where most French Regulars.
         """
-        rng = state["rng"]
-        best_key, best = None, None
+        scored = []
         for sid, sp in state["spaces"].items():
             fre = sp.get(C.REGULAR_FRE, 0)
             pat = sp.get(C.REGULAR_PAT, 0)
             if fre > 0 and pat > 0:
-                key = (-fre, rng.random())
-                if best_key is None or key < best_key:
-                    best_key, best = key, sid
-        if best:
-            return best
+                scored.append(((-fre,), sid))
+        picked = pick_by_priority(state, scored, count=1)  # Q22 §8.2 ties
+        if picked:
+            return picked[0]
         # Fallback: space with most French Regulars (no Continentals
         # needed).  §6.5.2: only spaces with FRENCH pieces are legal —
         # with no French Regulars on the map the Leader goes to
-        # Available (None).  Ties seeded per §8.2.  (Session 43: the
+        # Available (None).  §8.2 table ties (Q22).  (Session 43: the
         # old fallback could return a French-less dict-order space.)
-        for sid, sp in state["spaces"].items():
-            fre = sp.get(C.REGULAR_FRE, 0)
-            if fre == 0:
-                continue
-            key = (-fre, rng.random())
-            if best_key is None or key < best_key:
-                best_key, best = key, sid
-        return best
+        scored = [((-sp.get(C.REGULAR_FRE, 0),), sid)
+                  for sid, sp in state["spaces"].items()
+                  if sp.get(C.REGULAR_FRE, 0)]
+        picked = pick_by_priority(state, scored, count=1)  # Q22
+        return picked[0] if picked else None
 
     def ops_loyalist_desertion_priority(self, state: Dict) -> List[Tuple[str, str]]:
         """Loyalist Desertion: Remove a Tory so as to change the most
