@@ -79,3 +79,25 @@ correctness stretch (who-choice sweep, bot tie-site conversion,
 question-spaces-first) does not move the aggregate balance.  The
 STANDING PICTURE for the tune-or-not call: French ~45-47%, Indians
 ~22-26%, Patriots ~19-21%, British ~10%; Royalist share ~33-36%.
+
+## Addendum: post-Q23 rerun (largeN_s74.jsonl) — Session 74
+
+After the Q23 marker-stacking migration (Propaganda/Raid per-space
+counts; RL/CoC pay per stacked marker; cards 1/2/47 place both;
+re-Raids stack): same instrument, all 300 clean.
+
+| Faction | 1775 | 1776 | 1778 | total |
+|---|---|---|---|---|
+| FRENCH | 52 | 28 | 53 | 133 (44.3%, 38.8-50.0) |
+| INDIANS | 35 | 26 | 16 | 77 (25.7%, 21.1-30.9) |
+| PATRIOTS | 7 | 29 | 25 | 61 (20.3%, 16.2-25.2) |
+| BRITISH | 6 | 17 | 6 | 29 (9.7%, 6.8-13.5) |
+
+Royalist 106/300 (35.3%).  Despite the direct British-WQ-economy
+touch (Reward Loyalty now pays per stacked marker), every faction
+total again sits inside the standing CIs (B 30->29; F 141->133;
+I 72->77; P 57->61).  The stacking cost cuts both ways — the British
+pay more to clear stacks, but Raid re-stacking also concentrates
+Indian pressure the British never pay for — and the net is a wash at
+instrument resolution.  STANDING PICTURE unchanged: F ~44-47%,
+I ~22-26%, P ~19-21%, B ~10%.
