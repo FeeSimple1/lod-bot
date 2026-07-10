@@ -27,9 +27,17 @@ SAs, battle, winter quarters, victory, leaders). Larger than Piece 1;
 split by chapter. The §1.6.2 Active-counts-double and §1.9 FNI-ceiling
 class of rules live here.
 
-## Piece 3 — Complete the card / flowchart-condition audit
+## Piece 3 — Complete the card / flowchart-condition audit  [PARTIAL — S73 closed the §8.3.5 residuals]
 
-Work the backlog from Pieces 1–2 plus the known items:
+DONE (Session 73): the exhaustive per-card §8.3.5 who-choice audit
+(all 109 cards; cards 29/48/67/74/87 routed onto util/target_order,
+three hand-rolled sites verified conforming, ten what-choice-only),
+the last 15 pre-Q22 tie sites in the four bot files (card-80 presets,
+British garrison 2b/displacement, leader redeploys, Cornplanter,
+loyalist desertion), and the §8.3.5 flowchart-question-spaces-first
+bullet (state["_event_q_spaces"] threading; test_event_question_spaces).
+
+Remaining backlog from Pieces 1-2 plus the known items:
 - `event_instructions.py`: the PATRIOTS / INDIANS / FRENCH dicts are
   self-described "pared-down" versions of the Brown Bess sheet —
   transcribe the full reverse side of the Random Spaces sheet for all
