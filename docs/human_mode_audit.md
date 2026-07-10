@@ -54,6 +54,25 @@ enforcement test freezes it so new choice-bearing cards must be triaged.
 This is sized as its own session(s): 43 prompt specs, each validated
 against card text and the handler's expected value shape.
 
+## Wiring status (updated as batches land)
+
+* **Batch 1 — WIRED (Session 73):** the 26 space-selection cards
+  (5, 7, 9, 11, 15, 16, 17, 19, 21, 23, 25, 27, 29, 31, 35, 47, 50, 59,
+  73, 76, 77, 79, 81, 83, 84, 93) now prompt via
+  `lod_ai/event_choices.py` when a human plays the Event.  Candidate
+  menus mirror each handler's own legality filter; handlers re-validate
+  every value, so a bad pick degrades to the rules-faithful default.
+  Choices the card text assigns to a *different* faction (5, 9, 11, 15,
+  19, 21-shaded, 31-shaded, 76, 84, 7) prompt only when that faction is
+  a human seat; otherwise the bot-faithful handler default decides.
+  **Audit-table correction:** card 29's `target` value is a FACTION
+  (PATRIOTS or INDIANS), not a space id — it is collected as a
+  two-option pick.  The "26 pure space-selection" headline count is
+  unchanged.
+* **Not yet wired:** 4, 14, 18, 26, 38, 44, 48, 52, 55, 62, 66, 67, 74,
+  80, 85, 87, 88 (sub-option, faction-target and piece-mix batches —
+  next up).
+
 ## The registry
 
 | Card | Title | Choice type | Override key(s) | Non-player default |

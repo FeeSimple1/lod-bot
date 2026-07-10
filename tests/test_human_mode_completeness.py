@@ -10,9 +10,19 @@ such cards (docs/human_mode_audit.md, Session 72) so that:
     event-choice step);
   * removing a choice hook is likewise surfaced.
 
-It does NOT assert the CLI collects each choice — today it collects none
-(the documented Piece 7 gap).  The gate exists to stop the audit from
-silently drifting while the CLI wiring is built out.
+The CLI collection layer (lod_ai/event_choices.py) is being wired in
+batches; tests/test_event_choices.py asserts each wired card's keys
+match this registry.  Wiring status:
+
+  * WIRED (batch 1, the 26 space-selection cards): 5, 7, 9, 11, 15, 16,
+    17, 19, 21, 23, 25, 27, 29, 31, 35, 47, 50, 59, 73, 76, 77, 79, 81,
+    83, 84, 93.  (Note: card 29's value is a FACTION, not a space —
+    audit-table correction recorded in docs/human_mode_audit.md.)
+  * NOT yet wired: 4, 14, 18, 26, 38, 44, 48, 52, 55, 62, 66, 67, 74,
+    80, 85, 87, 88 (sub-option / faction-target / piece-mix batches).
+
+This gate stops the audit from silently drifting while the remaining
+batches are built out.
 """
 import re
 import pathlib

@@ -36,6 +36,7 @@ from lod_ai.cli_display import (
     _snapshot_state,
 )
 from lod_ai.engine import Engine
+from lod_ai.event_choices import collect_event_choices
 from lod_ai.map import adjacency as map_adj
 from lod_ai.state.setup_state import build_state
 from lod_ai.leaders import leader_location
@@ -1105,7 +1106,25 @@ def _human_decider(faction: str, card: dict, allowed: Dict[str, Any], engine: En
                     shaded = sides[0][1]
                 else:
                     shaded = choose_one("Select event side:", sides)
-            runner = lambda s, c: engine.handle_event(faction, card, state=s, shaded=shaded)
+            # Piece 7: collect the card's player choices (event_choices.py)
+            # and apply them as card<N>_* overrides around handle_event.
+            try:
+                event_overrides = collect_event_choices(
+                    engine, faction, card, bool(shaded))
+            except BackException:
+                continue
+
+            def _event_runner(s: dict, c: dict, _ov=event_overrides,
+                              _shaded=shaded) -> Any:
+                s.update(_ov)
+                try:
+                    return engine.handle_event(faction, card, state=s,
+                                               shaded=_shaded)
+                finally:
+                    for k in _ov:
+                        s.pop(k, None)
+
+            runner = _event_runner
         else:  # command
             try:
                 command_runner = _command_runner_for(faction, engine, allowed.get("limited_only", False))
