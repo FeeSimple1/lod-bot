@@ -32,6 +32,13 @@ _F = dict(
     places_british_from_unavailable=False,  # B2-2: places British pieces sourced from Unavailable
     places_tories=False,                   # B2-3: places Tory pieces on the map
     tories_in=None,                        # B2-3: fixed placement space(s), None = choose; "CITIES"/"COLONIES" sentinels
+    # --- P2 bullet-2 target-awareness (S75, the S63 "card-42 class" fix
+    # applied to the Patriot list): where the card's Militia can land.
+    # None = anywhere; tuple = fixed space(s); sentinels "CITIES",
+    # "COLONIES", "TORY_OR_INDIAN" (spaces holding a Tory or Indian
+    # piece), "MA_OR_INDIAN" (Massachusetts or any Indian-piece space).
+    militia_in=None,
+    militia_via_tory=False,                # replacement cards: needs a Tory in-space
     regulars_in=None,                      # B2-3c: fixed Regular placement space(s), None = choose
     places_british_fort=False,             # B2-3: places a British Fort on the map
     places_british_regulars=False,         # B2-3: places British Regulars on the map
@@ -100,6 +107,7 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
+            militia_in=("Northwest", "Southwest"),
             places_patriot_militia_u=True,
             is_effective=True,
         ),
@@ -114,6 +122,7 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
+            militia_in=("Massachusetts",),
             places_patriot_militia_u=True,
             places_patriot_fort=True,
             places_village=True,
@@ -254,7 +263,10 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
-            places_patriot_militia_u=True,  # places Active Militia (still patriot militia)
+            # S75: card 13 shaded adds ACTIVE Militia (handler places
+            # MILITIA_A) — it does NOT place Underground Militia, so
+            # the P2 bullet-2 flag was wrong.
+            places_patriot_militia_u=False,  # places Active Militia (still patriot militia)
             is_effective=True,
         ),
     },
@@ -427,6 +439,7 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
+            militia_in="CITIES",
             shifts_support_rebel=True,
             places_patriot_militia_u=True,
             is_effective=True,
@@ -462,6 +475,7 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
+            militia_in="CITIES",
             shifts_support_rebel=True,
             places_patriot_militia_u=True,
             is_effective=True,
@@ -479,6 +493,7 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
+            militia_via_tory=True,   # "replace every one Tory"
             places_patriot_militia_u=True,
             is_effective=True,
         ),
@@ -524,6 +539,7 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
+            militia_in=("South_Carolina", "Georgia"),
             places_patriot_militia_u=True,
             is_effective=True,
         ),
@@ -644,6 +660,7 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
+            militia_in=("New_York",),
             places_patriot_militia_u=True,  # can place Militia
             is_effective=True,
         ),
@@ -707,6 +724,7 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
+            militia_in=("Connecticut_Rhode_Island",),
             places_patriot_militia_u=True,
             is_effective=True,
         ),
@@ -781,6 +799,7 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
+            militia_in="COLONIES", militia_via_tory=True,
             places_patriot_militia_u=True,
             is_effective=True,
         ),
@@ -849,6 +868,11 @@ CARD_EFFECTS = {
     52: {
         "unshaded": _e(
             inflicts_rebel_casualties=True,  # free Battle anywhere
+            # S75 (Manual §8.6 F-bullet 4: "inflicts British Casualties
+            # (including a free French Battle...)"): the free Battle+2
+            # belongs to the EXECUTOR, so a French executor's battle
+            # inflicts British casualties — F4 must see this card.
+            inflicts_british_casualties=True,
             is_effective=True,
         ),
         "shaded": dict(_NONE),
@@ -947,6 +971,8 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
+            militia_in=("New_York", "Quebec", "Northwest"),
+            militia_via_tory=True,
             places_patriot_militia_u=True,
             is_effective=True,
         ),
@@ -1013,6 +1039,7 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
+            militia_in=("Northwest",),
             places_french_on_map=True,
             places_patriot_militia_u=True,  # can place Militia
             is_effective=True,
@@ -1081,6 +1108,11 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
+            # S75 (Manual §8.6 F-bullet 4 parenthetical): "French or
+            # Patriots free March and Battle" — the French can take the
+            # Battle (§8.3.5/T7 selects the executor first), so this is
+            # a free-French-Battle card and must fire F4.
+            inflicts_british_casualties=True,
             is_effective=True,
         ),
     },
@@ -1258,6 +1290,7 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
+            militia_in="TORY_OR_INDIAN",
             places_patriot_militia_u=True,
             is_effective=True,
         ),
@@ -1362,6 +1395,7 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
+            militia_in=("Southwest",),
             places_patriot_militia_u=True,
             places_french_on_map=True,
             is_effective=True,
@@ -1377,6 +1411,7 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
+            militia_in="MA_OR_INDIAN",
             places_patriot_militia_u=True,
             is_effective=True,
         ),
@@ -1415,6 +1450,7 @@ CARD_EFFECTS = {
             is_effective=True,
         ),
         "shaded": _e(
+            militia_via_tory=True,   # "Replace any three Tories"
             places_patriot_militia_u=True,
             is_effective=True,
         ),

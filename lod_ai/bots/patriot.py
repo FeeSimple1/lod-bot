@@ -1568,12 +1568,39 @@ class PatriotBot(BaseBot):
                     return True
         if eff["places_patriot_militia_u"] and state.get("available", {}).get(C.MILITIA_U, 0) > 0:
             # P2 bullet 2 (§8.5): "places Underground Militia in at least one
-            # Active Support or Village space that has none already"
+            # Active Support or Village space that has none already" —
+            # "none" scopes to the UNDERGROUND Militia being placed (the
+            # grammatical antecedent), so a space holding only Active
+            # Militia still qualifies (S75; was any-militia).
+            # S75 target-awareness (the S63 "card-42 class" fix): the
+            # bullet tests only spaces where THIS card's Militia can
+            # actually land (event_eval militia_in / militia_via_tory).
+            domain = eff.get("militia_in")
+            if domain == "CITIES":
+                cands = [s for s in state["spaces"]
+                         if _MAP_DATA.get(s, {}).get("type") == "City"]
+            elif domain == "COLONIES":
+                cands = [s for s in state["spaces"]
+                         if _MAP_DATA.get(s, {}).get("type") == "Colony"]
+            elif domain == "TORY_OR_INDIAN":
+                cands = [s for s, sp in state["spaces"].items()
+                         if sp.get(C.TORY, 0) or sp.get(C.WARPARTY_U, 0)
+                         or sp.get(C.WARPARTY_A, 0) or sp.get(C.VILLAGE, 0)]
+            elif domain == "MA_OR_INDIAN":
+                cands = [s for s, sp in state["spaces"].items()
+                         if s == "Massachusetts" or sp.get(C.WARPARTY_U, 0)
+                         or sp.get(C.WARPARTY_A, 0) or sp.get(C.VILLAGE, 0)]
+            elif domain:
+                cands = [s for s in domain if s in state["spaces"]]
+            else:
+                cands = list(state["spaces"])
             matches = []
-            for sid, sp in state["spaces"].items():
-                has_militia = (sp.get(C.MILITIA_U, 0) + sp.get(C.MILITIA_A, 0)) > 0
-                if has_militia:
+            for sid in cands:
+                sp = state["spaces"][sid]
+                if sp.get(C.MILITIA_U, 0) > 0:
                     continue
+                if eff.get("militia_via_tory") and sp.get(C.TORY, 0) == 0:
+                    continue    # replacement cards need a Tory to replace
                 sup = state.get("support", {}).get(sid, 0)
                 if sup == C.ACTIVE_SUPPORT or sp.get(C.VILLAGE, 0) > 0:
                     matches.append(sid)

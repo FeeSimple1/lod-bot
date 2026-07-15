@@ -1316,8 +1316,10 @@ def test_p2_bullet2_active_support_no_militia_returns_true():
         "support": {"Boston": C.ACTIVE_SUPPORT},
         "available": {C.MILITIA_U: 5},
     }
-    # Card 3 shaded has places_patriot_militia_u=True
-    card = {"id": 3, "dual": True}
+    # Card 24 shaded places Militia ANYWHERE (S75: card 3 is now
+    # domain-restricted to Northwest/Southwest and no longer probes the
+    # generic path).  Fort pool empty -> only bullet 2 can fire.
+    card = {"id": 24, "dual": True}
     assert bot._faction_event_conditions(state, card) is True
 
 
@@ -1352,7 +1354,7 @@ def test_p2_bullet2_village_no_militia_returns_true():
         "support": {"Quebec": C.NEUTRAL},
         "available": {C.MILITIA_U: 5},
     }
-    card = {"id": 3, "dual": True}
+    card = {"id": 24, "dual": True}   # anywhere-domain card (S75)
     assert bot._faction_event_conditions(state, card) is True
 
 

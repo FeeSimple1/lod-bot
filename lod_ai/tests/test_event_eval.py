@@ -21,6 +21,8 @@ _EXPECTED_FIELDS = {
     "places_patriot_militia_u",
     "tories_in",  # S60: B2-3 fixed placement space(s), None = choose
     "regulars_in",  # S63: B2-3c fixed Regular placement space(s)
+    "militia_in",  # S75: P2-2 Militia placement domain (target-aware)
+    "militia_via_tory",  # S75: replacement cards need a Tory in-space
     "places_patriot_fort",
     "places_french_from_unavailable",
     "places_french_on_map",
@@ -87,10 +89,12 @@ def test_card_values_are_booleans(card_id):
     for side in ("unshaded", "shaded"):
         flags = CARD_EFFECTS[card_id][side]
         for key, val in flags.items():
-            if key in ("tories_in", "regulars_in"):
-                # S60/S63: placement-target fields — None, a tuple of
-                # space ids, or a "CITIES"/"COLONIES" sentinel.
-                assert val is None or val in ("CITIES", "COLONIES") or (
+            if key in ("tories_in", "regulars_in", "militia_in"):
+                # S60/S63/S75: placement-target fields — None, a tuple
+                # of space ids, or a domain sentinel.
+                assert val is None or val in (
+                    "CITIES", "COLONIES", "TORY_OR_INDIAN",
+                    "MA_OR_INDIAN") or (
                     isinstance(val, tuple)
                     and all(isinstance(x, str) for x in val)
                 ), f"Card {card_id} {side}[{key}] = {val!r}"
@@ -126,7 +130,7 @@ def test_card_18_shaded_is_none():
     s = CARD_EFFECTS[18]["shaded"]
     # placement-target fields default to None (not flags)
     assert all(v is False for k, v in s.items()
-               if k not in ("tories_in", "regulars_in"))
+               if k not in ("tories_in", "regulars_in", "militia_in"))
     assert s["tories_in"] is None and s["regulars_in"] is None
 
 
