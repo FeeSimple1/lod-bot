@@ -101,3 +101,21 @@ pay more to clear stacks, but Raid re-stacking also concentrates
 Indian pressure the British never pay for — and the net is a wash at
 instrument resolution.  STANDING PICTURE unchanged: F ~44-47%,
 I ~22-26%, P ~19-21%, B ~10%.
+
+## Addendum: post-S75 event_eval-audit rerun (largeN_s75.jsonl)
+
+After the P2/F2/I2 bullet fixes (card-13 mis-flag, P2 underground
+scoping + target-awareness via militia_in domains, F4 free-French-
+Battle flags on 52/66s): same instrument, all 300 clean.
+
+| Faction | 1775 | 1776 | 1778 | total |
+|---|---|---|---|---|
+| FRENCH | 45 | 31 | 55 | 131 (43.7%, 38.2-49.3) |
+| INDIANS | 38 | 22 | 18 | 78 (26.0%, 21.4-31.2) |
+| PATRIOTS | 11 | 33 | 24 | 68 (22.7%, 18.3-27.7) |
+| BRITISH | 6 | 14 | 3 | 23 (7.7%, 5.2-11.2) |
+
+Royalist 101/300 (33.7%).  All cells inside the standing CIs (P 61->68
+up, B 29->23 down — the better-targeted Patriot event plays press the
+British; directional but noise-compatible).  Standing picture holds:
+F ~44-47%, I ~24-26%, P ~20-23%, B ~8-10%.
