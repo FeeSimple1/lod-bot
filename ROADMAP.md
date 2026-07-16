@@ -151,13 +151,16 @@ Instructions sheet wording is NOT in it — T12 stays blocked on Q15.
   `invariants.check_save_load_roundtrip`, which asserts exact
   canonical-state + RNG equality.  Green across all scenarios/seatings.
 
-## Piece 8 — Statistical validation at scale
+## Piece 8 — Statistical validation at scale  [DONE, Session 76]
 
-One large run (~1,000 games/scenario): win-rate confidence intervals,
-game-length and resource-curve distributions, documented in-repo.
-Future changes landing outside the intervals must be explained, not
-just rebaselined. (The 60-game pinned baseline stays as the fast
-canary.)
+3,000-game run (1,000/scenario, seeds 20000+) documented in
+docs/piece8_at_scale_s76.md: win-rate Wilson CIs (post-C6 baseline —
+British 6.1% (5.3-7.0), French 46.5%, Royalist 29.7%) and game-length
+distributions; all clean.  Future changes landing outside those
+intervals must be explained, not just rebaselined.  (60-game canary
+stays the fast gate; 300-game instrument the per-session read.)
+Deferred sub-item: resource-curve distributions via
+run_one_game(detailed=True) at soak scale.
 
 ## Piece 9 — Hygiene / CI hardening  [DONE, Session 71]
 
