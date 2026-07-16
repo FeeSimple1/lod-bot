@@ -142,14 +142,45 @@ def _reclaim_one_from_map(state: Dict[str, Any], pool_tag: str,
     return True
 
 
+_FORCE_OWNER_PREFIX = (("British_", C.BRITISH), ("Patriot_", C.PATRIOTS),
+                       ("French_", C.FRENCH), ("Indian_", C.INDIANS))
+
+
+def _force_owner(tag: str) -> str | None:
+    if tag == C.VILLAGE:
+        return C.INDIANS
+    for pre, fac in _FORCE_OWNER_PREFIX:
+        if tag.startswith(pre):
+            return fac
+    return None
+
+
 def _ensure_available(state: Dict[str, Any], tag: str, qty: int,
                       exclude_loc: str | None = None) -> None:
-    """Ensure at least *qty* of *tag* exist in Available, reclaiming from map if needed."""
+    """§1.4.1 voluntary map-pull: while executing a Command, Special
+    Activity or Event to place its OWN forces, a faction MAY take them
+    from the map into Available iff the type is not Available
+    (B/F Regulars excepted — not in _RECLAIM_ELIGIBLE).
+
+    C6 (Session 76): this used to run UNCONDITIONALLY on every
+    placement — but Manual §8 ("No voluntary removal") says Non-player
+    Factions NEVER use the 1.4.1 option, and the rule's own scope is
+    the owner executing its own placement.  Now gated: the force's
+    owner must be a HUMAN seat and must be the active (executing)
+    faction.  For human seats the pull is auto-exercised as an interim
+    (it maximises their placement); offering the decline/which-piece
+    choice in the CLI is the logged residual."""
     if qty <= 0:
         return
     pool_tag = _pool_tag(tag)
     if pool_tag not in _RECLAIM_ELIGIBLE:
         return
+    owner = _force_owner(pool_tag)
+    humans = state.get("human_factions") or set()
+    if owner is None or owner not in humans:
+        return                      # §8: bots never voluntarily remove
+    if str(state.get("active", "")).upper() != owner:
+        return                      # §1.4.1 scope: own placement only
     pool = state.setdefault("available", {})
     while pool.get(pool_tag, 0) < qty:
         if not _reclaim_one_from_map(state, pool_tag, exclude_loc):

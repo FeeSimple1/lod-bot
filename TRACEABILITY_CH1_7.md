@@ -38,7 +38,7 @@ in TRACEABILITY.md).
 | 1.3.8 | (no such § in source text) | — | — | — | Section absent from Reference Documents text. |
 | 1.3.9 | Unavailable boxes | UNVERIFIED | — | — | French Unavailable + British Release Date (6.5.3) paths exist; verify vs scenario set-up. |
 | 1.4 | Pieces | OK | bots/patriot.py, cards/effects/middle_war.py, commands/battle.py, special_activities/partisans.py, tools/gather_decline_audit.py | t/test_battle_modifiers.py, t/test_pat_bot.py, t/test_patriot_block_s45.py, t/test_special_activities.py, t/test_battle_selection.py | Tag model in rules_consts. |
-| 1.4.1 | Availability and Removal | PARTIAL (C6, C8) | cards/effects/early_war.py | — | Pool model + add_piece clamps OK; casualties routing OK (1.6.4). MISSING: voluntary take-own-pieces-from-map when type not Available (exception: not B/F Regulars) — no path anywhere → C6; 'replace with unavailable piece = simply remove' is per-site (5.1.1) → Piece 3. |
+| 1.4.1 | Availability and Removal | OK (C6 closed S76, C8 verified S66) | cards/effects/early_war.py | — | Pool model + add_piece clamps OK; casualties routing OK (1.6.4). MISSING: voluntary take-own-pieces-from-map when type not Available (exception: not B/F Regulars) — no path anywhere → C6; 'replace with unavailable piece = simply remove' is per-site (5.1.1) → Piece 3. |
 | 1.4.2 | Stacking | PARTIAL | bots/patriot.py, util/caps.py | t/test_pat_bot.py, t/test_smoke_zero_player_fixes.py | enforce_global_caps trims: ≤2 Fort/Village per space, WI occupancy whitelist, Indian-no-City. Enforcement is post-hoc TRIM, not placement-time refusal — planners must pre-check (Session 30 _fort_room lesson); refusal exists in rally/muster paths. |
 | 1.4.3 | Underground/Active | OK | cards/effects/early_war.py | — | New Militia/WP placed Underground (rally _place_militia→MILITIA_U, muster, gather); moves preserve state (march 3.3.2 note); flip helpers for Activate. |
 | 1.5 | Players & Factions | OK | — | — | Faction constants; human/bot seating via engine.set_human_factions. |
@@ -200,9 +200,16 @@ in TRACEABILITY.md).
   Faction's pieces (deterministic sorted-id tie, no rng — normalize
   stays pure), else Available.  Free on the hot path (profiled: 0.009s
   / 2000 calls).  test_leader_orphan_c5.py (4).
-- **C6** §1.4.1: Voluntary take-own-forces-from-map when the type is not
-  Available (exception: British/French Regulars may not; Tories/Forts
-  may) — no path anywhere (bots, events, human CLI).
+- **C6** §1.4.1 CLOSED (Session 76): the "no path anywhere" read was
+  WRONG — place_piece._ensure_available auto-reclaimed own pieces from
+  the map on EVERY pool-dry placement, bots included, violating Manual
+  §8 "No voluntary removal" (Non-players NEVER use the 1.4.1 option).
+  Now gated: the force owner must be a human seat AND the active
+  executing faction (the rule's own scope); bots place what the pool
+  holds (§5.1.3).  B/F-Regulars exception holds (not reclaim-eligible).
+  Human interim: the pull auto-fires (maximises the placement);
+  RESIDUAL: CLI prompt for the may-decline and which-piece choice.
+  Tests: test_c6_voluntary_removal.py (4).
 - **C7** §7.1/§7.2: Final ranking details — Non-players-first tie tier,
   1st-4th placement, all-players-lose-if-a-NP-passes-victory-check,
   French-last-without-ToA, Combined Victory for a both-factions player.
