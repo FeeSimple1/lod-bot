@@ -37,7 +37,17 @@ Leader is a "piece on the map" for this count is a Glossary read —
 candidate Q24 if it ever matters); F3 reads "French pieces" as
 Regulars only (ignores Squadrons/Leader — same class).
 
-## Part B — dict-order first-fit scan classification  [CLASSIFIED S75; FIXES QUEUED]
+## Part B — dict-order first-fit scan classification  [EXECUTED S76]
+
+All conversions below LANDED (S76).  Two sites needed MORE than the
+classified §8.2 treatment — their toward-Neutral shifts are
+side-sensitive, caught live by the §8.3.3 net-shift invariant during
+the batch battery: card 93 (routed through §8.3.6
+select_support_shift_spaces, target=0) and card 1 (side-aware keys:
+shaded = card-51/T8 winnable-Battle target + non-royalist-favoring
+shift; unshaded = Continentals-removed then pop-weighted gain).
+The borderline pool-removal analogues remain out of scope as
+documented.
 
 Verdicts from the S75 sweep (each verified against the printed card
 text).  §8.2 treatment = route through pick_by_priority /

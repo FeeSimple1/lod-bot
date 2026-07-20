@@ -211,23 +211,52 @@ def evt_005_lord_stirling(state, shaded=False):
     dest_override = state.get("card5_dest")
     src_override = state.get("card5_src")
 
+    def _src_for(dest):
+        """A legal Patriot March origin adjacent to *dest* (override first)."""
+        neighbors = _neighbors(dest)
+        if (src_override and src_override in neighbors
+                and src_override in state.get("spaces", {})
+                and _space_has_any(state, src_override,
+                                   _faction_unit_tags(PATRIOTS))):
+            return src_override
+        srcs = [s for s in neighbors
+                if s in state.get("spaces", {})
+                and _space_has_any(state, s, _faction_unit_tags(PATRIOTS))]
+        # §8.2 table (Q22, S76): equal qualifying March origins, no
+        # substantive key (was first-listed neighbour).
+        picked = pick_random_spaces(state, srcs, 1)
+        return picked[0] if picked else None
+
     def _pick_move():
         if dest_override in state.get("spaces", {}):
-            dests = [dest_override]
-        else:
-            dests = list(state.get("spaces", {}).keys())
-        for dest in dests:
-            neighbors = _neighbors(dest)
-            if src_override:
-                if src_override in neighbors and src_override in state.get("spaces", {}):
-                    sp_src = _safe_get_space(state, src_override)
-                    if _space_has_any(state, src_override, _faction_unit_tags(PATRIOTS)):
-                        return src_override, dest
-            for src in neighbors:
-                if src not in state.get("spaces", {}):
-                    continue
-                if _space_has_any(state, src, _faction_unit_tags(PATRIOTS)):
-                    return src, dest
+            src = _src_for(dest_override)
+            return (src, dest_override) if src else (None, None)
+        # Free March serves the free Battle: target a winnable-Battle
+        # destination per the Battle instructions (§8.3.1 Event
+        # Instruction; the card-51/T8 `bot_march_battle_target` pattern).
+        dest = battle.bot_march_battle_target(state, PATRIOTS)
+        if dest:
+            src = _src_for(dest)
+            if src:
+                return src, dest
+        # No winnable set-up: Battle still needs a target.
+        # §8.2 table (Q22, S76): key = enemy piece in the destination
+        # first; eligibility (a legal adjacent Patriot source) unchanged.
+        enemy_tags = [REGULAR_BRI, TORY, FORT_BRI,
+                      WARPARTY_A, WARPARTY_U, VILLAGE]
+        scored = []
+        for dest in state.get("spaces", {}):
+            if not any(_space_has_any(state, s, _faction_unit_tags(PATRIOTS))
+                       for s in _neighbors(dest)
+                       if s in state.get("spaces", {})):
+                continue
+            key = 0 if _space_has_any(state, dest, enemy_tags) else 1
+            scored.append(((key,), dest))
+        picked = pick_by_priority(state, scored, count=1)  # Q22
+        if picked:
+            src = _src_for(picked[0])
+            if src:
+                return src, picked[0]
         return None, None
 
     src, dest = _pick_move()
@@ -270,9 +299,14 @@ def evt_008_culpeper_ring(state, shaded=False):
         push_history(state, "Card 8 shaded: removed British cubes")
     else:
         flipped = 0
-        for name in list(state.get("spaces", {})):
-            if flipped >= 3:
-                break
+        # §8.2 table (Q22, S76): equal-candidate Militia spaces, no
+        # substantive key; re-roll only while more flips are needed
+        # (was first-3 dict order).
+        cands = [name for name, sp in state.get("spaces", {}).items()
+                 if sp.get(MILITIA_U, 0)]
+        while cands and flipped < 3:
+            name = pick_random_spaces(state, cands, 1)[0]
+            cands.remove(name)
             avail = state.get("spaces", {}).get(name, {}).get(MILITIA_U, 0)
             to_flip = min(avail, 3 - flipped)
             if to_flip:
@@ -310,6 +344,9 @@ def evt_009_von_steuben(state, shaded=False):
         candidates = [sid for sid in override_spaces if sid in state.get("spaces", {})]
     else:
         candidates = [sid for sid in state.get("spaces", {}) if _can_skirmish(sid)]
+        # §8.2 table (Q22, S76): equal-candidate Skirmish spaces, no
+        # substantive key, up-to-3 (was first-3 dict order).
+        candidates = pick_random_spaces(state, candidates, 3)
 
     chosen = []
     for sid in candidates:
@@ -345,6 +382,9 @@ def evt_011_kosciuszko(state, shaded=False):
                 continue
             if _space_has_any(state, sid, _faction_unit_tags(PATRIOTS)):
                 candidates.append(sid)
+        # §8.2 table (Q22, S76): equal-candidate Rebellion spaces, no
+        # substantive key, 2-of-N (was first-2 dict order).
+        candidates = pick_random_spaces(state, candidates, 2)
 
     done = 0
     for sid in candidates:
@@ -550,11 +590,15 @@ def evt_017_jane_mccrea(state, shaded=False):
             remove_piece(state, FORT_PAT, target, 1, to="available")
             push_history(state, f"Card 17 unshaded: Fort removed in {target}")
             return
-    for name, sp in state.get("spaces", {}).items():
-        if _is_reserve(name) and sp.get(FORT_PAT, 0):
-            remove_piece(state, FORT_PAT, name, 1, to="available")
-            push_history(state, f"Card 17 unshaded: Fort removed in {name}")
-            break
+    # §8.2 table (Q22, S76): equal-candidate Reserves with a Patriot
+    # Fort, no substantive key (was first-fit dict order).
+    cands = [name for name, sp in state.get("spaces", {}).items()
+             if _is_reserve(name) and sp.get(FORT_PAT, 0)]
+    picked = pick_random_spaces(state, cands, 1)
+    if picked:
+        name = picked[0]
+        remove_piece(state, FORT_PAT, name, 1, to="available")
+        push_history(state, f"Card 17 unshaded: Fort removed in {name}")
 
 
 # 26  JOSIAH MARTIN, NC ROYAL GOVERNOR, PLOTS
@@ -758,12 +802,20 @@ def evt_047_tories_tested(state, shaded=False):
 
     if shaded:
         if target not in state.get("spaces", {}):
-            for sid in state.get("spaces", {}):
-                if _is_colony(sid) and _safe_get_space(state, sid).get(TORY, 0):
-                    target = sid
-                    break
+            # §8.2 table (Q22, S76): equal-candidate Colonies with Tories,
+            # no substantive key (was first-fit dict order).
+            cands = [sid for sid in state.get("spaces", {})
+                     if _is_colony(sid)
+                     and _safe_get_space(state, sid).get(TORY, 0)]
+            picked = pick_random_spaces(state, cands, 1)
+            if picked:
+                target = picked[0]
         if target not in state.get("spaces", {}):
-            target = _pick_first_existing(state, [sid for sid in state.get("spaces", {}) if _is_colony(sid)])
+            # §8.2 table (Q22, S76): fallback tier — any Colony (the
+            # Propaganda still lands), no substantive key.
+            cands = [sid for sid in state.get("spaces", {}) if _is_colony(sid)]
+            picked = pick_random_spaces(state, cands, 1)
+            target = picked[0] if picked else None
         if target:
             tories = _safe_get_space(state, target).get(TORY, 0)
             if tories:
@@ -775,10 +827,14 @@ def evt_047_tories_tested(state, shaded=False):
 
     _ensure_control(state)
     if target not in state.get("spaces", {}):
-        for sid in state.get("spaces", {}):
-            if _is_colony(sid) and state.get("control", {}).get(sid) == BRITISH:
-                target = sid
-                break
+        # §8.2 table (Q22, S76): equal-candidate British-Controlled
+        # Colonies, no substantive key (was first-fit dict order).
+        cands = [sid for sid in state.get("spaces", {})
+                 if _is_colony(sid)
+                 and state.get("control", {}).get(sid) == BRITISH]
+        picked = pick_random_spaces(state, cands, 1)
+        if picked:
+            target = picked[0]
     if target and state.get("control", {}).get(target) == BRITISH:
         place_piece(state, TORY, target, 3)
         push_history(state, f"Card 47 unshaded: placed 3 Tories in {target}")
@@ -796,10 +852,12 @@ def evt_050_destaing_arrives(state, shaded=False):
     if shaded:
         target = state.get("card50_colony")
         if target not in state.get("spaces", {}):
-            for sid in state.get("spaces", {}):
-                if _is_colony(sid):
-                    target = sid
-                    break
+            # §8.2 table (Q22, S76): "any one Colony" — equal candidates,
+            # no substantive key (was first-fit dict order).
+            cands = [sid for sid in state.get("spaces", {}) if _is_colony(sid)]
+            picked = pick_random_spaces(state, cands, 1)
+            if picked:
+                target = picked[0]
         if target:
             place_piece(state, REGULAR_PAT, target, 2)
             # French Regulars come from Available or West Indies per reference
@@ -888,17 +946,19 @@ def evt_059_coudray(state, shaded=False):
 
     target = state.get("card59_space")
     if target not in state.get("spaces", {}):
-        # Prefer a space with both Continentals and French Regulars
+        # §8.2 table (Q22, S76): key = both piece types present first
+        # (§8.1.1 max extent), then either type; equal-key ties via the
+        # table (was first-fit dict order within each tier).
+        scored = []
         for sid, sp in state.get("spaces", {}).items():
-            if sp.get(REGULAR_PAT, 0) and sp.get(REGULAR_FRE, 0):
-                target = sid
-                break
-        # Fall back to any space with either piece type
-        if target not in state.get("spaces", {}):
-            for sid, sp in state.get("spaces", {}).items():
-                if sp.get(REGULAR_PAT, 0) or sp.get(REGULAR_FRE, 0):
-                    target = sid
-                    break
+            has_pat = sp.get(REGULAR_PAT, 0) > 0
+            has_fre = sp.get(REGULAR_FRE, 0) > 0
+            if not (has_pat or has_fre):
+                continue
+            scored.append(((0 if (has_pat and has_fre) else 1,), sid))
+        picked = pick_by_priority(state, scored, count=1)  # Q22
+        if picked:
+            target = picked[0]
     if target:
         remove_piece(state, REGULAR_PAT, target, 2, to="available")
         remove_piece(state, REGULAR_FRE, target, 2, to="available")
@@ -1016,6 +1076,9 @@ def evt_074_chickasaw(state, shaded=False):
             mil = sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0)
             if wp >= 1 and mil >= 1 and wp + mil >= 3:
                 candidates.append(sid)
+        # §8.2 table (Q22, S76): equal-candidate removal spaces, no
+        # substantive key, 2-of-N (was first-2 dict order).
+        candidates = pick_random_spaces(state, candidates, 2)
     done = 0
     for sid in candidates:
         if done == 2:
@@ -1051,12 +1114,14 @@ def evt_076_edward_hand(state, shaded=False):
 
     target = state.get("card76_space")
     if target not in state.get("spaces", {}):
-        for n, sp in state.get("spaces", {}).items():
-            if n == WEST_INDIES_ID or _is_city(n):
-                continue
-            if sp.get(MILITIA_U, 0) + sp.get(MILITIA_A, 0) >= 3:
-                target = n
-                break
+        # §8.2 table (Q22, S76): equal-candidate Provinces with 3+
+        # Militia, no substantive key (was first-fit dict order).
+        cands = [n for n, sp in state.get("spaces", {}).items()
+                 if n != WEST_INDIES_ID and not _is_city(n)
+                 and sp.get(MILITIA_U, 0) + sp.get(MILITIA_A, 0) >= 3]
+        picked = pick_random_spaces(state, cands, 1)
+        if picked:
+            target = picked[0]
     if not target:
         push_history(state, "Card 76 unshaded: no Province with 3 Militia")
         return
@@ -1071,15 +1136,13 @@ def evt_076_edward_hand(state, shaded=False):
 def evt_077_burgoyne(state, shaded=False):
     if shaded:
         affected = 0
-        for name, sp in state.get("spaces", {}).items():
-            if affected == 3:
-                break
-            if _is_city(name):
-                continue
-            if not _space_has_any(state, name, [WARPARTY_A, WARPARTY_U, VILLAGE]):
-                continue
-            if not _space_has_any(state, name, [REGULAR_BRI, TORY, FORT_BRI]):
-                continue
+        # §8.2 table (Q22, S76): equal-candidate shared Provinces, no
+        # substantive key, 3-of-N (was first-3 dict order).
+        cands = [name for name in state.get("spaces", {})
+                 if not _is_city(name)
+                 and _space_has_any(state, name, [WARPARTY_A, WARPARTY_U, VILLAGE])
+                 and _space_has_any(state, name, [REGULAR_BRI, TORY, FORT_BRI])]
+        for name in pick_random_spaces(state, cands, 3):
             if remove_piece(state, REGULAR_BRI, name, 1, to="available"):
                 pass
             elif remove_piece(state, TORY, name, 1, to="available"):
@@ -1092,12 +1155,14 @@ def evt_077_burgoyne(state, shaded=False):
     else:
         target = state.get("card77_space")
         if target not in state.get("spaces", {}):
-            for n, sp in state.get("spaces", {}).items():
-                if _space_has_any(state, n, [REGULAR_BRI, TORY, FORT_BRI]) and _space_has_any(
-                    state, n, [WARPARTY_A, WARPARTY_U, VILLAGE]
-                ):
-                    target = n
-                    break
+            # §8.2 table (Q22, S76): equal-candidate shared spaces for the
+            # Village, no substantive key (was first-fit dict order).
+            cands = [n for n in state.get("spaces", {})
+                     if _space_has_any(state, n, [REGULAR_BRI, TORY, FORT_BRI])
+                     and _space_has_any(state, n, [WARPARTY_A, WARPARTY_U, VILLAGE])]
+            picked = pick_random_spaces(state, cands, 1)
+            if picked:
+                target = picked[0]
         if target:
             place_with_caps(state, VILLAGE, target)
         for name in list(state.get("spaces", {})):
@@ -1112,13 +1177,15 @@ def evt_077_burgoyne(state, shaded=False):
 @register(78)
 def evt_078_cherry_valley(state, shaded=False):
     if shaded:
+        # §8.2 table (Q22, S76): equal-candidate Tory/Indian spaces, no
+        # substantive key, 4-of-N (was first-4 dict order).
+        cands = [name for name, sp in state.get("spaces", {}).items()
+                 if sp.get(TORY) or sp.get(WARPARTY_A) or sp.get(WARPARTY_U)
+                 or sp.get(VILLAGE)]
         added = 0
-        for name, sp in state.get("spaces", {}).items():
-            if added == 4:
-                break
-            if sp.get(TORY) or sp.get(WARPARTY_A) or sp.get(WARPARTY_U) or sp.get(VILLAGE):
-                place_piece(state, MILITIA_U, name, 1)
-                added += 1
+        for name in pick_random_spaces(state, cands, 4):
+            place_piece(state, MILITIA_U, name, 1)
+            added += 1
         push_history(state, "Card 78 shaded: militia rally")
     else:
         pat_tags = (REGULAR_PAT, MILITIA_U, MILITIA_A)
@@ -1346,17 +1413,26 @@ def evt_093_wyoming(state, shaded=False):
         push_history(state, "Card 93 shaded: no effect")
         return
 
-    override = state.get("card93_targets")
-    if isinstance(override, list):
-        cols = [sid for sid in override if sid in state.get("spaces", {})]
-    else:
-        cols = [sid for sid in state.get("spaces", {}) if _is_colony(sid)]
-
     def _adjacent_to_reserve(col_id):
         for nbr in _neighbors(col_id):
             if _is_reserve(nbr):
                 return True
         return False
+
+    override = state.get("card93_targets")
+    if isinstance(override, list):
+        cols = [sid for sid in override if sid in state.get("spaces", {})]
+    else:
+        # The toward-Neutral shift is SIDE-SENSITIVE (support>0 shifts
+        # pro-Rebellion, support<0 pro-Royalist), so §8.3.5 routes the
+        # selection to §8.3.6 executor-gain ordering with §8.2 ties —
+        # NOT a plain equal-candidate pick (S76: the first cut used
+        # pick_random_spaces and the §8.3.3 net-shift invariant caught
+        # an Indian bot shifting pro-rebel Colonies at 1778 seed 12).
+        cands = [sid for sid in state.get("spaces", {})
+                 if _is_colony(sid) and _adjacent_to_reserve(sid)]
+        cols = select_support_shift_spaces(state, cands, 3,
+                                           target=0, steps=1)
 
     affected = 0
     for name in cols:

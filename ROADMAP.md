@@ -27,7 +27,7 @@ SAs, battle, winter quarters, victory, leaders). Larger than Piece 1;
 split by chapter. The §1.6.2 Active-counts-double and §1.9 FNI-ceiling
 class of rules live here.
 
-## Piece 3 — Complete the card / flowchart-condition audit  [PARTIAL — S73 closed the §8.3.5 residuals]
+## Piece 3 — Complete the card / flowchart-condition audit  [PARTIAL — S73 §8.3.5 residuals, S75 event_eval audit, S76 dict-order batch all DONE; remaining: event_instructions transcription diff, auto_place_blockade stub, never-audited-card cross-check]
 
 DONE (Session 73): the exhaustive per-card §8.3.5 who-choice audit
 (all 109 cards; cards 29/48/67/74/87 routed onto util/target_order,

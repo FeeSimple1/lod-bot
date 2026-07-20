@@ -3,6 +3,7 @@
 from lod_ai.cards import register
 from lod_ai import rules_consts as C
 from lod_ai.cards.effects.shared import add_resource
+from lod_ai.bots.random_spaces import pick_random_spaces
 from lod_ai.board.pieces import remove_piece
 from lod_ai.util.history import push_history
 from lod_ai.victory import _summarize_board, _patriot_margin, _indian_margin
@@ -79,8 +80,12 @@ def _lose_fort_or_village(state, label):
     if not candidates:
         return
 
-    rng = state.get("rng")
-    sid = rng.choice(candidates) if rng else candidates[0]
+    # §8.2 table (Q22, S76): equal-candidate Fort/Village spaces, no
+    # substantive key (was raw rng.choice).
+    picked = pick_random_spaces(state, candidates, 1)
+    if not picked:
+        return
+    sid = picked[0]
 
     remove_piece(state, target_tag, sid, 1, to="available")
     push_history(state, f"{label} – removed 1 {target_tag} from {sid}")

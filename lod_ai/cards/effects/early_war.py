@@ -38,8 +38,9 @@ def _pick_spaces_with_militia(state, max_spaces=4):
         for name, sp in state["spaces"].items()
         if sp.get(MILITIA_U, 0) or sp.get(MILITIA_A, 0)
     ]
-    spaces.sort()
-    return spaces[:max_spaces]
+    # §8.2 table (Q22, S76): equal-candidate Militia spaces, no substantive
+    # key (was sorted()[:max_spaces]).
+    return pick_random_spaces(state, spaces, max_spaces)
 
 _RESERVE_PROVINCES = ("Northwest", "Southwest", "Quebec", "Florida")
 
@@ -1258,20 +1259,25 @@ def evt_092_cherokees_supplied(state, shaded=False):
         return
     cities = set(pick_cities(state, len(state.get("spaces", {}))))
     pool = state.setdefault("available", {})
-    for name in sorted(state.get("spaces", {})):
-        if name == WEST_INDIES_ID:
-            continue
-        sp = state["spaces"][name]
-        if sp.get(FORT_BRI, 0) + sp.get(VILLAGE, 0) == 0:
-            continue
-        if _available_base_slots(state, name) <= 0:
-            continue
-        if sp.get(VILLAGE, 0):
+    cands = [
+        name for name, sp in state.get("spaces", {}).items()
+        if name != WEST_INDIES_ID
+        and sp.get(FORT_BRI, 0) + sp.get(VILLAGE, 0) > 0
+        and _available_base_slots(state, name) > 0
+    ]
+    # §8.2 table (Q22, S76): equal-candidate Fort/Village spaces with an
+    # open base slot, no substantive key (was first sorted()).
+    picked = pick_random_spaces(state, cands, 1)
+    if not picked:
+        return
+    name = picked[0]
+    sp = state["spaces"][name]
+    if sp.get(VILLAGE, 0):
+        place_with_caps(state, FORT_BRI, name)
+        return
+    if sp.get(FORT_BRI, 0):
+        if name not in cities and pool.get(VILLAGE, 0) > 0:
+            place_with_caps(state, VILLAGE, name)
+        else:
             place_with_caps(state, FORT_BRI, name)
-            return
-        if sp.get(FORT_BRI, 0):
-            if name not in cities and pool.get(VILLAGE, 0) > 0:
-                place_with_caps(state, VILLAGE, name)
-            else:
-                place_with_caps(state, FORT_BRI, name)
-            return
+        return

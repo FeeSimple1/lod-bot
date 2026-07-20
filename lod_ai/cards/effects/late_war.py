@@ -107,7 +107,6 @@ def evt_001_waxhaws(state, shaded=False):
     Shaded   – Patriots free March to and free Battle in any 1 space;
                then place 2 Propaganda and shift 1 toward Neutral.
     """
-    # choose the first eligible space (deterministic placeholder)
     eligible = [
         sid for sid, sp in state["spaces"].items()
         if sp.get(REGULAR_BRI)      # has British pieces
@@ -115,7 +114,34 @@ def evt_001_waxhaws(state, shaded=False):
     if not eligible:
         push_history(state, "Waxhaws: no space with British pieces — no effect")
         return
-    target = eligible[0]
+    # S76 (second cut — the first used a plain §8.2 pick and the §8.3.3
+    # net-shift invariant caught a Patriot bot handing the Royalists a
+    # toward-Neutral shift on an Opposition space): the choice is
+    # SIDE-SENSITIVE.  Shaded (Rebellion executor): the space hosts a
+    # free Patriot March+Battle (§8.3.5 free-Command priorities → the
+    # card-51/T8 winnable-Battle target) and the toward-Neutral shift
+    # must not favor the Royalists (support>0 shifts pro-Rebel, <0
+    # pro-Royalist).  Unshaded (Royalist executor): maximise the
+    # Continentals removed (§8.1.1) then the pop-weighted gain of the
+    # toward-Active-Support shift.  §8.2 table on remaining ties (Q22).
+    sup_map = state.get("support", {})
+    if shaded:
+        from lod_ai.commands import battle as _battle
+        bt = _battle.bot_march_battle_target(state, PATRIOTS)
+        scored = []
+        for sid in eligible:
+            sup = sup_map.get(sid, 0)
+            shift_ben = 1 if sup > 0 else (0 if sup == 0 else -1)
+            scored.append(((0 if sid == bt else 1, -shift_ben), sid))
+    else:
+        scored = []
+        for sid in eligible:
+            sup = sup_map.get(sid, 0)
+            cont = min(2, state["spaces"][sid].get(REGULAR_PAT, 0))
+            pop = map_adj.population(sid) or 0
+            gain = pop if sup < ACTIVE_SUPPORT else 0
+            scored.append(((-cont, -gain), sid))
+    target = pick_by_priority(state, scored, count=1)[0]
 
     if shaded:
         queue_free_op(state, PATRIOTS, "march",  target)
@@ -519,12 +545,17 @@ def evt_039_king_mob(state, shaded=False):
     """
     if shaded:
         return
+    # Eligibility unchanged: only non-Neutral Cities can shift toward
+    # Neutral (target=0).  §8.3.6 executing-side pop-weighted gain key
+    # (the cards 25/41 pattern) + §8.2 table ties (Q22, S76) — was the
+    # first-3 shiftable Cities in dict order.
     cities = [sid for sid in state.get("spaces", {})
-              if _is_city_late(sid)]
+              if _is_city_late(sid)
+              and state.get("support", {}).get(sid, 0) != 0]
+    cities = select_support_shift_spaces(state, cities, 3,
+                                         target=0, steps=1, shaded=False)
     shifted = 0
     for name in cities:
-        if shifted >= 3:
-            break
         cur = state.get("support", {}).get(name, 0)
         if cur > 0:
             shift_support(state, name, -1)
@@ -595,25 +626,29 @@ def evt_048_god_save_king(state, shaded=False):
 
         unit_tags = faction_unit_map[chosen_fac]
         moved_spaces = 0
-        for name in list(state.get("spaces", {})):
-            if moved_spaces == 3:
-                break
+        # §8.2 table (Q22, S76): equal-candidate source spaces (chosen
+        # faction's units co-located with British Regulars), no
+        # substantive key, 3-of-N; re-roll only while more moves are
+        # needed (was first-3 dict order).
+        remaining = [
+            name for name, sp in state.get("spaces", {}).items()
+            if sp.get(REGULAR_BRI, 0) and any(sp.get(t, 0) for t in unit_tags)
+        ]
+        while remaining and moved_spaces < 3:
+            name = pick_random_spaces(state, remaining, 1)[0]
+            remaining.remove(name)
             sp = state["spaces"].get(name, {})
-            if not sp.get(REGULAR_BRI, 0):
-                continue
-            has_units = any(sp.get(tag, 0) for tag in unit_tags)
-            if not has_units:
-                continue
             # Find an adjacent space to move into
             neighbors = map_adj.space_meta(name) or {}
             adj_list = []
             for token in neighbors.get("adj", []):
                 adj_list.extend(token.split("|"))
-            dest = None
-            for nbr in adj_list:
-                if nbr in state.get("spaces", {}):
-                    dest = nbr
-                    break
+            # §8.2 table (Q22, S76): equal-candidate in-play adjacent
+            # destinations, no substantive key (was first-listed).
+            in_play = [nbr for nbr in adj_list
+                       if nbr in state.get("spaces", {})]
+            picked = pick_random_spaces(state, in_play, 1)
+            dest = picked[0] if picked else None
             if not dest:
                 continue
             for tag in unit_tags:
@@ -848,65 +883,55 @@ def evt_070_french_india(state, shaded=False):
     active = state.get("active", "").upper()
     remaining = 3
 
+    def _consume(tag, cands):
+        """Remove *tag* from *cands* (one §8.2 tier) until sated.
+
+        §8.2 table (Q22, S76): the sheet-Q2 executor tier is the
+        substantive key (preserved by the caller's tier order); ties
+        WITHIN a tier are equal candidates, re-rolling only while more
+        removals are needed (was dict-order first-fit)."""
+        nonlocal remaining
+        cands = [sid for sid in cands
+                 if state["spaces"].get(sid, {}).get(tag, 0) > 0]
+        while cands and remaining > 0:
+            sid = pick_random_spaces(state, cands, 1)[0]
+            cands.remove(sid)
+            take = min(remaining, state["spaces"][sid].get(tag, 0))
+            if take:
+                remaining -= remove_piece(state, tag, sid, take, to="available")
+
     if active == BRITISH:
         # "Remove French Regulars from West Indies, then from spaces with British pieces."
         wi = state["spaces"].get(WEST_INDIES_ID, {})
         take = min(remaining, wi.get(REGULAR_FRE, 0))
         if take:
             remaining -= remove_piece(state, REGULAR_FRE, WEST_INDIES_ID, take, to="available")
-        for sid, sp in state["spaces"].items():
-            if remaining <= 0:
-                break
-            if sid == WEST_INDIES_ID:
-                continue
-            if sp.get(REGULAR_BRI, 0) > 0 or sp.get(TORY, 0) > 0:
-                take = min(remaining, sp.get(REGULAR_FRE, 0))
-                if take:
-                    remaining -= remove_piece(state, REGULAR_FRE, sid, take, to="available")
+        _consume(REGULAR_FRE, [
+            sid for sid, sp in state["spaces"].items()
+            if sid != WEST_INDIES_ID
+            and (sp.get(REGULAR_BRI, 0) > 0 or sp.get(TORY, 0) > 0)])
 
     elif active == FRENCH:
         # "Remove British Regulars from spaces with Rebels."
-        for sid, sp in state["spaces"].items():
-            if remaining <= 0:
-                break
-            rebels = (sp.get(REGULAR_PAT, 0) + sp.get(REGULAR_FRE, 0)
-                      + sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0))
-            if rebels > 0:
-                take = min(remaining, sp.get(REGULAR_BRI, 0))
-                if take:
-                    remaining -= remove_piece(state, REGULAR_BRI, sid, take, to="available")
+        _consume(REGULAR_BRI, [
+            sid for sid, sp in state["spaces"].items()
+            if (sp.get(REGULAR_PAT, 0) + sp.get(REGULAR_FRE, 0)
+                + sp.get(MILITIA_A, 0) + sp.get(MILITIA_U, 0)) > 0])
 
     elif active == INDIANS:
         # "Remove French Regulars from Village spaces first."
-        village_spaces = [
-            (sid, sp) for sid, sp in state["spaces"].items()
-            if sp.get(VILLAGE, 0) > 0
-        ]
-        for sid, sp in village_spaces:
-            if remaining <= 0:
-                break
-            take = min(remaining, sp.get(REGULAR_FRE, 0))
-            if take:
-                remaining -= remove_piece(state, REGULAR_FRE, sid, take, to="available")
+        _consume(REGULAR_FRE, [
+            sid for sid, sp in state["spaces"].items()
+            if sp.get(VILLAGE, 0) > 0])
         # Then other spaces
-        for sid, sp in state["spaces"].items():
-            if remaining <= 0:
-                break
-            take = min(remaining, sp.get(REGULAR_FRE, 0))
-            if take:
-                remaining -= remove_piece(state, REGULAR_FRE, sid, take, to="available")
+        _consume(REGULAR_FRE, list(state["spaces"]))
 
     elif active == PATRIOTS:
         # "Remove British Regulars from spaces with Patriot pieces."
-        for sid, sp in state["spaces"].items():
-            if remaining <= 0:
-                break
-            pats = (sp.get(REGULAR_PAT, 0) + sp.get(MILITIA_A, 0)
-                    + sp.get(MILITIA_U, 0) + sp.get(FORT_PAT, 0))
-            if pats > 0:
-                take = min(remaining, sp.get(REGULAR_BRI, 0))
-                if take:
-                    remaining -= remove_piece(state, REGULAR_BRI, sid, take, to="available")
+        _consume(REGULAR_BRI, [
+            sid for sid, sp in state["spaces"].items()
+            if (sp.get(REGULAR_PAT, 0) + sp.get(MILITIA_A, 0)
+                + sp.get(MILITIA_U, 0) + sp.get(FORT_PAT, 0)) > 0])
     else:
         # Fallback: remove British then French (generic)
         removed = remove_piece(state, REGULAR_BRI, None, remaining, to="available")
