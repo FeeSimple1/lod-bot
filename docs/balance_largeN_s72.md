@@ -119,3 +119,14 @@ Royalist 101/300 (33.7%).  All cells inside the standing CIs (P 61->68
 up, B 29->23 down — the better-targeted Patriot event plays press the
 British; directional but noise-compatible).  Standing picture holds:
 F ~44-47%, I ~24-26%, P ~20-23%, B ~8-10%.
+
+## Addendum: post-S76 rerun (largeN_s76.jsonl) — vs the Piece 8 anchor
+
+After the S76 batch (C6 reclaim gate + Part B dict-order conversions +
+the two side-sensitive shift fixes): 300 games, all clean.
+F 132 (44.0%), P 76 (25.3%), I 74 (24.7%), B 18 (6.0%).
+Piece 8 anchor check (docs/piece8_at_scale_s76.md policy): PATRIOTS,
+INDIANS and BRITISH land INSIDE the n=3000 anchor intervals; FRENCH
+44.0% sits 0.7pp under the anchor's lower edge, explained by n=300
+sampling width (this read's own CI, 38.5-49.7, contains the anchor
+mean).  No unexplained drift.
