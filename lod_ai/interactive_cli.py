@@ -1407,7 +1407,8 @@ def _game_loop(engine: Engine, game_stats: Dict[str, Any]) -> None:
         def _post_turn_cb(faction, result, card):
             nonlocal pre_snap
             if faction not in engine.human_factions:
-                display_bot_summary(faction, engine.state, pre_snap, result)
+                display_bot_summary(faction, engine.state, pre_snap, result,
+                                    card=card)
                 raw = pause_for_player()
                 if raw in ("status", "s"):
                     display_board_state(engine.state)

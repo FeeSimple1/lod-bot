@@ -412,10 +412,21 @@ def _snapshot_state(state: Dict[str, Any]) -> Dict[str, Any]:
 
 def display_bot_summary(faction: str, state: Dict[str, Any],
                         pre_snapshot: Dict[str, Any],
-                        result: Dict[str, Any] | None = None) -> None:
-    """Print a structured summary of what a bot did by diffing state snapshots."""
+                        result: Dict[str, Any] | None = None,
+                        card: Dict[str, Any] | None = None) -> None:
+    """Print a structured summary of what a bot did by diffing state snapshots.
+
+    S76 (fs-bot playtest lesson 1.4): a bot EVENT play names the side and
+    quotes the card's printed text, so it is never a black box."""
     print()
     print(f"\u2501\u2501\u2501 {faction} BOT \u2501\u2501\u2501")
+    if (result or {}).get("action") == "event" and card:
+        side = (result or {}).get("event_side") or (
+            "shaded" if faction in (RC.PATRIOTS, RC.FRENCH) else "unshaded")
+        text = card.get(f"{side}_event") or card.get("unshaded_event") or ""
+        print(f"  EVENT ({side}): {card.get('title', '?')}")
+        if text:
+            print(f"    \u00ab{text}\u00bb")
 
     # Part 1: Plain English from history entries added during this turn
     history = state.get("history", [])
@@ -513,10 +524,21 @@ def pause_for_player() -> str:
 
 def display_turn_context(faction: str, state: Dict[str, Any],
                          slot: str = "", card: Dict[str, Any] | None = None) -> None:
-    """Print a brief context line before human action selection."""
+    """Print a brief context line before human action selection.
+
+    S76 (fs-bot playtest lesson 1.6): the victory math heads every
+    decision — a one-line margin summary for all four factions."""
     res = state.get("resources", {}).get(faction, 0)
     card_title = (card or {}).get("title", "?")
     print(f"\n{faction} turn ({slot}) | Resources: {res} | Card: {card_title}")
+    try:
+        t = _summarize_board(state)
+        margins = (f"Victory margins \u2014 "
+                   f"BRI {_british_margin(t)}  PAT {_patriot_margin(t)}  "
+                   f"FRE {_french_margin(t)}  IND {_indian_margin(t)}")
+        print(f"  {margins}")
+    except Exception:  # noqa: BLE001 — display must never break a turn
+        pass
 
 
 # ---------------------------------------------------------------------------
