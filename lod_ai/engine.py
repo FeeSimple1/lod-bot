@@ -569,6 +569,13 @@ class Engine:
             elig_map[fac] = False
         for fac in elig.consume_ineligible_through_next(self.state):
             elig_map[fac] = False
+        # §2.3.9 (S76, fs-bot "set-but-never-applied" audit): a
+        # remain-Eligible grant's window is ITS card's adjustment only
+        # (_mark_executed consumes it there).  A grant to a faction
+        # that did NOT act that card (card 67 can name the non-acting
+        # partner) would otherwise sit stale and wrongly retain that
+        # faction after some LATER card's Command — clear leftovers.
+        self.state.pop("remain_eligible", None)
 
         self.state["current_card"] = card
         self.state["card_order"] = determine_eligible_factions(self.state, card)

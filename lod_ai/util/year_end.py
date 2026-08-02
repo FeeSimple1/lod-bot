@@ -1,8 +1,9 @@
 """
 Winter‑Quarters resolution · Liberty or Death  (Rule 6, Aug 2016)
 ================================================================
-Executed **once** per Winter‑Quarters card after the final Faction has acted,
-or whenever an Event sets ``state["winter_flag"]``.
+Executed **once** per Winter‑Quarters card after the final Faction has acted.
+(Events that call for immediate Desertion — cards 12/13 Patriot, card 22
+Tory — call the §6.6 helpers directly; there is no deferral flag.)
 
 Pipeline (Rule 6 sequence):
     6.1  Return Leaders, lift Casualties

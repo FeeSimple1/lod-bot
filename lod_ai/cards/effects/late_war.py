@@ -355,9 +355,16 @@ def evt_022_newburgh_conspiracy(state, shaded=False):
     Shaded   – **Immediate** Tory desertion this Winter.
     """
     if shaded:
-        # "Immediately execute Tory Desertion as per Winter Quarters Round."
-        state["winter_flag"] = "TORY_DESERTION_IMMEDIATE"
-        push_history(state, "Card 22 shaded: immediate Tory Desertion")
+        # "Immediately execute Tory Desertion as per Winter Quarters
+        # Round."  S76 (fs-bot "set-but-never-applied" audit): this used
+        # to set state["winter_flag"] = "TORY_DESERTION_IMMEDIATE", which
+        # nothing reads — §6.6 Desertion became unconditional at every WQ
+        # and the flag was orphaned, leaving the shaded side a silent
+        # no-op.  Execute it now, mirroring cards 12/13's immediate
+        # Patriot Desertion.
+        from lod_ai.util.year_end import _tory_desertion
+        _tory_desertion(state)
+        push_history(state, "Card 22 shaded: Tory Desertion executed immediately")
     else:
         _remove_four_patriot_units(state)
 

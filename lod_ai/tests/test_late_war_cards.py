@@ -225,6 +225,39 @@ def test_card22_unshaded_removes_from_colony_only():
     assert removed == 3  # only 3 available, not 4
 
 
+def test_card22_shaded_executes_tory_desertion_immediately():
+    """Card 22 shaded: 'Immediately execute Tory Desertion as per Winter
+    Quarters Round' (§6.6.2) — executed NOW, not deferred via a flag
+    (S76: the old winter_flag sentinel was never read; silent no-op)."""
+    state = _base_state()
+    state["spaces"] = {
+        "Virginia": {"type": "Colony", TORY: 5},
+        "Georgia": {"type": "Colony", TORY: 5},
+    }
+    state["support"] = {"Virginia": 2, "Georgia": 0}
+
+    late_war.evt_022_newburgh_conspiracy(state, shaded=True)
+
+    # 10 Tories -> remove 2 (1-in-5, round down), immediately.
+    total_tory = sum(sp.get(TORY, 0) for sp in state["spaces"].values())
+    assert total_tory == 8
+    assert state["available"].get(TORY, 0) == 2
+    # No dead deferral flag.
+    assert "winter_flag" not in state
+
+
+def test_card22_shaded_under_five_tories_is_a_true_no_op():
+    """§6.6.2: 4 Tories on the map -> 4 // 5 == 0 desert."""
+    state = _base_state()
+    state["spaces"] = {"Virginia": {"type": "Colony", TORY: 4}}
+    state["support"] = {"Virginia": 0}
+
+    late_war.evt_022_newburgh_conspiracy(state, shaded=True)
+
+    assert state["spaces"]["Virginia"].get(TORY, 0) == 4
+    assert "winter_flag" not in state
+
+
 def test_card23_unshaded_does_not_move_forts():
     """Card 23 unshaded: Moves Patriot *units* (cubes) only, not Forts (bases)."""
     state = _base_state()
