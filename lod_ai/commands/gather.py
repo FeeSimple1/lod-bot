@@ -31,6 +31,8 @@ from lod_ai.rules_consts import (
     # factions
     INDIANS,
 )
+from lod_ai.util.command_checkpoint import command_checkpoint
+from lod_ai.util.movement_provenance import MovementProvenance
 from lod_ai.util.history import push_history
 from lod_ai.util.caps import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent
@@ -71,10 +73,14 @@ def execute(
     build_village: Set[str] | None = None,
     bulk_place: Dict[str, int] | None = None,
     move_plan: List[Tuple[str, str, int]] | None = None,
+    move_active_first: bool = False,
     limited: bool = False,
 ) -> Dict:
     """
     Perform the Gather Command for INDIANS.
+
+    ``move_active_first`` selects Active War Parties before Underground
+    among eligible unmoved units, as required by non-player regrouping.
 
     Parameters
     ----------
@@ -101,8 +107,6 @@ def execute(
     if limited and len(set(selected)) != 1:
         raise ValueError("Limited Gather must target exactly one Province.")
 
-    state["_turn_command"] = COMMAND_NAME
-    state.setdefault("_turn_affected_spaces", set()).update(selected)
     # Default empty containers so later membership tests work
     place_one = place_one or set()
     build_village = build_village or set()
@@ -112,6 +116,8 @@ def execute(
     # ---- Validation on each selected Province --------------------------------
     free_reserve_granted = False
     for prov in selected:
+        if _space_type(prov) not in ("Colony", "Reserve"):
+            raise ValueError(f"{prov} is not a Province; Gather selects Provinces only.")
         sp = state["spaces"][prov]
 
         # Support level gate
@@ -123,114 +129,85 @@ def execute(
         if _is_indian_reserve(prov) and not free_reserve_granted:
             free_reserve_granted = True
 
-    # ---- Pay Resources (1 each, first reserve free) --------------------------
-    _pay_cost(state, selected, free_one_reserve=free_reserve_granted)
+    state["_turn_command"] = COMMAND_NAME
+    state.setdefault("_turn_affected_spaces", set()).update(selected)
 
-    # ---- Track pieces that have moved this command ---------------------------
-    moved_ids: Set[int] = set()
-
-    # Push history once before any mutation
+    ctx["_planned_command"] = COMMAND_NAME
+    ctx["_command_selected_spaces"] = set(selected)
+    interleaved = callable(ctx.get("_command_checkpoint"))
+    if not interleaved:
+        _pay_cost(state, selected, free_one_reserve=free_reserve_granted)
     push_history(state, f"INDIANS GATHER selected={selected}")
 
-    # ---- Helper to access WP counts ------------------------------------------
-    def _wp_total(space: Dict) -> int:
-        return space.get(WARPARTY_U, 0) + space.get(WARPARTY_A, 0)
-
-    # ---- Process each Province ------------------------------------------------
-    for prov in selected:
-        sp = state["spaces"][prov]
-
-        # Action dispatch -------------------------------------------------------
-        if prov in build_village:
-            # Cornplanter capability (leader_capabilities.txt):
-            # "Gather builds Villages for 1 War Party in the space."
-            # Default cost is 2 WP; Cornplanter-in-space reduces to 1.
-            village_cost = 1 if leader_location(state, "LEADER_CORNPLANTER") == prov else 2
-
-            if _wp_total(sp) < village_cost:
-                raise ValueError(
-                    f"{prov}: need {village_cost} WP to build a Village."
-                )
-
-            base_total = sp.get(VILLAGE, 0) + sp.get(FORT_BRI, 0) + sp.get(FORT_PAT, 0)
-            if base_total >= 2:
-                raise ValueError(f"{prov}: stacking limit reached for bases.")
-
-            # Remove village_cost War-Parties (Underground preferred)
-            take_u = min(village_cost, sp.get(WARPARTY_U, 0))
-            if take_u:
-                remove_piece(state, WARPARTY_U, prov, take_u)
-            take_a = village_cost - take_u
-            if take_a:
-                remove_piece(state, WARPARTY_A, prov, take_a)
-
-            add_piece(state, VILLAGE, prov, 1)
-            continue
-
-        if prov in bulk_place:
-            n = bulk_place[prov]
-            villages = sp.get(VILLAGE, 0)
-            if villages == 0:
-                raise ValueError(f"{prov} has no Village for bulk placement.")
-            if n > villages + 1:
-                raise ValueError(f"{prov}: may place ≤ villages+1 WP.")
-            add_piece(state, WARPARTY_U, prov, n)
-            continue
-
-        # place_one by default if in place_one or if no directive given
-        if (prov in place_one) or (prov not in bulk_place and prov not in build_village):
-            add_piece(state, WARPARTY_U, prov, 1)
-
-    # ---- Handle moves (separate so we can validate duplicates) ---------------
-    # Group moves by destination for later flipping
-    dst_to_moves: Dict[str, List[Tuple[str, int]]] = {}
+    moves_by_dest: dict[str, list[tuple[str, int]]] = {}
     for src, dst, n in move_plan:
         if dst not in selected:
             raise ValueError(f"Move destination {dst} not in selected Provinces.")
-        if limited and dst != selected[0]:
-            raise ValueError("Limited Gather: all moves must end in the single Province.")
-        if not is_adjacent(src, dst):
+        if src != dst and not is_adjacent(src, dst):
             raise ValueError(f"{src} is not adjacent to {dst}.")
-        # §3.4.1: Move-and-flip is only available "If the Province already
-        # has at least one Village."
-        if state["spaces"][dst].get(VILLAGE, 0) == 0:
-            raise ValueError(f"{dst} has no Village; move action requires one.")
-        dst_to_moves.setdefault(dst, []).append((src, n))
-
-    # Perform movements
-    for dst, moves in dst_to_moves.items():
-        sp_dst = state["spaces"][dst]
-        for src, n in moves:
-            sp_src = state["spaces"][src]
-
-            # Available WP in src — cap to what's actually there since
-            # bot planning snapshots may over-count after village builds
-            # or multi-phase interactions.
-            available = sp_src.get(WARPARTY_U, 0) + sp_src.get(WARPARTY_A, 0)
-            if n > available:
-                n = available
-            if n <= 0:
-                continue
-
-            # Move WP one by one and mark each as moved
-            for _ in range(n):
-                uid = id(sp_src) ^ available          # unique per remaining WP
-                if uid in moved_ids:
-                    raise ValueError("A War-Party is attempting to move twice.")
-                moved_ids.add(uid)
-
-                # Prefer Underground first
-                if sp_src.get(WARPARTY_U, 0):
-                    remove_piece(state, WARPARTY_U, src, 1)
-                else:
-                    remove_piece(state, WARPARTY_A, src, 1)
-
-                add_piece(state, WARPARTY_U, dst, 1)
-                available -= 1                        # update remaining count
-
-        # After all moves into dst, flip ALL WP Underground
-        sp_dst[WARPARTY_U] = _wp_total(sp_dst)
-        sp_dst[WARPARTY_A] = 0
+        if src == dst and n:
+            raise ValueError("War Parties may only move from adjacent Provinces.")
+        moves_by_dest.setdefault(dst, []).append((src, n))
+    provenance = MovementProvenance(WARPARTY_U, WARPARTY_A)
+    reserve_used = False
+    for prov in selected:
+        before_special = provenance.snapshot(state)
+        command_checkpoint(state, ctx, "Before resolving Gather", prov)
+        provenance.reconcile_special(before_special, state)
+        if interleaved:
+            free_here = _is_indian_reserve(prov) and not reserve_used
+            spend(state, INDIANS, 0 if free_here else 1)
+            reserve_used = reserve_used or free_here
+        sp = state["spaces"][prov]
+        if prov in build_village:
+            village_cost = 1 if leader_location(state, "LEADER_CORNPLANTER") == prov else 2
+            if sp.get(WARPARTY_U, 0) + sp.get(WARPARTY_A, 0) < village_cost:
+                raise ValueError(f"{prov}: need {village_cost} WP to build a Village.")
+            if sp.get(VILLAGE, 0) + sp.get(FORT_BRI, 0) + sp.get(FORT_PAT, 0) >= 2:
+                raise ValueError(f"{prov}: stacking limit reached for bases.")
+            take_u = min(village_cost, sp.get(WARPARTY_U, 0))
+            if take_u:
+                remove_piece(state, WARPARTY_U, prov, take_u)
+            if village_cost > take_u:
+                remove_piece(state, WARPARTY_A, prov, village_cost - take_u)
+            add_piece(state, VILLAGE, prov, 1)
+        elif prov in moves_by_dest:
+            # Move-and-hide is an ALTERNATIVE to placement (§3.4.1).
+            if not sp.get(VILLAGE, 0):
+                raise ValueError(f"{prov} has no Village; move action requires one.")
+            for src, n in moves_by_dest[prov]:
+                if n < 0:
+                    raise ValueError("Cannot move a negative number of War Parties.")
+                if src == prov:
+                    continue  # zero movers still permits hiding in place
+                source = state["spaces"][src]
+                movable = provenance.movable(state, src)
+                # Bots may have budgeted against an earlier placement phase.
+                if interleaved and n > movable:
+                    raise ValueError(f"{src}: not enough unmoved War Parties.")
+                n = min(n, movable)
+                take_u, take_a = provenance.take(
+                    state, src, n, active_first=move_active_first)
+                if take_u:
+                    remove_piece(state, WARPARTY_U, src, take_u)
+                if n > take_u:
+                    remove_piece(state, WARPARTY_A, src, n - take_u)
+                if n:
+                    add_piece(state, WARPARTY_U, prov, n)
+                provenance.arrive_and_hide(prov, n)
+            provenance.arrive_and_hide(prov, 0)
+            sp[WARPARTY_U] = sp.get(WARPARTY_U, 0) + sp.get(WARPARTY_A, 0)
+            sp[WARPARTY_A] = 0
+        elif prov in bulk_place:
+            n = bulk_place[prov]
+            villages = sp.get(VILLAGE, 0)
+            if not villages:
+                raise ValueError(f"{prov} has no Village for bulk placement.")
+            if not 0 <= n <= villages + 1:
+                raise ValueError(f"{prov}: may place at most villages+1 WP.")
+            add_piece(state, WARPARTY_U, prov, n)
+        else:
+            add_piece(state, WARPARTY_U, prov, 1)
 
     # ---- Final bookkeeping ----------------------------------------------------
     refresh_control(state)

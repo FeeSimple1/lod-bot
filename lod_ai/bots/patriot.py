@@ -141,69 +141,7 @@ class PatriotBot(BaseBot):
         - Lose no Rebel Control
         Returns dict of {tag: max_movable_count}.
         """
-        sp = state["spaces"][sid]
-        avail = {
-            C.REGULAR_PAT: sp.get(C.REGULAR_PAT, 0),
-            C.MILITIA_A: sp.get(C.MILITIA_A, 0),
-            C.MILITIA_U: sp.get(C.MILITIA_U, 0),
-            C.REGULAR_FRE: sp.get(C.REGULAR_FRE, 0),
-        }
-        total_movable = sum(avail.values())
-        if total_movable == 0:
-            return {}
-
-        retain = 0
-
-        # Rule: Leave 1 Active Patriot unit with each Patriot Fort
-        if sp.get(C.FORT_PAT, 0) > 0:
-            retain = max(retain, 1)
-
-        # Rule: Leave 1 Patriot unit where no Active Opposition
-        support = self._support_level(state, sid)
-        if support > C.ACTIVE_OPPOSITION:
-            retain = max(retain, 1)
-
-        # Rule: Lose no Rebel Control
-        ctrl = state.get("control", {}).get(sid)
-        if ctrl == "REBELLION":
-            royalist = self._royalist_pieces_in(sp)
-            # Need rebels_after > royalist
-            # rebels_after = total_rebel - moved
-            # So moved < total_rebel - royalist
-            total_rebel = self._rebel_pieces_in(sp)
-            # Cannot remove Fort, so movable rebels only = cubes
-            movable_rebel = total_movable
-            max_can_move = total_rebel - royalist - 1  # must keep strict majority
-            if max_can_move < 0:
-                max_can_move = 0
-            retain = max(retain, total_movable - max_can_move)
-
-        if retain >= total_movable:
-            return {}
-
-        can_move = total_movable - retain
-
-        # §8.5.4: Leave Active Patriot unit at Fort; leave Underground
-        # preferred where no Active Opposition.
-        has_fort = sp.get(C.FORT_PAT, 0) > 0
-        if has_fort:
-            # Fort present: move Underground first so Active pieces stay
-            move_order = [C.MILITIA_U, C.REGULAR_PAT, C.MILITIA_A, C.REGULAR_FRE]
-        else:
-            # No Fort: move Active first, keep Underground for leave-behind
-            move_order = [C.REGULAR_PAT, C.MILITIA_A, C.REGULAR_FRE, C.MILITIA_U]
-
-        result = {}
-        remaining = can_move
-        for tag in move_order:
-            take = min(remaining, avail.get(tag, 0))
-            if take > 0:
-                result[tag] = take
-                remaining -= take
-            if remaining <= 0:
-                break
-
-        return result
+        return self._movable_from_simulated(state, sid, state["spaces"][sid])
 
     # ===================================================================
     #  BRILLIANT STROKE LimCom  (§8.3.7)
@@ -223,7 +161,8 @@ class PatriotBot(BaseBot):
 
         rebel = self._rebel_cube_count(state, leader_space)
         royal = self._active_royal_count(sp)
-        if rebel > 0 and royal > 0 and rebel > royal:
+        if (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0) > 0
+                and self._royalist_pieces_in(sp) > 0 and rebel > royal):
             return "battle"
 
         avail_forts = state["available"].get(C.FORT_PAT, 0)
@@ -359,7 +298,8 @@ class PatriotBot(BaseBot):
         for sid, sp in state["spaces"].items():
             rebel = self._rebel_cube_count(state, sid)
             royal = self._active_royal_count(sp)
-            if rebel > 0 and royal > 0 and rebel > royal:
+            if (sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0) > 0
+                    and self._royalist_pieces_in(sp) > 0 and rebel > royal):
                 return True
         return False
 
@@ -386,14 +326,14 @@ class PatriotBot(BaseBot):
             # (§3.6.2-3.6.6) via the shared helper -- same code the Battle
             # actually resolves with -- instead of a hand-rolled approximation.
             # §8.5.1: include the French ally only if French Resources > 0.
-            regs = sp.get(C.REGULAR_BRI, 0)
-            tories = sp.get(C.TORY, 0)
-            active_wp = sp.get(C.WARPARTY_A, 0)
+            # Forts and Villages are always Active (§1.4.3), and
+            # Underground War Parties are also Royalist pieces (§8.5.1).
+            royalist_pieces = self._royalist_pieces_in(sp)
             ally = french_res > 0
             att_score, def_score = battle.bot_battle_scores(
                 state, sid, "REBELLION",
                 attacker_faction=C.PATRIOTS, ally_involved=ally)
-            if att_score > def_score and (regs + tories + active_wp) > 0:
+            if att_score > def_score and royalist_pieces > 0:
                 has_wash = 1 if leader_location(state, "LEADER_WASHINGTON") == sid else 0
                 pop = _MAP_DATA.get(sid, {}).get("population", 0)
                 villages = sp.get(C.VILLAGE, 0)
@@ -559,7 +499,8 @@ class PatriotBot(BaseBot):
         """P6: 'Active British and/or Indian pieces'."""
         return (
             sp.get(C.REGULAR_BRI, 0) + sp.get(C.TORY, 0) +
-            sp.get(C.WARPARTY_A, 0)
+            sp.get(C.WARPARTY_A, 0) + sp.get(C.FORT_BRI, 0) +
+            sp.get(C.VILLAGE, 0)
         )
 
     # ---------- March (P5) --------------------------------------------
@@ -816,37 +757,33 @@ class PatriotBot(BaseBot):
             C.MILITIA_U: max(0, sp.get(C.MILITIA_U, 0)),
             C.REGULAR_FRE: max(0, sp.get(C.REGULAR_FRE, 0)),
         }
-        total_movable = sum(avail.values())
-        if total_movable == 0:
-            return {}
+        # Reserve actual Patriot units before applying the Control
+        # budget. A French Regular cannot satisfy either leave-behind
+        # requirement in §8.5.4.
+        reserved: Dict[str, int] = {}
+        has_fort = sp.get(C.FORT_PAT, 0) > 0
+        if has_fort:
+            for tag in (C.MILITIA_A, C.REGULAR_PAT, C.MILITIA_U):
+                if avail[tag] > 0:
+                    reserved[tag] = 1
+                    break
+        if self._support_level(state, sid) > C.ACTIVE_OPPOSITION:
+            if avail[C.MILITIA_U] > 0:
+                reserved[C.MILITIA_U] = 1
+            elif not reserved:
+                for tag in (C.MILITIA_A, C.REGULAR_PAT):
+                    if avail[tag] > 0:
+                        reserved[tag] = 1
+                        break
+        for tag, count in reserved.items():
+            avail[tag] -= count
 
-        retain = 0
-
-        if sp.get(C.FORT_PAT, 0) and sp.get(C.FORT_PAT, 0) > 0:
-            retain = max(retain, 1)
-
-        support = self._support_level(state, sid)
-        if support > C.ACTIVE_OPPOSITION:
-            retain = max(retain, 1)
-
-        # Control constraint
-        ctrl = state.get("control", {}).get(sid)
-        if ctrl == "REBELLION":
+        can_move = sum(avail.values())
+        if state.get("control", {}).get(sid) == "REBELLION":
             rebels_total = sum(max(0, sp.get(t, 0)) for t in _REBEL_TAGS)
             royalist = sum(max(0, sp.get(t, 0)) for t in _ROYALIST_TAGS)
-            max_can_move = rebels_total - royalist - 1
-            if max_can_move < 0:
-                max_can_move = 0
-            retain = max(retain, total_movable - max_can_move)
+            can_move = min(can_move, max(0, rebels_total - royalist - 1))
 
-        if retain >= total_movable:
-            return {}
-
-        can_move = total_movable - retain
-
-        # §8.5.4: Leave Active Patriot unit at Fort; leave Underground
-        # preferred where no Active Opposition.
-        has_fort = sp.get(C.FORT_PAT, 0) and sp.get(C.FORT_PAT, 0) > 0
         if has_fort:
             move_order = [C.MILITIA_U, C.REGULAR_PAT, C.MILITIA_A, C.REGULAR_FRE]
         else:
@@ -1210,6 +1147,7 @@ class PatriotBot(BaseBot):
                               if d == sid]
             if move_for_space:
                 kw["move_plan"] = move_for_space
+                kw["move_active_first"] = True  # §8.5.2: regroup Active Militia
             try:
                 rally.execute(
                     state, self.faction, {},

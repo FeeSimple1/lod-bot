@@ -53,6 +53,7 @@ from lod_ai.economy.resources import spend, can_afford
 from lod_ai.util.loss_mod  import pop_loss_mod
 from lod_ai.util.naval     import has_blockade, move_blockade_city_to_city
 from lod_ai.map             import adjacency as map_adj
+from lod_ai.util.command_checkpoint import command_checkpoint
 
 COMMAND_NAME = "BATTLE"
 
@@ -89,6 +90,9 @@ def execute(
     if not spaces:
         raise ValueError("Need >= 1 battle space")
 
+    ctx["_planned_command"] = COMMAND_NAME
+    ctx["_command_selected_spaces"] = set(spaces)
+    interrupted = callable(ctx.get("_command_checkpoint"))
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).update(spaces)
     # §4.2.2/§4.3.2/§4.3.3/§4.5.2: Skirmish and Partisans may accompany a
@@ -96,7 +100,7 @@ def execute(
     # spaces so the SA modules can enforce it (cleared in base_bot).
     state.setdefault("_turn_battle_spaces", set()).update(spaces)
     # Pay Resources (actor only); allied fees handled below
-    if not free:
+    if not free and not interrupted:
         spend(state, faction, len(spaces))
 
     # §3.3.3 / §3.5.5: Involving the ally is OPTIONAL and costs the ally 1
@@ -105,7 +109,7 @@ def execute(
     # in that space (enforced in _resolve_space via ally_involved).  The fee is
     # per-space-involved, not per-piece.
     ally_involved = {s: True for s in spaces}
-    if faction == PATRIOTS:
+    if faction == PATRIOTS and not interrupted:
         # French help = French Regulars present.  Rochambeau (leader_capabilities)
         # waives the French Resource fee in his space (still involved, for free).
         roch = leader_location(state, "LEADER_ROCHAMBEAU")
@@ -122,7 +126,7 @@ def execute(
             ally_involved[s] = False
         if pay > 0:
             spend(state, FRENCH, pay)
-    elif faction == FRENCH:
+    elif faction == FRENCH and not interrupted:
         # Patriot help = any Patriot combat piece (Continentals OR Active Militia)
         def _has_pat(s):
             spx = state["spaces"][s]
@@ -142,6 +146,24 @@ def execute(
 
     rebellion_won_in: list[str] = []
     for sid in spaces:
+        command_checkpoint(state, ctx, "Before Battle", sid)
+        if interrupted:
+            # Human Special Activities may fund later Battle spaces.
+            # Bots retain the established upfront payment path above.
+            if not free:
+                spend(state, faction, 1)
+            sp = state["spaces"][sid]
+            ally = None
+            if faction == PATRIOTS and sp.get(REGULAR_FRE, 0) > 0:
+                if leader_location(state, "LEADER_ROCHAMBEAU") != sid:
+                    ally = FRENCH
+            elif faction == FRENCH and (
+                    sp.get(REGULAR_PAT, 0) > 0 or sp.get(MILITIA_A, 0) > 0):
+                ally = PATRIOTS
+            if ally:
+                ally_involved[sid] = can_afford(state, ally, 1)
+                if ally_involved[sid]:
+                    spend(state, ally, 1)
         winner = _resolve_space(
             state, ctx, faction, sid, attacker_bonus,
             ally_involved=ally_involved.get(sid, True),

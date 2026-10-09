@@ -40,6 +40,8 @@ def execute(
 ) -> Dict:
     if faction != BRITISH:
         raise ValueError("Only BRITISH may invoke Common Cause.")
+    if ctx.get("_planned_command") not in (None, "MARCH", "BATTLE"):
+        raise ValueError("Common Cause may accompany only March or Battle.")
 
     state["_turn_used_special"] = True
     state["_turn_special_type"] = "COMMON_CAUSE"  # coverage (Piece 5, S67)

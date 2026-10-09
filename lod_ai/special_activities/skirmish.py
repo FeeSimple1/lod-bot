@@ -81,6 +81,22 @@ def execute(
     if (space_id in state.get("_turn_battle_spaces", set())
             and not state.get("bs_free")):
         raise ValueError(f"Skirmish cannot occur in Battle space {space_id}.")
+    if not state.get("bs_free"):
+        command = ctx.get("_planned_command")
+        selected = set(ctx.get("_command_selected_spaces", ()))
+        forbidden = set(state.get("_turn_battle_spaces", ()))
+        if command == "BATTLE":
+            forbidden |= selected
+        if faction in (BRITISH, FRENCH):
+            forbidden |= set(state.get("_turn_muster_spaces", ()))
+            if command == "MUSTER":
+                forbidden |= selected
+        if faction == BRITISH:
+            forbidden |= set(state.get("_turn_garrison_destinations", ()))
+            if command == "GARRISON":
+                forbidden |= selected
+        if space_id in forbidden:
+            raise ValueError(f"Skirmish cannot occur in accompanying Command space {space_id}.")
 
     state["_turn_used_special"] = True
     state["_turn_special_type"] = "SKIRMISH"  # coverage (Piece 5, S67)

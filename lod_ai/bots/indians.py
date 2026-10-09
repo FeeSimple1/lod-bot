@@ -422,19 +422,27 @@ class IndianBot(BaseBot):
 
         def _reserve_source(dst: str) -> str | None:
             nonlocal dc_extended_used
+
+            def can_take(src: str) -> bool:
+                remaining_u = available_wp.get(src, 0)
+                if remaining_u <= 0:
+                    return False
+                sp = state["spaces"][src]
+                # §8.7.1 protects the last War Party, Underground or Active,
+                # including for Dragging Canoe's extended Raid range.
+                remaining_wp = remaining_u + sp.get(C.WARPARTY_A, 0)
+                return not (sp.get(C.VILLAGE, 0) and remaining_wp <= 1)
+
             # prefer adjacent Underground WP (includes DC loc if adjacent)
             for src in _adjacent(dst):
-                if available_wp.get(src, 0) <= 0:
-                    continue
-                if state["spaces"][src].get(C.VILLAGE, 0) and available_wp[src] == 1:
-                    continue  # avoid stripping last WP from a Village space
-                return src
+                if can_take(src):
+                    return src
             # DC extended-range fallback: only if DC has WP remaining AND
             # we haven't exhausted the DC pool budget AND the destination
             # is within 2 moves of DC (but NOT adjacent, since adjacent
             # was already checked above).
             if (dc_loc
-                    and available_wp.get(dc_loc, 0) > 0
+                    and can_take(dc_loc)
                     and dc_initial_pool > dc_extended_used):
                 if not _is_adjacent(dc_loc, dst):
                     path = shortest_path(dc_loc, dst)
@@ -700,7 +708,9 @@ class IndianBot(BaseBot):
         return bases < 2
 
     def _gather_support_ok(self, state: Dict, sid: str) -> bool:
-        """Return True if *sid* is at an eligible support level for Gather."""
+        """§3.4.1: Gather selects only Provinces at Neutral or Passive."""
+        if _MAP_DATA.get(sid, {}).get("type") not in ("Colony", "Reserve"):
+            return False
         sup = self._support_level(state, sid)
         return sup in (C.NEUTRAL, C.PASSIVE_SUPPORT, C.PASSIVE_OPPOSITION)
 
@@ -848,13 +858,15 @@ class IndianBot(BaseBot):
         final_avail_wp -= sum(bulk_place.values())
         final_avail_wp -= getattr(self, "_b3_placed", 0)
         move_plan_list: List[Tuple[str, str, int]] = []
-        if final_avail_wp <= 0:
+        if final_avail_wp <= 0 and len(selected) < gather_max:
             refresh_control(state)
             ctrl = state.get("control", {})
             best_dst = None
             best_moves: List[Tuple[str, int]] = []
             best_total = 0
             for sid, sp in state["spaces"].items():
+                if sid in selected:
+                    continue  # §8.7.2: move-and-flip selects one additional space
                 if _bs_o and sid != _bs_o:
                     continue  # leader tie
                 if sp.get(C.VILLAGE, 0) == 0:
@@ -954,6 +966,7 @@ class IndianBot(BaseBot):
             build_village=build_village if build_village else None,
             bulk_place=bulk_place if bulk_place else None,
             move_plan=move_plan_list if move_plan_list else None,
+            move_active_first=True,  # §8.7.2: regroup adjacent Active War Parties
         )
         self._follow_leaders_after_move(state)
         return True

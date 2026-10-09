@@ -1092,8 +1092,8 @@ class BritishBot(BaseBot):
         """
         avail_regs = state["available"].get(C.REGULAR_BRI, 0)
         avail_tories = state["available"].get(C.TORY, 0)
-        if avail_regs == 0 and avail_tories == 0:
-            return False
+        # §8.4.2: even with no cubes Available, the final Muster step
+        # can select a space to Reward Loyalty or replace cubes with a Fort.
 
         refresh_control(state)
         max_spaces = 1 if state.get("_limited") else 4
@@ -2034,9 +2034,8 @@ class BritishBot(BaseBot):
         for sid, sp in state["spaces"].items():
             # B12: "spaces with Rebel Forts and/or Rebel cubes"
             rebel_cubes = sp.get(C.REGULAR_PAT, 0) + sp.get(C.REGULAR_FRE, 0)
-            total_militia = sp.get(C.MILITIA_A, 0) + sp.get(C.MILITIA_U, 0)
             rebel_forts = sp.get(C.FORT_PAT, 0)
-            if rebel_cubes + total_militia + rebel_forts == 0:
+            if rebel_cubes + rebel_forts == 0:
                 continue
 
             # B12 "Royalist Force Level + modifiers exceeds Rebel Force

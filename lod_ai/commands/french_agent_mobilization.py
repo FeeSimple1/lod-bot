@@ -29,6 +29,7 @@ from lod_ai.util.history  import push_history
 from lod_ai.util.caps     import refresh_control, enforce_global_caps
 from lod_ai.board.pieces      import add_piece
 from lod_ai.economy.resources import spend, can_afford
+from lod_ai.util.command_checkpoint import command_checkpoint
 
 COMMAND_NAME = "FRENCH_AGENT_MOBILIZATION"   # auto‑registered
 
@@ -85,6 +86,10 @@ def execute(
     # Province validation ----------------------------------------------------
     if province not in _VALID_PROVINCES:
         raise ValueError(f"{province} is not a valid province for Agent Mobilization.")
+
+    ctx["_planned_command"] = COMMAND_NAME
+    ctx["_command_selected_spaces"] = {province}
+    command_checkpoint(state, ctx, "Before Agent Mobilization", province)
 
     sp = state["spaces"].get(province)
     if sp is None:

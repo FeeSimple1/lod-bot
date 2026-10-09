@@ -32,6 +32,7 @@ from lod_ai.rules_consts import (
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.board.pieces      import remove_piece, add_piece, flip_pieces
+from lod_ai.util.nonplayer_pieces import remove_enemy_cubes, ROYALIST
 
 SA_NAME = "PARTISANS"      # auto-registered by special_activities/__init__.py
 
@@ -48,12 +49,28 @@ _CUBE_TAGS = frozenset((REGULAR_BRI, TORY))
 
 # Glossary §1.4: units = Regulars, Tories, War Parties (not Forts or
 # Villages).  Options 1/2 may remove only these.
-_UNIT_TAGS = (TORY, WARPARTY_A, REGULAR_BRI, WARPARTY_U)
+_UNIT_TAGS = (WARPARTY_U, WARPARTY_A, REGULAR_BRI, TORY)
 
 
 def _removal_dest(tag: str) -> str:
     """Return 'casualties' for cubes, 'available' for everything else."""
     return "casualties" if tag in _CUBE_TAGS else "available"
+
+
+def _remove_units(state: Dict, space_id: str, count: int,
+                  remove_plan: Dict[str, int] | None) -> None:
+    """Apply a player's choices, or the §8.5.1/§8.1.2 bot priorities."""
+    if remove_plan is not None:
+        for tag, amount in remove_plan.items():
+            if amount:
+                remove_piece(state, tag, space_id, amount, to=_removal_dest(tag))
+        return
+    for tag in (WARPARTY_U, WARPARTY_A):
+        removed = remove_piece(state, tag, space_id, count, to="available")
+        count -= removed
+        if count == 0:
+            return
+    remove_enemy_cubes(state, space_id, count, ROYALIST, to="casualties")
 
 
 # ---------------------------------------------------------------------------
@@ -66,6 +83,7 @@ def execute(
     space_id: str,
     *,
     option: int = 1,          # 1, 2, or 3 (see docstring)
+    remove_plan: Dict[str, int] | None = None,
 ) -> Dict:
 
     if faction != PATRIOTS:
@@ -86,8 +104,6 @@ def execute(
             and not state.get("bs_free")):
         raise ValueError(f"Partisans cannot occur in Battle space {space_id}.")
 
-    state["_turn_used_special"] = True
-    state["_turn_special_type"] = "PARTISANS"  # coverage (Piece 5, S67)
     sp = state["spaces"][space_id]
 
     if sp.get(MILITIA_U, 0) == 0:
@@ -111,6 +127,21 @@ def execute(
     wp_present = sp.get(WARPARTY_A, 0) + sp.get(WARPARTY_U, 0) > 0
     if option == 3 and wp_present:
         raise ValueError("Option 3 only if no War Parties are present.")
+    if option == 3 and sp.get(VILLAGE, 0) == 0:
+        raise ValueError("Option 3 requires a Village present.")
+    if remove_plan is not None:
+        if option == 3:
+            raise ValueError("Option 3 removes its Village without a unit removal plan.")
+        if not isinstance(remove_plan, dict) or any(
+                tag not in _UNIT_TAGS or type(amount) is not int
+                or amount < 0 or amount > sp.get(tag, 0)
+                for tag, amount in remove_plan.items()):
+            raise ValueError("Partisans removal plan must select Royalist units present.")
+        if sum(remove_plan.values()) != min(option, roy_units):
+            raise ValueError("Partisans removal plan has the wrong number of units.")
+
+    state["_turn_used_special"] = True
+    state["_turn_special_type"] = "PARTISANS"
 
     push_history(state, f"PATRIOTS PARTISANS begins in {space_id} (opt {option})")
 
@@ -119,10 +150,7 @@ def execute(
         # Activate 1 Militia U → A
         flip_pieces(state, MILITIA_U, MILITIA_A, space_id, 1)
         # Remove 1 Royalist unit (cubes → Casualties, others → Available)
-        for tag in _UNIT_TAGS:
-            if sp.get(tag, 0):
-                remove_piece(state, tag, space_id, 1, to=_removal_dest(tag))
-                break
+        _remove_units(state, space_id, 1, remove_plan)
 
     elif option == 2:
         # Activate 2 Militia U → A
@@ -130,11 +158,7 @@ def execute(
         # Remove 1 of those Militia A (Militia not cubes → Available)
         remove_piece(state, MILITIA_A, space_id, 1, to="available")
         # Remove 2 Royalist units (cubes → Casualties, others → Available)
-        removed = 0
-        for tag in _UNIT_TAGS:
-            while sp.get(tag, 0) and removed < 2:
-                remove_piece(state, tag, space_id, 1, to=_removal_dest(tag))
-                removed += 1
+        _remove_units(state, space_id, 2, remove_plan)
 
     else:  # option 3
         # Activate 2 Militia U → A
@@ -144,8 +168,6 @@ def execute(
         remove_piece(state, MILITIA_A, space_id, 1, to="available")
 
         # Remove 1 Village
-        if sp.get(VILLAGE, 0) == 0:
-            raise ValueError("Option 3 requires a Village present.")
         remove_piece(state, VILLAGE, space_id, 1, to="available")
 
     refresh_control(state)

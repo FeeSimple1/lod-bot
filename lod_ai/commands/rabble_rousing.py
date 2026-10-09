@@ -34,6 +34,7 @@ from lod_ai.rules_consts import (
     PATRIOTS,
 )
 
+from lod_ai.util.command_checkpoint import command_checkpoint
 from lod_ai.util.history   import push_history
 from lod_ai.map.adjacency  import space_type as _space_type
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
@@ -127,19 +128,27 @@ def execute(
         if not (rebellion_control and _has_patriot_piece(sp) or has_underground):
             raise ValueError(f"{space_id} is not eligible for Rabble‑Rousing.")
 
-    # Resource cost
-    _pay_cost(state, len(selected))
+    ctx["_planned_command"] = COMMAND_NAME
+    ctx["_command_selected_spaces"] = set(selected)
+    interleaved = callable(ctx.get("_command_checkpoint"))
+    if not interleaved:
+        _pay_cost(state, len(selected))
 
     from lod_ai.board.pieces import place_marker, marker_count
 
     push_history(state, f"PATRIOTS RABBLE_ROUSING {selected}")
 
     for space_id in selected:
+        command_checkpoint(state, ctx, "Before resolving Rabble-Rousing", space_id)
+        if interleaved:
+            spend(state, PATRIOTS, 1)
         sp = state["spaces"][space_id]
 
-        # Validate selection criteria (re-checked for clarity)
+        # Validate selection criteria after an intervening Special Activity.
         rebellion_control = state.get("control", {}).get(space_id) == "REBELLION"
         has_underground = sp.get(MILITIA_U, 0) > 0
+        if not ((rebellion_control and _has_patriot_piece(sp)) or has_underground):
+            raise ValueError(f"{space_id} no longer eligible for Rabble-Rousing.")
         # Place a Propaganda marker if any remain (§3.3.4).  Q23:
         # markers stack — a marked space gets another; the global pool
         # of 12 is the only cap.

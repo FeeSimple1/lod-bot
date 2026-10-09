@@ -41,6 +41,7 @@ from lod_ai.util.adjacency import is_adjacent
 from lod_ai.map import adjacency as map_adj
 from lod_ai.board.pieces      import remove_piece, add_piece, move_piece
 from lod_ai.economy.resources import spend                          # NEW
+from lod_ai.util.command_checkpoint import command_checkpoint
 
 COMMAND_NAME = "SCOUT"          # auto-registered by commands/__init__.py
 
@@ -100,6 +101,12 @@ def execute(
     if not is_adjacent(src, dst):
         raise ValueError(f"{src} is not adjacent to {dst}.")
 
+    ctx["_planned_command"] = COMMAND_NAME
+    ctx["_command_selected_spaces"] = {dst}
+    state["_turn_command"] = COMMAND_NAME
+    state.setdefault("_turn_affected_spaces", set()).add(dst)
+    command_checkpoint(state, ctx, "Before Scout movement", dst)
+
     sp_src = state["spaces"][src]
     sp_dst = state["spaces"][dst]
 
@@ -118,8 +125,6 @@ def execute(
     if n_tories   > _avail(TORY):
         raise ValueError(f"Not enough Tories in {src}.")
 
-    state["_turn_command"] = COMMAND_NAME
-    state.setdefault("_turn_affected_spaces", set()).add(dst)
     # -------- Resource payments ---------------------------------------------
     if not free:
         spend(state, INDIANS, 1)
@@ -143,7 +148,9 @@ def execute(
     if n_tories:
         _move(state, TORY, n_tories, src, dst)
 
+    command_checkpoint(state, ctx, "Before Scout Militia activation", dst)
     # Flip all Militia in destination Active
+    sp_dst = state["spaces"][dst]
     mil_u = sp_dst.pop(MILITIA_U, 0)
     if mil_u:
         sp_dst[MILITIA_A] = sp_dst.get(MILITIA_A, 0) + mil_u
@@ -153,6 +160,7 @@ def execute(
     # separate Special Activity.  Preserve _turn_used_special so the
     # engine doesn't flag it as SA usage.
     if skirmish:
+        command_checkpoint(state, ctx, "Before Scout Skirmish", dst)
         from lod_ai.special_activities import skirmish as sa_skirmish
         _saved_special = state.get("_turn_used_special", False)
         ctx = sa_skirmish.execute(state, BRITISH, ctx, dst, option=skirmish_option)

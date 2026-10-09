@@ -611,7 +611,7 @@ class FrenchBot(BaseBot):
                            for d in _dst_order]
 
         move_plans = []
-        used_from: Dict[str, int] = defaultdict(int)  # committed per source
+        used_from: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
         limited = bool(state.get("_limited"))
         dest_list: List[str] = []
 
@@ -632,22 +632,25 @@ class FrenchBot(BaseBot):
                 if gathered >= need:
                     break
                 sp = state["spaces"][src]
-                available_fre = sp.get(C.REGULAR_FRE, 0) - used_from[src]
+                available_fre = sp.get(C.REGULAR_FRE, 0) - used_from[src][C.REGULAR_FRE]
                 if available_fre <= 0:
                     continue
-                # Check lose-no-rebel-control constraint
-                max_can_move = available_fre
+                # §8.6.5's source Control budget includes both French
+                # Regulars and their Continental escorts, including all
+                # departures already committed to other destinations.
+                pat_avail = sp.get(C.REGULAR_PAT, 0) - used_from[src][C.REGULAR_PAT]
+                max_departures = available_fre + pat_avail
                 if ctrl.get(src) == "REBELLION":
-                    total_rebel = self._rebel_pieces_in(sp) - used_from[src]
+                    total_rebel = self._rebel_pieces_in(sp) - sum(used_from[src].values())
                     total_royalist = self._royalist_pieces_in(sp)
-                    max_can_move = min(max_can_move,
-                                       max(0, total_rebel - total_royalist - 1))
-                take = min(max_can_move, need - gathered)
+                    max_departures = min(max_departures,
+                                         max(0, total_rebel - total_royalist - 1))
+                take = min(available_fre, max_departures, need - gathered)
                 if take > 0:
                     entry_pieces = {C.REGULAR_FRE: take}
                     # Also bring Continentals as escorts (up to French count)
-                    pat_avail = sp.get(C.REGULAR_PAT, 0)
-                    escort = min(take, pat_avail, need - gathered - take)
+                    escort = min(take, pat_avail, need - gathered - take,
+                                 max_departures - take)
                     if escort > 0:
                         entry_pieces[C.REGULAR_PAT] = escort
                     plan_entries.append(
@@ -658,8 +661,7 @@ class FrenchBot(BaseBot):
                 for entry in plan_entries:
                     move_plans.append(entry)
                     for tag, cnt in entry["pieces"].items():
-                        if tag == C.REGULAR_FRE:
-                            used_from[entry["src"]] += cnt
+                        used_from[entry["src"]][tag] += cnt
                 dest_list.append(dst)
 
         # ---- Bullet 2: isolated French Regulars toward nearest British ----
@@ -676,7 +678,7 @@ class FrenchBot(BaseBot):
         if british_spaces and not (limited and dest_list):
             for src in sources:
                 sp = state["spaces"][src]
-                fre = sp.get(C.REGULAR_FRE, 0) - used_from[src]
+                fre = sp.get(C.REGULAR_FRE, 0) - used_from[src][C.REGULAR_FRE]
                 if fre <= 0:
                     continue
                 adj = map_adj.adjacent_spaces(src)
@@ -705,7 +707,7 @@ class FrenchBot(BaseBot):
                     best_next = choose_random_space(_tied, state["rng"]) or best_next
                 movable = fre
                 if ctrl.get(src) == "REBELLION":
-                    total_rebel = self._rebel_pieces_in(sp) - used_from[src]
+                    total_rebel = self._rebel_pieces_in(sp) - sum(used_from[src].values())
                     total_royalist = self._royalist_pieces_in(sp)
                     movable = min(movable,
                                   max(0, total_rebel - total_royalist - 1))
@@ -713,7 +715,7 @@ class FrenchBot(BaseBot):
                     continue
                 move_plans.append({"src": src, "dst": best_next,
                                    "pieces": {C.REGULAR_FRE: movable}})
-                used_from[src] += movable
+                used_from[src][C.REGULAR_FRE] += movable
                 if best_next not in dest_list:
                     dest_list.append(best_next)
                 if limited:
