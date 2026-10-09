@@ -66,6 +66,8 @@ from lod_ai.rules_consts import (
     REGULAR_PAT, MILITIA_A, MILITIA_U, FORT_PAT, FORT_BRI, VILLAGE,
     WEST_INDIES_ID, PATRIOTS,
 )
+from lod_ai.util.command_checkpoint import command_checkpoint
+from lod_ai.util.movement_provenance import MovementProvenance
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent
@@ -168,11 +170,16 @@ def execute(
     build_fort: Set[str] | None = None,
     bulk_place: Dict[str, int] | None = None,
     move_plan: List[Tuple[str, str, int]] | None = None,
+    move_active_first: bool = False,
     promote_space: str | None = None,
     promote_n: int | None = None,
     limited: bool = False,
 ) -> Dict:
-    """Perform the Patriot Rally command as directed by the caller."""
+    """Perform the Patriot Rally command as directed by the caller.
+
+    ``move_active_first`` selects Active Militia before Underground among
+    eligible unmoved units; the non-player regrouping instruction uses it.
+    """
     if faction != PATRIOTS:
         raise ValueError("Only PATRIOTS may Rally.")
 
@@ -203,80 +210,73 @@ def execute(
         if _is_indian_reserve(space_id) or _is_west_indies(space_id):
             raise ValueError(f"Cannot Rally in {space_id}.")
 
-    # --- Cost payment (after validation) ------------------------------
-    cost = len(selected)
-    spend(state, PATRIOTS, cost)
-
+    ctx["_planned_command"] = COMMAND_NAME
+    ctx["_command_selected_spaces"] = set(selected)
+    interleaved = callable(ctx.get("_command_checkpoint"))
+    if not interleaved:
+        spend(state, PATRIOTS, len(selected))
     push_history(state, f"PATRIOTS RALLY selected={selected}")
 
-    moved_militia: Set[Tuple[str, str]] = set()  # (src_id, dst_id)
-
-    # --- Phase 1: apply per‑space actions -----------------------------------
+    # Resolve the selected spaces in the player's order (§3.1).  The
+    # interruption point is before each space's payment, so §4.1 Persuasion
+    # can finance the remainder of the same Rally.
+    moves_by_dest: dict[str, list[tuple[str, int]]] = {}
+    for src_id, dst_id, n in move_plan:
+        if dst_id not in selected:
+            raise ValueError("Destination must be one of the Rally spaces selected.")
+        if not is_adjacent(src_id, dst_id) and src_id != dst_id:
+            raise ValueError(f"{src_id} not adjacent to {dst_id}.")
+        moves_by_dest.setdefault(dst_id, []).append((src_id, n))
+    provenance = MovementProvenance(MILITIA_U, MILITIA_A)
+    moved_pairs = set()
     for space_id in selected:
+        before_special = provenance.snapshot(state)
+        command_checkpoint(state, ctx, "Before resolving Rally", space_id)
+        provenance.reconcile_special(before_special, state)
+        if interleaved:
+            spend(state, PATRIOTS, 1)
         sp = state["spaces"][space_id]
-        pop = _map_population(space_id)
         forts = sp.get(FORT_PAT, 0)
-
         if space_id in build_fort:
             if forts > 0:
                 raise ValueError("Cannot build Fort where one already exists.")
             _replace_with_fort(state, space_id)
-            forts += 1  # update local var so next checks see it
-            continue  # no militia placement after fort‑build
+        elif space_id in moves_by_dest:
+            if not forts:
+                raise ValueError("Destination must have a Fort for move action.")
+            for src_id, n in moves_by_dest[space_id]:
+                if n < 0:
+                    raise ValueError("Cannot move a negative number of Militia.")
+                # A zero-length entry selects the legal hide-in-place option.
+                if src_id == space_id:
+                    if n:
+                        raise ValueError("Militia may only move from adjacent spaces.")
+                    continue
+                if (src_id, space_id) in moved_pairs:
+                    raise ValueError("Cannot move from the same src to dst twice.")
+                moved_pairs.add((src_id, space_id))
+                src = state["spaces"][src_id]
+                take_u, take_a = provenance.take(
+                    state, src_id, n, active_first=move_active_first)
+                src[MILITIA_U] = src.get(MILITIA_U, 0) - take_u
+                src[MILITIA_A] = src.get(MILITIA_A, 0) - take_a
+                sp[MILITIA_U] = sp.get(MILITIA_U, 0) + n
+                provenance.arrive_and_hide(space_id, n)
+            provenance.arrive_and_hide(space_id, 0)
+            sp[MILITIA_U] = sp.get(MILITIA_U, 0) + sp.get(MILITIA_A, 0)
+            sp[MILITIA_A] = 0
+        elif space_id in bulk_place:
+            if not forts:
+                raise ValueError("Bulk placement requires an existing Fort.")
+            n = bulk_place[space_id]
+            maximum = forts + _map_population(space_id)
+            if not 0 <= n <= maximum:
+                raise ValueError(f"Cannot place {n} Militia in {space_id}; limit is {maximum}.")
+            _place_militia(state, space_id, n)
+        elif space_id in place_one or not forts:
+            _place_militia(state, space_id, 1)
 
-        if forts == 0:
-            # No fort yet → either place 1 militia or error
-            if space_id not in place_one and space_id not in bulk_place:
-                place_one.add(space_id)  # default action
-
-        # If space has ≥1 Fort, branch between bulk_place or move action
-
-    # Place‑one actions (after possible auto‑fill)
-    for space_id in place_one:
-        if space_id in build_fort or space_id in bulk_place:
-            continue
-        if _is_indian_reserve(space_id) or _is_west_indies(space_id):
-            raise ValueError("Cannot place Militia in Indian Reserve or West Indies.")
-        _place_militia(state, space_id, 1)
-
-    # Bulk placement in fort spaces
-    for space_id, n in bulk_place.items():
-        sp = state["spaces"][space_id]
-        forts = sp.get(FORT_PAT, 0)
-        if forts == 0:
-            raise ValueError("Bulk placement requires an existing Fort.")
-        max_n = forts + _map_population(space_id)
-        if n > max_n:
-            raise ValueError(f"Cannot place {n} Militia in {space_id}; limit is {max_n}.")
-        if _is_indian_reserve(space_id) or _is_west_indies(space_id):
-            raise ValueError("Cannot place Militia in Indian Reserve or West Indies.")
-        _place_militia(state, space_id, n)
-
-    # Move‑plan execution
-    for src_id, dst_id, n in move_plan:
-        if n <= 0:
-            continue
-        if (src_id, dst_id) in moved_militia:
-            raise ValueError("Cannot move from the same src to dst twice.")
-        if dst_id not in selected:
-            raise ValueError("Destination must be one of the Rally spaces selected.")
-        dst_sp = state["spaces"][dst_id]
-        if dst_sp.get(FORT_PAT, 0) == 0:
-            raise ValueError("Destination must have a Fort for move action.")
-        if not is_adjacent(src_id, dst_id):
-            raise ValueError(f"{src_id} not adjacent to {dst_id}.")
-        src_sp = state["spaces"][src_id]
-        _move_militia(state, src_id, dst_id, n)
-        moved_militia.add((src_id, dst_id))
-
-    # Flip all militia in destinations of move_plan Underground
-    for _, dst_id, _ in move_plan:
-        dst = state["spaces"][dst_id]
-        moved = dst.get(MILITIA_A, 0)
-        if moved:
-            dst[MILITIA_U] = dst.get(MILITIA_U, 0) + moved
-            dst[MILITIA_A] = 0
-
+    command_checkpoint(state, ctx, "Before Continental promotion", promote_space)
     # --- Promotion (Continentals) -----------------------------------------
     # §3.3.1: "replace any Militia with Continentals"
     # The caller chooses how many via promote_n; defaults to all if omitted.

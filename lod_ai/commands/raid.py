@@ -34,6 +34,7 @@ from lod_ai.rules_consts import (
     INDIANS,
 )
 from lod_ai.leaders import leader_location
+from lod_ai.util.command_checkpoint import command_checkpoint
 from lod_ai.util.history   import push_history
 from lod_ai.util.caps      import refresh_control, enforce_global_caps
 from lod_ai.util.adjacency import is_adjacent
@@ -132,21 +133,27 @@ def execute(
     # ═══ resource payment ══════════════════════════════════════════════════
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).update(selected)
-    cost = len(selected)
-    spend(state, INDIANS, cost)
+    ctx["_planned_command"] = COMMAND_NAME
+    ctx["_command_selected_spaces"] = set(selected)
+    ctx["raid_active"] = True
+    ctx["raid_spaces"] = set(selected)
+    interleaved = callable(ctx.get("_command_checkpoint"))
+    if not interleaved:
+        spend(state, INDIANS, len(selected))
 
     # ═══ execute ═══════════════════════════════════════════════════════════
     push_history(state, f"INDIANS RAID {selected}")
 
-    # optional moves (kept Underground)
-    for src, dst in move_plan:
-        _move_one_wp(state,
-                     state["spaces"][src], state["spaces"][dst],
-                     src, dst)
-
     from lod_ai.board.pieces import place_marker
 
     for prov in selected:
+        command_checkpoint(state, ctx, "Before resolving Raid", prov)
+        if interleaved:
+            spend(state, INDIANS, 1)
+        for src, dst in move_plan:
+            if dst == prov:
+                _move_one_wp(state, state["spaces"][src], state["spaces"][dst], src, dst)
+        command_checkpoint(state, ctx, "After Raid movement", prov)
         sp = state["spaces"][prov]
 
         # Activate one Underground WP (must exist after optional move)

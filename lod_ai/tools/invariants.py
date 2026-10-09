@@ -59,6 +59,11 @@ def _canonical(state: Dict[str, Any]) -> Dict[str, Any]:
     canon = serialize_state(state)
     for key in _VOLATILE_KEYS:
         canon.pop(key, None)
+    if callable(state.get("winter_card_event")):
+        # Reconstructing a queued WQ lambda on load changes its memory
+        # address, not its effect.  Compare its persisted card identity.
+        canon["winter_card_event"] = {
+            "card_id": (state.get("current_card") or {}).get("id")}
     return canon
 
 

@@ -48,6 +48,7 @@ from lod_ai.rules_consts import (
 )
 from lod_ai.board.pieces      import add_piece, remove_piece
 from lod_ai.economy.resources import spend, can_afford
+from lod_ai.util.command_checkpoint import command_checkpoint
 
 COMMAND_NAME = "MUSTER"
 
@@ -240,8 +241,12 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
     if build_fort and reward_levels:
         raise ValueError("Cannot both build a Fort and Reward Loyalty in the same Muster.")
 
+    ctx["_planned_command"] = COMMAND_NAME
+    ctx["_command_selected_spaces"] = set(selected)
+    interrupted = callable(ctx.get("_command_checkpoint"))
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).update(selected)
+    state.setdefault("_turn_muster_spaces", set()).update(selected)
     # Leader hooks – none defined yet, keep pattern
 
     push_history(state, f"{faction} MUSTER starts in {selected}")
@@ -251,7 +256,15 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
     # -------------------------------------------------------------------
     if faction == BRITISH:
         # Pay cost (1 Resource per selected space)
-        _brit_cost(state, len(selected))
+        if not interrupted:
+            _brit_cost(state, len(selected))
+        paid_spaces = set()
+
+        def pay_space_once(sid):
+            if interrupted and sid not in paid_spaces:
+                _brit_cost(state, 1)
+                paid_spaces.add(sid)
+
         dest: Optional[str] = None   # Regular destination (step 1), if any
 
         # 1) Regular placement (in exactly ONE City/Colony/WI).
@@ -262,11 +275,13 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
             dest = regular_plan["space"]
             if dest not in selected:
                 raise ValueError("Regular placement space must be among selected.")
+            command_checkpoint(state, ctx, "Before placing Regulars", dest)
             if not _is_legal_regular_dest(state, dest):
                 raise ValueError(
                     f"British Regulars cannot be placed in {dest}: must be a "
                     "non-Blockaded City, an adjacent Colony, or the West Indies."
                 )
+            pay_space_once(dest)
             n_reg = min(regular_plan.get("n", 0), 6)
             n_reg = _draw_from_pool(state, REGULAR_BRI, n_reg)
             add_piece(state, REGULAR_BRI, dest, n_reg)
@@ -276,6 +291,8 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
             for sp_id, n in tory_plan.items():
                 if sp_id not in selected or sp_id == WEST_INDIES_ID:
                     continue
+                command_checkpoint(state, ctx, "Before placing Tories", sp_id)
+                pay_space_once(sp_id)
                 # §3.2.1: Tories may be placed only in Cities or Colonies.
                 if _madj.space_type(sp_id) not in ("City", "Colony"):
                     continue
@@ -296,6 +313,9 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
         # Muster has no implicit step-3 target.
         if build_fort or reward_levels:
             target = fort_space if fort_space and fort_space in selected else dest
+            if target is not None:
+                command_checkpoint(state, ctx, "Before Fort or Reward Loyalty", target)
+                pay_space_once(target)
             if target is None:
                 push_history(state, f"{faction} MUSTER: no step-3 space — "
                                     "Fort/Reward Loyalty skipped")
@@ -325,14 +345,22 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
                         _reward_loyalty(state, sp_rl, target, reward_levels,
                                         free_first=rl_free_first)
 
+        # Selected spaces still cost a Resource if their optional placements
+        # were declined; never charge a space again for a later Muster phase.
+        for sid in selected:
+            if interrupted and sid not in paid_spaces:
+                command_checkpoint(state, ctx, "Before completing Muster", sid)
+                pay_space_once(sid)
+
     # -------------------------------------------------------------------
     # FRENCH flow
     # -------------------------------------------------------------------
     else:  # faction == "FRENCH"
-        _french_cost(state)
         if len(selected) != 1:
             raise ValueError("French Muster selects exactly one space.")
         sp_id = selected[0]
+        command_checkpoint(state, ctx, "Before placing Regulars", sp_id)
+        _french_cost(state)
 
         # §3.5.3: "Select any one Colony or City with Rebellion Control
         # or the West Indies."
@@ -349,6 +377,7 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
         # Patriot Fort and Patriots pay one Resource."  Caller-controlled
         # via french_fort parameter.
         if french_fort:
+            command_checkpoint(state, ctx, "Before Patriot Fort replacement", sp_id)
             sp = state["spaces"][sp_id]
             if sp_id == WEST_INDIES_ID:
                 raise ValueError("Cannot build Patriot Fort in West Indies.")

@@ -1,19 +1,18 @@
 """
 Winter‑Quarters resolution · Liberty or Death  (Rule 6, Aug 2016)
 ================================================================
-Executed **once** per Winter‑Quarters card after the final Faction has acted.
+Executed once when a Winter Quarters card becomes the current card.
 (Events that call for immediate Desertion — cards 12/13 Patriot, card 22
 Tory — call the §6.6 helpers directly; there is no deferral flag.)
 
 Pipeline (Rule 6 sequence):
-    6.1  Return Leaders, lift Casualties
-    6.2  Supply Phase              – complete
-    6.3  Resource Income           – complete
-    6.4  Support Phase             – complete
-    6.5  Leader Change / Redeploy, British Release, FNI drift – complete
-    6.6  Desertion Phase           – complete
-    6.7  Reset Phase               – **NEW**
-    British Up‑keep follows Reset unless this is the final round
+    6.1  Victory Check
+    6.2  Supply Phase
+    6.3  Resource Income
+    6.4  Support Phase (final round ends here)
+    6.5  Leader Change / Redeploy, British Release, FNI drift
+    6.6  Desertion Phase
+    6.7  Reset, casualty return, and Winter Quarters Event
 
 All piece & Resource mutations *must* route through the gate‑keepers:
     • lod_ai.board.pieces.*
@@ -52,16 +51,18 @@ from lod_ai.rules_consts import (
     RAID, PROPAGANDA
 )
 from lod_ai.victory import final_scoring
+from lod_ai.util import year_end_choices as human_choices
+from lod_ai.util import leader_state
 
 # ────────────────────────────────────────────────────────────────
 #  Helper – count faction pieces in a space (for leader redeploy)
 # ────────────────────────────────────────────────────────────────
 
 _FACTION_PIECES: Dict[str, Tuple[str, ...]] = {
-    BRITISH: (REGULAR_BRI, TORY),
-    PATRIOTS: (REGULAR_PAT, MILITIA_A, MILITIA_U),
+    BRITISH: (REGULAR_BRI, TORY, FORT_BRI),
+    PATRIOTS: (REGULAR_PAT, MILITIA_A, MILITIA_U, FORT_PAT),
     FRENCH: (REGULAR_FRE,),           # ← fixed
-    INDIANS: (WARPARTY_A, WARPARTY_U),
+    INDIANS: (WARPARTY_A, WARPARTY_U, VILLAGE),
 }
 
 def _piece_total(sp: Dict, faction: str) -> int:
@@ -103,7 +104,7 @@ def _supply_phase(state, *, bots=None, human_factions=None):
                 and state.get("support", {}).get(sid, 0) < ACTIVE_SUPPORT)
 
     # British — collect unsupplied spaces, then sort by bot priority
-    human = human_factions or set()
+    human = human_choices.humans(state, human_factions)
     brit_unsupplied = []
     for sid, sp in state["spaces"].items():
         if sid == WEST_INDIES_ID:
@@ -129,8 +130,27 @@ def _supply_phase(state, *, bots=None, human_factions=None):
         # of bleeding Support with a shift.
         brit_pay_set = set(priority)
 
-    for sid in brit_unsupplied:
+    for sid in human_choices.ordered_spaces(state, BRITISH, brit_unsupplied, human):
         sp = state["spaces"][sid]
+        if BRITISH in human:
+            options = [("Remove all British cubes to Available", "remove")]
+            if resources.can_afford(state, BRITISH, 1):
+                options.insert(0, ("Pay 1 Resource", "pay"))
+            if (map_adj.space_type(sid) in ("City", "Colony")
+                    and state.get("support", {}).get(sid, 0) > ACTIVE_OPPOSITION):
+                options.append(("Shift one level toward Active Opposition", "shift"))
+            choice = human_choices.pick(state, BRITISH, f"Supply in {sid}:", options)
+            if choice == "pay":
+                _pay(BRITISH, sid, "British Supply")
+                continue
+            if choice == "shift":
+                shift_support(state, sid, -1)
+                continue
+            for tag in (REGULAR_BRI, TORY):
+                if sp.get(tag):
+                    remove_piece(state, tag, sid, sp[tag], to="available")
+            push_history(state, f"British Supply — cubes removed from {sid}")
+            continue
         worth_keeping = brit_pay_set is None or sid in brit_pay_set
         if worth_keeping and _pay(BRITISH, sid, "British Supply"):
             continue
@@ -144,6 +164,7 @@ def _supply_phase(state, *, bots=None, human_factions=None):
             remove_piece(state, TORY, sid, sp[TORY], to="available")
         push_history(state, f"British Supply – cubes removed from {sid}")
 
+    board_control.refresh_control(state)
     # Patriots — collect unsupplied spaces, then sort by bot priority
     pat_unsupplied = []
     for sid, sp in state["spaces"].items():
@@ -173,6 +194,22 @@ def _supply_phase(state, *, bots=None, human_factions=None):
                 left -= take
         return plan
 
+    if PATRIOTS in human:
+        for sid in human_choices.ordered_spaces(state, PATRIOTS, pat_unsupplied, human):
+            sp = state["spaces"][sid]
+            amount = sum(sp.get(t, 0) for t in (REGULAR_PAT, MILITIA_A, MILITIA_U)) // 2
+            options = [(f"Return {amount} Patriot units to Available", "remove")]
+            if resources.can_afford(state, PATRIOTS, 1):
+                options.insert(0, ("Pay 1 Resource", "pay"))
+            choice = human_choices.pick(state, PATRIOTS, f"Supply in {sid}:", options)
+            if choice == "pay":
+                _pay(PATRIOTS, sid, "Patriot Supply")
+            else:
+                human_choices.remove_units(state, PATRIOTS, sid,
+                    (REGULAR_PAT, MILITIA_A, MILITIA_U), amount,
+                    f"Select Patriot supply removal in {sid}:")
+        pat_unsupplied = []
+
     pat_pay, pat_other = [], []
     for sid in pat_unsupplied:
         plan = _pat_removal(sid)
@@ -199,6 +236,7 @@ def _supply_phase(state, *, bots=None, human_factions=None):
     for sid in pat_other:
         _pat_remove(sid)
 
+    board_control.refresh_control(state)
     # French — collect unsupplied spaces, then sort by bot priority
     fre_unsupplied = []
     for sid, sp in state["spaces"].items():
@@ -219,6 +257,24 @@ def _supply_phase(state, *, bots=None, human_factions=None):
     # able to Reward Loyalty, then highest Population. All OTHER
     # unsupplied spaces move to the nearest Patriot Fort (or, if none,
     # to Available). 6.2.1: can't pay → move.
+    if FRENCH in human:
+        for sid in human_choices.ordered_spaces(state, FRENCH, fre_unsupplied, human):
+            nearest = human_choices.nearest(state, sid, [s for s, sp in state["spaces"].items()
+                                                       if sp.get(FORT_PAT)])
+            options = [(f"Move all French Regulars to {s}", ("move", s)) for s in nearest]
+            if resources.can_afford(state, FRENCH, 1):
+                options.insert(0, ("Pay 1 Resource", ("pay", None)))
+            if not options:
+                options = [("Return all French Regulars to Available", ("remove", None))]
+            action, destination = human_choices.pick(state, FRENCH, f"Supply in {sid}:", options)
+            quantity = state["spaces"][sid].get(REGULAR_FRE, 0)
+            if action == "pay":
+                _pay(FRENCH, sid, "French Supply")
+            elif action == "move":
+                bp.move_piece(state, REGULAR_FRE, sid, destination, quantity)
+            else:
+                remove_piece(state, REGULAR_FRE, sid, quantity, to="available")
+        fre_unsupplied = []
     fre_pay, fre_other = [], []
     for sid in fre_unsupplied:
         fr = state["spaces"][sid].get(REGULAR_FRE, 0)
@@ -255,6 +311,7 @@ def _supply_phase(state, *, bots=None, human_factions=None):
     for sid in fre_other:
         _fre_move_out(sid)
 
+    board_control.refresh_control(state)
     # Indians – auto‑Village (§6.2.1).  §8.7 note: "place the Village in
     # a space that already has War Parties if possible"; §8.2 seeded
     # ties (Session 51: was the first Reserve in dict order).
@@ -265,10 +322,12 @@ def _supply_phase(state, *, bots=None, human_factions=None):
         # Q22 (Session 67): equal-WP ties resolve via the Random Spaces
         # table, not an rng sort key (this site was missed in the S60
         # engine-wide migration).
-        picked = _pbp(state, [(
+        picked = ([human_choices.pick(state, INDIANS, "Place the required Village:",
+                                      [(s, s) for s in sorted(reserves)])]
+                  if INDIANS in human and reserves else _pbp(state, [(
             -(state["spaces"][s].get(WARPARTY_U, 0)
               + state["spaces"][s].get(WARPARTY_A, 0)), s)
-            for s in reserves], count=1)
+            for s in reserves], count=1))
         if picked:
             place_with_caps(state, VILLAGE, picked[0], 1)
             push_history(state, f"Indian Supply – auto‑Village in {picked[0]}")
@@ -302,6 +361,24 @@ def _supply_phase(state, *, bots=None, human_factions=None):
                 and wp >= need and bases < 2
                 and state.get("support", {}).get(sid, 0) in _GATHER_OK)
 
+    if INDIANS in human:
+        for sid in human_choices.ordered_spaces(state, INDIANS, indian_unsupplied, human):
+            nearest = human_choices.nearest(state, sid, [s for s, sp in state["spaces"].items()
+                                                       if sp.get(VILLAGE)])
+            options = [(f"Move all War Parties to {s}", ("move", s)) for s in nearest]
+            if resources.can_afford(state, INDIANS, 1):
+                options.insert(0, ("Pay 1 Resource", ("pay", None)))
+            if not options:
+                raise ValueError("Indian supply requires a reachable Village or 1 Resource")
+            action, destination = human_choices.pick(state, INDIANS, f"Supply in {sid}:", options)
+            if action == "pay":
+                _pay(INDIANS, sid, "Indian Supply")
+            else:
+                for tag in (WARPARTY_U, WARPARTY_A):
+                    quantity = state["spaces"][sid].get(tag, 0)
+                    if quantity:
+                        bp.move_piece(state, tag, sid, destination, quantity)
+        indian_unsupplied = []
     ind_pay_a, ind_pay_b, ind_other = [], [], []
     for sid in indian_unsupplied:
         sp = state["spaces"][sid]
@@ -359,6 +436,16 @@ def _supply_phase(state, *, bots=None, human_factions=None):
         cnt = wi.get(pid, 0)
         if not cnt:
             return
+        if faction in human:
+            keep = (human_choices.count(state, faction,
+                    "How many remaining West Indies units will you keep for 1 Resource?", cnt)
+                    if resources.can_afford(state, faction, 1) else 0)
+            if cnt > keep:
+                remove_piece(state, pid, WEST_INDIES_ID, cnt - keep, to="available")
+            if keep:
+                resources.spend(state, faction, 1)
+            push_history(state, f"{faction} kept {keep} units in West Indies")
+            return
         if resources.can_afford(state, faction, 1):
             resources.spend(state, faction, 1)
             push_history(state, f"{faction.title()} pay 1 Resource to keep garrison ({cnt}) in West Indies")
@@ -367,6 +454,7 @@ def _supply_phase(state, *, bots=None, human_factions=None):
             push_history(state, f"{faction.title()} return garrison ({cnt}) from West Indies")
     _wi_cleanup(REGULAR_FRE, FRENCH)
     _wi_cleanup(REGULAR_BRI, BRITISH)
+    board_control.refresh_control(state)
     push_history(state, "Supply Phase complete")
 
 # ────────────────────────────────────────────────────────────────
@@ -504,6 +592,10 @@ def _support_phase(state):
     skipped if only markers would be removed.
     """
 
+    human = human_choices.humans(state)
+    from lod_ai.leaders import leader_location
+    gage_space = leader_location(state, leader_state.GAGE)
+
     def _eff_pop(sid):
         # C10 (§8.1.1×§1.9): a Blockaded City's population is 0 for the
         # Support total, so its RL/CoC "change in Support" is 0.
@@ -539,9 +631,13 @@ def _support_phase(state):
     # "first select the space or spaces with the lowest total of Raid
     #  and Propaganda markers, within that where the largest change in
     #  (Support – Opposition) is possible."
+    if BRITISH in human:
+        human_choices.support(state, BRITISH)
     brit_eligible = []
     bri_res = state.get("resources", {}).get(BRITISH, 0)
     for sid, sp in state["spaces"].items():
+        if BRITISH in human:
+            continue
         if rl_shifted[sid] >= 2:
             continue
         # §1.6.2/§6.4.1 (Session 67): the four Indian Reserves and the
@@ -566,7 +662,7 @@ def _support_phase(state):
         # levels per space, and the purse must pay the markers first
         # (Session 45: was the raw uncapped distance).
         levels = min(ACTIVE_SUPPORT - level, 2,
-                     max(0, bri_res - marker_count))
+                     max(0, bri_res - marker_count + int(sid == gage_space)))
         potential = levels * pop
 
         brit_eligible.append((sid, marker_count, potential))
@@ -596,7 +692,7 @@ def _support_phase(state):
         # Must be able to afford all marker removals PLUS at least 1 shift.
         n_raid = raid_on_map.get(sid, 0)
         n_prop = propaganda_on_map.get(sid, 0)
-        min_cost = n_raid + n_prop + 1
+        min_cost = n_raid + n_prop + (0 if sid == gage_space else 1)
         if not resources.can_afford(state, BRITISH, min_cost):
             continue
 
@@ -611,8 +707,12 @@ def _support_phase(state):
                 push_history(state, f"British removed {marker_tag} in {sid} (6.4.1)")
 
         # pay 1 Resource per support shift, up to remaining steps
-        while steps_remaining > 0 and resources.can_afford(state, BRITISH, 1) and level < ACTIVE_SUPPORT:
-            resources.spend(state, BRITISH, 1)
+        while steps_remaining > 0 and level < ACTIVE_SUPPORT:
+            free_shift = sid == gage_space and rl_shifted[sid] == 0
+            if not free_shift and not resources.can_afford(state, BRITISH, 1):
+                break
+            if not free_shift:
+                resources.spend(state, BRITISH, 1)
             level += 1
             state["support"][sid] = level
             spent += 1
@@ -631,9 +731,13 @@ def _support_phase(state):
     # "first select the spaces with the lowest number of Raid markers,
     #  within that where the largest change in (Opposition - Support)
     #  is possible."
+    if PATRIOTS in human:
+        human_choices.support(state, PATRIOTS)
     pat_eligible = []
     pat_res = state.get("resources", {}).get(PATRIOTS, 0)
     for sid, sp in state["spaces"].items():
+        if PATRIOTS in human:
+            continue
         if coc_shifted[sid] >= 2:
             continue
         # §6.4.2: "Rebellion Controlled spaces with Patriot pieces" — a
@@ -723,18 +827,18 @@ def _leader_change(state):
         state["upcoming_card"] = {"first_faction": BRITISH}
     """
     card = state.get("upcoming_card", {})
-    fac = card.get("first_faction")
+    from lod_ai.cards import get_faction_order
+    order = card.get("order") or get_faction_order(card)
+    fac = card.get("first_faction") or (order[0] if order else None)
     if not fac or fac == PATRIOTS:
         return  # no change required or Patriots never change
     if fac == FRENCH and not state.get("treaty_of_alliance", False):
         return  # French changes locked until ToA
 
-    current = state.get("leaders", {}).get(fac)
-    nxt = LEADER_CHAIN.get(current)
-    if not nxt:
+    changed = leader_state.change(state, fac)
+    if not changed:
         return  # no further change in chain
-
-    state["leaders"][fac] = nxt
+    current, nxt = changed
     push_history(state, f"Leader Change – {fac} {current} → {nxt} (6.5.1)")
 
 # ────────────────────────────────────────────────────────────────
@@ -742,11 +846,19 @@ def _leader_change(state):
 # ────────────────────────────────────────────────────────────────
 
 def _leader_redeploy(state, *, bots=None, human_factions=None):
-    human = human_factions or set()
+    human = human_choices.humans(state, human_factions)
     order = [INDIANS, FRENCH, BRITISH, PATRIOTS]
     for fac in order:
-        leader = state.get("leaders", {}).get(fac)
-        if not leader:
+        if fac == FRENCH and not state.get("treaty_of_alliance", state.get("toa_played", False)):
+            continue
+        leader = leader_state.current_leader(state, fac)
+
+        if fac in human:
+            destinations = [sid for sid, sp in state["spaces"].items() if _piece_total(sp, fac)]
+            dest = human_choices.pick(state, fac, f"Redeploy {leader}:",
+                [("Available", None)] + [(s, s) for s in sorted(destinations)])
+            leader_state.set_location(state, leader, dest)
+            push_history(state, f"Leader Redeploy — {fac} leader to {dest or 'Available'} (6.5.2)")
             continue
 
         if bots and fac in bots and fac not in human:
@@ -764,9 +876,11 @@ def _leader_redeploy(state, *, bots=None, human_factions=None):
                 dest = None
 
             if dest:
+                leader_state.set_location(state, leader, dest)
                 state.setdefault("leader_locs", {})[leader] = dest
                 push_history(state, f"Leader Redeploy – {fac} leader to {dest} (6.5.2, bot)")
             else:
+                leader_state.set_location(state, leader, None)
                 state.setdefault("leader_locs", {})[leader] = "Available"
                 push_history(state, f"Leader Redeploy – {fac} leader to Available (6.5.2)")
         else:
@@ -778,9 +892,11 @@ def _leader_redeploy(state, *, bots=None, human_factions=None):
                 if cnt > best:
                     best, dest = cnt, sid
             if dest:
+                leader_state.set_location(state, leader, dest)
                 state.setdefault("leader_locs", {})[leader] = dest
                 push_history(state, f"Leader Redeploy – {fac} leader to {dest} (6.5.2)")
             else:
+                leader_state.set_location(state, leader, None)
                 state.setdefault("leader_locs", {})[leader] = "Available"
                 push_history(state, f"Leader Redeploy – {fac} leader to Available (6.5.2)")
 
@@ -829,7 +945,7 @@ def _british_release(state):
 def _fni_drift(state, *, bots=None, human_factions=None):
     if not state.get("treaty_of_alliance", False):
         return  # only after ToA
-    human = human_factions or set()
+    human = human_choices.humans(state, human_factions)
 
     # Lower FNI one box if > 0
     if state.get("fni_level", 0) > 0:
@@ -841,7 +957,10 @@ def _fni_drift(state, *, bots=None, human_factions=None):
     bloc = state.setdefault("markers", {}).setdefault(BLOCKADE, {"pool": 0, "on_map": set()})
     on_map = bloc.get("on_map", set())
     if on_map:
-        if bots and FRENCH in bots and FRENCH not in human:
+        if FRENCH in human:
+            removed_city = human_choices.pick(state, FRENCH,
+                "Choose one Blockade to return to West Indies:", [(s, s) for s in sorted(on_map)])
+        elif bots and FRENCH in bots and FRENCH not in human:
             # §8.6.9: Remove Blockade from City with least Support
             support_map = state.get("support", {})
             removed_city = min(on_map, key=lambda s: support_map.get(s, 0))
@@ -852,7 +971,21 @@ def _fni_drift(state, *, bots=None, human_factions=None):
         push_history(state, f"Blockade removed from {removed_city} to West Indies (6.5.4)")
 
         # §8.6.9: Rearrange remaining Blockades to Cities with most Support
-        if bots and FRENCH in bots and FRENCH not in human and on_map:
+        if FRENCH in human and on_map:
+            rearrange = human_choices.pick(state, FRENCH, "Rearrange remaining Blockades?",
+                                          [("Keep current Cities", False), ("Choose new Cities", True)])
+            if rearrange:
+                cities = [s for s in state["spaces"] if map_adj.space_type(s) == "City"]
+                destinations = []
+                for index in range(len(on_map)):
+                    dest = human_choices.pick(state, FRENCH,
+                        f"Destination for Blockade {index + 1}:",
+                        [(s, s) for s in sorted(cities) if s not in destinations])
+                    destinations.append(dest)
+                on_map.clear()
+                on_map.update(destinations)
+                push_history(state, f"French rearranged Blockades to {sorted(on_map)} (6.5.4)")
+        elif bots and FRENCH in bots and FRENCH not in human and on_map:
             _rearrange_blockades(state, on_map)
         elif on_map:
             push_history(state, "French may rearrange remaining Blockade markers (6.5.4)")
@@ -902,7 +1035,7 @@ def _patriot_desertion(state, *, bots=None, human_factions=None):
     • **Indians** choose the *first* Militia **and** the *first* Continental to desert.
     • **Patriots** choose the remainder (engine removes least‑harmful pieces).
     """
-    human = human_factions or set()
+    human = human_choices.humans(state, human_factions)
 
     # §6.6.1: "Remove 1 in 5 Militia and 1 in 5 Continentals from the map"
     mil_spaces = [(sid, sp.get(MILITIA_U, 0) + sp.get(MILITIA_A, 0))
@@ -919,7 +1052,10 @@ def _patriot_desertion(state, *, bots=None, human_factions=None):
 
     # Indians choose first Militia & Continental
     if drop_mil and mil_spaces:
-        if bots and INDIANS in bots and INDIANS not in human:
+        if INDIANS in human:
+            sid, tag = human_choices.choose_deserter(state, INDIANS, (MILITIA_U, MILITIA_A),
+                                                   "Choose the first Militia deserter:")
+        elif bots and INDIANS in bots and INDIANS not in human:
             # Build candidate list for Indian bot
             mil_candidates = [(s, MILITIA_U) for s, _ in mil_spaces
                               if state["spaces"][s].get(MILITIA_U, 0)]
@@ -941,7 +1077,10 @@ def _patriot_desertion(state, *, bots=None, human_factions=None):
         removed += 1
 
     if drop_con and con_spaces:
-        if bots and INDIANS in bots and INDIANS not in human:
+        if INDIANS in human:
+            sid, _ = human_choices.choose_deserter(state, INDIANS, (REGULAR_PAT,),
+                                                 "Choose the first Continental deserter:")
+        elif bots and INDIANS in bots and INDIANS not in human:
             con_candidates = [(s, REGULAR_PAT) for s, _ in con_spaces]
             sorted_con = bots[INDIANS].ops_patriot_desertion_priority(state, con_candidates)
             sid, _ = sorted_con[0]
@@ -953,7 +1092,15 @@ def _patriot_desertion(state, *, bots=None, human_factions=None):
         removed += 1
 
     # Patriots remove the rest
-    if bots and PATRIOTS in bots and PATRIOTS not in human and (drop_mil or drop_con):
+    if PATRIOTS in human:
+        for tags, amount in (((MILITIA_U, MILITIA_A), drop_mil), ((REGULAR_PAT,), drop_con)):
+            for _ in range(amount):
+                sid, tag = human_choices.choose_deserter(state, PATRIOTS, tags,
+                                                       "Choose your next Patriot deserter:")
+                remove_piece(state, tag, sid, 1, to="available")
+                removed += 1
+        drop_mil = drop_con = 0
+    elif bots and PATRIOTS in bots and PATRIOTS not in human and (drop_mil or drop_con):
         # §8.5.7: "Remove Militia and Continentals so as to change as
         # little Control as possible, within that first without removing
         # the last Patriot unit from any space."  Every removal changes
@@ -1011,7 +1158,7 @@ def _tory_desertion(state, *, bots=None, human_factions=None):
     • **French** choose the *first* Tory to desert.
     • **British** choose the remainder (engine removes arbitrarily).
     """
-    human = human_factions or set()
+    human = human_choices.humans(state, human_factions)
 
     tory_spaces = [(sid, sp.get(TORY, 0)) for sid, sp in state["spaces"].items() if sp.get(TORY,0)]
     total = sum(c for _, c in tory_spaces)
@@ -1022,7 +1169,10 @@ def _tory_desertion(state, *, bots=None, human_factions=None):
     removed = 0
 
     # French choose first Tory
-    if bots and FRENCH in bots and FRENCH not in human:
+    if FRENCH in human:
+        sid_choice, _ = human_choices.choose_deserter(state, FRENCH, (TORY,),
+                                                   "Choose the first Tory deserter:")
+    elif bots and FRENCH in bots and FRENCH not in human:
         french_picks = bots[FRENCH].ops_loyalist_desertion_priority(state)
         if french_picks:
             sid_choice, _ = french_picks[0]
@@ -1037,7 +1187,14 @@ def _tory_desertion(state, *, bots=None, human_factions=None):
     drop -= 1; removed += 1
 
     # British remove the rest
-    if bots and BRITISH in bots and BRITISH not in human and drop > 0:
+    if BRITISH in human:
+        for _ in range(drop):
+            sid, tag = human_choices.choose_deserter(state, BRITISH, (TORY,),
+                                                   "Choose your next Tory deserter:")
+            remove_piece(state, tag, sid, 1, to="available")
+            removed += 1
+        drop = 0
+    elif bots and BRITISH in bots and BRITISH not in human and drop > 0:
         removals = bots[BRITISH].bot_loyalist_desertion(state, drop)
         for sid, n in removals:
             remove_piece(state, TORY, sid, n, to="available")
@@ -1137,17 +1294,23 @@ def resolve(state, *, bots=None, human_factions=None):
         When provided, bot-controlled factions use their OPS methods for
         Supply priority, Leader Redeploy, and Desertion choices.
     human_factions : set | None
-        Set of faction strings controlled by humans.  These factions use the
-        existing ad-hoc logic even when *bots* is provided.
+        Set of faction strings controlled by humans. Those factions choose
+        their own actions through the configured CLI input provider.
     """
 
+    if human_factions is not None:
+        state["human_factions"] = set(human_factions)
+    state["winter_quarters_count"] = state.get("winter_quarters_count", 0) + 1
     # 6.1  Victory Check Phase
     if victory_check(state):
+        state.pop("winter_card_event", None)  # no Reset Phase after game end
         push_history(state, "Victory achieved at Winter-Quarters (6.1)")
         return  # game ends immediately
 
-    # Return all Leaders to Available before redeploy (Rule 6.1)
-    return_leaders(state)
+    # Preserve each current Leader through Supply/Support. §6.1 is only
+    # the Victory Check; leaders change/redeploy during §6.5, not before.
+    for faction in leader_state.FACTION_LEADERS:
+        leader_state.current_leader(state, faction)
 
     # 6.2
     _supply_phase(state, bots=bots, human_factions=human_factions)
@@ -1161,6 +1324,7 @@ def resolve(state, *, bots=None, human_factions=None):
 
     # ── Final steps ───────────────────────────────────────────
     if state.get("final_winter_round", False):
+        state.pop("winter_card_event", None)  # §6.4.3 omits Reset and its Event
         # 6.4.3 was the last phase; go straight to end-of-game scoring (Rule 7.3)
         push_history(state, "Final Winter-Quarters card – Support Phase complete")
         board_control.refresh_control(state)  # §1.7 derived state (Session 67)

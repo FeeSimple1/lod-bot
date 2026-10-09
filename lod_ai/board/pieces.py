@@ -424,16 +424,25 @@ def marker_count(state, marker_tag: str, loc: str) -> int:
     return 1 if om and loc in om else 0
 
 def return_leaders(state) -> None:
+    """Move current leader markers to Available, retaining their identity.
+
+    This is a state utility, not a Winter Quarters §6.1 instruction.
     """
-    Rule 6.1 – move *all* Leader pieces on the map to Available.
-    """
+    from lod_ai.util import leader_state
+    from lod_ai.leaders import leader_location
     moved = 0
     for sid, space in state["spaces"].items():
-        for lid in LEADERS:
-            cnt = space.get(lid, 0)
-            if cnt:
-                remove_piece(state, lid, sid, cnt, to="available")
-                moved += cnt
+        for leader in LEADERS:
+            if space.get(leader, 0):
+                remove_piece(state, leader, sid, space[leader], to="available")
+                leader_state.set_location(state, leader, None)
+                moved += 1
+    for faction in leader_state.FACTION_LEADERS:
+        leader = leader_state.current_leader(state, faction)
+        if leader_location(state, leader):
+            leader_state.set_location(state, leader, None)
+            state.setdefault("available", {})[leader] = 1
+            moved += 1
     if moved:
         push_history(state, f"Leaders returned to Available ({moved})")
 

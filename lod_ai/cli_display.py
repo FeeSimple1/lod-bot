@@ -87,17 +87,9 @@ def display_board_state(state: Dict[str, Any]) -> None:
           f"Indians={res.get(RC.INDIANS, 0)}  "
           f"French={res.get(RC.FRENCH, 0)}")
 
-    # Support/Opposition totals (population-weighted per §1.6.2-1.6.3)
-    sup_total = 0
-    opp_total = 0
-    for sid in state.get("spaces", {}):
-        lvl = state.get("support", {}).get(sid, 0)
-        pop = map_adj.population(sid)
-        if lvl > 0:
-            sup_total += lvl * pop
-        elif lvl < 0:
-            opp_total += abs(lvl) * pop
-    print(f"Support Total: {sup_total}  |  Opposition Total: {opp_total}")
+    # Share the rules calculation with victory checks, including Blockades.
+    tallies = _summarize_board(state)
+    print(f"Support Total: {tallies['support']}  |  Opposition Total: {tallies['opposition']}")
 
     fni = state.get("fni_level", 0)
     cbc = state.get("cbc", 0)
@@ -109,8 +101,13 @@ def display_board_state(state: Dict[str, Any]) -> None:
     if toa:
         print("Treaty of Alliance: PLAYED")
     else:
-        fp = state.get("french_preparations", 0)
+        from lod_ai.cards.effects.brilliant_stroke import preparations_total
+        preparation_state = {**state, "markers": deepcopy(state.get("markers", {}))}
+        fp = preparations_total(preparation_state)
         print(f"French Preparations: {fp}  |  Treaty of Alliance: NOT PLAYED")
+        if RC.FRENCH not in (state.get("human_factions") or set()):
+            bot_fp = preparations_total(preparation_state, nonplayer=True)
+            print(f"French Non-player Preparations (half CBC): {bot_fp}")
 
     # Leaders with locations
     leaders = state.get("leaders", {})
@@ -244,9 +241,9 @@ def display_board_state(state: Dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 
 def _print_event_text(card: Dict[str, Any]) -> None:
-    """Print shaded/unshaded event text for a card, if any."""
-    if card.get("winter_quarters"):
-        return
+    """Print all printed effects, including Winter Quarters and Brilliant Strokes."""
+    if card.get("effect"):
+        print(f"    Effect: {card['effect']}")
     unshaded = card.get("unshaded_event", "")
     shaded = card.get("shaded_event", "")
     if unshaded or shaded:
@@ -383,6 +380,25 @@ def display_event_choice(card: Dict[str, Any]) -> None:
     print()
 
 
+def display_brilliant_strokes(state: Dict[str, Any], faction: str) -> None:
+    """Show the public card context and held Brilliant Stroke printed effects."""
+    from lod_ai.cards.effects.brilliant_stroke import FACTION_BY_BS_CARD, TOA_CARD_ID, TOA_KEY
+    from lod_ai.state.setup_state import _card_from_id
+    if state.get("current_card"):
+        display_card(state["current_card"], state.get("upcoming_card"),
+                     state.get("eligible"))
+    played = state.get("bs_played", {})
+    ids = []
+    if not played.get(faction) and faction in FACTION_BY_BS_CARD:
+        ids.append(FACTION_BY_BS_CARD[faction])
+    if faction == RC.FRENCH and not state.get("toa_played") and not played.get(TOA_KEY):
+        ids.append(TOA_CARD_ID)
+    for cid in ids:
+        card = _card_from_id(cid)
+        if card:
+            display_card(card)
+
+
 # ---------------------------------------------------------------------------
 # 4. Bot turn summary
 # ---------------------------------------------------------------------------
@@ -399,6 +415,11 @@ def _snapshot_state(state: Dict[str, Any]) -> Dict[str, Any]:
         "fni_level": state.get("fni_level", 0),
         "pieces": {},
     }
+    for key in ("markers", "leaders", "available", "unavailable", "casualties",
+                "eligible", "eligible_next", "ineligible_next", "remain_eligible",
+                "ineligible_through_next", "bs_played", "toa_played",
+                "treaty_of_alliance", "campaign_year", "capabilities", "momentum"):
+        snap[key] = deepcopy(state.get(key))
     for sid, sp in state.get("spaces", {}).items():
         piece_counts = {}
         for tag in list(_PIECE_ABBREV.keys()):
@@ -495,6 +516,45 @@ def display_bot_summary(faction: str, state: Dict[str, Any],
     if misc_changes:
         print(f"  Other changes: {', '.join(misc_changes)}")
 
+    # Changes in pieces must be visible even when a command has no detailed log.
+    current = _snapshot_state(state)
+    for sid in sorted(set(pre_snapshot.get("pieces", {})) | set(current["pieces"])):
+        before = pre_snapshot.get("pieces", {}).get(sid, {})
+        after = current["pieces"].get(sid, {})
+        changes = [f"{_PIECE_ABBREV[tag]} {before.get(tag, 0)}→{after.get(tag, 0)}"
+                   for tag in _PIECE_ABBREV if before.get(tag, 0) != after.get(tag, 0)]
+        if changes:
+            print(f"  Pieces at {sid}: {', '.join(changes)}")
+
+    def show_changes(label, before, after, prefix=""):
+        if before == after:
+            return
+        if isinstance(before, dict) or isinstance(after, dict):
+            left = before if isinstance(before, dict) else {}
+            right = after if isinstance(after, dict) else {}
+            for key in sorted(set(left) | set(right)):
+                show_changes(label, left.get(key), right.get(key),
+                             f"{prefix}/{key}" if prefix else str(key))
+        else:
+            def fmt(value):
+                if isinstance(value, (set, frozenset)):
+                    return ", ".join(sorted(value)) or "(none)"
+                return "(none)" if value is None else str(value)
+            print(f"  {label}{' ' + prefix if prefix else ''}: {fmt(before)}→{fmt(after)}")
+
+    for key, label in (("markers", "Markers"), ("leaders", "Leaders"),
+                       ("available", "Available"), ("unavailable", "Unavailable"),
+                       ("casualties", "Casualties"), ("eligible", "Eligibility"),
+                       ("eligible_next", "Eligible next card"),
+                       ("ineligible_next", "Ineligible next card"),
+                       ("remain_eligible", "Remain eligible"),
+                       ("ineligible_through_next", "Ineligible through next card"),
+                       ("bs_played", "Brilliant Stroke played"),
+                       ("toa_played", "Treaty of Alliance played"),
+                       ("campaign_year", "Campaign year"),
+                       ("capabilities", "Capabilities"), ("momentum", "Momentum")):
+        show_changes(label, pre_snapshot.get(key), current.get(key))
+
     print()
 
 
@@ -528,6 +588,9 @@ def display_turn_context(faction: str, state: Dict[str, Any],
 
     S76 (fs-bot playtest lesson 1.6): the victory math heads every
     decision — a one-line margin summary for all four factions."""
+    if card or state.get("current_card"):
+        display_card(card or state["current_card"], state.get("upcoming_card"),
+                     state.get("eligible"))
     res = state.get("resources", {}).get(faction, 0)
     card_title = (card or {}).get("title", "?")
     print(f"\n{faction} turn ({slot}) | Resources: {res} | Card: {card_title}")
@@ -625,9 +688,15 @@ def display_game_end(state: Dict[str, Any]) -> None:
         elif "Final Scoring" in msg:
             final_scoring_msg = msg
 
+    result = state.get("victory_result", {})
+    if result:
+        victory_type = result.get("type")
+        winner_msg = ("Stalemate (Rule 8.8)" if result.get("outcome") == "stalemate"
+                      else f"Winner: {result.get('winner', 'Unknown')}")
+
     if victory_type == "final_scoring":
         print("\n  Game ended by FINAL SCORING (Rule 7.3)")
-    elif victory_type == "victory_condition":
+    elif victory_type in ("victory_condition", "victory_check"):
         print("\n  Game ended by VICTORY CONDITION at Winter Quarters")
     else:
         print("\n  Game ended (deck exhausted or manual stop)")

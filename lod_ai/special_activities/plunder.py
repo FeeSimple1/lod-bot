@@ -56,7 +56,12 @@ def execute(
         raise ValueError("Plunder is Indian-only.")
 
     if not ctx.get("raid_active"):
-        raise ValueError("Plunder can only follow a Raid Command this turn.")
+        raise ValueError("Plunder must accompany a Raid Command this turn.")
+    selected = ctx.get("_command_selected_spaces")
+    if selected is not None and province not in selected:
+        raise ValueError("Plunder must occur in a selected Raid Province.")
+    if map_adj.space_type(province) not in ("Colony", "Reserve"):
+        raise ValueError("Plunder requires a Province.")
 
     state["_turn_used_special"] = True
     state["_turn_special_type"] = "PLUNDER"  # coverage (Piece 5, S67)

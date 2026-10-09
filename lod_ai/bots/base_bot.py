@@ -117,10 +117,11 @@ class BaseBot:
         sup = 0
         opp = 0
         for sid, lvl in state.get("support", {}).items():
-            # §1.9: Blockaded-City pop counts 0 for Support (Session 46, C1)
-            pop = effective_population(state, sid, _map_population(sid))
+            pop = _map_population(sid)
             if lvl > 0:
-                sup += lvl * pop
+                # §1.9 suppresses Support in a Blockaded City, but
+                # Opposition still uses that City's printed Population.
+                sup += lvl * effective_population(state, sid, pop)
             elif lvl < 0:
                 opp += (-lvl) * pop
         return sup, opp
@@ -439,11 +440,10 @@ class BaseBot:
         except Exception:
             return True  # treat as ineffective if handler crashes
         # §8.3.3 net-shift clause. Total Support − Total Opposition per
-        # §1.6.2/§1.6.3 with §1.9 blockade-zeroed population (C1
-        # precedent, Session 46; effective-pop here Session 67): a level
-        # shift on a Blockaded City moves the tracked difference by 0,
-        # and an Event that Blockades/un-Blockades a City moves it even
-        # with no level change.
+        # §1.6.2/§1.6.3 with §1.9: Blockades suppress Support, never
+        # Opposition. A shift within Opposition therefore changes the
+        # difference even in a Blockaded City; adding/removing a Blockade
+        # changes it only when the City contributes Support.
         def _support_diff(st):
             sup, opp = self._support_opposition_totals(st)
             return sup - opp

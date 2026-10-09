@@ -21,9 +21,30 @@ python -m lod_ai
 Setup wizard:
 1) Pick scenario (1775 Long, 1776 Medium, 1778 Short).
 2) Choose deck method (Standard or Period Events) and RNG seed.
-3) Select number of human players (0–4) and which factions they control.
+3) Select number of human players (0–4) and assign each player a faction or both allied factions. Unassigned factions use bots. A lone player can choose standard solitaire victory rules or the greater-challenge option (§8.8).
 
 During play the CLI always shows the current and upcoming card. Each faction’s turn presents only the actions that are legal for that slot (Pass, Event, Command/Special). Commands, spaces, and piece counts are chosen from numbered menus—no free typing. Illegal choices are rejected before they commit.
+
+At any prompt, enter `status` (or `s`) to inspect the board, `save` (or
+`w`) to save, or `undo` (or `u`) to return to the current card's checkpoint.
+Loading resumes the unfinished current card and preserves completed faction
+turns, Passes, eligibility, and the random-number generator. A save during an
+unfinished turn, Brilliant Stroke, or Winter Quarters round restarts that
+operation from its beginning; the save confirmation identifies this boundary.
+Its partial choices and effects are discarded, so Resources and pieces are
+not applied twice. After loading mid-card, undo returns to that resumed
+checkpoint.
+
+At a prompt, type `status` (or `s` / `board`) for the full board, `cards` (or `c`) for current and upcoming card effects, `victory` for population-weighted victory totals, or `history` for the recent log. Turn summaries include pieces, pools, markers, leaders, and eligibility changes. Winter Quarters and Brilliant Stroke effects are displayed before their decisions. Player ownership is saved so combined-side and solitaire victory rules remain correct after loading.
+
+Choose **Command + Special Activity** to execute the activity before, during,
+or after the Command (§4.1). Before lets you use newly gained Resources or
+Available pieces when planning the Command. During offers interruption points
+between Command steps and selected spaces, including before paying for a later
+space. You may execute only one Special Activity; choose **Continue Command**
+to defer it, or **No Special Activity** to decline it. Declining does not grant
+the next faction Event access. Accompanying-command and space restrictions
+apply in every order.
 
 ## LLM harness (play a seat with a language model)
 Let an LLM (or an offline test policy) occupy one or more human seats against the bots:

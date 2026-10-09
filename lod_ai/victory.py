@@ -1,22 +1,8 @@
-"""
-Victory evaluation  (Rules 7.1 & 7.2)
-
-Assumed state keys
-------------------
-state["support"]            : int   # 0-30   (spaces at Active/Passive Support)
-state["opposition"]         : int   # 0-30   (spaces at Active/Passive Opposition)
-state["cbc"]                : int   # Cumulative British Casualties
-state["crc"]                : int   # Cumulative Rebellion Casualties
-state["forts"]["PATRIOTS"]  : int   # Patriot Forts on map
-state["villages"]           : int   # Indian Villages on map
-state["treaty_of_alliance"] : bool  # Treaty of Alliance Event resolved?
-
-If your project uses different keys, adjust the look-ups below.
-"""
+"""Victory checks and final scoring under §§7.1–7.3 and solitaire §8.8."""
 
 from lod_ai.rules_consts import BRITISH, PATRIOTS, FRENCH, INDIANS, FORT_PAT, VILLAGE
 from lod_ai.map.adjacency import population as _map_population
-from lod_ai.util.naval import effective_population as _effective_population
+from lod_ai.rules_consts import BLOCKADE
 
 # --------------------------------------------------------------------------- #
 #  Board summarizer – converts the live map into the tallies used below       #
@@ -37,12 +23,13 @@ def _summarize_board(state) -> dict:
     villages          = 0
 
     for sid, sp in state["spaces"].items():
-        lvl = state["support"].get(sid, 0)
+        lvl = state.get("support", {}).get(sid, 0)
         # §1.9: a Blockaded City's population counts 0 for Support
         # (Session 46, C1).
-        pop = _effective_population(state, sid, _map_population(sid))
+        pop = _map_population(sid)
         if lvl > 0:
-            support_total += lvl * pop
+            blockaded = state.get("markers", {}).get(BLOCKADE, {}).get("on_map", ())
+            support_total += lvl * (0 if sid in blockaded else pop)
         elif lvl < 0:
             opposition_total += abs(lvl) * pop
 
@@ -92,99 +79,137 @@ def _indian_margin(st) -> tuple[int, int]:
     cond2 = (st["villages"] - 3) - st["forts"][PATRIOTS]
     return cond1, cond2
 
-# --------------------------------------------------------------------------- #
-# 7.3  Final-Round Scoring                                                    #
-# --------------------------------------------------------------------------- #
-def final_scoring(state) -> None:
-    """
-    Apply Rule 7.3 when the final Winter-Quarters Support Phase ends.
-    Adds the two victory-condition margins for each faction and logs
-    the totals.  Declares the winner (or tie order) per Rule 7.1.
-    """
-    t = _summarize_board(state)
+_ORDER = (PATRIOTS, BRITISH, FRENCH, INDIANS)
+_SOLO_NP_ORDER = (FRENCH, INDIANS, PATRIOTS, BRITISH)
 
-    # §7.3: raw sums without the -10 threshold offset used by §7.2 check()
-    totals = {
-        BRITISH:  sum(_british_margin(t)) + 10,
-        PATRIOTS: sum(_patriot_margin(t)) + 10,
-        FRENCH:   sum(_french_margin(t))  + 10,
-        INDIANS:  sum(_indian_margin(t))  + 10,
+
+def player_groups(state) -> list[tuple[str, ...]]:
+    """Read explicit ownership; never infer a shared player from two factions.
+
+    Older saves selected one faction per player. A single human faction is
+    unambiguously a solitaire game; multiple human factions remain separate
+    unless the user has supplied an ownership map.
+    """
+    humans = set(state.get("human_factions") or ())
+    groups = state.get("player_factions")
+    if groups is None:
+        return [(f,) for f in _ORDER if f in humans]
+    normalized = [tuple(group) for group in groups if group]
+    owned = [f for group in normalized for f in group]
+    if len(owned) != len(set(owned)) or set(owned) != humans:
+        raise ValueError("player_factions must assign every human faction exactly once")
+    for group in normalized:
+        if len(group) > 1 and set(group) not in ({BRITISH, INDIANS}, {PATRIOTS, FRENCH}):
+            raise ValueError("A player may control one faction or both allied factions")
+    return normalized
+
+
+def _totals(tallies) -> dict:
+    # §7.3 prints raw sums without the -10 victory-check threshold.
+    scores = {
+        BRITISH: sum(_british_margin(tallies)) + 10,
+        PATRIOTS: sum(_patriot_margin(tallies)) + 10,
+        FRENCH: sum(_french_margin(tallies)) + 10,
+        INDIANS: sum(_indian_margin(tallies)) + 10,
     }
+    if not tallies["treaty_of_alliance"]:
+        scores[FRENCH] = float("-inf")
+    return scores
 
-    # Treaty requirement: French score only if ToA played
-    if not t["treaty_of_alliance"]:
-        totals[FRENCH] = float("-inf")
 
-    # Rank: higher total wins.  §7.1 ties: "resolved in order of
-    # Non-players, the Patriots, British, French and Indian Factions" —
-    # the NON-PLAYER tier comes first (Session 53/C7: only the faction
-    # order was implemented; a human Patriot tying a non-player French
-    # resolved wrongly).
-    humans = state.get("human_factions", set()) or set()
-    order = [PATRIOTS, BRITISH, FRENCH, INDIANS]
+def _solo_np_winner(totals, humans):
+    bots = [f for f in _SOLO_NP_ORDER if f not in humans]
+    return max(bots, key=lambda f: (totals[f], -_SOLO_NP_ORDER.index(f)))
 
-    def _tie_key(f):
-        return (totals[f], 1 if f not in humans else 0, -order.index(f))
 
-    winner = max(order, key=_tie_key)
-
-    log = "Final Scoring – " + "  ".join(f"{f}:{totals[f]}" for f in order)
-    push_history(state, log)
-
-    # §7.1 placements: rank all four by the same key; "if the Treaty of
-    # Alliance Event was not played, the French come in last place
-    # (regardless of their margin or whether they are a Non-player)" —
-    # already forced by the -inf total above.
-    placement = sorted(order, key=_tie_key, reverse=True)
+def final_scoring(state) -> None:
+    """Resolve final Support Phase scoring, including combined and solo play."""
+    totals = _totals(_summarize_board(state))
+    humans = set(state.get("human_factions") or ())
+    groups = player_groups(state)
+    push_history(state, "Final Scoring – " + "  ".join(f"{f}:{totals[f]}" for f in _ORDER))
+    placement = sorted(_ORDER, key=lambda f: (totals[f], f not in humans,
+                                              -_ORDER.index(f)), reverse=True)
     push_history(state, "Placements (7.1): " + " > ".join(placement))
-    push_history(state, f"Winner: {winner} (Rule 7.3)")
 
-# --------------------------------------------------------------------------- #
-# Public API                                                                  #
-# --------------------------------------------------------------------------- #
+    result: dict = {"type": "final_scoring", "margins": totals, "outcome": "victory"}
+    if len(groups) == 1:
+        group = groups[0]
+        opponent = _solo_np_winner(totals, humans)
+        margin = min(totals[f] for f in group)
+        gap = margin - totals[opponent]
+        result.update(gap=gap, human_won=gap >= 6)
+        # §8.8 requires the highest margin; the printed stalemate band is
+        # 1–5. A tied/lower player margin loses (Non-player wins ties).
+        if gap <= 0:
+            winner = opponent
+        elif gap <= 5:
+            result.update(winner=None, outcome="stalemate")
+            state["victory_result"] = result
+            push_history(state, f"Stalemate: player margin lead {gap} (Rule 7.3; 8.8)")
+            return
+        else:
+            winner = " + ".join(group)
+        push_history(state, f"One-player margin lead: {gap} (8.8)")
+    else:
+        # §7.3: a player controlling a side scores its LOWER margin.
+        competitors = [(f,) for f in _ORDER if f not in humans] + groups
+        def rank(group):
+            return (min(totals[f] for f in group),
+                    all(f not in humans for f in group),
+                    -min(_ORDER.index(f) for f in group))
+        winner = " + ".join(max(competitors, key=rank))
+    result["winner"] = winner
+    state["victory_result"] = result
+    push_history(state, f"Winner: {winner} (Rule 7.3{' / 8.8' if len(groups) == 1 else ''})")
+
+
 def check(state) -> bool:
-    """
-    Return True if *any* faction meets both of its victory conditions
-    at the Winter-Quarters Victory-Check Phase (Rule 6.1 & 7.2).
-    Logs margins for debugging.
-
-    Final-round Support-Phase scoring (Rule 7.3) will be added later.
-    """
+    """Resolve a Winter Quarters Victory Check, returning whether play ends."""
     tallies = _summarize_board(state)
-    brit1, brit2 = _british_margin(tallies)
-    pat1, pat2   = _patriot_margin(tallies)
-    fre1, fre2   = _french_margin(tallies)
-    ind1, ind2   = _indian_margin(tallies)
-
-    log = (
-        f"Victory Check  –  "
-        f"BRI({brit1},{brit2})  PAT({pat1},{pat2})  "
-        f"FRE({fre1},{fre2})  IND({ind1},{ind2})"
-    )
-    push_history(state, log)
-
-    british_win = (brit1 > 0 and brit2 > 0)
-    patriot_win = (pat1 > 0 and pat2 > 0)
-    french_win  = (
-        tallies["treaty_of_alliance"]
-        and fre1 > 0 and fre2 > 0
-    )
-    indian_win  = (ind1 > 0 and ind2 > 0)
-
-    winners = [f for f, w in ((BRITISH, british_win), (PATRIOTS, patriot_win),
-                              (FRENCH, french_win), (INDIANS, indian_win)) if w]
-    if winners:
-        humans = state.get("human_factions", set()) or set()
-        # §7.1 tie order among simultaneous passers: Non-players first,
-        # then PAT > BRI > FRE > IND (Session 53/C7).
-        order = [PATRIOTS, BRITISH, FRENCH, INDIANS]
-        winners.sort(key=lambda f: (0 if f not in humans else 1,
-                                    order.index(f)))
-        push_history(state, f"Victory Check passed by {winners[0]} (7.2)")
-        # §7.1: "If any Non-player Faction passes a victory check, all
-        # players lose equally."
-        if humans and winners[0] not in humans:
-            push_history(state,
-                         "Non-player victory — all players lose equally (7.1)")
-
-    return british_win or patriot_win or french_win or indian_win
+    margins = {BRITISH: _british_margin(tallies),
+               PATRIOTS: _patriot_margin(tallies),
+               FRENCH: _french_margin(tallies),
+               INDIANS: _indian_margin(tallies)}
+    push_history(state, "Victory Check  –  " + "  ".join(
+        f"{label}({margins[f][0]},{margins[f][1]})"
+        for label, f in (("BRI", BRITISH), ("PAT", PATRIOTS),
+                         ("FRE", FRENCH), ("IND", INDIANS))))
+    passed = {f for f, (first, second) in margins.items() if first > 0 and second > 0
+              and (f != FRENCH or tallies["treaty_of_alliance"])}
+    humans = set(state.get("human_factions") or ())
+    groups = player_groups(state)
+    totals = _totals(tallies)
+    bot_passes = passed - humans
+    solo = len(groups) == 1
+    difficulty_loss = (solo and state.get("solo_difficulty", False)
+                       and state.get("winter_quarters_count", 0) >= 2
+                       and min(totals[f] for f in groups[0]) <
+                           max(totals[f] for f in _ORDER if f not in humans))
+    if solo:
+        if not bot_passes and not difficulty_loss:
+            return False  # §8.8: the lone player never wins a Victory Phase.
+        winner = _solo_np_winner(totals, humans)
+    elif bot_passes:
+        winner = min(bot_passes, key=_ORDER.index)
+    else:
+        # §7.2 Combined Victory requires BOTH factions' conditions.
+        winning_groups = [group for group in groups if set(group) <= passed]
+        if not winning_groups:
+            return False
+        group = min(winning_groups, key=lambda g: min(_ORDER.index(f) for f in g))
+        winner = " + ".join(group)
+    state["victory_result"] = {"type": "victory_check", "outcome": "victory",
+                               "winner": winner, "margins": totals,
+                               "human_won": not (bot_passes or difficulty_loss)}
+    if bot_passes:
+        passer = min(bot_passes, key=_ORDER.index)
+        push_history(state, f"Victory Check passed by {passer} (7.2)")
+    elif difficulty_loss:
+        push_history(state, "One-player difficulty: Non-player margin exceeds player margin (8.8)")
+    else:
+        push_history(state, f"Victory Check passed by {winner} (7.2)")
+    if humans and (bot_passes or difficulty_loss):
+        push_history(state, "Non-player victory — all players lose equally (7.1)")
+    push_history(state, f"Winner: {winner} (Rule {'8.8' if solo else '7.2'})")
+    return True

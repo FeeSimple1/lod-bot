@@ -142,6 +142,12 @@ def _record_wq_margins(game_stats: Dict[str, Any], state: Dict[str, Any]) -> Non
 
 def _detect_winner(game_stats: Dict[str, Any], state: Dict[str, Any]) -> None:
     """Parse history for winner and victory type."""
+    result = state.get("victory_result")
+    if result:
+        game_stats["winner"] = result.get("winner") or "Stalemate"
+        game_stats["victory_type"] = result.get("type", "unknown")
+        game_stats["outcome"] = result.get("outcome", "victory")
+        return
     history = state.get("history", [])
     for entry in reversed(history[-40:]):
         msg = entry.get("msg", "") if isinstance(entry, dict) else str(entry)
@@ -209,7 +215,7 @@ def _battle_candidates(state: Dict[str, Any], faction: str) -> List[str]:
 def _movable_sources(state: Dict[str, Any], faction: str, bring_escorts: bool = False) -> Dict[str, Dict[str, int]]:
     tags = {
         RC.BRITISH: [RC.REGULAR_BRI, RC.TORY, RC.WARPARTY_U, RC.WARPARTY_A] if bring_escorts else [RC.REGULAR_BRI],
-        RC.PATRIOTS: [RC.REGULAR_PAT, RC.MILITIA_U, RC.MILITIA_A, RC.WARPARTY_U, RC.WARPARTY_A] + ([RC.REGULAR_FRE] if bring_escorts else []),
+        RC.PATRIOTS: [RC.REGULAR_PAT, RC.MILITIA_U, RC.MILITIA_A] + ([RC.REGULAR_FRE] if bring_escorts else []),
         RC.INDIANS: [RC.WARPARTY_U, RC.WARPARTY_A],
         RC.FRENCH: [RC.REGULAR_FRE] + ([RC.REGULAR_PAT] if bring_escorts else []),
     }[faction]
@@ -249,6 +255,12 @@ def _log_empty_menu(state: Dict[str, Any], faction: str, command: str) -> None:
 def _march_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
     bring = choose_one("Bring escorts?", [("No", False), ("Yes", True)])
     sources = _movable_sources(engine.state, faction, bring_escorts=bring)
+    if faction == RC.BRITISH and not (engine.ctx.get("common_cause")
+                                      or engine.state.get("_human_sa_pending")):
+        for pieces in sources.values():
+            pieces.pop(RC.WARPARTY_U, None)
+            pieces.pop(RC.WARPARTY_A, None)
+        sources = {sid: pieces for sid, pieces in sources.items() if pieces}
     if not sources:
         _log_empty_menu(engine.state, faction, "March")
         raise ValueError("No pieces available to March.")
@@ -257,7 +269,8 @@ def _march_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
     filtered_out = []
     for src in sources:
         for dst in all_space_ids:
-            if map_adj.is_adjacent(src, dst):
+            if src != dst and (map_adj.is_adjacent(src, dst)
+                               or march._city_network_legal(engine.state, faction, src, dst)):
                 if faction == RC.INDIANS and map_adj.space_type(dst) == "City":
                     filtered_out.append({"space": dst, "reason": "Indians cannot march to City"})
                     continue
@@ -274,7 +287,9 @@ def _march_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
     )
     move_plan: List[Dict[str, Any]] = []
     for dest in dests:
-        origin_candidates = [s for s in sources if map_adj.is_adjacent(s, dest)]
+        origin_candidates = [s for s in sources if s != dest and any(sources[s].values())
+                             and (map_adj.is_adjacent(s, dest)
+                                  or march._city_network_legal(engine.state, faction, s, dest))]
         origins = choose_multiple(
             f"Select origins marching to {dest}:",
             [(o, o) for o in origin_candidates],
@@ -286,6 +301,7 @@ def _march_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
                 count = choose_count(f"Move how many {tag} from {origin} to {dest}?", min_val=0, max_val=available)
                 if count:
                     pieces[tag] = count
+                    sources[origin][tag] -= count
             if pieces:
                 move_plan.append({"src": origin, "dst": dest, "pieces": pieces})
     if not move_plan:
@@ -358,35 +374,80 @@ def _battle_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
 
 
 def _rally_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
-    all_spaces = list(engine.state.get("spaces", {}).keys())
-    filtered_out = []
-    valid = []
-    for sid in sorted(all_spaces):
-        sup = engine.state.get("support", {}).get(sid, 0)
-        if sup >= RC.ACTIVE_SUPPORT:
-            filtered_out.append({"space": sid, "reason": f"already Active Support ({sup})"})
-        else:
-            valid.append((sid, sid))
-    _log_wizard_filter(engine.state, "Rally", len(all_spaces), len(valid), filtered_out)
+    state = engine.state
+    valid = _space_options(state, lambda sid, sp:
+        map_adj.space_type(sid) in ("City", "Colony")
+        and state.get("support", {}).get(sid, RC.NEUTRAL) != RC.ACTIVE_SUPPORT)
     if not valid:
-        _log_empty_menu(engine.state, faction, "Rally")
         raise ValueError("No spaces available for Rally.")
-    selected = choose_multiple(
-        "Select Rally spaces:",
-        valid,
-        min_sel=1,
-        max_sel=1 if limited else None,
-    )
-    build_fort = choose_one("Build a Fort in any selected space?", [("No", False), ("Yes", True)])
-    build_set = set(selected) if build_fort else set()
-    return lambda s, c: rally.execute(
-        s,
-        faction,
-        c,
-        selected,
-        build_fort=build_set if build_set else None,
-        limited=limited,
-    )
+    selected = choose_multiple("Select Rally spaces:", valid, min_sel=1,
+                               max_sel=1 if limited else None)
+    place_one, build_fort, bulk_place, move_plan = set(), set(), {}, []
+    remaining_militia = state["available"].get(RC.MILITIA_U, 0)
+    remaining_forts = state["available"].get(RC.FORT_PAT, 0)
+    remaining = {sid: sp.get(RC.MILITIA_U, 0) + sp.get(RC.MILITIA_A, 0)
+                 for sid, sp in state["spaces"].items()}
+    for sid in selected:
+        sp = state["spaces"][sid]
+        forts = sp.get(RC.FORT_PAT, 0)
+        units = remaining[sid] + sp.get(RC.REGULAR_PAT, 0)
+        bases = forts + sp.get(RC.FORT_BRI, 0) + sp.get(RC.VILLAGE, 0)
+        choices = []
+        if remaining_militia:
+            choices.append(("Place 1 Militia", "one"))
+        if not forts and units >= 2 and remaining_forts and bases < 2:
+            choices.append(("Replace 2 units with a Fort", "fort"))
+        if forts:
+            if remaining_militia:
+                choices.append(("Place Militia up to Forts + Population", "bulk"))
+            choices.append(("Move Militia here and turn all Underground", "regroup"))
+        if not choices:
+            raise ValueError(f"No Rally action available in {sid}.")
+        action = choose_one_or_back(f"Rally action in {sid}:", choices)
+        if action == "one":
+            place_one.add(sid)
+            remaining_militia -= 1
+        elif action == "fort":
+            build_fort.add(sid)
+            remaining_forts -= 1
+        elif action == "bulk":
+            n = choose_count(f"Militia to place in {sid}:", min_val=1,
+                max_val=min(remaining_militia, forts + map_adj.population(sid)))
+            bulk_place[sid] = n
+            remaining_militia -= n
+        else:
+            sources = [(src, src) for src, n in remaining.items()
+                       if n and map_adj.is_adjacent(src, sid)]
+            origins = choose_multiple(f"Move Militia into {sid} from:", sources, min_sel=0) if sources else []
+            # An explicit zero move selects the regroup alternative even if
+            # no Militia move; §3.3.1 still flips all Militia already there.
+            move_plan.append((sid, sid, 0))
+            for src in origins:
+                n = choose_count(f"Militia from {src} to {sid}:", min_val=1,
+                                 max_val=remaining[src])
+                remaining[src] -= n
+                move_plan.append((src, sid, n))
+    promotion_spaces = [sid for sid in selected
+                        if state["spaces"][sid].get(RC.FORT_PAT, 0) or sid in build_fort]
+    promote_space, promote_n = None, None
+    if promotion_spaces and state["available"].get(RC.REGULAR_PAT, 0):
+        promote_space = choose_one_or_back("Replace Militia with Continentals in one Rally space?",
+            [("No promotion", False)] + [(sid, sid) for sid in promotion_spaces])
+        if promote_space:
+            existing = remaining.get(promote_space, 0)
+            new = (1 if promote_space in place_one else bulk_place.get(promote_space, 0))
+            incoming = sum(n for _, dst, n in move_plan if dst == promote_space)
+            if promote_space in build_fort:
+                existing = max(0, existing - 2)
+            maximum = min(existing + new + incoming, state["available"].get(RC.REGULAR_PAT, 0))
+            if maximum < 1:
+                raise ValueError("No Militia will be available to promote there.")
+            promote_n = choose_count("Militia to replace with Continentals:", min_val=1,
+                                     max_val=maximum)
+    return lambda s, c: rally.execute(s, faction, c, selected,
+        place_one=place_one, build_fort=build_fort, bulk_place=bulk_place,
+        move_plan=move_plan, promote_space=promote_space, promote_n=promote_n,
+        limited=limited)
 
 
 def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
@@ -544,82 +605,83 @@ def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
 
 
 def _muster_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
-    options = _space_options(engine.state)
-    if not options:
-        _log_empty_menu(engine.state, faction, "Muster")
-        raise ValueError("No spaces available for Muster.")
+    state = engine.state
     if faction == RC.BRITISH:
-        # Filter to spaces adjacent to British Regulars/Forts (meaningful
-        # for Tory placement or already containing British power).
-        brit_options = []
-        for label, sid in options:
-            sp = engine.state["spaces"].get(sid, {})
-            has_brit = sp.get(RC.REGULAR_BRI, 0) > 0 or sp.get(RC.FORT_BRI, 0) > 0
-            adj_brit = any(
-                engine.state["spaces"].get(nbr, {}).get(RC.REGULAR_BRI, 0) > 0
-                or engine.state["spaces"].get(nbr, {}).get(RC.FORT_BRI, 0) > 0
-                for nbr in engine.state.get("spaces", {})
-                if map_adj.is_adjacent(sid, nbr)
-            )
-            if has_brit or adj_brit:
-                brit_options.append((label, sid))
-        if not brit_options:
-            _log_empty_menu(engine.state, faction, "Muster")
-            raise ValueError("No spaces adjacent to British Regulars or Forts for Muster.")
-        selected = choose_multiple(
-            "Select Muster spaces:",
-            brit_options,
-            min_sel=1,
-            max_sel=1 if limited else None,
-        )
-        available_regs = engine.state["available"].get(RC.REGULAR_BRI, 0)
-        if available_regs > 0:
-            reg_space = choose_one_or_back("Place Regulars in which space?", [(s, s) for s in selected])
-            reg_num = choose_count("How many British Regulars to place? (max 6)", min_val=1, max_val=min(6, available_regs))
-            regular_plan = {"space": reg_space, "n": reg_num}
-        else:
-            print("(No British Regulars available to place.)")
-            regular_plan = None
-        tory_plan: Dict[str, int] = {}
-        for sp in selected:
-            max_tory = 2
-            count = choose_count(f"Tories to place in {sp} (0-{max_tory}):", min_val=0, max_val=max_tory)
+        options = _space_options(state, lambda sid, sp:
+            muster._is_legal_regular_dest(state, sid)
+            or (map_adj.space_type(sid) in ("City", "Colony")
+                and state.get("support", {}).get(sid, RC.NEUTRAL) != RC.ACTIVE_OPPOSITION
+                and muster._is_adjacent_to_brit_power(state, sid)))
+        if not options:
+            raise ValueError("No qualifying Muster spaces.")
+        selected = choose_multiple("Select Muster spaces:", options, min_sel=1,
+                                   max_sel=1 if limited else None)
+        regular_plan = None
+        available = state["available"].get(RC.REGULAR_BRI, 0)
+        reg_options = [(sid, sid) for sid in selected if muster._is_legal_regular_dest(state, sid)]
+        preview = deepcopy(state)
+        if available and reg_options:
+            sid = choose_one_or_back("Place Regulars in which space?",
+                [("Do not place Regulars", False)] + reg_options)
+            if sid:
+                n = choose_count("How many British Regulars to place? (max 6)",
+                                 min_val=1, max_val=min(6, available))
+                regular_plan = {"space": sid, "n": n}
+                preview["spaces"][sid][RC.REGULAR_BRI] = preview["spaces"][sid].get(RC.REGULAR_BRI, 0) + n
+        tory_plan = {}
+        available_tories = state["available"].get(RC.TORY, 0)
+        for sid in selected:
+            sup = state.get("support", {}).get(sid, RC.NEUTRAL)
+            if (map_adj.space_type(sid) not in ("City", "Colony")
+                    or sup == RC.ACTIVE_OPPOSITION
+                    or not muster._is_adjacent_to_brit_power(preview, sid)):
+                continue
+            maximum = min(available_tories, 1 if sup == RC.PASSIVE_OPPOSITION else 2)
+            count = choose_count(f"Tories to place in {sid}:", min_val=0, max_val=maximum)
             if count:
-                tory_plan[sp] = count
-        fort_or_loyalty = choose_one(
-            "Fort or Reward Loyalty?",
-            [("None", "none"), ("Build Fort", "fort"), ("Reward Loyalty", "loyalty")],
-        )
-        reward_levels = 0
-        build_fort = False
-        if fort_or_loyalty == "fort":
-            build_fort = True
-        elif fort_or_loyalty == "loyalty":
-            reward_levels = choose_count("Reward Loyalty levels (0-2):", min_val=0, max_val=2)
-        return lambda s, c: muster.execute(
-            s,
-            faction,
-            c,
-            selected,
-            regular_plan=regular_plan,
-            tory_plan=tory_plan or None,
-            build_fort=build_fort,
-            reward_levels=reward_levels,
-        )
-    else:
-        # §3.5.3: French Muster may select one Colony or City with
-        # Rebellion Control, or the West Indies.
-        french_options = []
-        for label, sid in options:
-            if sid == RC.WEST_INDIES_ID:
-                french_options.append((label, sid))
-            elif engine.state.get("control", {}).get(sid) == "REBELLION":
-                french_options.append((label, sid))
-        if not french_options:
-            _log_empty_menu(engine.state, faction, "Muster")
-            raise ValueError("No spaces with Rebellion Control (or West Indies) for French Muster.")
-        selected = [choose_one_or_back("Select City/Colony for French Muster:", french_options)]
-        return lambda s, c: muster.execute(s, faction, c, selected)
+                tory_plan[sid] = count
+                available_tories -= count
+                preview["spaces"][sid][RC.TORY] = preview["spaces"][sid].get(RC.TORY, 0) + count
+        from lod_ai.util.caps import refresh_control
+        refresh_control(preview)
+        fort_options, loyalty_options = [], []
+        for sid in selected:
+            sp = preview["spaces"][sid]
+            bases = sp.get(RC.FORT_BRI, 0) + sp.get(RC.FORT_PAT, 0) + sp.get(RC.VILLAGE, 0)
+            if (sp.get(RC.REGULAR_BRI, 0) + sp.get(RC.TORY, 0) >= 3
+                    and bases < 2 and state["available"].get(RC.FORT_BRI, 0)):
+                fort_options.append((sid, sid))
+            if (sp.get(RC.REGULAR_BRI, 0) and sp.get(RC.TORY, 0)
+                    and preview["control"].get(sid) == RC.BRITISH
+                    and preview.get("support", {}).get(sid, RC.NEUTRAL) < RC.ACTIVE_SUPPORT):
+                loyalty_options.append((sid, sid))
+        step3 = [("None", "none")]
+        if fort_options:
+            step3.append(("Build Fort", "fort"))
+        if loyalty_options:
+            step3.append(("Reward Loyalty", "loyalty"))
+        action = choose_one("Fort or Reward Loyalty?", step3)
+        fort_space, reward_levels = None, 0
+        if action != "none":
+            fort_space = choose_one_or_back("Muster space for Fort or Reward Loyalty:",
+                fort_options if action == "fort" else loyalty_options)
+            if action == "loyalty":
+                reward_levels = choose_count("Reward Loyalty levels:", min_val=1,
+                    max_val=RC.ACTIVE_SUPPORT - preview["support"].get(fort_space, RC.NEUTRAL))
+        return lambda s, c: muster.execute(s, faction, c, selected,
+            regular_plan=regular_plan, tory_plan=tory_plan, build_fort=action == "fort",
+            reward_levels=reward_levels, fort_space=fort_space)
+    options = _space_options(state, lambda sid, sp:
+        sid == RC.WEST_INDIES_ID or (map_adj.space_type(sid) in ("City", "Colony")
+                                    and state.get("control", {}).get(sid) == "REBELLION"))
+    if not options:
+        raise ValueError("No spaces with Rebellion Control (or West Indies) for French Muster.")
+    sid = choose_one_or_back("Select City/Colony for French Muster:", options)
+    build_fort = False
+    if sid != RC.WEST_INDIES_ID:
+        build_fort = choose_one("Replace two French Regulars with a Patriot Fort?",
+                                [("No", False), ("Yes", True)])
+    return lambda s, c: muster.execute(s, faction, c, [sid], french_fort=build_fort)
 
 
 def _scout_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
@@ -664,7 +726,7 @@ def _raid_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict,
     # §3.4.4: pay one Resource per Province -- gate and cap on affordability
     # (free actions, e.g. during a Brilliant Stroke, bypass via bs_free).
     _res = state.get("resources", {}).get(faction, 0)
-    if _res < 1 and not state.get("bs_free"):
+    if _res < 1 and not state.get("bs_free") and not state.get("_human_sa_pending"):
         _log_empty_menu(state, faction, "Raid")
         raise ValueError("Raid requires at least 1 Resource (1 per Province).")
     support_ok = {RC.ACTIVE_OPPOSITION, RC.PASSIVE_OPPOSITION}
@@ -711,7 +773,7 @@ def _raid_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict,
         raise ValueError("No legal Provinces for Raid.")
 
     _cap = 1 if limited else 3
-    if not state.get("bs_free"):
+    if not state.get("bs_free") and not state.get("_human_sa_pending"):
         _cap = min(_cap, _res)
     selected = choose_multiple(
         "Select Raid Provinces:",
@@ -748,38 +810,46 @@ def _raid_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict,
 
 
 def _garrison_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
-    all_spaces = list(engine.state.get("spaces", {}).keys())
-    filtered_out = []
-    src_options = []
-    for sid in sorted(all_spaces):
-        sp = engine.state["spaces"][sid]
-        if sp.get(RC.REGULAR_BRI, 0) > 0:
-            src_options.append((sid, sid))
-        else:
-            filtered_out.append({"space": sid, "reason": "no British Regulars"})
-    _log_wizard_filter(engine.state, "Garrison", len(all_spaces), len(src_options), filtered_out)
-    if not src_options:
-        _log_empty_menu(engine.state, faction, "Garrison")
-        raise ValueError("No Regulars available for Garrison.")
-    moves: Dict[str, Dict[str, int]] = {}
-    max_moves = 1 if limited else 3
-    num_moves = choose_count("Number of Garrison moves:", min_val=1, max_val=max_moves)
-    for idx in range(num_moves):
-        src = choose_one_or_back(f"Garrison move {idx+1} - Source space:", src_options)
-        # §3.2.2: destinations are Cities that are not Blockaded.
-        blockaded = engine.state.get("markers", {}).get(RC.BLOCKADE, {})
-        blockaded_on = blockaded.get("on_map", set()) if isinstance(blockaded, dict) else set()
-        dst_options = _space_options(
-            engine.state,
-            lambda sid, _sp: map_adj.space_type(sid) == "City"
-            and sid not in blockaded_on)
-        if not dst_options:
-            raise ValueError("No un-Blockaded destination City for Garrison.")
-        dst = choose_one_or_back(f"Garrison move {idx+1} - Destination City:", dst_options)
-        max_reg = engine.state["spaces"][src].get(RC.REGULAR_BRI, 0)
-        qty = choose_count(f"Regulars to move from {src} to {dst}:", min_val=1, max_val=max_reg)
-        moves.setdefault(src, {})[dst] = qty
-    return lambda s, c: garrison.execute(s, faction, c, moves, limited=limited)
+    state = engine.state
+    if state.get("fni_level", 0) == 3:
+        raise ValueError("Garrison is unavailable at FNI level 3.")
+    cities = _space_options(state, lambda sid, sp:
+                           map_adj.is_city(sid) and not garrison._is_blockaded(sid, state))
+    if not cities:
+        raise ValueError("No un-Blockaded Cities for Garrison.")
+    destinations = choose_multiple("Select Garrison destination Cities:", cities,
+                                   min_sel=1, max_sel=1 if limited else None)
+    remaining = {sid: sp.get(RC.REGULAR_BRI, 0) for sid, sp in state["spaces"].items()
+                 if not garrison._is_blockaded(sid, state)}
+    moves = {}
+    for dst in destinations:
+        # Zero-move selection still permits locating/displacing Militia there.
+        moves.setdefault(dst, {})[dst] = 0
+        options = [(sid, sid) for sid, n in remaining.items() if n and sid != dst]
+        origins = choose_multiple(f"Garrison origins for {dst}:", options, min_sel=0) if options else []
+        for src in origins:
+            qty = choose_count(f"Regulars to move from {src} to {dst}:", min_val=1,
+                               max_val=remaining[src])
+            moves.setdefault(src, {})[dst] = qty
+            remaining[src] -= qty
+    preview = deepcopy(state)
+    preview["bs_free"] = True
+    garrison.execute(preview, faction, {}, moves, limited=limited)
+    displace_options = [(sid, sid) for sid, _ in cities
+        if (not limited or sid in destinations)
+        and preview.get("control", {}).get(sid) == RC.BRITISH
+        and not preview["spaces"][sid].get(RC.FORT_PAT, 0)
+        and any(preview["spaces"][sid].get(tag, 0)
+                for tag in (RC.REGULAR_PAT, RC.REGULAR_FRE, RC.MILITIA_U, RC.MILITIA_A))]
+    displace_city, target = None, None
+    if displace_options:
+        displace_city = choose_one_or_back("Displace Rebellion units from one City?",
+            [("No displacement", False)] + displace_options)
+        if displace_city:
+            target = choose_one_or_back("Destination for displaced Rebellion units:",
+                _space_options(state, lambda sid, sp: map_adj.is_adjacent(displace_city, sid)))
+    return lambda s, c: garrison.execute(s, faction, c, moves, limited=limited,
+        displace_city=displace_city, displace_target=target)
 
 
 def _rabble_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
@@ -791,8 +861,10 @@ def _rabble_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
     for sid in sorted(all_spaces):
         sp = state["spaces"][sid]
         ctrl = state.get("control", {}).get(sid)
-        if ctrl != "REBELLION":
-            filtered_out.append({"space": sid, "reason": f"control={ctrl}, not REBELLION"})
+        if map_adj.space_type(sid) not in ("City", "Colony"):
+            continue
+        if ctrl != "REBELLION" and not sp.get(RC.MILITIA_U, 0):
+            filtered_out.append({"space": sid, "reason": "neither Rebellion Control nor Underground Militia"})
             continue
         has_patriot_piece = any(
             sp.get(tag, 0) > 0
@@ -839,162 +911,192 @@ def _hortelez_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[d
 # Special activities
 # ---------------------------------------------------------------------------
 
-def _special_wizard(state: Dict[str, Any], faction: str) -> Callable[[dict, dict], Any] | None:
+def _validate_human_special(state: dict, ctx: dict, faction: str,
+                            *, final: bool = False) -> None:
+    """Enforce accompanying-command restrictions in either execution order."""
+    special = ctx.get("_human_special")
+    if not special or state.get("bs_free"):
+        return
+    name, spaces = special["name"], set(special["spaces"])
+    command = ctx.get("_planned_command") or state.get("_turn_command")
+    selected = set(ctx.get("_command_selected_spaces", ()))
+    if final:
+        selected |= set(state.get("_turn_affected_spaces", ()))
+    if name == "COMMON_CAUSE":
+        if command and command not in {"MARCH", "BATTLE"}:
+            raise ValueError("Common Cause may accompany only March or Battle.")
+        if final:
+            allowed = (set(state.get("_turn_march_sources", ()))
+                       if command == "MARCH" else selected)
+            if not spaces <= allowed:
+                raise ValueError("Common Cause must be used in its accompanying March/Battle spaces.")
+    if name == "PLUNDER":
+        if command and command != "RAID":
+            raise ValueError("Plunder may accompany only Raid.")
+        if selected and not spaces <= selected:
+            raise ValueError("Plunder must take place in a selected Raid Province.")
+    if name in {"PARTISANS", "SKIRMISH"} and command == "BATTLE" and spaces & selected:
+        raise ValueError(f"{name} cannot occur in a Battle space.")
+    if name == "SKIRMISH" and faction in (RC.BRITISH, RC.FRENCH):
+        if command == "MUSTER" and spaces & selected:
+            raise ValueError("Skirmish cannot occur in a Muster space.")
+        if faction == RC.BRITISH and command == "GARRISON" and spaces & selected:
+            raise ValueError("Skirmish cannot occur in a Garrison destination.")
+
+
+def _special_wizard(state: Dict[str, Any], faction: str,
+                    ctx: dict | None = None) -> Callable[[dict, dict], Any] | None:
+    ctx = ctx if ctx is not None else {}
     sa_log = state.setdefault("_cli_sa_log", [])
+    command = ctx.get("_planned_command") or state.get("_turn_command")
 
-    def _legal_space_list(sa_name: str, builder: Callable[[dict, dict, str], Any]) -> List[Tuple[str, str]]:
-        legal: List[Tuple[str, str]] = []
+    def legal(name, sid, execute):
+        test_state, test_ctx = deepcopy(state), deepcopy(ctx)
+        test_ctx.pop("_command_checkpoint", None)
+        test_ctx["_human_special"] = {"name": name, "spaces": [sid]}
+        try:
+            _validate_human_special(test_state, test_ctx, faction)
+            execute(test_state, test_ctx)
+        except (ValueError, KeyError) as exc:
+            sa_log.append({"sa_name": name, "space": sid,
+                           "exception_type": type(exc).__name__,
+                           "exception_message": str(exc)})
+            return False
+        return True
+
+    def remember(c, name, spaces):
+        c["_human_special"] = {"name": name, "spaces": list(spaces)}
+
+    options = []
+
+    def add_strike(label, name, module):
+        legal_options = {}
         for sid, _ in _space_options(state):
-            test_state = deepcopy(state)
-            test_ctx: dict = {}
-            try:
-                builder(test_state, test_ctx, sid)
-            except Exception as exc:  # noqa: BLE001
-                sa_log.append({
-                    "sa_name": sa_name,
-                    "space": sid,
-                    "exception_type": type(exc).__name__,
-                    "exception_message": str(exc),
-                })
-                continue
-            legal.append((sid, sid))
-        return legal
+            opts = [n for n in (1, 2, 3) if legal(
+                name, sid, lambda s, c, sid=sid, n=n:
+                module.execute(s, faction, c, sid, option=n))]
+            if opts:
+                legal_options[sid] = opts
+        if not legal_options:
+            return
+        def run(s, c):
+            sid = choose_one_or_back(f"{label} space:", [(p, p) for p in legal_options])
+            n = choose_one_or_back(f"{label} option:",
+                                  [(f"Option {n}", n) for n in legal_options[sid]])
+            remember(c, name, [sid])
+            return module.execute(s, faction, c, sid, option=n)
+        options.append((label, run))
 
-    options: List[Tuple[str, Callable[[dict, dict], Any] | None]] = []
-
-    if faction == RC.BRITISH:
-        naval_spaces = _legal_space_list("Naval Pressure", lambda s, c, sid: naval_pressure.execute(s, RC.BRITISH, c, city_choice=sid))
-        if naval_spaces:
-            options.append((
-                "Naval Pressure",
-                lambda s, c: naval_pressure.execute(s, RC.BRITISH, c, city_choice=choose_one_or_back("Select City for Naval Pressure:", naval_spaces)),
-            ))
-        skirmish_spaces = _legal_space_list("Skirmish", lambda s, c, sid: skirmish.execute(s, RC.BRITISH, c, sid, option=1))
-        if skirmish_spaces:
-            options.append((
-                "Skirmish",
-                lambda s, c: skirmish.execute(s, RC.BRITISH, c, choose_one_or_back("Skirmish space:", skirmish_spaces), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3)),
-            ))
-        cc_spaces = _legal_space_list("Common Cause", lambda s, c, sid: common_cause.execute(s, RC.BRITISH, c, [sid]))
-        if cc_spaces:
-            options.append((
-                "Common Cause",
-                lambda s, c: common_cause.execute(
-                    s,
-                    RC.BRITISH,
-                    c,
-                    [v for v in choose_multiple("Spaces for Common Cause:", cc_spaces, min_sel=1)],
-                ),
-            ))
-    elif faction == RC.PATRIOTS:
-        part_spaces = _legal_space_list("Partisans", lambda s, c, sid: partisans.execute(s, RC.PATRIOTS, c, sid, option=1))
-        if part_spaces:
-            options.append((
-                "Partisans",
-                lambda s, c: partisans.execute(s, RC.PATRIOTS, c, choose_one_or_back("Partisans space:", part_spaces), option=choose_count("Option (1-3):", min_val=1, max_val=3)),
-            ))
-        persuasion_spaces = _legal_space_list("Persuasion", lambda s, c, sid: persuasion.execute(s, RC.PATRIOTS, c, spaces=[sid]))
-        if persuasion_spaces:
-            options.append((
-                "Persuasion",
-                lambda s, c: persuasion.execute(
-                    s,
-                    RC.PATRIOTS,
-                    c,
-                    spaces=[v for v in choose_multiple("Spaces for Persuasion (up to 3):", persuasion_spaces, min_sel=1, max_sel=3)],
-                ),
-            ))
-        skirmish_spaces = _legal_space_list("Skirmish", lambda s, c, sid: skirmish.execute(s, RC.PATRIOTS, c, sid, option=1))
-        if skirmish_spaces:
-            options.append((
-                "Skirmish",
-                lambda s, c: skirmish.execute(s, RC.PATRIOTS, c, choose_one_or_back("Skirmish space:", skirmish_spaces), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3)),
-            ))
-    elif faction == RC.INDIANS:
-        plunder_spaces = _legal_space_list("Plunder", lambda s, c, sid: plunder.execute(s, RC.INDIANS, c, sid))
-        if plunder_spaces:
-            options.append((
-                "Plunder",
-                lambda s, c: plunder.execute(s, RC.INDIANS, c, choose_one_or_back("Province to Plunder:", plunder_spaces)),
-            ))
-        trade_spaces = _legal_space_list("Trade", lambda s, c, sid: trade.execute(s, RC.INDIANS, c, sid, transfer=0))
+    if faction in (RC.BRITISH, RC.PATRIOTS, RC.FRENCH):
+        add_strike("Skirmish", "SKIRMISH", skirmish)
+    if faction == RC.PATRIOTS:
+        add_strike("Partisans", "PARTISANS", partisans)
+        spaces = [(sid, sid) for sid, _ in _space_options(state)
+                  if legal("PERSUASION", sid, lambda s, c, sid=sid:
+                           persuasion.execute(s, faction, c, spaces=[sid]))]
+        if spaces:
+            def persuade(s, c):
+                selected = choose_multiple("Spaces for Persuasion (up to 3):", spaces,
+                                           min_sel=1, max_sel=3)
+                remember(c, "PERSUASION", selected)
+                return persuasion.execute(s, faction, c, spaces=selected)
+            options.append(("Persuasion", persuade))
+    if faction == RC.BRITISH and (not command or command in {"MARCH", "BATTLE"}):
+        spaces = [(sid, sid) for sid, _ in _space_options(state)
+                  if legal("COMMON_CAUSE", sid, lambda s, c, sid=sid:
+                           common_cause.execute(s, faction, c, [sid]))]
+        if spaces:
+            def cause(s, c):
+                selected = choose_multiple("Spaces for Common Cause:", spaces, min_sel=1)
+                counts = {}
+                for sid in selected:
+                    sp = s["spaces"][sid]
+                    counts[sid] = choose_count(f"War Parties to use in {sid}:", min_val=1,
+                        max_val=sp.get(RC.WARPARTY_U, 0) + sp.get(RC.WARPARTY_A, 0))
+                remember(c, "COMMON_CAUSE", selected)
+                return common_cause.execute(s, faction, c, selected, wp_counts=counts,
+                    mode="BATTLE" if c.get("_planned_command") == "BATTLE" else "MARCH")
+            options.append(("Common Cause", cause))
+    if faction == RC.INDIANS:
+        add_strike("War Path", "WAR_PATH", war_path)
+        if not command or command == "RAID":
+            spaces = [(sid, sid) for sid, _ in _space_options(state)
+                      if legal("PLUNDER", sid, lambda s, c, sid=sid:
+                               plunder.execute(s, faction, dict(c, raid_active=True), sid))]
+            if spaces:
+                def loot(s, c):
+                    sid = choose_one_or_back("Province to Plunder:", spaces)
+                    remember(c, "PLUNDER", [sid])
+                    c["raid_active"] = True
+                    return plunder.execute(s, faction, c, sid)
+                options.append(("Plunder", loot))
+        trade_spaces = [(sid, sid) for sid, _ in _space_options(state)
+                        if legal("TRADE", sid, lambda s, c, sid=sid:
+                                 trade.execute(s, faction, c, sid, transfer=0))]
         if trade_spaces:
-            options.append((
-                "Trade",
-                lambda s, c: trade.execute(s, RC.INDIANS, c, choose_one_or_back("Province to Trade in:", trade_spaces), transfer=choose_count("Resource transfer (0=roll D3):", min_val=0, max_val=3)),
-            ))
-        war_path_spaces = _legal_space_list("War Path", lambda s, c, sid: war_path.execute(s, RC.INDIANS, c, sid, option=1))
-        if war_path_spaces:
-            options.append((
-                "War Path",
-                lambda s, c: war_path.execute(s, RC.INDIANS, c, choose_one_or_back("Province for War Path:", war_path_spaces), option=choose_count("Option (1-3):", min_val=1, max_val=3)),
-            ))
-    elif faction == RC.FRENCH:
-        skirmish_spaces = _legal_space_list("Skirmish", lambda s, c, sid: skirmish.execute(s, RC.FRENCH, c, sid, option=1))
-        if skirmish_spaces:
-            options.append((
-                "Skirmish",
-                lambda s, c: skirmish.execute(s, RC.FRENCH, c, choose_one_or_back("Skirmish space:", skirmish_spaces), option=choose_count("Skirmish option (1-3):", min_val=1, max_val=3)),
-            ))
-        bloc = state.setdefault("markers", {}).setdefault(RC.BLOCKADE, {"pool": 0, "on_map": set()})
-        # Only test cities for Naval Pressure blockade placement
-        city_filter = lambda sid, _sp: map_adj.is_city(sid)
-        naval_spaces = []
-        for sid, _ in _space_options(state, city_filter):
-            test_state = deepcopy(state)
-            test_ctx: dict = {}
-            try:
-                naval_pressure.execute(test_state, RC.FRENCH, test_ctx, city_choice=sid)
-            except Exception:
-                continue
-            naval_spaces.append((sid, sid))
-        if naval_spaces or bloc.get("pool", 0) == 0 and bloc.get("on_map"):
-            def _french_naval_runner(s: dict, c: dict) -> Any:
-                current_bloc = s.setdefault("markers", {}).setdefault(RC.BLOCKADE, {"pool": 0, "on_map": set()})
-                if current_bloc.get("pool", 0) > 0:
-                    city = choose_one_or_back("City to receive Blockade:", naval_spaces)
-                    return naval_pressure.execute(s, RC.FRENCH, c, city_choice=city, rearrange_map=None)
-                existing = list(current_bloc.get("on_map", set()))
-                if not existing:
-                    raise ValueError("No Blockades available for Naval Pressure.")
-                # Only show cities for rearrangement
-                city_opts = _space_options(s, lambda sid, _sp: map_adj.is_city(sid))
-                selection = choose_multiple(
-                    f"Select {len(existing)} cities to host Blockades after rearrange:",
-                    city_opts,
-                    min_sel=len(existing),
-                    max_sel=len(existing),
-                )
-                rearrange_map = {cid: 1 for cid in selection}
-                return naval_pressure.execute(s, RC.FRENCH, c, city_choice=None, rearrange_map=rearrange_map)
-
-            options.append(("Naval Pressure", _french_naval_runner))
-        prep_choices: List[Tuple[str, str]] = []
-        for label, val in [("BLOCKADE", "BLOCKADE"), ("REGULARS", "REGULARS"), ("RESOURCES", "RESOURCES")]:
-            test_state = deepcopy(state)
-            try:
-                preparer.execute(test_state, RC.FRENCH, {}, choice=val)
-            except Exception as exc:  # noqa: BLE001
-                sa_log.append({
-                    "sa_name": "Preparer la Guerre",
-                    "choice": val,
-                    "exception_type": type(exc).__name__,
-                    "exception_message": str(exc),
-                })
-                continue
-            prep_choices.append((label, val))
-        if prep_choices:
-            options.append((
-                "Preparer la Guerre",
-                lambda s, c: preparer.execute(s, RC.FRENCH, c, choice=choose_one_or_back("Choose Preparer option:", prep_choices)),
-            ))
-
+            def exchange(s, c):
+                sid = choose_one_or_back("Province to Trade in:", trade_spaces)
+                transfer = 0
+                if RC.BRITISH in s.get("human_factions", set()):
+                    Engine._bind_provider_faction(RC.BRITISH)
+                    try:
+                        transfer = choose_count("BRITISH: Resources to transfer (0 gives Indians 1 Resource):",
+                            min_val=0, max_val=s["resources"].get(RC.BRITISH, 0))
+                    finally:
+                        Engine._bind_provider_faction(faction)
+                else:
+                    from lod_ai.bots.british_bot import BritishBot
+                    transfer = BritishBot.bot_indian_trade(s)
+                remember(c, "TRADE", [sid])
+                return trade.execute(s, faction, c, sid, transfer=transfer)
+            options.append(("Trade", exchange))
+    if faction in (RC.BRITISH, RC.FRENCH):
+        if faction == RC.BRITISH:
+            candidates = [(sid, sid) for sid, _ in _space_options(state)
+                          if legal("NAVAL_PRESSURE", sid, lambda s, c, sid=sid:
+                                   naval_pressure.execute(s, faction, c, city_choice=sid))]
+            if candidates:
+                def british_naval(s, c):
+                    sid = None
+                    if s.get("toa_played") and s.get("fni_level", 0) > 0:
+                        sid = choose_one_or_back("City whose Blockade returns to West Indies:", candidates)
+                    remember(c, "NAVAL_PRESSURE", [sid] if sid else [])
+                    return naval_pressure.execute(s, faction, c, city_choice=sid)
+                options.append(("Naval Pressure", british_naval))
+        else:
+            bloc = state.get("markers", {}).get(RC.BLOCKADE, {})
+            candidates = [(sid, sid) for sid, _ in _space_options(state)
+                          if map_adj.is_city(sid) and legal("NAVAL_PRESSURE", sid,
+                             lambda s, c, sid=sid: naval_pressure.execute(s, faction, c, city_choice=sid))]
+            existing = bloc.get("on_map", set())
+            rearrange_ok = (state.get("toa_played") and not bloc.get("pool", 0)
+                            and existing and state.get("fni_level", 0) < len(existing))
+            if candidates or rearrange_ok:
+                def french_naval(s, c):
+                    if s["markers"][RC.BLOCKADE].get("pool", 0):
+                        sid = choose_one_or_back("City to receive Blockade:", candidates)
+                        remember(c, "NAVAL_PRESSURE", [sid])
+                        return naval_pressure.execute(s, faction, c, city_choice=sid)
+                    selected = choose_multiple("Cities to host Blockades after rearrange:",
+                        _space_options(s, lambda sid, _: map_adj.is_city(sid)),
+                        min_sel=len(existing), max_sel=len(existing))
+                    remember(c, "NAVAL_PRESSURE", selected)
+                    return naval_pressure.execute(s, faction, c,
+                                                   rearrange_map={sid: 1 for sid in selected})
+                options.append(("Naval Pressure", french_naval))
+            prep = [(label, label) for label in ("BLOCKADE", "REGULARS", "RESOURCES")
+                    if legal("PREPARER", "", lambda s, c, label=label:
+                             preparer.execute(s, faction, c, choice=label))]
+            if prep:
+                def prepare(s, c):
+                    choice = choose_one_or_back("Choose Preparer option:", prep)
+                    remember(c, "PREPARER", [])
+                    return preparer.execute(s, faction, c, choice=choice)
+                options.append(("Preparer la Guerre", prepare))
     if not options:
         return None
-
-    options.append(("No Special Activity", None))
-    choice = choose_one_or_back("Select a Special Activity:", options)
-    return choice
+    choice = choose_one_or_back("Select a Special Activity:", options + [("No Special Activity", False)])
+    return choice if choice else None
 
 
 # ---------------------------------------------------------------------------
@@ -1044,7 +1146,23 @@ def _command_runner_for(faction: str, engine: Engine, limited: bool) -> Callable
         _log_empty_menu(engine.state, faction, "(any command)")
         raise ValueError(f"No commands available for {faction}.")
 
+    special = engine.ctx.get("_human_special", {}).get("name")
+    if special == "COMMON_CAUSE":
+        options = [(label, fn) for label, fn in options if label in {"March", "Battle"}]
+    elif special == "PLUNDER":
+        options = [(label, fn) for label, fn in options if label == "Raid"]
     runner_factory = choose_one_or_back("Select Command:", options)
+    command_names = {
+        _muster_wizard: "MUSTER", _garrison_wizard: "GARRISON",
+        _march_wizard: "MARCH", _battle_wizard: "BATTLE",
+        _rally_wizard: "RALLY", _rabble_wizard: "RABBLE_ROUSING",
+        _gather_wizard: "GATHER", _scout_wizard: "SCOUT", _raid_wizard: "RAID",
+        _agent_mobilization_wizard: "FRENCH_AGENT_MOBILIZATION",
+        _hortelez_wizard: "HORTELEZ",
+    }
+    engine.ctx["_planned_command"] = command_names[runner_factory]
+    from lod_ai.util.command_checkpoint import command_checkpoint
+    command_checkpoint(engine.state, engine.ctx, "Before choosing Command details")
     return runner_factory(engine, faction, limited)
 
 
@@ -1126,34 +1244,79 @@ def _human_decider(faction: str, card: dict, allowed: Dict[str, Any], engine: En
 
             runner = _event_runner
         else:  # command
-            try:
-                command_runner = _command_runner_for(faction, engine, allowed.get("limited_only", False))
+            timing = "after"
+            if choice == "command_special":
+                timing = choose_one("When to execute the Special Activity?", [
+                    ("After the Command", "after"),
+                    ("Before the Command", "before"),
+                    ("During the Command", "during"),
+                ])
 
-                special_runner: Callable[[dict, dict], Any] | None = None
-                if choice == "command_special":
-                    preview_state = deepcopy(engine.state)
-                    preview_ctx = deepcopy(engine.ctx)
-                    try:
-                        command_runner(preview_state, preview_ctx)
-                        special_runner = _special_wizard(preview_state, faction)
-                    except BackException:
-                        raise
-                    except Exception as exc:  # noqa: BLE001
-                        print(f"Unable to add Special Activity: {exc}")
-                        special_runner = None
+            def _runner(state: dict, ctx: dict) -> Any:
+                # Collect choices inside the one sandbox execution. A before-SA
+                # can change Resources/pieces that the Command wizard then sees.
+                set_game_state(state, engine=engine)
+                used = False
+                for key in ("_human_special", "_planned_command", "_command_selected_spaces",
+                            "common_cause", "raid_active"):
+                    ctx.pop(key, None)
+                state["_human_sa_pending"] = choice == "command_special"
 
-                def _runner(state: dict, ctx: dict) -> Any:
-                    result = command_runner(state, ctx)
-                    if special_runner:
-                        special_runner(state, ctx)
-                    return result
+                def use_special(s, c):
+                    nonlocal used
+                    activity = _special_wizard(s, faction, c)
+                    if activity is not None:
+                        before_units = {sid: dict(sp) for sid, sp in s["spaces"].items()}
+                        activity(s, c)
+                        if s.get("_turn_command") == "MARCH":
+                            # Preserve explicit movement choices when this SA
+                            # flips their facing. Only net surviving flips may
+                            # substitute Active for a planned Underground unit.
+                            flips = c.setdefault("_march_sa_flips", {})
+                            for sid, old in before_units.items():
+                                now = s["spaces"][sid]
+                                for ug, active in ((RC.MILITIA_U, RC.MILITIA_A),
+                                                   (RC.WARPARTY_U, RC.WARPARTY_A)):
+                                    n = min(max(0, old.get(ug, 0) - now.get(ug, 0)),
+                                            max(0, now.get(active, 0) - old.get(active, 0)))
+                                    if n:
+                                        flips.setdefault(sid, {})[ug] = n
+                        used = True
+                        s["_human_sa_pending"] = False
+                        _validate_human_special(s, c, faction)
 
-                runner = _runner
-            except BackException:
-                continue
-            except ValueError as exc:
-                print(f"  Cannot execute: {exc}")
-                continue
+                def interruption(s, c, label, space):
+                    if used:
+                        return
+                    location = f" ({space})" if space else ""
+                    now = choose_one(f"{label}{location}: Special Activity now?", [
+                        ("Continue Command", False),
+                        ("Execute Special Activity now", True),
+                    ])
+                    if now:
+                        use_special(s, c)
+
+                try:
+                    if choice == "command_special" and timing == "before":
+                        use_special(state, ctx)
+                    if choice == "command_special" and timing == "during":
+                        ctx["_command_checkpoint"] = interruption
+                    command_runner = _command_runner_for(
+                        faction, engine, allowed.get("limited_only", False))
+                    command_runner(state, ctx)
+                    if choice == "command_special" and not used and timing != "before":
+                        use_special(state, ctx)
+                    _validate_human_special(state, ctx, faction, final=True)
+                    return {"action": "command",
+                            "used_special": bool(state.get("_turn_used_special"))}
+                finally:
+                    ctx.pop("_command_checkpoint", None)
+                    state.pop("_human_sa_pending", None)
+                    for key in ("_human_special", "_planned_command", "_command_selected_spaces",
+                                "common_cause", "raid_active", "_march_sa_flips"):
+                        ctx.pop(key, None)
+
+            runner = _runner
 
         # Take snapshot before simulating for summary
         pre_snap = _snapshot_state(engine.state)
@@ -1162,16 +1325,14 @@ def _human_decider(faction: str, card: dict, allowed: Dict[str, Any], engine: En
             result, legal, sim_state, sim_ctx = engine.simulate_action(faction, card, allowed, runner)
         except BackException:
             continue
+        except UndoException:
+            raise
         except Exception as exc:  # noqa: BLE001
             print(f"Action failed: {exc}")
             continue
+        finally:
+            set_game_state(engine.state, engine=engine)
 
-        # When the player chose "Command + Special Activity", mark
-        # used_special True so the 2nd eligible gets Event access per
-        # the COIN Sequence of Play, regardless of whether the SA
-        # wizard produced an actual activity.
-        if choice == "command_special":
-            result["used_special"] = True
 
         if legal:
             # Show structured summary of what the human action did
@@ -1240,23 +1401,28 @@ def _choose_scenario() -> Tuple[str, str]:
     return scenario, deck_method
 
 
-def _choose_humans() -> List[str]:
+def _choose_players() -> List[List[str]]:
+    """Assign actual human players, including a player controlling a side."""
     num = choose_count("Number of human players:", min_val=0, max_val=4, default=1)
     if num == 0:
         return []
-    factions = [
-        (RC.BRITISH, RC.BRITISH),
-        (RC.PATRIOTS, RC.PATRIOTS),
-        (RC.FRENCH, RC.FRENCH),
-        (RC.INDIANS, RC.INDIANS),
-    ]
-    humans = choose_multiple(
-        "Select human-controlled factions:",
-        factions,
-        min_sel=num,
-        max_sel=num,
-    )
-    return humans
+    available = [RC.BRITISH, RC.PATRIOTS, RC.FRENCH, RC.INDIANS]
+    players = []
+    for index in range(num):
+        choices = [(faction, [faction]) for faction in available]
+        for pair in ([RC.BRITISH, RC.INDIANS], [RC.PATRIOTS, RC.FRENCH]):
+            if (all(f in available for f in pair)
+                    and len(available) - 2 >= num - index - 1):
+                choices.append((" + ".join(pair) + " (one player)", pair))
+        group = choose_one(f"Select factions for human player {index + 1}:", choices)
+        players.append(group)
+        available = [f for f in available if f not in group]
+    return players
+
+
+def _choose_humans() -> List[str]:
+    """Compatibility helper for callers that need only human faction names."""
+    return [faction for group in _choose_players() for faction in group]
 
 
 def _choose_seed() -> int:
@@ -1298,13 +1464,17 @@ def _game_loop(engine: Engine, game_stats: Dict[str, Any]) -> None:
     game_ended = False
 
     while not game_ended:
+        if engine.state.get("victory_result"):
+            _detect_winner(game_stats, engine.state)
+            display_game_end(engine.state)
+            break
         # Auto-save between cards so we can resume from the last card
         try:
             _save_game(engine.state, engine.human_factions, filename="autosave")
         except Exception:  # noqa: BLE001
             pass  # auto-save failure is non-fatal
 
-        card = engine.draw_card()
+        card = engine.next_card()
         if not card:
             print("No more cards in deck.")
             _detect_winner(game_stats, engine.state)
@@ -1335,8 +1505,6 @@ def _game_loop(engine: Engine, game_stats: Dict[str, Any]) -> None:
             except UndoException:
                 # Undo at the Winter Quarters pause: revert to the start of
                 # this card and replay it (state already restored).
-                engine.state.setdefault("deck", []).insert(0, card)
-                engine.state.pop("current_card", None)
                 continue
             if raw in ("status", "s"):
                 display_board_state(engine.state)
@@ -1346,10 +1514,7 @@ def _game_loop(engine: Engine, game_stats: Dict[str, Any]) -> None:
             try:
                 engine.play_card(card, human_decider=_human_decider)
             except UndoException:
-                # Undo during Winter Quarters: state already restored,
-                # re-push card so draw_card() gets it again
-                engine.state.setdefault("deck", []).insert(0, card)
-                engine.state.pop("current_card", None)
+                # The restored current card resumes without another draw.
                 continue
             except Exception as exc:
                 tb_str = traceback.format_exc()
@@ -1377,8 +1542,6 @@ def _game_loop(engine: Engine, game_stats: Dict[str, Any]) -> None:
             except UndoException:
                 # Undo after WQ resolution rewinds the whole Winter Quarters
                 # card to its start (checkpoint already restored).
-                engine.state.setdefault("deck", []).insert(0, card)
-                engine.state.pop("current_card", None)
                 continue
             if raw in ("status", "s"):
                 display_board_state(engine.state)
@@ -1402,7 +1565,7 @@ def _game_loop(engine: Engine, game_stats: Dict[str, Any]) -> None:
         pre_snap = _snapshot_state(engine.state)
 
         # Store first action marker for human context display
-        engine.state["_first_action_this_card"] = None
+        engine.state["_first_action_this_card"] = engine.state.get("_card_progress", {}).get("first_action")
 
         def _post_turn_cb(faction, result, card):
             nonlocal pre_snap
@@ -1413,7 +1576,7 @@ def _game_loop(engine: Engine, game_stats: Dict[str, Any]) -> None:
                 if raw in ("status", "s"):
                     display_board_state(engine.state)
             # Track first action
-            if engine.state.get("_first_action_this_card") is None:
+            if result.get("action") != "pass" and engine.state.get("_first_action_this_card") is None:
                 engine.state["_first_action_this_card"] = result
             # Update snapshot so the next turn's diff is accurate
             pre_snap = _snapshot_state(engine.state)
@@ -1422,9 +1585,7 @@ def _game_loop(engine: Engine, game_stats: Dict[str, Any]) -> None:
             actions = engine.play_card(card, human_decider=_human_decider, post_turn_callback=_post_turn_cb)
         except UndoException:
             # State already restored by the meta-command handler.
-            # Re-push the card so draw_card() gets it again next iteration.
-            engine.state.setdefault("deck", []).insert(0, card)
-            engine.state.pop("current_card", None)
+            # The restored current card resumes without another draw.
             continue
         except Exception as exc:
             tb_str = traceback.format_exc()
@@ -1513,17 +1674,28 @@ def main() -> None:
 
     scenario, deck_method = _choose_scenario()
     seed = _choose_seed()
-    human_factions = _choose_humans()
+    players = _choose_players()
+    human_factions = [faction for group in players for faction in group]
 
     # Setup confirmation loop
     while True:
         display_setup_confirmation(scenario, deck_method, seed, human_factions)
+        for index, group in enumerate(players, 1):
+            print(f"  Player {index}: {' + '.join(group)}")
         confirm = choose_one("Start game?", [("Yes", True), ("No - re-select", False)])
         if confirm:
             break
         scenario, deck_method = _choose_scenario()
         seed = _choose_seed()
-        human_factions = _choose_humans()
+        players = _choose_players()
+        human_factions = [faction for group in players for faction in group]
+
+    solo_difficulty = False
+    if len(players) == 1:
+        solo_difficulty = choose_one("One-player victory rules:", [
+            ("Standard", False),
+            ("Greater challenge: lose if a Non-player leads at a Victory Phase from the second Winter Quarters", True),
+        ])
 
     deck_display = choose_one("Deck info display:", [
         ("Exact — show exact cards until Winter Quarters", "exact"),
@@ -1536,6 +1708,8 @@ def main() -> None:
     initial_state["_scenario"] = scenario
     initial_state["_setup_method"] = deck_method
     initial_state["_deck_display_mode"] = deck_display
+    initial_state["player_factions"] = players
+    initial_state["solo_difficulty"] = solo_difficulty
 
     engine = Engine(initial_state=initial_state, use_cli=True)
     engine.set_human_factions(human_factions)

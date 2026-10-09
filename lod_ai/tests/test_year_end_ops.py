@@ -210,6 +210,7 @@ class TestFrenchRedeploy:
 
     def test_bot_picks_colocation(self):
         state = basic_state()
+        state["toa_played"] = state["treaty_of_alliance"] = True
         state["spaces"] = {
             "CityX": {C.REGULAR_FRE: 3, C.REGULAR_PAT: 0},  # French only
             "CityY": {C.REGULAR_FRE: 2, C.REGULAR_PAT: 2},  # co-located
@@ -367,7 +368,7 @@ class TestBackwardCompat:
         year_end.resolve(state)
 
     def test_human_faction_skipped(self, monkeypatch):
-        """With British as human and others as bot, British uses old logic."""
+        """A human chooses supply, without consulting the British bot."""
         monkeypatch.setattr(year_end.board_control, "refresh_control", _noop_refresh, raising=False)
         monkeypatch.setattr(year_end.caps_util, "enforce_global_caps", lambda s: None, raising=False)
 
@@ -382,6 +383,8 @@ class TestBackwardCompat:
 
         bot = MagicMock()
         bots = {C.BRITISH: bot}
+        monkeypatch.setattr(year_end.human_choices, "pick",
+                            lambda state, faction, prompt, options: options[0][1])
 
         # British is human — bot_supply_priority should NOT be called
         year_end._supply_phase(state, bots=bots, human_factions={C.BRITISH})

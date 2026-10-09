@@ -42,6 +42,8 @@ from lod_ai.leaders          import leader_location
 from lod_ai.board.pieces      import remove_piece, add_piece, move_piece
 from lod_ai.economy.resources import spend, can_afford               # NEW
 from lod_ai.util.naval        import has_blockade
+from lod_ai.util.command_checkpoint import command_checkpoint
+from lod_ai.util.movement_provenance import MovementProvenance
 
 COMMAND_NAME = "MARCH"            # auto-registered by commands/__init__.py
 
@@ -161,6 +163,30 @@ def execute(
 
     # §3.3.2 / §3.4.2: capture pre-move control for activation conditions
     _pre_control = dict(state.get("control", {}))
+    common_cause_used: Dict[str, int] = {}
+    militia_provenance = MovementProvenance(MILITIA_U, MILITIA_A)
+    warparty_provenance = MovementProvenance(WARPARTY_U, WARPARTY_A)
+    provenance = {MILITIA_U: militia_provenance, MILITIA_A: militia_provenance,
+                  WARPARTY_U: warparty_provenance, WARPARTY_A: warparty_provenance}
+    moved_cubes: Dict[str, Dict[str, int]] = {}
+
+    def _checkpoint(label, sid):
+        if not callable(ctx.get("_command_checkpoint")):
+            return
+        snapshots = [(p, p.snapshot(state)) for p in (militia_provenance, warparty_provenance)]
+        cubes = {s: {tag: sp.get(tag, 0) for tag in (REGULAR_BRI, REGULAR_PAT, REGULAR_FRE, TORY)}
+                 for s, sp in state["spaces"].items()}
+        command_checkpoint(state, ctx, label, sid)
+        for tracker, before in snapshots:
+            tracker.reconcile_special(before, state)
+        for space, tags in cubes.items():
+            for tag, before in tags.items():
+                removed = max(0, before - state["spaces"][space].get(tag, 0))
+                if removed:
+                    moved = moved_cubes.setdefault(space, {})
+                    # Counters of the same type are interchangeable: removing
+                    # already-moved counters preserves every legal later move.
+                    moved[tag] = max(0, moved.get(tag, 0) - removed)
 
     def _apply_move(src: str, dst: str, pieces: Dict[str, int]) -> Dict:
         """Move pieces src→dst.  Returns tracking dict for post-move effects."""
@@ -172,6 +198,18 @@ def execute(
                 "(not adjacent and no City-network route)."
             )
         sp_src = state["spaces"][src]
+        pieces = dict(pieces)
+        flipped = ctx.get("_march_sa_flips", {}).get(src, {})
+        for ug, active in ((MILITIA_U, MILITIA_A), (WARPARTY_U, WARPARTY_A)):
+            if faction == BRITISH:  # Common Cause uses its explicit authorization below.
+                break
+            missing = max(0, pieces.get(ug, 0) - sp_src.get(ug, 0))
+            substitute = min(missing, flipped.get(ug, 0))
+            if substitute:
+                pieces[ug] -= substitute
+                pieces[active] = pieces.get(active, 0) + substitute
+                flipped[ug] -= substitute
+
         sp_dst = state["spaces"][dst]
 
         moved_total = 0
@@ -185,7 +223,20 @@ def execute(
                 return 0
             if sp_src.get(tag, 0) < count:
                 raise ValueError(f"Not enough {tag} in {src}.")
+            tracker = provenance.get(tag)
+            if tracker:
+                tracker.take_exact(state, src,
+                                   count if tag == tracker.underground else 0,
+                                   count if tag == tracker.active else 0)
+            elif sp_src.get(tag, 0) - moved_cubes.get(src, {}).get(tag, 0) < count:
+                raise ValueError(f"{src}: a unit cannot March more than once.")
             move_piece(state, tag, src, dst, count)
+            if tracker:
+                tracker.arrive(dst, count if tag == tracker.underground else 0,
+                               count if tag == tracker.active else 0)
+            else:
+                moved = moved_cubes.setdefault(dst, {})
+                moved[tag] = moved.get(tag, 0) + count
             moved_total += count
             return count
 
@@ -193,10 +244,13 @@ def execute(
             raise ValueError("Indians cannot occupy a City space.")
 
         if faction == BRITISH:
-            reg = _take(REGULAR_BRI, pieces.get(REGULAR_BRI, 0))
             tory = pieces.get(TORY, 0)
             wp_u = pieces.get(WARPARTY_U, 0)
             wp_a = pieces.get(WARPARTY_A, 0)
+            authorized = ctx.get("common_cause", {}).get(src, 0)
+            if wp_u + wp_a > authorized - common_cause_used.get(src, 0):
+                raise ValueError("War Parties require Common Cause authorization in their origin.")
+            reg = _take(REGULAR_BRI, pieces.get(REGULAR_BRI, 0))
             if (tory or wp_u or wp_a) and not bring_escorts:
                 raise ValueError("Escorts required to move Tories or War Parties.")
             escort_cap = reg
@@ -207,13 +261,11 @@ def execute(
             if wp_u or wp_a:
                 if _is_city(dst):
                     raise ValueError("Common-Cause War Parties may not move into Cities.")
-                if wp_u:
-                    _take(WARPARTY_U, wp_u)
-                    # Common-Cause WP arrive Active (§4.2.1)
-                    sp_dst[WARPARTY_U] = sp_dst.get(WARPARTY_U, 0) - wp_u
-                    sp_dst[WARPARTY_A] = sp_dst.get(WARPARTY_A, 0) + wp_u
-                if wp_a:
-                    _take(WARPARTY_A, wp_a)
+                # Common Cause already Activates its selected War Parties.
+                # A during-Command SA can have flipped them since the human
+                # wrote the movement plan, so use the authorized Active pool.
+                _take(WARPARTY_A, wp_u + wp_a)
+                common_cause_used[src] = common_cause_used.get(src, 0) + wp_u + wp_a
 
         elif faction == PATRIOTS:
             # §3.3.2: move Militia, Continentals and French Regulars.
@@ -307,13 +359,17 @@ def execute(
 
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).update(destinations_set)
+    state["_turn_march_sources"] = set(sources_set)
+    ctx["_planned_command"] = COMMAND_NAME
+    ctx["_command_selected_spaces"] = set(destinations_set)
+    interactive = callable(ctx.get("_command_checkpoint"))
 
     # §3.3.2 / §3.5.4: Escorts (French Regulars accompanying a Patriot March,
     # or Continentals accompanying a French March) are optional and require the
     # ally to pay 1 Resource per destination entered. Validate affordability
     # BEFORE any pieces move so an escort can never happen for free and so the
     # command never mutates state and then fails.
-    if not free:
+    if not free and not interactive:
         if faction == FRENCH:
             cont_dsts = {p["dst"] for p in plan
                          if p["pieces"].get(REGULAR_PAT, 0) > 0}
@@ -333,7 +389,8 @@ def execute(
                 )
     # Resource payment
     first_free = (faction == INDIANS) and ctx.get("all_reserve_origin", False)
-    _pay_cost(state, faction, len(destinations_set), first_free=first_free, free=free)
+    if not interactive:
+        _pay_cost(state, faction, len(destinations_set), first_free=first_free, free=free)
 
     # §3.5.4: French March escort billing deferred to after moves execute
     # (see post-move section below)
@@ -345,6 +402,32 @@ def execute(
         f"{faction} MARCH begins: {sources} ➜ {destinations} (escorts={bring_escorts})"
     )
 
+    def _flip(sp: Dict, from_tag: str, to_tag: str, n: int) -> int:
+        actual = min(n, sp.get(from_tag, 0))
+        if actual:
+            sp[from_tag] = sp.get(from_tag, 0) - actual
+            sp[to_tag] = sp.get(to_tag, 0) + actual
+        return actual
+
+    def _finish_destination(dst: str, groups: list) -> None:
+        """Apply mandatory moving-group facing before another SA decision."""
+        sp = state["spaces"][dst]
+        if faction == PATRIOTS:
+            _flip(sp, WARPARTY_U, WARPARTY_A, sp.get(REGULAR_PAT, 0) // 2)
+            if _is_city(dst) and _pre_control.get(dst) == BRITISH:
+                cubes = sp.get(REGULAR_BRI, 0) + sp.get(TORY, 0)
+                for group in groups:
+                    if group["total"] + cubes > 3:
+                        n = _flip(sp, MILITIA_U, MILITIA_A, group["militia_u"])
+                        militia_provenance.activate_moved(dst, n)
+        elif faction == INDIANS:
+            if map_adj.space_type(dst) == "Colony" and _pre_control.get(dst) == "REBELLION":
+                militia = sp.get(MILITIA_U, 0) + sp.get(MILITIA_A, 0)
+                for group in groups:
+                    if group["total"] + militia > 3:
+                        n = _flip(sp, WARPARTY_U, WARPARTY_A, group["wp_u"])
+                        warparty_provenance.activate_moved(dst, n)
+
     # ── Execute moves and collect tracking data ──────────────────────────
     moved_overall = 0
     # Per-destination tracking for post-move effects
@@ -353,22 +436,36 @@ def execute(
 
     continental_entered_dsts: set = set()
 
-    for entry in plan:
-        info = _apply_move(entry["src"], entry["dst"], entry["pieces"])
-        moved_overall += info["total"]
-        dst_groups.setdefault(entry["dst"], []).append(info)
-        if info.get("french_entered"):
-            french_entered_dsts.add(entry["dst"])
-        # Track Continental escort entries for French March billing
-        if faction == FRENCH and entry["pieces"].get(REGULAR_PAT, 0) > 0:
-            continental_entered_dsts.add(entry["dst"])
+    for index, dst in enumerate(dict.fromkeys(entry["dst"] for entry in plan)):
+        _checkpoint("Before March destination", dst)
+        entries = [entry for entry in plan if entry["dst"] == dst]
+        if interactive:
+            _pre_control[dst] = state.get("control", {}).get(dst)
+            _pay_cost(state, faction, 1, first_free=first_free and index == 0, free=free)
+            if faction == FRENCH and not free and any(
+                    p["pieces"].get(REGULAR_PAT, 0) for p in entries):
+                spend(state, PATRIOTS, 1)
+            if faction == PATRIOTS and not free and any(
+                    p["pieces"].get(REGULAR_FRE, 0) for p in entries):
+                if dst != leader_location(state, "LEADER_ROCHAMBEAU"):
+                    spend(state, FRENCH, 1)
+        for entry in entries:
+            info = _apply_move(entry["src"], entry["dst"], entry["pieces"])
+            moved_overall += info["total"]
+            dst_groups.setdefault(entry["dst"], []).append(info)
+            if info.get("french_entered"):
+                french_entered_dsts.add(entry["dst"])
+            if faction == FRENCH and entry["pieces"].get(REGULAR_PAT, 0) > 0:
+                continental_entered_dsts.add(entry["dst"])
+        _finish_destination(dst, dst_groups.get(dst, []))
+        _checkpoint("After moving to March destination", dst)
 
     if moved_overall <= 0:
         raise ValueError("March must move at least one piece.")
 
     # §3.5.4: French March — Patriots also pay 1 Resource per destination
     # that Continental escorts enter.
-    if faction == FRENCH and continental_entered_dsts and not free:
+    if faction == FRENCH and continental_entered_dsts and not free and not interactive:
         # Affordability pre-validated above; escorts never move for free.
         spend(state, PATRIOTS, len(continental_entered_dsts))
 
@@ -377,73 +474,19 @@ def execute(
     # Rochambeau capability (leader_capabilities.txt): "French may March
     # and Battle with a Patriot Command at no Resource cost."  Waive the
     # French fee for any destination where Rochambeau is present.
-    if faction == PATRIOTS and french_entered_dsts and not free:
+    if faction == PATRIOTS and french_entered_dsts and not free and not interactive:
         rochambeau_loc = leader_location(state, "LEADER_ROCHAMBEAU")
         chargeable = [d for d in french_entered_dsts if d != rochambeau_loc]
         if chargeable:
             spend(state, FRENCH, len(chargeable))
 
-    # ── Post-move activation effects ─────────────────────────────────────
-    # NOTE: Flipping pieces between Active/Underground uses direct dict
-    # manipulation because the pool system doesn't support tag changes.
-    def _flip(sp: Dict, from_tag: str, to_tag: str, n: int) -> None:
-        """Flip *n* pieces from *from_tag* to *to_tag* within a space."""
-        actual = min(n, sp.get(from_tag, 0))
-        if actual:
-            sp[from_tag] = sp.get(from_tag, 0) - actual
-            sp[to_tag] = sp.get(to_tag, 0) + actual
-
     if faction == BRITISH:
-        # §3.2.3: "Activate one Militia for every three British cubes
-        # there (whether they just moved or were already there)."
-        for dst in destinations_set:
-            sp_dst = state["spaces"][dst]
-            brit_cubes = sp_dst.get(REGULAR_BRI, 0) + sp_dst.get(TORY, 0)
-            flips = min(brit_cubes // 3, sp_dst.get(MILITIA_U, 0))
-            _flip(sp_dst, MILITIA_U, MILITIA_A, flips)
-
-    elif faction == PATRIOTS:
-        for dst, groups in dst_groups.items():
-            sp_dst = state["spaces"][dst]
-            # §3.3.2: "Activate one War Party for every two Continentals
-            # in the destination space."
-            continentals = sp_dst.get(REGULAR_PAT, 0)
-            wp_flips = min(continentals // 2, sp_dst.get(WARPARTY_U, 0))
-            _flip(sp_dst, WARPARTY_U, WARPARTY_A, wp_flips)
-            # §3.3.2: "Set Militia of a moving group to Active if:
-            #   • The destination is a British Controlled City before the
-            #     move, and
-            #   • The moving group's number of units plus the number of
-            #     British cubes in the destination space exceeds 3."
-            is_brit_city = (
-                _is_city(dst)
-                and _pre_control.get(dst) == BRITISH
-            )
-            if is_brit_city:
-                brit_cubes_in_dst = sp_dst.get(REGULAR_BRI, 0) + sp_dst.get(TORY, 0)
-                for grp in groups:
-                    if grp["total"] + brit_cubes_in_dst > 3:
-                        mil_to_flip = min(grp["militia_u"], sp_dst.get(MILITIA_U, 0))
-                        _flip(sp_dst, MILITIA_U, MILITIA_A, mil_to_flip)
-
-    elif faction == INDIANS:
-        for dst, groups in dst_groups.items():
-            sp_dst = state["spaces"][dst]
-            # §3.4.2: "Set Underground War Parties moving to Active if:
-            #   • The destination space is a Colony Controlled by the
-            #     Rebellion before the move, and
-            #   • The moving group's number of pieces plus the number of
-            #     Militia in the destination Province exceed 3."
-            is_reb_colony = (
-                map_adj.space_type(dst) == "Colony"
-                and _pre_control.get(dst) == "REBELLION"
-            )
-            if is_reb_colony:
-                mil_in_dst = sp_dst.get(MILITIA_U, 0) + sp_dst.get(MILITIA_A, 0)
-                for grp in groups:
-                    if grp["total"] + mil_in_dst > 3:
-                        wp_to_flip = min(grp["wp_u"], sp_dst.get(WARPARTY_U, 0))
-                        _flip(sp_dst, WARPARTY_U, WARPARTY_A, wp_to_flip)
+        # British locating is a separate "Then" step after all movements.
+        for dst in dict.fromkeys(entry["dst"] for entry in plan):
+            _checkpoint("Before March Militia activation", dst)
+            sp = state["spaces"][dst]
+            _flip(sp, MILITIA_U, MILITIA_A,
+                  (sp.get(REGULAR_BRI, 0) + sp.get(TORY, 0)) // 3)
 
     refresh_control(state)
     enforce_global_caps(state)

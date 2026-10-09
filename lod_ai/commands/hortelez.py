@@ -12,6 +12,7 @@ from typing import Dict
 from lod_ai.rules_consts import FRENCH, PATRIOTS
 from lod_ai.util.history import push_history
 from lod_ai.economy.resources import spend, add
+from lod_ai.util.command_checkpoint import command_checkpoint
 
 COMMAND_NAME = "HORTELEZ"          # auto-registered by commands/__init__.py
 
@@ -39,6 +40,9 @@ def execute(
 
     if pay < 1:
         raise ValueError("Must pay at least 1 Resource.")
+    ctx["_planned_command"] = COMMAND_NAME
+    ctx["_command_selected_spaces"] = set()
+    command_checkpoint(state, ctx, "Before Hortelez payment")
     french_res = state["resources"].get(FRENCH, 0)
     if french_res < pay:
         raise ValueError(f"FRENCH have only {french_res} Resources, cannot pay {pay}.")

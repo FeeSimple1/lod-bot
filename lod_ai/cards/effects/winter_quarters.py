@@ -82,7 +82,12 @@ def _lose_fort_or_village(state, label):
 
     # §8.2 table (Q22, S76): equal-candidate Fort/Village spaces, no
     # substantive key (was raw rng.choice).
-    picked = pick_random_spaces(state, candidates, 1)
+    if fac in state.get("human_factions", set()):
+        from lod_ai.util.year_end_choices import pick
+        picked = [pick(state, fac, f"{label}: choose your {target_tag} to remove:",
+                       [(sid, sid) for sid in sorted(candidates)])]
+    else:
+        picked = pick_random_spaces(state, candidates, 1)
     if not picked:
         return
     sid = picked[0]

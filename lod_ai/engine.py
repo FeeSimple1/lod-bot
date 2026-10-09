@@ -23,6 +23,7 @@ from lod_ai.util import eligibility as elig
 from lod_ai.cards.effects import brilliant_stroke as bs
 from lod_ai.state.setup_state import build_state
 from lod_ai.economy import resources
+from lod_ai.cli_utils import UndoException
 
 # Command / SA implementations
 from lod_ai.commands import march, rally, battle, gather, muster, scout, raid
@@ -54,6 +55,14 @@ class Engine:
         self.dispatcher = Dispatcher(self)
         self.use_cli = use_cli
         self.human_factions: set[str] = set()
+        # A menu can run inside a sandbox or a partly executed Winter
+        # Quarters round.  Those states cannot resume without the Python
+        # call stack.  Manual saves use the last committed transaction
+        # boundary instead, including its RNG and current-card cursor.
+        self._save_checkpoint: dict | None = None
+        self._save_boundary: dict | None = None
+        self._save_live_state: dict | None = None
+        self._state_generation = 0
 
         # ── core Command registrations ──────────────────────────────────
         self.dispatcher.register_cmd("march",  self._wrap_march())
@@ -247,12 +256,20 @@ class Engine:
     @contextmanager
     def _using_state(self, state: dict, ctx: dict) -> Iterable[None]:
         """Temporarily swap in a different state/ctx (for sandbox runs)."""
+        from lod_ai import cli_utils
         old_state, old_ctx = self.state, self.ctx
+        generation = self._state_generation
+        bound_cli = cli_utils._engine_ref is self
         self.state, self.ctx = state, ctx
+        if bound_cli:
+            cli_utils.set_game_state(state, engine=self)
         try:
             yield
         finally:
-            self.state, self.ctx = old_state, old_ctx
+            self.state = old_state
+            self.ctx = old_ctx if generation == self._state_generation else {}
+            if bound_cli:
+                cli_utils.set_game_state(old_state, engine=self)
 
     def _reset_trace_on(self, target_state: dict) -> None:
         target_state["_turn_used_special"] = False
@@ -261,6 +278,9 @@ class Engine:
         target_state["_turn_affected_spaces"] = set()
         target_state.pop("_turn_command", None)
         target_state.pop("_turn_command_meta", None)
+        for key in ("_turn_muster_spaces", "_turn_garrison_destinations",
+                    "_turn_march_sources", "_turn_battle_spaces"):
+            target_state.pop(key, None)
         target_state.pop("_limited", None)
         target_state.pop("_no_special", None)
 
@@ -497,6 +517,8 @@ class Engine:
                                        ["chosen space"])[0]
                     push_history(target_state, f"FREE {_op.upper()} by {_fac} in {_where}")
                     normalize_state(target_state)
+                except UndoException:
+                    raise
                 except Exception:
                     # If the command fails (e.g. no valid targets), log and continue
                     push_history(target_state, f"FREE {_op.upper()} by {_fac} — skipped (no valid target)")
@@ -530,6 +552,8 @@ class Engine:
                          f"FREE {op.upper()} by {faction} — skipped "
                          f"(no legal target: {exc})")
             return True
+        except UndoException:
+            raise
         except Exception as exc:
             push_history(target_state,
                          f"FREE {op.upper()} by {faction} — wizard failed "
@@ -579,11 +603,73 @@ class Engine:
 
         self.state["current_card"] = card
         self.state["card_order"] = determine_eligible_factions(self.state, card)
+        self.state["_first_action_this_card"] = None
         self._reset_trace_on(self.state)
         return self._eligible_queue(card)
 
+    @contextmanager
+    def _save_transaction(self, kind: str, faction: str | None = None):
+        """Expose a resumable checkpoint while an atomic action is pending."""
+        previous_checkpoint = self._save_checkpoint
+        previous_boundary = self._save_boundary
+        previous_live_state = self._save_live_state
+        if previous_checkpoint is None:
+            self._save_live_state = self.state
+            self._save_checkpoint = deepcopy(self.state)
+            self._save_boundary = {"kind": kind}
+            if faction is not None:
+                self._save_boundary["faction"] = faction
+        try:
+            yield
+        finally:
+            self._save_checkpoint = previous_checkpoint
+            self._save_boundary = previous_boundary
+            self._save_live_state = previous_live_state
+
+    def restore_checkpoint(self, checkpoint: dict) -> None:
+        """Undo the committed state even when a menu is inside a sandbox."""
+        live_state = self._save_live_state if self._save_live_state is not None else self.state
+        restored = deepcopy(checkpoint)
+        live_state.clear()
+        live_state.update(restored)
+        self.ctx = {}
+        self._state_generation += 1
+
+    def state_for_save(self) -> dict:
+        """Return committed game data, never a partly executed preview.
+
+        An unfinished turn, Brilliant Stroke, or Winter Quarters restarts
+        from its beginning on load.  Earlier completed faction turns and
+        their eligibility changes remain committed.
+        """
+        state = deepcopy(self._save_checkpoint
+                         if self._save_checkpoint is not None else self.state)
+        state.pop("_resume_boundary", None)
+        if self._save_boundary is not None:
+            state["_resume_boundary"] = deepcopy(self._save_boundary)
+        return state
+
+    def next_card(self) -> dict | None:
+        """Resume an unfinished current card, otherwise reveal a new card."""
+        if self.state.get("victory_result", {}).get("outcome") in {"victory", "stalemate"}:
+            return None
+        current = self.state.get("current_card")
+        progress = self.state.get("_card_progress")
+        if current:
+            if progress and progress.get("phase") != "complete":
+                return current
+            if not progress and current.get("id") not in self.state.get("played_cards", []):
+                # Includes a save taken after revealing the card but before
+                # its first decision (and legacy saves at that boundary).
+                return current
+        return self.draw_card()
+
     def draw_card(self) -> dict | None:
         """Reveal the next card, updating current/upcoming/deck."""
+        if self.state.get("victory_result", {}).get("outcome") in {"victory", "stalemate"}:
+            return None
+        self.state.pop("_card_progress", None)
+        self.state.pop("_resume_boundary", None)
         deck = list(self.state.get("deck", []))
         upcoming = self.state.pop("upcoming_card", None)
 
@@ -891,6 +977,8 @@ class Engine:
                     try:
                         result, _legal, sb_state, sb_ctx = self._simulate_action(
                             faction, {}, {}, _wrapped(runner))
+                    except UndoException:
+                        raise
                     except Exception as exc:
                         print(f"(Step failed: {exc}; choose again.)")
                         continue
@@ -955,6 +1043,8 @@ class Engine:
                 options.append((f"Declare Brilliant Stroke", fac))
             if not options:
                 continue
+            from lod_ai.cli_display import display_brilliant_strokes
+            display_brilliant_strokes(self.state, fac)
             choice = choose_one(
                 f"\n{fac}: declare a Brilliant Stroke before the 1st "
                 f"Eligible acts?",
@@ -1068,6 +1158,8 @@ class Engine:
         if faction == C.BRITISH and hasattr(bot, "_apply_howe_fni"):
             try:
                 bot._apply_howe_fni(self.state)
+            except UndoException:
+                raise
             except Exception:
                 pass
         for name in chains.get(faction, ()):
@@ -1078,6 +1170,8 @@ class Engine:
                 if fn(self.state):
                     normalize_state(self.state)
                     return
+            except UndoException:
+                raise
             except Exception:
                 continue
         # French fallback: Préparer la Guerre (§4.5.1) has no
@@ -1088,6 +1182,8 @@ class Engine:
                 if _preparer_la_guerre(self.state,
                                        self.state.get("toa_played", False)):
                     normalize_state(self.state)
+            except UndoException:
+                raise
             except Exception:
                 pass
 
@@ -1117,6 +1213,8 @@ class Engine:
                     result = bool(fn(st, tried_muster=True))
                 else:
                     result = bool(fn(st))
+            except UndoException:
+                raise
             except Exception:
                 return False
             normalize_state(st)
@@ -1150,6 +1248,8 @@ class Engine:
             if follow is not None:
                 follow(st)
                 normalize_state(st)
+        except UndoException:
+            raise
         except Exception:
             pass
         finally:
@@ -1469,6 +1569,8 @@ class Engine:
                     self._award_pass(faction)
                     return {"action": "pass", "used_special": False, "pass_reason": pass_reason}
                 self._commit_state(sandbox_state, sandbox_ctx)
+            except UndoException:
+                raise
             except Exception as exc:  # noqa: BLE001
                 # Enhanced error logging: capture full traceback for diagnostics
                 card_id = card.get("id") if card else None
@@ -1514,13 +1616,25 @@ class Engine:
         faction acts.  Signature: ``callback(faction, result, card)``.
         This lets the CLI display bot summaries *before* a human is prompted.
         """
-        queue = self._prepare_card(card)
-        self.state['_card_turn_log'] = []
+        progress = self.state.get("_card_progress")
+        if not progress or progress.get("card") != card:
+            queue = self._prepare_card(card)
+            self.state['_card_turn_log'] = []
+            progress = {
+                "card": deepcopy(card),
+                "phase": "winter_quarters" if card.get("winter_quarters") else "interrupt",
+                "queue": queue,
+                "actions": [],
+                "first_action": None,
+                "eligible_position": 0,
+            }
+            self.state["_card_progress"] = progress
+        self.state.pop("_resume_boundary", None)
+        if progress.get("phase") == "complete":
+            return [(faction, result) for faction, result in progress["actions"]]
+
         if card.get("winter_quarters"):
-            # §7.3 / §6.4.3: Check if this is the final Winter Quarters card.
-            # If no more WQ cards remain in the deck or upcoming, set the flag
-            # so year_end.resolve() will call final_scoring() after the
-            # Support Phase instead of continuing play.
+            # §7.3 / §6.4.3: final Winter Quarters ends after Support.
             remaining_wq_in_deck = any(
                 c.get("winter_quarters") for c in self.state.get("deck", [])
             )
@@ -1528,33 +1642,56 @@ class Engine:
             upcoming_is_wq = bool(upcoming and upcoming.get("winter_quarters"))
             if not remaining_wq_in_deck and not upcoming_is_wq:
                 self.state["final_winter_round"] = True
-            resolve_year_end(self.state, bots=self.bots, human_factions=self.human_factions)
+            with self._save_transaction("winter_quarters"):
+                resolve_year_end(self.state, bots=self.bots, human_factions=self.human_factions)
             if card.get("id"):
                 self._record_played_card(card["id"])
+            self.state["_card_progress"]["phase"] = "complete"
             return []
-        first_eligible = queue[0] if queue else None
-        if self._resolve_brilliant_stroke_interrupt(card, first_eligible=first_eligible):
-            return []
-        actions: List[Tuple[str, dict]] = []
-        first_action: dict | None = None
-        eligible_position = 0
 
-        while queue and len(actions) < 2:
-            faction = queue.pop(0)
-            eligible_position += 1
-            allowed = self._allowed_for_faction(faction, first_action)
+        if progress["phase"] == "interrupt":
+            first_eligible = progress["queue"][0] if progress["queue"] else None
+            with self._save_transaction("brilliant_stroke"):
+                interrupted = self._resolve_brilliant_stroke_interrupt(
+                    card, first_eligible=first_eligible)
+            progress = self.state["_card_progress"]
+            if interrupted:
+                progress["phase"] = "complete"
+                return []
+            progress["phase"] = "turns"
+
+        while progress["queue"] and len(progress["actions"]) < 2:
+            # Leave the pending faction in the serialized queue until its
+            # action commits.  Saving from any nested menu restarts only
+            # this transaction, rather than skipping the faction or card.
+            faction = progress["queue"][0]
+            allowed = self._allowed_for_faction(faction, progress["first_action"])
+            # Context belongs to this action; completed actions communicate
+            # lasting effects through state, not their temporary runners.
+            self.ctx = {}
             sig = inspect.signature(self.play_turn)
-            if "allowed" in sig.parameters:
-                result = self.play_turn(faction, card=card, allowed=allowed, human_decider=human_decider)
-            else:
-                result = self.play_turn(faction, card=card)
+            with self._save_transaction("turn", faction):
+                if "allowed" in sig.parameters:
+                    result = self.play_turn(faction, card=card, allowed=allowed, human_decider=human_decider)
+                else:
+                    result = self.play_turn(faction, card=card)
             if not result:
                 result = {"action": "command", "used_special": bool(self.state.get("_turn_used_special"))}
 
-            # Record this faction's turn for diagnostic tracking
+            # Committing a sandbox replaces nested dict objects, so obtain
+            # the cursor from the committed state before advancing it.
+            progress = self.state["_card_progress"]
+            progress["queue"].pop(0)
+            progress["eligible_position"] += 1
+            if result.get("action") != "pass":
+                progress["actions"].append([faction, result])
+                if progress["first_action"] is None:
+                    progress["first_action"] = result
+                self.state["_first_action_this_card"] = progress["first_action"]
+
             _log_entry = {
                 'faction': faction,
-                'eligible_position': eligible_position,
+                'eligible_position': progress["eligible_position"],
                 'action': result.get('action'),
                 'pass_reason': result.get('pass_reason'),
             }
@@ -1568,22 +1705,12 @@ class Engine:
                                             or self.state.get('_turn_event_side'))
             self.state.setdefault('_card_turn_log', []).append(_log_entry)
 
-            # Fire the post-turn callback so the CLI can display bot
-            # summaries before the next faction (possibly human) acts.
-            if post_turn_callback and result.get("action") != "pass":
+            # Passes also alter resources and eligibility.  Publish every
+            # completed turn before the next faction makes any decision.
+            if post_turn_callback:
                 post_turn_callback(faction, result, card)
-
-            if result.get("action") == "pass":
-                continue
-
-            actions.append((faction, result))
-            if first_action is None:
-                first_action = result
-
-        if card.get("winter_quarters"):
-            resolve_year_end(self.state, bots=self.bots, human_factions=self.human_factions)
 
         if card.get("id"):
             self._record_played_card(card["id"])
-
-        return actions
+        progress["phase"] = "complete"
+        return [(faction, result) for faction, result in progress["actions"]]

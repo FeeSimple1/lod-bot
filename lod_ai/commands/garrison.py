@@ -49,6 +49,7 @@ from lod_ai.util.adjacency import is_adjacent
 from lod_ai.map            import adjacency as map_adj
 from lod_ai.board.pieces      import remove_piece, add_piece, flip_pieces, move_piece
 from lod_ai.economy.resources import spend, can_afford
+from lod_ai.util.command_checkpoint import command_checkpoint
 
 COMMAND_NAME = "GARRISON"  # auto-registered by commands/__init__.py
 
@@ -130,6 +131,14 @@ def execute(
     if faction.upper() != BRITISH:
         raise ValueError("Only BRITISH may execute GARRISON")
 
+    dest_set = {dst for inner in move_map.values() for dst in inner}
+    ctx["_planned_command"] = COMMAND_NAME
+    ctx["_command_selected_spaces"] = set(dest_set)
+    state["_turn_command"] = COMMAND_NAME
+    state.setdefault("_turn_garrison_destinations", set()).update(dest_set)
+    state.setdefault("_turn_affected_spaces", set()).update(dest_set)
+    command_checkpoint(state, ctx, "Before Garrison movement")
+
     # FNI gate -------------------------------------------------------
     if state.get("fni_level", 0) == 3:
         raise ValueError("GARRISON unavailable at FNI level 3")
@@ -139,8 +148,6 @@ def execute(
 
     # Leader hooks (none today, keep pattern) -----------------------
 
-    state["_turn_command"] = COMMAND_NAME
-    dest_set = {dst for inner in move_map.values() for dst in inner}
     # Limited‑command validations -----------------------------------
     if limited:
         if len(dest_set) != 1:
@@ -148,7 +155,6 @@ def execute(
         if displace_city and displace_city != next(iter(dest_set)):
             raise ValueError("Limited GARRISON displacement must originate in the destination City")
 
-    state.setdefault("_turn_affected_spaces", set()).update(dest_set)
     # Main movement --------------------------------------------------
     push_history(state, "BRITISH GARRISON")
 
@@ -185,10 +191,12 @@ def execute(
         city_list = [name for name in state["spaces"] if map_adj.is_city(name) and not _is_blockaded(name, state)]
 
     for city in city_list:
+        command_checkpoint(state, ctx, "Before Garrison Militia activation", city)
         _activate_militia(state, city)
 
     # Optional displacement -----------------------------------------
     if displace_city and displace_target:
+        command_checkpoint(state, ctx, "Before Garrison displacement", displace_city)
         # Refresh control after moves so the check reflects current board state
         refresh_control(state)
         if _is_blockaded(displace_city, state):
