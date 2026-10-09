@@ -39,7 +39,8 @@ from lod_ai.rules_consts import (
 
 # deck helpers
 try:
-    from lod_ai.cards import CARD_REGISTRY as _CARD_REGISTRY  # preferred
+    # Optional legacy registry; current card packages use the JSON fallback.
+    from lod_ai.cards import CARD_REGISTRY as _CARD_REGISTRY  # type: ignore[attr-defined]
 except Exception:
     import importlib.resources as _ires  # Python 3.9+
     _CARD_REGISTRY = {}

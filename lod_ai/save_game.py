@@ -44,6 +44,17 @@ def _serialize_state(state: Dict[str, Any], human_factions: set) -> dict:
     """Convert game state to a JSON-serializable dict."""
     data = deepcopy(state)
 
+    # Winter Quarters handlers schedule a Python callable for Reset.  Store
+    # its authoritative card identity, not repr(function), which reloads as
+    # an inert string and silently drops the card's effect.
+    winter_event = data.pop("winter_card_event", None)
+    if winter_event is not None:
+        from lod_ai.rules_consts import WINTER_QUARTERS_CARDS
+        card_id = (data.get("current_card") or {}).get("id")
+        if not callable(winter_event) or card_id not in WINTER_QUARTERS_CARDS:
+            raise ValueError("Cannot save an unidentified Winter Quarters effect.")
+        data["_winter_card_event_id"] = card_id
+
     # Handle random.Random -> save its internal state
     rng = data.pop("rng", None)
     if rng and isinstance(rng, random.Random):
@@ -105,12 +116,37 @@ def _deserialize_state(data: dict) -> tuple[dict, set]:
         if key in data and isinstance(data[key], list):
             data[key] = set(data[key])
 
+    winter_card_id = data.pop("_winter_card_event_id", None)
+    if winter_card_id is None and isinstance(data.get("winter_card_event"), str):
+        # Older saves wrote repr(callback).  Its current-card identity is
+        # sufficient to recover the queued effect without trusting repr.
+        from lod_ai.rules_consts import WINTER_QUARTERS_CARDS
+        current_id = (data.get("current_card") or {}).get("id")
+        if current_id in WINTER_QUARTERS_CARDS:
+            winter_card_id = current_id
+    if winter_card_id is not None:
+        from lod_ai.cards import CARD_HANDLERS
+        from lod_ai.rules_consts import WINTER_QUARTERS_CARDS
+        if winter_card_id not in WINTER_QUARTERS_CARDS:
+            raise ValueError("Save contains an unknown Winter Quarters effect.")
+        pending: Dict[str, Any] = {}
+        CARD_HANDLERS[winter_card_id](pending, False)
+        data["winter_card_event"] = pending["winter_card_event"]
+
     return data, human_factions
 
 
 def save_game(state: Dict[str, Any], human_factions: set,
               filename: str | None = None) -> str:
-    """Save current game to a JSON file. Returns the filepath."""
+    """Save resumable game data to JSON and return the filepath.
+
+    Interactive callers must pass ``engine.state_for_save()`` so a save
+    inside a preview or unfinished phase contains its committed boundary,
+    rather than a partial operation that needs an unavailable call stack.
+    ``_card_progress`` and ``_resume_boundary`` persist with the rest of the
+    state; the former retains completed turns and the latter explains any
+    unfinished operation that must restart.
+    """
     _ensure_save_dir()
 
     if not filename:

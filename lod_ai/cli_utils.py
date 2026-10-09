@@ -127,10 +127,24 @@ def _save_bug_report() -> None:
 def _handle_meta_command(raw: str) -> bool:
     """Check for status/history/victory/bug/help/quit meta-commands. Returns True if handled."""
     cmd = raw.strip().lower()
-    if cmd in ("status", "s"):
+    if cmd in ("status", "s", "board"):
         if _game_state is not None:
             from lod_ai.cli_display import display_board_state
             display_board_state(_game_state)
+        else:
+            print("(No game state available yet.)")
+        return True
+    if cmd in ("card", "cards", "c"):
+        if _game_state is not None:
+            from lod_ai.cli_display import display_card
+            current = _game_state.get("current_card")
+            upcoming = _game_state.get("upcoming_card")
+            if current:
+                display_card(current, upcoming, _game_state.get("eligible"))
+            elif upcoming:
+                display_card(upcoming)
+            else:
+                print("(No card has been revealed yet.)")
         else:
             print("(No game state available yet.)")
         return True
@@ -144,29 +158,16 @@ def _handle_meta_command(raw: str) -> bool:
     if cmd in ("victory", "v"):
         if _game_state is not None:
             from lod_ai.cli_display import display_victory_margins
-            from lod_ai.rules_consts import FORT_PAT, VILLAGE
             print("\n  --- Victory Margins ---")
             display_victory_margins(_game_state)
 
-            # Show raw numbers that feed into the margins
-            sup_total = 0
-            opp_total = 0
-            for sid, lvl in _game_state.get("support", {}).items():
-                if lvl > 0:
-                    sup_total += lvl
-                elif lvl < 0:
-                    opp_total += abs(lvl)
-            cbc = _game_state.get("cbc", 0)
-            crc = _game_state.get("crc", 0)
-
-            forts = sum(
-                sp.get(FORT_PAT, 0)
-                for sp in _game_state.get("spaces", {}).values()
-            )
-            villages = sum(
-                sp.get(VILLAGE, 0)
-                for sp in _game_state.get("spaces", {}).values()
-            )
+            # Use the same population/Blockade math as victory resolution.
+            from lod_ai.victory import _summarize_board
+            from lod_ai.rules_consts import PATRIOTS
+            totals = _summarize_board(_game_state)
+            sup_total, opp_total = totals["support"], totals["opposition"]
+            cbc, crc = totals["cbc"], totals["crc"]
+            forts, villages = totals["forts"][PATRIOTS], totals["villages"]
 
             print(f"\n  Support Total: {sup_total}  |  Opposition Total: {opp_total}")
             print(f"  CBC: {cbc}  |  CRC: {crc}")
@@ -216,8 +217,12 @@ def _handle_meta_command(raw: str) -> bool:
         if _undo_checkpoint is not None and _engine_ref is not None:
             import copy
             restored = copy.deepcopy(_undo_checkpoint)
-            _engine_ref.state.clear()
-            _engine_ref.state.update(restored)
+            if hasattr(_engine_ref, "restore_checkpoint"):
+                _engine_ref.restore_checkpoint(restored)
+            else:
+                _engine_ref.state.clear()
+                _engine_ref.state.update(restored)
+                _engine_ref.ctx = {}
             print("  Undone! Replaying current card...")
             raise UndoException()
         else:
@@ -229,14 +234,25 @@ def _handle_meta_command(raw: str) -> bool:
     if cmd in ("save", "w"):
         if _engine_ref is not None:
             from lod_ai.save_game import save_game
-            filepath = save_game(_engine_ref.state, _engine_ref.human_factions)
+            saved_state = (_engine_ref.state_for_save() if hasattr(_engine_ref, "state_for_save")
+                           else _engine_ref.state)
+            filepath = save_game(saved_state, _engine_ref.human_factions)
             print(f"  Game saved to: {filepath}")
+            boundary = saved_state.get("_resume_boundary", {})
+            if boundary:
+                kind = boundary.get("kind", "turn")
+                label = {"turn": f"{boundary.get('faction', 'Current')} turn",
+                         "winter_quarters": "Winter Quarters",
+                         "brilliant_stroke": "Brilliant Stroke decision"}.get(kind, kind)
+                print(f"  The unfinished {label} will restart from its beginning on load.")
+                print("  Previously completed faction turns are preserved.")
         else:
             print("(No game in progress to save.)")
         return True
     if cmd in ("help", "?"):
         print("\n  Available commands (can be typed at any prompt):")
-        print("    status  / s  — Show full board state")
+        print("    status  / s  — Show full board state (also: board)")
+        print("    cards   / c  — Show current and upcoming card information")
         print("    victory / v  — Show victory margins for all factions")
         print("    deck    / d  — Show cards played/remaining and next Winter Quarters")
         print("    history / h  — Show game log")
