@@ -9,13 +9,15 @@ from lod_ai.map.adjacency import population as _map_population
 from lod_ai.util.history import push_history
 from lod_ai.util import eligibility as elig
 
-def _complete_noncombat_preview(state: Dict, card_id: int) -> Optional[Dict]:
-    """Return a completed copy only when granted actions need no combat dice.
+def _complete_pre_roll_preview(state: Dict, card_id: int) -> Optional[Dict]:
+    """Complete known Event effects without resolving offered Battles.
 
     §5.3 includes immediate free Commands in the Event. A queued but
     impossible Battle must not conceal a deterministic §8.3.3 net shift.
-    Discard combat-dependent results entirely: Q24 does not authorize a
-    new efficacy policy based on the outcome of a speculative Battle.
+    Q24: judge only information known before rolling. The copied state's
+    preview flag makes both direct and queued Battle grants record their
+    availability without dice, losses, or Win-the-Day changes. Printed
+    follow-ups are evaluated against that known board, not a predicted win.
     Human decisions likewise cannot be supplied by this bot preview.
     """
     from copy import deepcopy
@@ -25,11 +27,12 @@ def _complete_noncombat_preview(state: Dict, card_id: int) -> Optional[Dict]:
     if any(faction in humans for faction, _op, _loc in state.get("free_ops", [])):
         return None
     completed = deepcopy(state)
+    completed["_event_pre_roll_preview"] = True
     dice_before = completed.get("_battle_dice_rolled", 0)
     errors_before = len(completed.get("_free_op_error_log", []))
     Engine(completed)._drain_free_ops(completed, card_id)
     if completed.get("_battle_dice_rolled", 0) != dice_before:
-        return None
+        raise RuntimeError("Event pre-roll preview attempted to roll Battle dice")
     if len(completed.get("_free_op_error_log", [])) > errors_before:
         error = completed["_free_op_error_log"][errors_before]
         raise RuntimeError(f"Event free-operation preview failed: {error}")
@@ -300,12 +303,12 @@ class BaseBot:
         state.pop("_event_q_spaces", None)
         if self._faction_event_conditions(state, card):
             preview = self._event_choice_preview
-            if preview is not None and not preview.get("battle_dice"):
+            if preview is not None:
                 # Question spaces and the flowchart D6 can both change the
                 # actual target after the first preview. Check the current
-                # choice, including queued Events with no possible Battle.
-                # Completed combat-dependent previews are discarded below;
-                # Q24's contingent-Battle policy remains unchanged.
+                # choice, including all known queued Event follow-ups.
+                # This is still before execution: Q24 permits no pivot
+                # after the actual Battle outcome becomes known.
                 if self._is_ineffective_event(card, state):
                     state.pop("_event_q_spaces", None)
                     return False
@@ -313,9 +316,10 @@ class BaseBot:
             from lod_ai.util.event_audit import record_choice, support_difference
             d_before = support_difference(state)
             dice_before = state.get("_battle_dice_rolled", 0)
+            battles_before = state.get("_battle_commands_executed", 0)
             self._execute_event(card, state)
             record_choice(state, self.faction, card, d_before, dice_before,
-                          preview)
+                          preview, battles_before=battles_before)
             return True
         return False
 
@@ -447,7 +451,8 @@ class BaseBot:
                         pt.pop(tag, None)
         b_cmp = deepcopy(before)
         for st_ in (test, b_cmp):
-            for k in ("history", "rng", "rng_log", "_battle_dice_rolled"):
+            for k in ("history", "rng", "rng_log", "_battle_dice_rolled",
+                      "_battle_commands_executed"):
                 st_.pop(k, None)
         return test == b_cmp
 
@@ -475,15 +480,20 @@ class BaseBot:
         # unaffected by the key itself.
         before["active"] = self.faction
         after["active"] = self.faction
+        # Never inspect the future combat RNG, even on a copied state.
+        # battle.execute handles direct as well as engine-queued Battles.
+        after["_event_pre_roll_preview"] = True
+        after["_event_preview_battles"] = []
         shaded = card.get("dual") and self.faction in {C.PATRIOTS, C.FRENCH}
         try:
             handler(after, shaded=shaded)
-            if ((after.get("free_ops") or after.get("free_op_followups"))
-                    and after.get("_battle_dice_rolled", 0)
-                    == before.get("_battle_dice_rolled", 0)):
-                completed = _complete_noncombat_preview(after, card["id"])
+            if after.get("free_ops") or after.get("free_op_followups"):
+                completed = _complete_pre_roll_preview(after, card["id"])
                 if completed is not None:
                     after = completed
+            if (after.get("_battle_dice_rolled", 0)
+                    != before.get("_battle_dice_rolled", 0)):
+                raise RuntimeError("Event pre-roll preview attempted to roll Battle dice")
         except Exception as exc:
             self._event_choice_preview = {"error": type(exc).__name__}
             state.setdefault("_event_preview_error_log", []).append({
@@ -501,6 +511,9 @@ class BaseBot:
             sup, opp = self._support_opposition_totals(st)
             return sup - opp
         d_before, d_after = _support_diff(before), _support_diff(after)
+        offered_battles = after.pop("_event_preview_battles", [])
+        after.pop("_event_pre_roll_preview", None)
+        battle_possible = bool(offered_battles)
         # Resolving a declined queue removes its empty container. Container
         # presence is not an Event effect, including for removal-only checks.
         for st_ in (before, after):
@@ -509,7 +522,8 @@ class BaseBot:
                     st_.pop(key, None)
         # §8.3.3: "where the only effect would be to remove one or more
         # friendly pieces without replacing them with other friendly pieces"
-        only_friendly = self._only_removes_friendly_pieces(before, after)
+        only_friendly = (not battle_possible
+                         and self._only_removes_friendly_pieces(before, after))
         battle_dice = (after.get("_battle_dice_rolled", 0)
                        - before.get("_battle_dice_rolled", 0))
         pending_free_ops = bool(after.get("free_ops") or after.get("free_op_followups"))
@@ -519,15 +533,20 @@ class BaseBot:
         # rng; rng_log grows on any die roll, and rolling dice is not an
         # effect.
         for st_ in (before, after):
-            for k in ("history", "rng", "rng_log", "_battle_dice_rolled"):
+            for k in ("history", "rng", "rng_log", "_battle_dice_rolled",
+                      "_battle_commands_executed"):
                 st_.pop(k, None)
-        no_effect = before == after
+        # An executable Battle grant is a possible benefit, not a known
+        # casualty/shift. Do not mistake its suppressed resolution for no
+        # effect, or let it override a known enemy-favoring printed shift.
+        no_effect = not battle_possible and before == after
         # Store measurements, not the acceptance Boolean, so diagnostics can
         # independently test all three clauses of §8.3.3.
         self._event_choice_preview = {
             "d_before": d_before, "d_after": d_after,
             "only_friendly_removal": only_friendly, "no_effect": no_effect,
             "battle_dice": battle_dice, "pending_free_ops": pending_free_ops,
+            "battle_possible": battle_possible, "evaluation": "pre_roll",
         }
         from lod_ai.util.event_audit import favors_enemy
         return (favors_enemy(self.faction, d_before, d_after)

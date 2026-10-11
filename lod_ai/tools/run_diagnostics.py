@@ -21,7 +21,7 @@ def collect_runtime_diagnostics(state: dict) -> dict[str, Any]:
         "illegal_actions": deepcopy(state.get("_illegal_action_log") or []),
         "free_op_errors": deepcopy(state.get("_free_op_error_log") or []),
         "event_preview_errors": deepcopy(state.get("_event_preview_error_log") or []),
-        # Battle-dependent adverse outcomes are evidence for Q24, not a
+        # Battle-dependent adverse outcomes under Q24 are observations, not a
         # proven illegal decision. Preserve them without making them errors.
         "event_outcome_observations": deepcopy(state.get("event_outcome_observations") or []),
         "free_op_skips": [message for message in history
