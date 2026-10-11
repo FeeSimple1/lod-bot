@@ -252,7 +252,9 @@ def _log_empty_menu(state: Dict[str, Any], faction: str, command: str) -> None:
 # Command wizards
 # ---------------------------------------------------------------------------
 
-def _march_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
+def _march_wizard(engine: Engine, faction: str, limited: bool, *,
+                  allow_in_place: bool = False) -> Callable[[dict, dict], Any]:
+    allow_in_place = allow_in_place and faction == RC.BRITISH
     bring = choose_one("Bring escorts?", [("No", False), ("Yes", True)])
     sources = _movable_sources(engine.state, faction, bring_escorts=bring)
     if faction == RC.BRITISH and not (engine.ctx.get("common_cause")
@@ -261,7 +263,7 @@ def _march_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
             pieces.pop(RC.WARPARTY_U, None)
             pieces.pop(RC.WARPARTY_A, None)
         sources = {sid: pieces for sid, pieces in sources.items() if pieces}
-    if not sources:
+    if not sources and not allow_in_place:
         _log_empty_menu(engine.state, faction, "March")
         raise ValueError("No pieces available to March.")
     all_space_ids = map_adj.all_space_ids()
@@ -275,6 +277,9 @@ def _march_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
                     filtered_out.append({"space": dst, "reason": "Indians cannot march to City"})
                     continue
                 dest_options.add(dst)
+    if allow_in_place:
+        # §3.2.3 permits selecting a destination without moving cubes.
+        dest_options.update(sid for sid in all_space_ids if sid != RC.WEST_INDIES_ID)
     _log_wizard_filter(engine.state, "March", len(all_space_ids), len(dest_options), filtered_out)
     if not dest_options:
         _log_empty_menu(engine.state, faction, "March (destinations)")
@@ -290,11 +295,11 @@ def _march_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
         origin_candidates = [s for s in sources if s != dest and any(sources[s].values())
                              and (map_adj.is_adjacent(s, dest)
                                   or march._city_network_legal(engine.state, faction, s, dest))]
-        origins = choose_multiple(
+        origins = (choose_multiple(
             f"Select origins marching to {dest}:",
             [(o, o) for o in origin_candidates],
-            min_sel=1,
-        )
+            min_sel=0 if allow_in_place else 1,
+        ) if origin_candidates else [])
         for origin in origins:
             pieces = {}
             for tag, available in sources[origin].items():
@@ -304,7 +309,7 @@ def _march_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
                     sources[origin][tag] -= count
             if pieces:
                 move_plan.append({"src": origin, "dst": dest, "pieces": pieces})
-    if not move_plan:
+    if not move_plan and not allow_in_place:
         raise ValueError("March must move at least one piece.")
 
     return lambda s, c: march.execute(
@@ -330,8 +335,11 @@ def _cli_defender_activation(state, sid, def_side, owner, n_ug, ug_tag):
     )
 
 
-def _battle_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
+def _battle_wizard(engine: Engine, faction: str, limited: bool, *,
+                   allowed_spaces: set[str] | None = None) -> Callable[[dict, dict], Any]:
     candidates = _battle_candidates(engine.state, faction)
+    if allowed_spaces is not None:
+        candidates = [sid for sid in candidates if sid in allowed_spaces]
     if not candidates:
         _log_empty_menu(engine.state, faction, "Battle")
         raise ValueError("No legal Battle spaces.")

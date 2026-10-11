@@ -226,6 +226,14 @@ def move_piece(state: Dict[str, Any], tag: str, src: str, dst: str, qty: int = 1
     if qty <= 0:
         return 0
     tag = _norm(tag)
+    # §2.3.9 and the explicit Event exception in §5.1.1 prohibit French
+    # Regulars on the map (including West Indies) before the Treaty.
+    # Like a blocked base placement, leave the source intact and let
+    # the rest of an Event resolve under §5.1.3.
+    if (tag == C.REGULAR_FRE and dst in state.get("spaces", {})
+            and not state.get("toa_played")):
+        push_history(state, f"French Regulars cannot enter {dst} before Treaty of Alliance")
+        return 0
     src_dict = _space_dict(state, src)
     dst_dict = _space_dict(state, dst)
 

@@ -9,7 +9,37 @@ from lod_ai.map.adjacency import population as _map_population
 from lod_ai.util.history import push_history
 from lod_ai.util import eligibility as elig
 
+def _complete_noncombat_preview(state: Dict, card_id: int) -> Optional[Dict]:
+    """Return a completed copy only when granted actions need no combat dice.
+
+    §5.3 includes immediate free Commands in the Event. A queued but
+    impossible Battle must not conceal a deterministic §8.3.3 net shift.
+    Discard combat-dependent results entirely: Q24 does not authorize a
+    new efficacy policy based on the outcome of a speculative Battle.
+    Human decisions likewise cannot be supplied by this bot preview.
+    """
+    from copy import deepcopy
+    from lod_ai.engine import Engine
+
+    humans = state.get("human_factions", set())
+    if any(faction in humans for faction, _op, _loc in state.get("free_ops", [])):
+        return None
+    completed = deepcopy(state)
+    dice_before = completed.get("_battle_dice_rolled", 0)
+    errors_before = len(completed.get("_free_op_error_log", []))
+    Engine(completed)._drain_free_ops(completed, card_id)
+    if completed.get("_battle_dice_rolled", 0) != dice_before:
+        return None
+    if len(completed.get("_free_op_error_log", [])) > errors_before:
+        error = completed["_free_op_error_log"][errors_before]
+        raise RuntimeError(f"Event free-operation preview failed: {error}")
+    if completed.get("free_ops") or completed.get("free_op_followups"):
+        return None
+    return completed
+
+
 class BaseBot:
+    _event_choice_preview: Optional[Dict] = None
     faction: str            # e.g. "BRITISH"
 
     # ------------ public entry ------------
@@ -259,6 +289,7 @@ class BaseBot:
                 return False  # condition not met → Command & SA
 
         # 3. Ineffective-event test (Rule 8.3.3)
+        self._event_choice_preview = None
         if self._is_ineffective_event(card, state):
             return False
 
@@ -268,20 +299,23 @@ class BaseBot:
         # clear any stale set from a previous decision first.
         state.pop("_event_q_spaces", None)
         if self._faction_event_conditions(state, card):
-            # §8.3.3 post-hoc audit (ROADMAP Piece 4): record the actual
-            # Support−Opposition difference around a bot-CHOSEN event so
-            # tools.invariants can assert the net shift never favors the
-            # enemy side.  Directive-forced events above are exempt
-            # (§8.3.1 instructions override the Ineffective test).
-            sup_b, opp_b = self._support_opposition_totals(state)
+            preview = self._event_choice_preview
+            if preview is not None and not preview.get("battle_dice"):
+                # Question spaces and the flowchart D6 can both change the
+                # actual target after the first preview. Check the current
+                # choice, including queued Events with no possible Battle.
+                # Completed combat-dependent previews are discarded below;
+                # Q24's contingent-Battle policy remains unchanged.
+                if self._is_ineffective_event(card, state):
+                    state.pop("_event_q_spaces", None)
+                    return False
+                preview = self._event_choice_preview
+            from lod_ai.util.event_audit import record_choice, support_difference
+            d_before = support_difference(state)
+            dice_before = state.get("_battle_dice_rolled", 0)
             self._execute_event(card, state)
-            sup_a, opp_a = self._support_opposition_totals(state)
-            state.setdefault("event_choice_audit", []).append({
-                "faction": self.faction,
-                "card": int(card.get("id", 0)),
-                "d_before": sup_b - opp_b,
-                "d_after": sup_a - opp_a,
-            })
+            record_choice(state, self.faction, card, d_before, dice_before,
+                          preview)
             return True
         return False
 
@@ -413,7 +447,7 @@ class BaseBot:
                         pt.pop(tag, None)
         b_cmp = deepcopy(before)
         for st_ in (test, b_cmp):
-            for k in ("history", "rng", "rng_log"):
+            for k in ("history", "rng", "rng_log", "_battle_dice_rolled"):
                 st_.pop(k, None)
         return test == b_cmp
 
@@ -425,6 +459,13 @@ class BaseBot:
         side."""
         handler = CARD_HANDLERS.get(card["id"])
         if not handler:
+            self._event_choice_preview = {"error": "missing handler"}
+            state.setdefault("_event_preview_error_log", []).append({
+                "faction": self.faction, "card_id": card["id"],
+                "error_type": "MissingEventHandler",
+                "message": f"No registered handler for card {card['id']}",
+                "source": "ineffective_event_preview",
+            })
             return True
         from copy import deepcopy
         before = deepcopy(state)
@@ -437,7 +478,19 @@ class BaseBot:
         shaded = card.get("dual") and self.faction in {C.PATRIOTS, C.FRENCH}
         try:
             handler(after, shaded=shaded)
-        except Exception:
+            if ((after.get("free_ops") or after.get("free_op_followups"))
+                    and after.get("_battle_dice_rolled", 0)
+                    == before.get("_battle_dice_rolled", 0)):
+                completed = _complete_noncombat_preview(after, card["id"])
+                if completed is not None:
+                    after = completed
+        except Exception as exc:
+            self._event_choice_preview = {"error": type(exc).__name__}
+            state.setdefault("_event_preview_error_log", []).append({
+                "faction": self.faction, "card_id": card["id"],
+                "error_type": type(exc).__name__, "message": str(exc),
+                "source": "ineffective_event_preview",
+            })
             return True  # treat as ineffective if handler crashes
         # §8.3.3 net-shift clause. Total Support − Total Opposition per
         # §1.6.2/§1.6.3 with §1.9: Blockades suppress Support, never
@@ -448,20 +501,34 @@ class BaseBot:
             sup, opp = self._support_opposition_totals(st)
             return sup - opp
         d_before, d_after = _support_diff(before), _support_diff(after)
-        if self.faction in (C.BRITISH, C.INDIANS) and d_after < d_before:
-            return True
-        if self.faction in (C.PATRIOTS, C.FRENCH) and d_after > d_before:
-            return True
+        # Resolving a declined queue removes its empty container. Container
+        # presence is not an Event effect, including for removal-only checks.
+        for st_ in (before, after):
+            for key in ("free_ops", "free_op_followups"):
+                if not st_.get(key):
+                    st_.pop(key, None)
         # §8.3.3: "where the only effect would be to remove one or more
         # friendly pieces without replacing them with other friendly pieces"
-        if self._only_removes_friendly_pieces(before, after):
-            return True
+        only_friendly = self._only_removes_friendly_pieces(before, after)
+        battle_dice = (after.get("_battle_dice_rolled", 0)
+                       - before.get("_battle_dice_rolled", 0))
+        pending_free_ops = bool(after.get("free_ops") or after.get("free_op_followups"))
         # No-effect comparison. Drop non-semantic keys: two deepcopies of a
         # random.Random NEVER compare equal (identity-based __eq__), which
         # silently disabled this clause in any state carrying the seeded
         # rng; rng_log grows on any die roll, and rolling dice is not an
         # effect.
         for st_ in (before, after):
-            for k in ("history", "rng", "rng_log"):
+            for k in ("history", "rng", "rng_log", "_battle_dice_rolled"):
                 st_.pop(k, None)
-        return before == after
+        no_effect = before == after
+        # Store measurements, not the acceptance Boolean, so diagnostics can
+        # independently test all three clauses of §8.3.3.
+        self._event_choice_preview = {
+            "d_before": d_before, "d_after": d_after,
+            "only_friendly_removal": only_friendly, "no_effect": no_effect,
+            "battle_dice": battle_dice, "pending_free_ops": pending_free_ops,
+        }
+        from lod_ai.util.event_audit import favors_enemy
+        return (favors_enemy(self.faction, d_before, d_after)
+                or only_friendly or no_effect)

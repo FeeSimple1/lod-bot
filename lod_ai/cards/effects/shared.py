@@ -16,7 +16,10 @@ from lod_ai.board.pieces import (
     move_piece, place_piece, remove_piece, place_with_caps, place_marker,
     flip_pieces,
 )
-from lod_ai.rules_consts import MAX_FNI, MIN_RESOURCES, MAX_RESOURCES, BRITISH, PATRIOTS, FRENCH, INDIANS
+from lod_ai.rules_consts import (
+    MAX_FNI, MIN_RESOURCES, MAX_RESOURCES,
+    BRITISH, PATRIOTS, FRENCH, INDIANS, BLOCKADE,
+)
 from lod_ai.util.loss_mod import queue_loss_mod
 from lod_ai.map import adjacency as _madj
 from lod_ai.util.free_ops import queue_free_op
@@ -119,7 +122,7 @@ def pick_colonies(state, count: int = 1):
 # --------------------------------------------------------------------------- #
 # §8.2 tie-break picks for candidates of EQUAL priority (re-exported so card
 # modules have a single import site).
-from lod_ai.bots.random_spaces import pick_random_spaces  # noqa: E402
+from lod_ai.bots.random_spaces import pick_by_priority, pick_random_spaces  # noqa: E402
 
 
 def _walk_toward(cur: int, target: int, steps: int) -> int:
@@ -132,26 +135,12 @@ def _walk_toward(cur: int, target: int, steps: int) -> int:
     return max(MIN_SUPPORT, min(MAX_SUPPORT, new))
 
 
-def select_support_shift_spaces(state, candidates, count, *, target: int,
-                                steps: int = 1, shaded=None):
-    """Select *count* spaces for an Event Support/Opposition shift.
+def support_shift_gain_key(state, space_id, *, target: int,
+                           steps: int = 1, shaded=None):
+    """The executing side's ordered Event shift gains (§§1.9, 8.3.6).
 
-    §8.3.5 routes Event shift-space selection to §8.3.6: Royalist factions
-    select "for the highest gain in Support, then the highest loss in
-    Opposition"; Rebellion factions the reverse. Gain/loss is Population-
-    weighted (§8.1.1: level times Population), with Active counting double
-    Passive (§1.6.2) — both fall out of the ±2/±1 support encoding times
-    Population. Candidates tied on the §8.3.6 key are resolved by the §8.2
-    Random Spaces table (per §8.1/§8.2, random selection applies only among
-    candidates of EQUAL priority).
-
-    The executing side comes from state["active"] when set (base_bot sets it
-    during event execution), else from *shaded* per §8.3.2 (Non-player
-    Patriot/French execute the shaded text, British/Indian the unshaded).
-    Zero-gain candidates outrank negative-gain ones, so an event forced to
-    select spaces never shifts a space against the executing side while a
-    harmless space exists. The §8.3.3 net-shift guard (base_bot) keeps bots
-    from playing an event whose net shift favors the enemy at all.
+    Exposed for Events that must combine shift priorities with additional
+    piece-placement or removal choices under §8.3.5.
     """
     active = state.get("active")
     if active is not None:
@@ -161,24 +150,44 @@ def select_support_shift_spaces(state, candidates, count, *, target: int,
     else:
         royalist = True
 
-    support = state.get("support", {})
+    pop = _madj.population(space_id)
+    blockaded = state.get("markers", {}).get(BLOCKADE, {}).get("on_map", ())
+    support_pop = 0 if space_id in blockaded else pop
+    cur = state.get("support", {}).get(space_id, 0)
+    new = _walk_toward(cur, target, steps)
+    support_gain = (max(new, 0) - max(cur, 0)) * support_pop
+    opposition_gain = (max(-new, 0) - max(-cur, 0)) * pop
+    if royalist:
+        return (support_gain, -opposition_gain)
+    return (opposition_gain, -support_gain)
 
-    def gain_key(sid):
-        pop = _madj.population(sid)
-        cur = support.get(sid, 0)
-        new = _walk_toward(cur, target, steps)
-        support_gain = (max(new, 0) - max(cur, 0)) * pop
-        opposition_gain = (max(-new, 0) - max(-cur, 0)) * pop
-        if royalist:
-            return (support_gain, -opposition_gain)
-        return (opposition_gain, -support_gain)
 
-    chosen: list = []
-    remaining = list(dict.fromkeys(candidates))
-    while remaining and len(chosen) < count:
-        best = max(gain_key(s) for s in remaining)
-        ties = [s for s in remaining if gain_key(s) == best]
-        pick = ties[0] if len(ties) == 1 else pick_random_spaces(state, ties, 1)[0]
-        chosen.append(pick)
-        remaining.remove(pick)
-    return chosen
+def select_support_shift_spaces(state, candidates, count, *, target: int,
+                                steps: int = 1, shaded=None):
+    """Select *count* spaces for an Event Support/Opposition shift.
+
+    §8.3.5 routes Event shift-space selection to §8.3.6: Royalist factions
+    select "for the highest gain in Support, then the highest loss in
+    Opposition"; Rebellion factions the reverse. Gain/loss is Population-
+    weighted (§8.1.1: level times Population), with Active counting double
+    Passive (§1.6.2). A Blockaded City's Population counts as zero for
+    Support only (§1.9); Opposition retains its printed Population.
+    Flowchart-question matches take precedence (§8.3.5). Candidates tied
+    on the §8.3.6 key are resolved by the §8.2
+    Random Spaces table (per §8.1/§8.2, random selection applies only among
+    candidates of EQUAL priority).
+
+    The executing side comes from state["active"] when set (base_bot sets it
+    during event execution), else from *shaded* per §8.3.2 (Non-player
+    Patriot/French execute the shaded text, British/Indian the unshaded).
+    Within the question-space priority, zero-gain candidates outrank
+    negative-gain ones. The §8.3.3 net-shift guard (base_bot) separately
+    checks whether the Event would favor the enemy side.
+    """
+    scored = []
+    for sid in dict.fromkeys(candidates):
+        gains = support_shift_gain_key(
+            state, sid, target=target, steps=steps, shaded=shaded)
+        # pick_by_priority sorts ascending and applies question spaces first.
+        scored.append((tuple(-gain for gain in gains), sid))
+    return pick_by_priority(state, scored, count=count)

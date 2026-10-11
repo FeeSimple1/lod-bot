@@ -4820,3 +4820,55 @@ could create Forts in Reserves).  Tests: +13
 `dual` flag (they encoded the pre-S67 unconditional-shaded lookup).
 Battery: 1,396 + 101 green, gate 1-20 x3 clean, soak 120 DONE,
 rebaselined (P/F event-choice changes are balance-scale).
+
+## Review: §8.3.3 event decision diagnostics and remaining Q24
+
+The previous audit sampled the event handler boundary, before queued free
+Commands resolved, and treated an adverse realized Battle outcome as proof
+of an illegal event choice. This produced false positives for card 1 and
+card 5 in 1776 seeds 10212/10240 and 1775 seeds 10130/10155. §5.3 includes
+immediate granted Commands in event resolution; §8.3.3 applies when the
+Non-player chooses the Event, before unknown Battle results.
+
+The audit now stores independently measured preview Support–Opposition
+deltas, no-effect and friendly-removal flags, plus completed actual event
+deltas after free operations. A counter increments only at actual Battle
+D3 rolls; Random Spaces and flowchart dice cannot suppress deterministic
+violations. Adverse actual Battle outcomes remain available in
+`event_outcome_observations`; they are observations rather than assertions
+that the bot made an illegal choice. Deterministic adverse actual choices
+still fail, and Event-question dice or question-space changes trigger a
+deterministic preview recheck before execution. Counter state survives
+save/load and is excluded from semantic no-effect and friendly-removal
+comparisons.
+
+The contingent-event selection policy itself remains a documented modeling
+limitation, **QUESTIONS.md Q24**, rather than being replaced by an invented
+expected-value or risk rule. Passing the diagnostic does not certify that
+policy. Source references and the concrete ruling request are in Q24.
+
+Also added §2.3.9/§5.1.1 invariant: no French Regulars may be on any map
+space before Treaty, including West Indies. This catches illegal placement
+even when piece conservation is perfect.
+
+Validation: 53 focused event/invariant tests passed, including harmful
+deterministic choices, independent preview evidence, question-space target
+changes, partial/completed free-operation resolution, unfavorable Battle
+observations, Random Spaces non-exemption, counter roundtrip, and conserved
+pre-Treaty placement. All four original failing full games above completed
+with per-card invariants enabled. No outcome/balance baseline was updated.
+
+Follow-up source review confirmed card 1's printed sequencing: March and
+Battle precede Propaganda placement and the Neutral shift. The engine now
+supports serialized `free_op_followups`, consumed after free operations
+including declines/errors, before event-audit completion. A second copied
+state now completes those queued effects for the efficacy test when no
+Battle dice or human free-operation decisions are involved. This catches
+harmful Neutral shifts after a legally declined Battle and Events whose
+entire sequence has no effect. If the completed copy involves Battle dice,
+its result is discarded and the existing handler-only contingent preview
+is retained. Q24 documents that remaining contingent-result omission and
+the limit of whole-event Battle observation classification. The pre-edit
+source audit is `docs/review_event_resolution_sequence.md`. Unexpected efficacy-preview
+exceptions and missing handlers are now structured diagnostic errors, so
+silently declining their Events cannot make a batch gate report clean.

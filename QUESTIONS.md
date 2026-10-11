@@ -429,3 +429,59 @@ per-space counts (schema + save format + validate + RL/CoC pricing +
 card handlers + census invariant).  (b) is a working session of
 its own.  Balance stakes unmeasured; the RL pricing difference plays
 into the British WQ economy.
+
+---
+
+## Q24 (review, OPEN): Ineffective Events with contingent Battle outcomes
+
+**Decision needed:** How should a Non-player apply §8.3.3 before choosing
+an Event whose completed Support minus Opposition change depends on Battle
+dice: assess only guaranteed non-Battle effects, require every possible
+Battle outcome to be non-harmful, or apply a specified probability or
+expected-value criterion? In particular, may a free Battle make card 1's
+otherwise harmful Opposition-to-Neutral shift effective?
+
+Sources: `Reference Documents/Manual Ch 8.txt` §8.3.3 (lines 181–188),
+§8.3.5 (lines 202–206); `Manual Ch 5.txt` §5.3 (lines 56–62);
+`card reference full.txt`, card 1 shaded (lines 10–11) and card 5 shaded
+(lines 62–63). §8.3.3 rejects an enemy-favoring net shift; §5.3 makes
+granted free Commands immediate; §8.3.5 supplies their faction priorities.
+These provisions do not specify an advance aggregation of uncertain Battle
+results for this efficacy test.
+
+The current `_is_ineffective_event` policy is retained for contingent events:
+it runs the handler on a copy of the current seeded RNG state. Card 5's
+handler executes Battle in that preview, before the actual flowchart may
+consume another die; the actual Battle can therefore differ. Card 1 queues
+March/Battle and its following marker/Neutral effects in printed order, so
+its handler-only efficacy preview does not evaluate their complete result.
+Before that sequencing fix it incorrectly applied Neutral before Battle,
+which could reject a potentially beneficial complete event. Draining the
+preview alone would extend RNG lookahead, not settle how a Non-player should
+evaluate an unknown combat result.
+
+The October follow-up distinguishes queued Commands that actually need
+Battle dice from deterministic completed Events. A second state copy runs
+the queued operations and following printed effects; only a completed
+result with no Battle dice and no human operation choice can supply the
+efficacy test. Any simulated combat-dependent result is discarded in full,
+leaving the existing handler-only contingent policy above. Thus a queued
+Battle that legally declines no longer hides a harmful card 1 Neutral shift
+or a no-effect Event. The deterministic test is repeated after the Event
+flowchart questions, whose D6 or question-space preference can change the
+actual target. This does not choose an advance criterion for uncertain
+Battle outcomes or resolve Q24.
+
+The diagnostic now records independent preview deltas/no-effect/removal
+evidence and waits for granted free operations before measuring the actual
+completed result. An actual adverse Battle outcome is retained as an
+observation, not declared an illegal decision. Deterministic adverse choices
+(including target changes after question-space selection) remain checked;
+Random Spaces tie-break dice do not create an exemption. Passing these
+diagnostics does not certify the unresolved contingent-event selection
+policy above. A compound Event with actual Battle dice is classified as
+contingent as a whole: the current evidence cannot isolate an unrelated
+deterministic harmful subeffect from its Battle-dependent net result.
+Independent harmful preview evidence is still rejected. Rule sources remain
+unchanged. The balance baseline is refreshed for the documented rules
+corrections; that refresh does not resolve this contingent-event question.
