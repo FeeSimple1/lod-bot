@@ -109,21 +109,17 @@ def evt_001_waxhaws(state, shaded=False):
     """
     eligible = [
         sid for sid, sp in state["spaces"].items()
-        if sp.get(REGULAR_BRI)      # has British pieces
+        if shaded or any(sp.get(tag, 0) for tag in (REGULAR_BRI, TORY, FORT_BRI))
     ]
     if not eligible:
-        push_history(state, "Waxhaws: no space with British pieces — no effect")
+        push_history(state, "Waxhaws: no eligible space — no effect")
         return
-    # S76 (second cut — the first used a plain §8.2 pick and the §8.3.3
-    # net-shift invariant caught a Patriot bot handing the Royalists a
-    # toward-Neutral shift on an Opposition space): the choice is
-    # SIDE-SENSITIVE.  Shaded (Rebellion executor): the space hosts a
-    # free Patriot March+Battle (§8.3.5 free-Command priorities → the
-    # card-51/T8 winnable-Battle target) and the toward-Neutral shift
-    # must not favor the Royalists (support>0 shifts pro-Rebel, <0
-    # pro-Royalist).  Unshaded (Royalist executor): maximise the
-    # Continentals removed (§8.1.1) then the pop-weighted gain of the
-    # toward-Active-Support shift.  §8.2 table on remaining ties (Q22).
+    # Shaded: choose the free Patriot March+Battle target first (§8.3.5),
+    # then use the current Support direction for the remaining choices.
+    # Battle can change Support before the subsequent Neutral shift.
+    # Unshaded: apply §8.3.6 shift priorities, then
+    # maximise Continentals removed within those priorities (§8.3.5).
+    # §8.2 table on remaining ties (Q22).
     sup_map = state.get("support", {})
     if shaded:
         from lod_ai.commands import battle as _battle
@@ -134,26 +130,31 @@ def evt_001_waxhaws(state, shaded=False):
             shift_ben = 1 if sup > 0 else (0 if sup == 0 else -1)
             scored.append(((0 if sid == bt else 1, -shift_ben), sid))
     else:
+        from .shared import support_shift_gain_key
+        from lod_ai.rules_consts import ACTIVE_SUPPORT
+
         scored = []
         for sid in eligible:
-            sup = sup_map.get(sid, 0)
             cont = min(2, state["spaces"][sid].get(REGULAR_PAT, 0))
-            pop = map_adj.population(sid) or 0
-            gain = pop if sup < ACTIVE_SUPPORT else 0
-            scored.append(((-cont, -gain), sid))
+            gain = support_shift_gain_key(
+                state, sid, target=ACTIVE_SUPPORT, shaded=False)
+            scored.append((tuple(-value for value in gain) + (-cont,), sid))
     target = pick_by_priority(state, scored, count=1)[0]
 
     if shaded:
+        from lod_ai.util.free_ops import queue_after_free_ops
+        from lod_ai.rules_consts import NEUTRAL
+
         queue_free_op(state, PATRIOTS, "march",  target)
         queue_free_op(state, PATRIOTS, "battle", target)
-        place_marker(state, PROPAGANDA, target, 2)
-        # Shift one level toward Neutral (toward 0)
-        cur = state.get("support", {}).get(target, 0)
-        if cur > 0:
-            shift_support(state, target, -1)
-        elif cur < 0:
-            shift_support(state, target, +1)
-        push_history(state, f"Waxhaws (shaded): March/Battle in {target}, +2 PROPAGANDA, shift toward Neutral")
+        # §5.1/§5.3: the granted Commands interrupt before the remaining
+        # Event text. Battle may change the level shifted toward Neutral.
+        queue_after_free_ops(state, "place_marker", marker=PROPAGANDA,
+                             space=target, quantity=2)
+        queue_after_free_ops(state, "shift_support_toward", space=target,
+                             target=NEUTRAL, steps=1)
+        push_history(state, f"Waxhaws (shaded): queued March/Battle in {target}, "
+                     "then +2 PROPAGANDA and shift toward Neutral")
     else:
         remove_piece(state, REGULAR_PAT, target, 2, to="casualties")
         shift_support(state, target, +1)     # toward Active Support
@@ -193,23 +194,26 @@ def evt_016_mercy_warren(state, shaded=False):
     """
     rng = state.get("rng")
     if shaded:
+        from .shared import support_shift_gain_key
+        from lod_ai.rules_consts import PASSIVE_OPPOSITION
+
         city = state.get("card16_city")
         if not city or not _is_city_late(city):
-            # "Shift one City TO Passive Opposition" — rebel-favoring:
-            # largest (level - (-1)) x Pop gain first (§8.3.6 semantics),
-            # §8.2 seeded ties (Session 48/T9: was first-alphabetical).
+            # §8.3.6: Opposition gain first, then Support loss; value
+            # the full shift TO Passive Opposition with §1.9 Blockades.
             cands = []
             for sid in state.get("spaces", {}):
                 if not _is_city_late(sid):
                     continue
                 lvl = state.get("support", {}).get(sid, 0)
-                gain = (lvl + 1) * map_adj.population(sid)
-                cands.append(((-gain,), sid))
+                gain = support_shift_gain_key(
+                    state, sid, target=PASSIVE_OPPOSITION,
+                    steps=abs(lvl - PASSIVE_OPPOSITION), shaded=True)
+                cands.append((tuple(-value for value in gain), sid))
             picked = pick_by_priority(state, cands, count=1)  # Q22
             city = picked[0] if picked else None
         if city:
-            # Passive Opposition = -1
-            delta = -1 - state.get("support", {}).get(city, 0)
+            delta = PASSIVE_OPPOSITION - state.get("support", {}).get(city, 0)
             if delta:
                 shift_support(state, city, delta)
             push_history(state, f"Card 16 shaded: {city} to Passive Opposition")
@@ -320,9 +324,11 @@ def evt_021_sumter(state, shaded=False):
         if shaded:
             colony = "South_Carolina"
         else:
-            # Sheet I21: "First in non-Village spaces."  Within that the
-            # larger possible shift x Pop (§8.3.6), §8.2 seeded ties
-            # (Session 47: was always South_Carolina).
+            from .shared import support_shift_gain_key
+            from lod_ai.rules_consts import ACTIVE_SUPPORT
+
+            # Sheet I21: "First in non-Village spaces."  Within that,
+            # Support gain then Opposition loss (§8.3.6), §8.2 ties.
             executor = str(state.get("active", "")).upper()
             scored = []
             for sid in ("South_Carolina", "Georgia"):
@@ -331,12 +337,9 @@ def evt_021_sumter(state, shaded=False):
                 sp = state["spaces"][sid]
                 nonvillage = (1 if (executor == INDIANS
                                     and not sp.get(VILLAGE, 0)) else 0)
-                lvl = state.get("support", {}).get(sid, 0)
-                gain = max(0, min(2, 2 - lvl))
-                pop = map_adj.population(sid)
-                # Q22: substantive key only (non-Village, then shift x Pop);
-                # equal-key ties resolved by the Random Spaces table.
-                scored.append(((-nonvillage, -(gain * pop)), sid))
+                gain = support_shift_gain_key(
+                    state, sid, target=ACTIVE_SUPPORT, steps=2, shaded=False)
+                scored.append(((-nonvillage,) + tuple(-value for value in gain), sid))
             picked = pick_by_priority(state, scored, count=1)
             colony = picked[0] if picked else "South_Carolina"
 
@@ -599,9 +602,9 @@ def evt_048_god_save_king(state, shaded=False):
     from lod_ai.util.free_ops import queue_free_op
 
     if not shaded:
-        target = None                # let the bot/AI select
-        queue_free_op(state, BRITISH, "march",  target)
-        queue_free_op(state, BRITISH, "battle", target)
+        # "there" links the optional Battle to the one March destination.
+        # Keep that relationship in the queue until the March is planned.
+        queue_free_op(state, BRITISH, "march_then_battle")
     else:
         # "A non-British Faction" (singular) moves its units from three
         # spaces containing British Regulars into any adjacent spaces.
@@ -748,7 +751,22 @@ def evt_062_langlade(state, shaded=False):
     Shaded   – Place three French Regulars in Quebec or three Militia in Northwest.
     """
     if shaded:
-        choice = state.get("card62_shaded_choice", "FRENCH_QUEBEC")
+        choice = state.get("card62_shaded_choice")
+        if choice is None:
+            # §8.3.5: the executing Faction, then its ally, among branches
+            # that can place pieces (§8.3.4). F62's Militia-only instruction
+            # is an explicit override and takes precedence above.
+            pool = state.get("available", {})
+            candidates = []
+            if state.get("toa_played") and pool.get(REGULAR_FRE, 0) > 0:
+                candidates.append(FRENCH)
+            if pool.get(MILITIA_U, 0) > 0:
+                candidates.append(PATRIOTS)
+            if not candidates:
+                return
+            fac = first_beneficiary(state, state.get("active"),
+                                    candidates=candidates, default=candidates[0])
+            choice = "FRENCH_QUEBEC" if fac == FRENCH else "MILITIA_NORTHWEST"
         if choice == "MILITIA_NORTHWEST":
             place_piece(state, MILITIA_U, "Northwest", 3)
             push_history(state, "Card 62 shaded: 3 Militia in Northwest")
@@ -793,21 +811,22 @@ def evt_065_necker(state, shaded=False):
 def evt_066_don_bernardo(state, shaded=False):
     """
     Shaded – French or Patriots free March to and free Battle in
-             Florida with +2 Force Level (player choice, regardless
-             of Treaty of Alliance status).
+             Florida with +2 Force Level (player choice, subject to
+             the Command prerequisites in §5.3).
     (Card's unshaded side has no free ops.)
     """
     from lod_ai.util.free_ops import queue_free_op
 
     if shaded:
-        # "French or Patriots" — player choice regardless of TOA
+        # "French or Patriots" — preserve an explicit player choice.
         fac = state.get("card66_shaded_faction", "").upper()
         if fac not in (FRENCH, PATRIOTS):
             # §8.3.5 benefit (free ops to French OR Patriots): the executing
             # Faction first, then the other friendly Faction (T7).
             active = str(state.get("active", "")).upper()
+            candidates = (FRENCH, PATRIOTS) if state.get("toa_played") else (PATRIOTS,)
             fac = first_beneficiary(state, active,
-                                    candidates=(FRENCH, PATRIOTS), default=FRENCH)
+                                    candidates=candidates, default=PATRIOTS)
         queue_free_op(state, fac, "march", "Florida")
         queue_free_op(state, fac, "battle_plus2", "Florida")
     else:
@@ -1092,7 +1111,7 @@ def evt_085_mississippi_raids(state, shaded=False):
 def evt_087_lenape(state, shaded=False):
     """
     Unshaded – Remove one piece in Pennsylvania. Remain Eligible.
-               Player chooses which piece (bot: §8.3.8 or card instruction).
+               Player chooses which piece (bot: §8.3.5 then §8.1.2).
     Shaded   – (none)
     """
     if shaded:
@@ -1109,15 +1128,26 @@ def evt_087_lenape(state, shaded=False):
         # "Remove one piece" (any faction's) — implicitly a §8.3.5 harm
         # choice of WHOSE piece: a random enemy, player first (T7), the
         # ally then own pieces only when no enemy piece is present
-        # (§5.1.3 implement-what-can).  Within a faction keep the
-        # units-before-bases order.  (Was a fixed executor-blind tag
-        # order that removed friendly Indian War Parties first for a
-        # Royalist executor.)
+        # (§5.1.3 implement-what-can). Within the selected faction,
+        # §8.1.2 removes enemy bases first, then Underground guerrillas
+        # before Active, then cubes starting with the fewest. Friendly
+        # removal instead starts with the most numerous cubes, then
+        # Active guerrillas before Underground, with bases last.
         from lod_ai.util.target_order import harm_target_order
-        faction_tags = {
-            INDIANS: (WARPARTY_U, WARPARTY_A, VILLAGE),
-            PATRIOTS: (MILITIA_U, MILITIA_A, REGULAR_PAT, FORT_PAT),
-            BRITISH: (REGULAR_BRI, TORY, FORT_BRI),
+        enemy_cubes = tuple(sorted(
+            (REGULAR_BRI, TORY), key=lambda tag: sp.get(tag, 0)))
+        friendly_cubes = tuple(sorted(
+            (REGULAR_BRI, TORY), key=lambda tag: -sp.get(tag, 0)))
+        enemy_tags = {
+            INDIANS: (VILLAGE, WARPARTY_U, WARPARTY_A),
+            PATRIOTS: (FORT_PAT, MILITIA_U, MILITIA_A, REGULAR_PAT),
+            BRITISH: (FORT_BRI,) + enemy_cubes,
+            FRENCH: (REGULAR_FRE,),
+        }
+        friendly_tags = {
+            INDIANS: (WARPARTY_A, WARPARTY_U, VILLAGE),
+            PATRIOTS: (REGULAR_PAT, MILITIA_A, MILITIA_U, FORT_PAT),
+            BRITISH: friendly_cubes + (FORT_BRI,),
             FRENCH: (REGULAR_FRE,),
         }
         executor = str(state.get("active", "")).upper()
@@ -1130,7 +1160,17 @@ def evt_087_lenape(state, shaded=False):
             order += [BRITISH, PATRIOTS, FRENCH, INDIANS]
         done = False
         for fac in order:
-            for tag in faction_tags.get(fac, ()):
+            faction_tags = (friendly_tags if fac in
+                            (executor, _ALLY.get(executor)) else enemy_tags)
+            tags = faction_tags.get(fac, ())
+            if faction_tags is friendly_tags:
+                # §8.1.2 protects the last Tory/Continental whenever any
+                # other friendly piece of this selected faction can go.
+                protected = {tag for tag in (TORY, REGULAR_PAT)
+                             if sp.get(tag, 0) == 1}
+                tags = tuple(tag for tag in tags if tag not in protected) + tuple(
+                    tag for tag in tags if tag in protected)
+            for tag in tags:
                 if sp.get(tag, 0):
                     remove_piece(state, tag, loc, 1, to="available")
                     push_history(

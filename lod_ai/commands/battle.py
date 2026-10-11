@@ -306,6 +306,8 @@ def _resolve_defender_activation(state, sp, sid, def_side) -> None:
 # -------- Internal helpers --------
 def _roll_d3(state: Dict) -> int:
     val = state["rng"].randint(1, 3)
+    # Distinguish actual combat outcomes from Random Spaces D3 tie-breaks.
+    state["_battle_dice_rolled"] = state.get("_battle_dice_rolled", 0) + 1
     state.setdefault("rng_log", []).append(("D3", val))
     return val
 

@@ -107,6 +107,16 @@ def _space_has_any(state, sid, tags):
     return any(sp.get(tag, 0) > 0 for tag in tags)
 
 
+def _event_battle_possible(state, faction, sid):
+    """Free Battles retain the participating-piece requirements (§5.3)."""
+    if faction == FRENCH and not state.get("toa_played"):
+        return False
+    enemies = ((PATRIOTS, FRENCH) if faction == BRITISH else (BRITISH, INDIANS))
+    return (_space_has_any(state, sid, _faction_piece_tags(faction))
+            and any(_space_has_any(state, sid, _faction_piece_tags(enemy))
+                    for enemy in enemies))
+
+
 def _remove_own_faction_pieces(state, sid, faction, qty, *, to="available"):
     """The TARGET faction removes its own pieces (§5.1) per the §8.1.2
     friendly-removal bullet: cubes first (sparing the last
@@ -428,9 +438,10 @@ def evt_014_overmountain_men(state, shaded=False):
     """
     from lod_ai.commands import march, battle, scout
     from lod_ai.special_activities import war_path
+    from lod_ai.bots.free_op_planner import plan_free_war_path
 
     dest = state.get("card14_dest")
-    if dest not in state.get("spaces", {}):
+    if dest not in ("North_Carolina", "Southwest") or dest not in state.get("spaces", {}):
         dest = _pick_first_existing(state, ["North_Carolina", "Southwest"])
     if not dest:
         push_history(state, "Card 14: no valid destination")
@@ -451,25 +462,23 @@ def evt_014_overmountain_men(state, shaded=False):
                     break
         if not src:
             push_history(state, "Card 14 shaded: no legal Patriot March")
-            return
-        sp_src = _safe_get_space(state, src)
-        piece_tag = REGULAR_PAT if sp_src.get(REGULAR_PAT, 0) else MILITIA_U
-        if not sp_src.get(piece_tag, 0):
-            piece_tag = MILITIA_A if sp_src.get(MILITIA_A, 0) else None
-        if not piece_tag:
-            push_history(state, "Card 14 shaded: no Patriot units to March")
-            return
-        move_plan = [{"src": src, "dst": dest, "pieces": {piece_tag: 1}}]
-        march.execute(
-            state,
-            PATRIOTS,
-            ctx={},
-            sources=[src],
-            destinations=[dest],
-            move_plan=move_plan,
-            free=True,
-        )
-        battle.execute(state, PATRIOTS, ctx={}, spaces=[dest], free=True)
+        else:
+            sp_src = _safe_get_space(state, src)
+            piece_tag = next(tag for tag in (REGULAR_PAT, MILITIA_U, MILITIA_A)
+                             if sp_src.get(tag, 0))
+            move_plan = [{"src": src, "dst": dest, "pieces": {piece_tag: 1}}]
+            march.execute(
+                state,
+                PATRIOTS,
+                ctx={},
+                sources=[src],
+                destinations=[dest],
+                move_plan=move_plan,
+                free=True,
+            )
+        # §5.1.3: the Battle can still occur when movement was unavailable.
+        if _event_battle_possible(state, PATRIOTS, dest):
+            battle.execute(state, PATRIOTS, ctx={}, spaces=[dest], free=True)
         push_history(state, f"Card 14 shaded: Patriot March/Battle in {dest}")
         return
 
@@ -553,24 +562,21 @@ def evt_014_overmountain_men(state, shaded=False):
 
     if not op_done:
         push_history(state, "Card 14 unshaded: no legal Indian Scout/March")
-        return
 
-    sp_dest = _safe_get_space(state, dest)
+    war_path_plan = plan_free_war_path(state, INDIANS, dest)
     if followup_override:
         followup = followup_override
     else:
-        rebellion_tags = [MILITIA_A, MILITIA_U, REGULAR_PAT, REGULAR_FRE, FORT_PAT]
-        if sp_dest.get(WARPARTY_U, 0) and _space_has_any(state, dest, rebellion_tags):
+        if war_path_plan:
             followup = "WAR_PATH"
         else:
             followup = "BRITISH_BATTLE"
 
     if followup == "WAR_PATH":
-        if sp_dest.get(WARPARTY_U, 0) and _space_has_any(
-            state, dest, [MILITIA_A, MILITIA_U, REGULAR_PAT, REGULAR_FRE, FORT_PAT]
-        ):
-            war_path.execute(state, INDIANS, ctx={}, space_id=dest, option=1)
-    else:
+        if war_path_plan:
+            war_path.execute(state, INDIANS, ctx={}, space_id=dest,
+                             option=war_path_plan["option"])
+    elif _event_battle_possible(state, BRITISH, dest):
         battle.execute(state, BRITISH, ctx={}, spaces=[dest], free=True)
 
     push_history(state, f"Card 14 unshaded: {op_choice} then {followup} in {dest}")
@@ -896,7 +902,8 @@ def evt_055_french_navy(state, shaded=False):
             if qty:
                 move_piece(state, REGULAR_BRI, n, WEST_INDIES_ID, min(qty, 4 - moved))
                 moved += min(qty, 4 - moved)
-        battle.execute(state, BRITISH, ctx={}, spaces=[WEST_INDIES_ID], free=True)
+        if _event_battle_possible(state, BRITISH, WEST_INDIES_ID):
+            battle.execute(state, BRITISH, ctx={}, spaces=[WEST_INDIES_ID], free=True)
         push_history(state, "Card 55 shaded: British battle in West Indies")
     else:
         moved = 0
@@ -909,9 +916,12 @@ def evt_055_french_navy(state, shaded=False):
             if qty:
                 move_piece(state, REGULAR_FRE, n, WEST_INDIES_ID, min(qty, 3 - moved))
                 moved += min(qty, 3 - moved)
-        adjust_fni(state, -1)
-        if state.get("card55_do_battle", True):
+        # §5.3 retains §3.5.5 prerequisites; §5.1.3 resolves the rest
+        # even when this optional Battle cannot be carried out.
+        if (state.get("card55_do_battle", True)
+                and _event_battle_possible(state, FRENCH, WEST_INDIES_ID)):
             battle.execute(state, FRENCH, ctx={}, spaces=[WEST_INDIES_ID], free=True)
+        adjust_fni(state, -1)
         push_history(state, "Card 55 unshaded: French may battle in West Indies")
 
 

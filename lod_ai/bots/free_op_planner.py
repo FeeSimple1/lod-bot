@@ -430,6 +430,8 @@ def plan_free_march(state: Dict, faction: str,
                     dest: Optional[str]) -> Optional[Dict]:
     """Build march.execute kwargs for a card-granted free March, or
     None when no legal plan exists (a genuine decline)."""
+    if faction == C.FRENCH and not state.get("toa_played"):
+        return None  # §2.3.9 / §5.3; match march.execute's prerequisite
     refresh_control(state)
     movable_fn = _MOVABLE.get(faction)
     if movable_fn is None:

@@ -31,6 +31,7 @@ if os.environ.get("PYTHONHASHSEED") != "0" and __name__ == "__main__":
                               "lod_ai.tools.soak"] + sys.argv[1:])
 
 from lod_ai.tools.batch_smoke import run_one_game
+from lod_ai.tools.run_diagnostics import COUNT_KEYS, issue_summary, result_is_clean
 
 SCENARIOS = ("1775", "1776", "1778")
 
@@ -80,8 +81,7 @@ def main(argv=None) -> int:
                 break
             scen, seed = schedule[idx]
             result = run_one_game(scen, seed, check_invariants=args.invariants)
-            bad = result["end_reason"] in ("CRASH", "INVARIANT",
-                                           "INTERACTIVE_PROMPT")
+            bad = not result_is_clean(result)
             rec = {
                 "i": idx, "scenario": scen, "seed": seed,
                 "end_reason": result["end_reason"],
@@ -89,6 +89,11 @@ def main(argv=None) -> int:
                 "cards": result["cards_played"],
                 "error": result["error"],
                 "repro": result.get("repro_command"),
+                "clean": not bad,
+                "issues": issue_summary(result) if bad else None,
+                "event_outcome_observations": result.get("event_outcome_observations", []),
+                "event_outcome_observation_count": result.get("event_outcome_observation_count", 0),
+                **{key: result.get(key, 0) for key in COUNT_KEYS},
             }
             f.write(json.dumps(rec) + "\n")
             f.flush()
@@ -98,7 +103,7 @@ def main(argv=None) -> int:
             if bad:
                 failures += 1
                 print(f"  FAIL [{scen} seed={seed}] {result['end_reason']}: "
-                      f"{result['error']}  repro: {result.get('repro_command')}")
+                      f"{issue_summary(result)}  repro: {result.get('repro_command')}")
 
     if args.coverage:
         _coll.save(args.coverage)
@@ -107,23 +112,17 @@ def main(argv=None) -> int:
     elapsed = time.time() - start
     print(f"ran {ran} game(s) this invocation in {elapsed:.1f}s "
           f"({now_done}/{len(schedule)} total); {failures} failure(s) here")
+    # Include failures from previous invocations, even when they reached a
+    # winner or were stored under a legacy DIRTY/TIMEOUT end reason.
+    with open(args.out) as fh:
+        all_records = [json.loads(line) for line in fh if line.strip()]
+    dirty_total = sum(not result_is_clean(record) for record in all_records)
     if now_done >= len(schedule):
-        # Final tally across the whole file.
-        crashes = inval = 0
-        with open(args.out) as fh:
-            for line in fh:
-                if not line.strip():
-                    continue
-                r = json.loads(line)
-                if r["end_reason"] == "CRASH":
-                    crashes += 1
-                elif r["end_reason"] in ("INVARIANT", "INTERACTIVE_PROMPT"):
-                    inval += 1
-        print(f"DONE: {now_done} games. crashes={crashes}, "
-              f"invariant/prompt failures={inval}")
-        return 1 if (crashes or inval) else 0
-    print("PARTIAL: re-run the same command to continue.")
-    return 0
+        print(f"DONE: {now_done} games. dirty={dirty_total}")
+        return 1 if dirty_total else 0
+    print(f"PARTIAL: re-run the same command to continue. dirty_so_far={dirty_total}")
+    return 1 if dirty_total else 0
+
 
 
 if __name__ == "__main__":

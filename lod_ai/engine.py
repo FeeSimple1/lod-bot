@@ -292,6 +292,11 @@ class Engine:
 
         with self._using_state(target_state, target_ctx):
             for _fac, _op, _loc in ops:  # execute all queued ops FIFO
+                if _op == "march_then_battle":
+                    self._run_march_then_battle(
+                        target_state, _fac, _loc,
+                        target_state.get("current_card", {}).get("id"))
+                    continue
                 self.dispatcher.execute(_op, faction=_fac, space=_loc, free=True)
                 push_history(target_state, f"FREE {_op.upper()} by {_fac} in {_loc or 'chosen space'}")
                 normalize_state(target_state)
@@ -475,12 +480,15 @@ class Engine:
         resolve during event resolution per COIN rules, not on a later turn.
         """
         ops = target_state.pop("free_ops", [])
-        if not ops:
+        if not ops and not target_state.get("free_op_followups"):
             return
         old_state = self.state
         self.state = target_state
         try:
             for _fac, _op, _loc in ops:
+                if _op == "march_then_battle":
+                    self._run_march_then_battle(target_state, _fac, _loc, card_id)
+                    continue
                 # Human seats with no preset location plan their free op via
                 # the normal CLI wizard (e.g. the ToA-granted free French
                 # Muster), with costs waived through the bs_free flag.
@@ -519,13 +527,127 @@ class Engine:
                     normalize_state(target_state)
                 except UndoException:
                     raise
-                except Exception:
-                    # If the command fails (e.g. no valid targets), log and continue
-                    push_history(target_state, f"FREE {_op.upper()} by {_fac} — skipped (no valid target)")
+                except Exception as exc:
+                    # A planner-produced operation that fails is an error,
+                    # distinct from the legal no-plan declines above.
+                    target_state.setdefault("_free_op_error_log", []).append({
+                        "faction": _fac, "operation": _op, "location": _loc,
+                        "card_id": card_id, "error_type": type(exc).__name__,
+                        "message": str(exc),
+                    })
+                    push_history(target_state,
+                                 f"FREE {_op.upper()} by {_fac} — failed "
+                                 f"({type(exc).__name__}: {exc})")
                 finally:
                     target_state.pop("bs_free", None)
+            from lod_ai.util.free_ops import resolve_after_free_ops
+            resolve_after_free_ops(target_state)
+            normalize_state(target_state)
+            # §5.3: granted free operations are part of the Event. Do not
+            # close its §8.3.3 evidence at the handler's partial result.
+            from lod_ai.util.event_audit import complete_choices
+            complete_choices(target_state)
         finally:
             self.state = old_state
+
+    def _run_march_then_battle(self, state: dict, faction: str,
+                               loc: str | None, card_id=None) -> None:
+        """Card 48: one free March, then an optional free Battle THERE."""
+        human = faction in self.human_factions and self._interactive_input()
+        op, destination = "march", loc
+        state["bs_free"] = True
+        try:
+            if human:
+                from lod_ai import interactive_cli as cli
+                self._bind_provider_faction(faction)
+                print(f"\n{faction}: plan your FREE MARCH to one space.")
+                try:
+                    runner = cli._march_wizard(self, faction, True, allow_in_place=True)
+                except ValueError as exc:
+                    push_history(state, f"FREE MARCH by {faction} — declined ({exc})")
+                    return
+                march_ctx = {}
+                runner(state, march_ctx)
+                destinations = march_ctx.get("_command_selected_spaces", set())
+            else:
+                plan = self._plan_bot_free_op(state, faction, "march", loc, card_id)
+                if plan is None and faction == C.BRITISH:
+                    # §8.3.5: multiple free Commands use the FIRST one's
+                    # priorities. With no moving group, §8.4.3 next locates
+                    # Militia in place, first in Support. If inapplicable,
+                    # §8.3.5 / §8.2 choose an existing Battle space randomly.
+                    from lod_ai.bots.random_spaces import choose_random_space
+                    from lod_ai.map.adjacency import all_space_ids
+                    candidates = [sid for sid in all_space_ids()
+                                  if sid != C.WEST_INDIES_ID and sid in state["spaces"]
+                                  and (loc is None or sid == loc)]
+                    activation = [sid for sid in candidates
+                                  if state["spaces"][sid].get(C.MILITIA_U, 0) > 0
+                                  and sum(state["spaces"][sid].get(tag, 0)
+                                          for tag in (C.REGULAR_BRI, C.TORY)) >= 3]
+                    if activation:
+                        supported = [sid for sid in activation
+                                     if state.get("support", {}).get(sid, 0) > 0]
+                        candidates = supported or activation
+                    else:
+                        candidates = [sid for sid in candidates
+                                      if self._own_force_in(state, sid, faction) > 0
+                                      and self._enemy_force_in(state, sid, faction) > 0]
+                    selected = choose_random_space(candidates, state.get("rng"))
+                    if selected is not None:
+                        plan = {"space": None, "sources": [],
+                                "destinations": [selected], "move_plan": []}
+                if plan is None:
+                    push_history(state, f"FREE MARCH by {faction} — declined (no legal plan)")
+                    return
+                destinations = plan.get("destinations", [])
+                if len(destinations) != 1:
+                    raise ValueError("Linked March must have exactly one destination")
+                kwargs = dict(plan)
+                space = kwargs.pop("space", None)
+                self.dispatcher.execute("march", faction=faction, space=space,
+                                        free=True, limited=True, **kwargs)
+            if len(destinations) != 1:
+                raise ValueError("Linked March must have exactly one destination")
+            destination = next(iter(destinations))
+            push_history(state, f"FREE MARCH by {faction} in {destination}")
+            normalize_state(state)
+
+            op = "battle"
+            if human:
+                if destination not in cli._battle_candidates(state, faction):
+                    push_history(state, f"FREE BATTLE by {faction} — declined (no legal plan)")
+                    return
+                if not cli.choose_one(
+                        f"Take the optional FREE BATTLE in {destination}?",
+                        [("No", False), ("Yes", True)]):
+                    push_history(state, f"FREE BATTLE by {faction} — declined (player choice)")
+                    return
+                runner = cli._battle_wizard(
+                    self, faction, True, allowed_spaces={destination})
+                runner(state, {})
+            else:
+                plan = self._plan_bot_free_op(
+                    state, faction, "battle", destination, card_id)
+                if plan is None:
+                    push_history(state, f"FREE BATTLE by {faction} — declined (no legal plan)")
+                    return
+                self.dispatcher.execute("battle", faction=faction,
+                                        free=True, **plan)
+            push_history(state, f"FREE BATTLE by {faction} in {destination}")
+            normalize_state(state)
+        except UndoException:
+            raise
+        except Exception as exc:
+            state.setdefault("_free_op_error_log", []).append({
+                "faction": faction, "operation": op, "location": destination,
+                "card_id": card_id, "error_type": type(exc).__name__,
+                "message": str(exc),
+            })
+            push_history(state, f"FREE {op.upper()} by {faction} — failed "
+                         f"({type(exc).__name__}: {exc})")
+        finally:
+            state.pop("bs_free", None)
 
     def _run_human_free_op(self, target_state: dict, faction: str,
                            op: str) -> bool:

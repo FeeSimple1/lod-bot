@@ -106,6 +106,7 @@ def test_card71_shaded_french_resources():
 def test_card50_shaded_draws_french_regulars_from_west_indies():
     """Card 50 shaded: French Regulars come from Available or West Indies."""
     state = _base_state()
+    state["toa_played"] = True
     state["spaces"] = {
         "Georgia": {"type": "Colony"},
         WEST_INDIES_ID: {REGULAR_FRE: 2},
@@ -124,6 +125,7 @@ def test_card50_shaded_draws_french_regulars_from_west_indies():
 def test_card50_shaded_prefers_available_before_west_indies():
     """Card 50 shaded: draw from Available first, then West Indies."""
     state = _base_state()
+    state["toa_played"] = True
     state["spaces"] = {
         "Georgia": {"type": "Colony"},
         WEST_INDIES_ID: {REGULAR_FRE: 3},

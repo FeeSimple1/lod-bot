@@ -33,6 +33,7 @@ from lod_ai.rules_consts import (
     WARPARTY_A, WARPARTY_U,
     # factions
     BRITISH, PATRIOTS, INDIANS, FRENCH,
+    WEST_INDIES_ID,
 )
 from lod_ai.util.history     import push_history
 from lod_ai.util.caps        import refresh_control, enforce_global_caps
@@ -354,6 +355,8 @@ def execute(
                 plan.append({"src": src, "dst": dst, "pieces": cleaned})
 
     # Limited-command constraints
+    if not plan and faction == BRITISH and WEST_INDIES_ID in destinations_set:
+        raise ValueError("West Indies is not a March destination.")
     if limited and len(destinations_set) != 1:
         raise ValueError("Limited March must end in a single destination.")
 
@@ -436,7 +439,13 @@ def execute(
 
     continental_entered_dsts: set = set()
 
-    for index, dst in enumerate(dict.fromkeys(entry["dst"] for entry in plan)):
+    destination_order = list(dict.fromkeys([
+        *(entry["dst"] for entry in plan),
+        *(sid for sid in destinations if sid in destinations_set),
+    ]))
+    # The selected in-place British destination also pays once and exposes
+    # the same human interruption checkpoints (§3.2.3), even with no moves.
+    for index, dst in enumerate(destination_order):
         _checkpoint("Before March destination", dst)
         entries = [entry for entry in plan if entry["dst"] == dst]
         if interactive:
@@ -460,7 +469,9 @@ def execute(
         _finish_destination(dst, dst_groups.get(dst, []))
         _checkpoint("After moving to March destination", dst)
 
-    if moved_overall <= 0:
+    # §3.2.3: British cubes may already be in selected destinations.
+    # A British March can locate Militia there without moving a cube.
+    if moved_overall <= 0 and not (faction == BRITISH and destinations_set):
         raise ValueError("March must move at least one piece.")
 
     # §3.5.4: French March — Patriots also pay 1 Resource per destination
@@ -482,7 +493,7 @@ def execute(
 
     if faction == BRITISH:
         # British locating is a separate "Then" step after all movements.
-        for dst in dict.fromkeys(entry["dst"] for entry in plan):
+        for dst in destination_order:
             _checkpoint("Before March Militia activation", dst)
             sp = state["spaces"][dst]
             _flip(sp, MILITIA_U, MILITIA_A,

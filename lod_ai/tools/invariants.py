@@ -355,6 +355,17 @@ def _rules_property_violations(state: Dict[str, Any],
             problems.append(
                 f"piece conservation (S1.2): {fam} census {census[fam]} != {expected}")
 
+    # §2.3.9 / §5.1.1: Treaty is required for French Regulars on ANY map
+    # space, including the West Indies. Conservation alone cannot catch an
+    # illegal transfer out of Available.
+    if not state.get("toa_played", False):
+        french_spaces = sorted(
+            sid for sid, sp in state.get("spaces", {}).items()
+            if sp.get(C.REGULAR_FRE, 0) > 0)
+        if french_spaces:
+            problems.append(
+                f"S2.3.9/S5.1.1: French Regulars before Treaty at {french_spaces}")
+
     # Marker conservation / bounds
     markers = marker_census(state)
     if markers[C.PROPAGANDA] > C.MAX_PROPAGANDA:
@@ -396,23 +407,48 @@ def _rules_property_violations(state: Dict[str, Any],
             if stored_ctrl.get(sid) != expected_ctrl.get(sid))
         problems.append(f"control staleness: recomputation differs at {stale}")
 
-    # §8.3.3 post-hoc: bot-chosen Events must not net-shift the
-    # Support-Opposition difference in favor of the enemy side.
+    # §8.3.3 concerns a bot's choice, not whether a Battle roll turned out
+    # well. Independently check preview evidence; use completed actual
+    # totals to catch deterministic target/priority discrepancies. §5.3
+    # free Commands must finish before an actual net shift can be checked.
+    from lod_ai.util.event_audit import favors_enemy
     audit = state.get("event_choice_audit")
     if audit:
         for entry in audit:
             fac = entry.get("faction")
             d_b, d_a = entry.get("d_before"), entry.get("d_after")
-            if fac in _ROYALIST and d_a < d_b:
+            prefix = f"S8.3.3: {fac} chose event card {entry.get('card')}"
+            preview = entry.get("preview")
+            if preview is not None:
+                pb, pa = preview.get("d_before"), preview.get("d_after")
+                if preview.get("error"):
+                    problems.append(f"{prefix} despite preview error {preview['error']}")
+                if preview.get("no_effect"):
+                    problems.append(f"{prefix} despite no-effect preview")
+                if preview.get("only_friendly_removal"):
+                    problems.append(f"{prefix} despite only-friendly-removal preview")
+                if (pb is not None and pa is not None
+                        and favors_enemy(fac, pb, pa)):
+                    problems.append(
+                        f"{prefix} despite harmful preview {pb} -> {pa}")
+            if entry.get("complete") is False:
+                # Retain partial evidence until the engine drains free ops.
+                continue
+            if (not entry.get("battle_dice", 0)
+                    and favors_enemy(fac, d_b, d_a)):
                 problems.append(
-                    f"S8.3.3 net shift: {fac} chose event card {entry.get('card')} "
-                    f"but Support-Opposition moved {d_b} -> {d_a} (favors Rebellion)")
-            elif fac in _REBEL and d_a > d_b:
-                problems.append(
-                    f"S8.3.3 net shift: {fac} chose event card {entry.get('card')} "
-                    f"but Support-Opposition moved {d_b} -> {d_a} (favors Royalists)")
+                    f"{prefix} but completed deterministic Support-Opposition "
+                    f"moved {d_b} -> {d_a} (favors enemy)")
+            elif entry.get("battle_dice", 0) and favors_enemy(fac, d_b, d_a):
+                # This is an observed contingent outcome, not a proven
+                # illegal decision. Preserve the evidence for reports/Q24.
+                observed = dict(entry)
+                log = state.setdefault("event_outcome_observations", [])
+                if observed not in log:
+                    log.append(observed)
         if not problems:
-            audit.clear()  # checked; keep the key bounded
+            audit[:] = [entry for entry in audit
+                        if entry.get("complete") is False]
 
     return problems
 
