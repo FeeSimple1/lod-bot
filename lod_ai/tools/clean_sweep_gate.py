@@ -22,46 +22,27 @@ if os.environ.get("PYTHONHASHSEED") != "0" and __name__ == "__main__":
     os.execv(sys.executable, [sys.executable, "-m",
                               "lod_ai.tools.clean_sweep_gate"] + sys.argv[1:])
 
-from lod_ai.state.setup_state import build_state
-from lod_ai.engine import Engine
-from lod_ai.tools import invariants
+from lod_ai.tools.batch_smoke import run_one_game
+from lod_ai.tools.run_diagnostics import result_is_clean
 
 SCENARIOS = ("1775", "1776", "1778")
 
 
 def play(scenario: str, seed: int, *, check_invariants: bool = True):
-    st = build_state(scenario, seed=seed)
-    eng = Engine(initial_state=st)
-    eng.set_human_factions(set())
-    baseline = invariants.capture_baseline(eng.state)
-    invariant_failures = []
     with contextlib.redirect_stdout(io.StringIO()):
-        n = 0
-        while n < 200:
-            card = eng.draw_card()
-            if card is None:
-                break
-            eng.play_card(card)
-            n += 1
-            if check_invariants:
-                try:
-                    invariants.check_all(
-                        eng.state, scenario=scenario, seed=seed, card_number=n,
-                        human_factions=set(), baseline=baseline,
-                    )
-                except invariants.InvariantError as exc:
-                    invariant_failures.append(str(exc))
-                    break
-    errs = eng.state.get("_bot_error_log", []) or []
-    hist = [str(h.get("msg", "") if isinstance(h, dict) else h)
-            for h in eng.state.get("history", [])]
-    illegal = [h for h in hist if "illegal" in h.lower()]
-    # Free-op fidelity: a card-granted free op should run, not be silently
-    # skipped for lack of a target. A planner that genuinely declines logs
-    # "declined (no legal plan)" instead, which is allowed.
-    free_skips = [h for h in hist
-                  if "FREE " in h and "skipped (no valid target)" in h]
-    return errs, illegal, free_skips, invariant_failures, n
+        result = run_one_game(scenario, seed, check_invariants=check_invariants)
+    errs = result.get("bot_errors", [])
+    illegal = result.get("illegal_actions", [])
+    free_issues = list(result.get("free_op_skips", []))
+    free_issues.extend(str(issue) for issue in result.get("free_op_errors", []))
+    failures = []
+    for error in result.get("event_preview_errors", []):
+        failures.append(f"Event preview failed: {error}")
+    if result.get("error") or result.get("end_reason") != "WINNER":
+        failures.append(result.get("error") or f"Unfinished run: {result.get('end_reason')}")
+    elif not result_is_clean(result) and not (errs or illegal or free_issues or failures):
+        failures.append("Completed run marked dirty or has no canonical winner")
+    return errs, illegal, free_issues, failures, result["cards_played"]
 
 
 def main(argv=None) -> int:
@@ -78,26 +59,26 @@ def main(argv=None) -> int:
             tag = f"[{scen} seed={seed:2d}] {cards} cards"
             if inv_fail:
                 dirty += 1
-                print(f"{tag}  DIRTY: {len(inv_fail)} invariant failure(s)")
+                print(f"{tag}  DIRTY: {len(inv_fail)} execution/invariant failure(s)")
                 for m in inv_fail[:2]:
-                    print(f"    invariant: {m.splitlines()[0][:140]}")
+                    print(f"    failure: {m.splitlines()[0][:140]}")
             elif errs or illegal:
                 dirty += 1
                 print(f"{tag}  DIRTY: {len(errs)} bot error(s), "
                       f"{len(illegal)} illegal action(s)")
                 for e in errs[:3]:
-                    print(f"    bot_error: {str(e.get('error'))[:100]}")
+                    print(f"    bot_error: {str(e.get('exception_message', e.get('error')))[:100]}")
                 for h in illegal[:3]:
                     print(f"    illegal: {str(h)[:100]}")
             elif free_skips:
                 skip_games += 1
-                print(f"{tag}  FREE-OP SKIPS: {len(free_skips)}")
+                print(f"{tag}  FREE-OP ERRORS/SKIPS: {len(free_skips)}")
                 for h in free_skips[:3]:
                     print(f"    {h[:100]}")
             else:
                 print(f"{tag}  clean")
     if dirty:
-        print(f"\nFAIL: {dirty} game(s) trapped bot errors or illegal actions.")
+        print(f"\nFAIL: {dirty} game(s) failed completion, execution, or invariants.")
         return 1
     if skip_games:
         # HARD gate since the per-faction free-Command and free-SA
@@ -105,11 +86,11 @@ def main(argv=None) -> int:
         # Genuine "no legal target" outcomes log as "declined (no legal
         # plan)" in the planner and are allowed; an execution-time skip
         # means the planner and an executor disagree about legality.
-        print(f"\nFAIL: {skip_games} game(s) had free-op execution skips "
+        print(f"\nFAIL: {skip_games} game(s) had free-op execution errors/skips "
               f"(planner/executor divergence).")
         return 1
     print("\nOK: every game clean (zero bot errors, illegal actions, "
-          "free-op skips, invariant violations).")
+          "free-op errors/skips, event-preview errors, invariant violations).")
     return 0
 
 

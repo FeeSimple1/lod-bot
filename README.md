@@ -81,6 +81,33 @@ A fast 9-game canary runs as part of `pytest`.
 pytest
 ```
 
+### Bot-only diagnostics
+Run a single checked reproduction, the strict multi-game gate, or a detailed
+150-game statistics batch:
+
+```bash
+python -m lod_ai.tools.batch_smoke --repro 1775:1
+python -m lod_ai.tools.clean_sweep_gate --seeds 1-20
+python -m lod_ai.tools.batch_smoke --large --invariants
+python -m lod_ai.tools.soak --games 1000 --invariants --out soak.jsonl
+```
+
+Completed wins and clean execution are reported separately. A run is clean
+only if it finishes with a canonical winner and has no caught bot errors,
+rejected actions, failed free operations, Event preview exceptions, or
+invariant failures. These tools
+return a failing exit status for dirty or unfinished runs; a resumed soak
+also retains failures from earlier invocations. Win tables retain completed
+flagged games and identify them explicitly. Combat statistics distinguish
+Battle Command executions from individual spaces resolved, with losses
+counting pieces actually removed. Winter Quarters snapshots record the board
+before its phases; the displayed sum of margins is a descriptive metric.
+
+Reports retain Battle-dependent adverse Event outcomes separately from
+execution errors. How bots should evaluate an Event whose benefit depends
+on unknown Battle dice remains the rules question in `QUESTIONS.md` Q24;
+a clean run does not resolve that interpretation.
+
 ## CLI flow example
 ```
 Liberty or Death — Interactive CLI

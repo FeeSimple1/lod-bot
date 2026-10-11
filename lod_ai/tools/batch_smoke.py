@@ -21,6 +21,7 @@ import re
 import sys
 import traceback
 from collections import Counter, defaultdict
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -36,6 +37,9 @@ from lod_ai.victory import (
     _french_margin, _indian_margin,
 )
 from lod_ai import rules_consts as C
+from lod_ai.tools.run_diagnostics import (
+    COUNT_KEYS, ERROR_END_REASONS, collect_runtime_diagnostics, issue_summary, result_is_clean,
+)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -120,17 +124,8 @@ def _count_controlled_spaces(state: dict) -> Dict[str, int]:
 
 def _support_opposition_totals(state: dict) -> Tuple[int, int]:
     """Return (total_support, total_opposition) population-weighted per §1.6.2-1.6.3."""
-    from lod_ai.map.adjacency import population as _map_population
-    from lod_ai.util.naval import effective_population
-    sup = 0
-    opp = 0
-    for sid, lvl in state.get("support", {}).items():
-        pop = effective_population(state, sid, _map_population(sid))
-        if lvl > 0:
-            sup += lvl * pop
-        elif lvl < 0:
-            opp += abs(lvl) * pop
-    return sup, opp
+    totals = _summarize_board(state)
+    return totals["support"], totals["opposition"]
 
 
 def _count_forts_villages(state: dict) -> Tuple[int, int, int]:
@@ -174,7 +169,10 @@ def _determine_winner_from_margins(state: dict) -> str:
 
 
 def _check_game_over(state: dict) -> str | None:
-    """Scan history for a winner or victory message. Return winner or None."""
+    """Read the engine's resolved winner, with legacy history fallback."""
+    outcome = state.get("victory_result")
+    if outcome is not None:
+        return outcome.get("winner") if outcome.get("outcome") == "victory" else None
     history = state.get("history", [])
     for entry in reversed(history[-40:]):
         msg = entry.get("msg", "") if isinstance(entry, dict) else str(entry)
@@ -280,10 +278,15 @@ def _scan_history_for_events(diag: Dict, history: list, history_offset: int,
             margins = _parse_victory_margins(msg)
             if margins:
                 diag['wq_margins'].append(margins)
-        if 'Treaty of Alliance' in msg and not diag['treaty_played']:
-            diag['treaty_played'] = True
-            diag['treaty_card_number'] = cards_played
     return len(history)
+
+
+def _record_treaty_status(diag: Dict, state: dict, cards_played: int) -> None:
+    """Record an actual state transition; initial Treaty status has card zero."""
+    played = bool(state.get("toa_played", state.get("treaty_of_alliance", False)))
+    if played and not diag["treaty_played"]:
+        diag["treaty_card_number"] = cards_played
+    diag["treaty_played"] = played
 
 
 def _finalize_diagnostics(diag: Dict, state: dict) -> None:
@@ -295,10 +298,8 @@ def _finalize_diagnostics(diag: Dict, state: dict) -> None:
             pd['current_streak'] = 0
         pd['max_streak'] = max(pd['streaks']) if pd['streaks'] else 0
     diag['final_resources'] = dict(state.get('resources', {}))
-    if not diag['treaty_played']:
-        diag['treaty_played'] = bool(
-            state.get('toa_played') or state.get('treaty_of_alliance')
-        )
+    diag['treaty_played'] = bool(
+        state.get('toa_played', state.get('treaty_of_alliance', False)))
     diag['total_pieces_on_map'] = _count_pieces_on_map(state)
 
 
@@ -338,7 +339,9 @@ def _empty_large_data() -> Dict[str, Any]:
         "wq_snapshots": [],
 
         # Combat stats
-        "battles_total": 0,
+        "battle_commands_total": 0,
+        "battle_commands_by_faction": {f: 0 for f in FACTIONS},
+        "battles_total": 0,  # resolved spaces, not multi-space Command announcements
         "battles_as_attacker": {f: 0 for f in FACTIONS},
         "battle_losses": {"ROYALIST": 0, "REBELLION": 0},
         "cbc_final": 0,
@@ -347,7 +350,7 @@ def _empty_large_data() -> Dict[str, Any]:
 
 
 def _capture_wq_snapshot(state: dict, wq_number: int) -> Dict[str, Any]:
-    """Capture board state at a Winter Quarters resolution."""
+    """Capture the board before Winter Quarters phases change it."""
     margins = _compute_margins(state)
     pieces = _count_pieces_on_map(state)
     ctrl = _count_controlled_spaces(state)
@@ -356,6 +359,7 @@ def _capture_wq_snapshot(state: dict, wq_number: int) -> Dict[str, Any]:
 
     return {
         "wq_number": wq_number,
+        "phase": "before_resolution",
         "margins": {
             FACTION_ABBREV[f]: list(margins[f]) for f in FACTIONS
         },
@@ -421,13 +425,18 @@ def _scan_history_large(data: Dict, history: list, offset: int,
         m = _BATTLE_ANNOUNCE_RE.match(msg)
         if m:
             att_faction = m.group(1).upper()
-            data["battles_total"] += 1
-            if att_faction in data["battles_as_attacker"]:
-                data["battles_as_attacker"][att_faction] += 1
+            data["battle_commands_total"] += 1
+            data["_battle_attacker"] = att_faction
+            if att_faction in data["battle_commands_by_faction"]:
+                data["battle_commands_by_faction"][att_faction] += 1
 
         # Battle results: "BATTLE {sid}: {side}-loss={n}, {side}-loss={n}, winner={w}"
         m = _BATTLE_RESULT_RE.search(msg)
         if m:
+            data["battles_total"] += 1
+            attacker = data.get("_battle_attacker")
+            if attacker in data["battles_as_attacker"]:
+                data["battles_as_attacker"][attacker] += 1
             side1, loss1 = m.group(2), int(m.group(3))
             side2, loss2 = m.group(4), int(m.group(5))
             if side1 in data["battle_losses"]:
@@ -446,10 +455,6 @@ def _scan_history_large(data: Dict, history: list, offset: int,
                             fa["special_activities"].get(sa_key, 0) + 1
                         )
                         break
-
-        # Treaty of Alliance detection (for timing)
-        if 'Treaty of Alliance played' in msg:
-            data.setdefault("_treaty_card_number", cards_played)
 
         # Final Scoring: parse faction scores
         if _FINAL_SCORING_RE.search(msg):
@@ -481,14 +486,16 @@ def _determine_victory_detail(data: Dict, state: dict,
     data["crc_final"] = state.get("crc", 0)
 
     if end_reason == "WINNER" and winner:
-        # Was it a mid-game victory condition or final scoring?
-        history = state.get("history", [])
-        is_final_scoring = False
-        for entry in reversed(history[-40:]):
-            msg = entry.get("msg", "") if isinstance(entry, dict) else str(entry)
-            if "Final Scoring" in msg:
-                is_final_scoring = True
-                break
+        outcome = state.get("victory_result")
+        if outcome is not None:
+            is_final_scoring = outcome.get("type") == "final_scoring"
+            if is_final_scoring:
+                data["final_scores"] = dict(outcome.get("margins", {}))
+        else:
+            history = state.get("history", [])
+            is_final_scoring = any("Final Scoring" in (
+                entry.get("msg", "") if isinstance(entry, dict) else str(entry))
+                for entry in history[-40:])
 
         if is_final_scoring:
             data["victory_type"] = "final_scoring"
@@ -524,12 +531,13 @@ def run_one_game(scenario: str, seed: int, *, detailed: bool = False,
         "repro_command": None,
     }
     diag = _empty_diagnostics()
-    large_data = _empty_large_data() if detailed else None
+    large_data = _empty_large_data() if detailed else {}
 
     try:
         state = build_state(scenario, seed=seed)
         engine = Engine(initial_state=state, use_cli=False)
         engine.set_human_factions([])  # all bots
+        _record_treaty_status(diag, engine.state, 0)
         if check_invariants:
             from lod_ai.tools import invariants as _inv
             _census_baseline = _inv.capture_baseline(engine.state)
@@ -546,13 +554,16 @@ def run_one_game(scenario: str, seed: int, *, detailed: bool = False,
                 break
 
             is_wq = bool(card.get("winter_quarters"))
-
-            # Pre-card resource snapshot (for delta tracking)
-            pre_resources = dict(engine.state.get("resources", {})) if detailed else None
+            # Victory is checked before Supply/Resources/Support/Reset.
+            # Later phases can change the margins even on a final WQ.
+            wq_snapshot = (_capture_wq_snapshot(engine.state, wq_count + 1)
+                           if detailed and is_wq else None)
 
             engine.play_card(card, human_decider=None)
             cards_played += 1
             current_campaign_cards += 1
+            result["cards_played"] = cards_played
+            _record_treaty_status(diag, engine.state, cards_played)
 
             if check_invariants:
                 from lod_ai.tools import invariants
@@ -580,17 +591,21 @@ def run_one_game(scenario: str, seed: int, *, detailed: bool = False,
                 _scan_history_large(
                     large_data, history, prev_offset, cards_played
                 )
+                if diag["treaty_card_number"] is not None:
+                    large_data["_treaty_card_number"] = diag["treaty_card_number"]
 
             # WQ handling
             if is_wq:
                 wq_count += 1
                 if detailed:
-                    snapshot = _capture_wq_snapshot(engine.state, wq_count)
-                    large_data["wq_snapshots"].append(snapshot)
+                    large_data["wq_snapshots"].append(wq_snapshot)
                     large_data["cards_per_campaign"].append(current_campaign_cards)
                 current_campaign_cards = 0
 
             # Check game over
+            if engine.state.get("victory_result", {}).get("outcome") == "stalemate":
+                result["end_reason"] = "STALEMATE"
+                break
             winner = _check_game_over(engine.state)
             if winner:
                 result["winner"] = winner
@@ -600,7 +615,6 @@ def run_one_game(scenario: str, seed: int, *, detailed: bool = False,
             result["end_reason"] = "TIMEOUT"
 
         result["cards_played"] = cards_played
-        _finalize_diagnostics(diag, engine.state)
 
         if detailed:
             # Add remaining campaign cards if game didn't end at WQ
@@ -642,8 +656,16 @@ def run_one_game(scenario: str, seed: int, *, detailed: bool = False,
                 f"python -m lod_ai.tools.batch_smoke --repro {scenario}:{seed}"
             )
 
+    eng = locals().get("engine")
+    if eng is not None:
+        result.update(collect_runtime_diagnostics(eng.state))
+        _finalize_diagnostics(diag, eng.state)
+    else:
+        result.update(collect_runtime_diagnostics({}))
+    result["clean"] = result_is_clean(result)
     result["diagnostics"] = diag
     if detailed:
+        large_data["total_cards"] = result["cards_played"]
         result["large_data"] = large_data
     return result
 
@@ -680,9 +702,24 @@ def _print_summary(results: List[Dict[str, Any]], label: str) -> None:
     print(f"  {'Deck exhausted':<16} {end_reasons.get('DECK_EXHAUSTED', 0):>6}")
     print(f"  {'Timeouts':<16} {end_reasons.get('TIMEOUT', 0):>6}")
     print(f"  {'Crashes':<16} {end_reasons.get('CRASH', 0):>6}")
+    print(f"  {'Invariants':<16} {end_reasons.get('INVARIANT', 0):>6}")
+    flagged = sum(r.get("end_reason") == "WINNER" and not result_is_clean(r) for r in results)
+    print(f"  {'Flagged wins':<16} {flagged:>6}")
     print(f"  {'Interactive hang':<16} {end_reasons.get('INTERACTIVE_PROMPT', 0):>6}")
     print(f"  {'Avg cards played':<16} {avg_cards:>6.1f}")
     print()
+
+
+def _print_run_quality(results: List[Dict[str, Any]]) -> None:
+    clean = sum(result_is_clean(r) for r in results)
+    flagged = [r for r in results if not result_is_clean(r)]
+    print(f"\n  Clean completed games: {clean}/{len(results)}")
+    for key in COUNT_KEYS:
+        print(f"  {key}: {sum(r.get(key, 0) for r in results)}")
+    observed = sum(r.get("event_outcome_observation_count", 0) for r in results)
+    print(f"  Battle-dependent adverse Event outcomes observed (Q24): {observed}")
+    for result in flagged:
+        print(f"  [{result.get('scenario')} seed={result.get('seed')}] DIRTY: {issue_summary(result)}")
 
 
 def _print_victory_margin_analysis(by_scenario: Dict[str, List[Dict]]) -> None:
@@ -757,7 +794,7 @@ def _print_margin_trends(by_scenario: Dict[str, List[Dict]]) -> None:
             continue
         print(f"\n  Scenario {scenario}:")
         for abbrev in ['BRI', 'FRE', 'IND']:
-            values_by_wq = []
+            values_by_wq: List[float | None] = []
             for wq_idx in sorted(wq_avgs.keys()):
                 vals = wq_avgs[wq_idx].get(abbrev, [])
                 if vals:
@@ -981,10 +1018,10 @@ def _print_winners_table(all_results: List[Dict], by_scenario: Dict[str, List[Di
             end_reason = r.get("end_reason")
             vtype = ld.get("victory_type")
 
-            if end_reason in ("CRASH", "INTERACTIVE_PROMPT", "TIMEOUT"):
+            if end_reason in ERROR_END_REASONS:
                 crashes += 1
                 continue
-            if not winner or winner == "UNKNOWN":
+            if end_reason != "WINNER" or winner not in FACTIONS:
                 unresolved += 1
                 continue
             if vtype == "victory_condition":
@@ -995,7 +1032,9 @@ def _print_winners_table(all_results: List[Dict], by_scenario: Dict[str, List[Di
                 # Fallback: count as VC
                 vc_wins[winner] += 1
 
-        print(f"\n  {label} ({total} games):")
+        print(f"\n  {label} ({total} games; percentages use all attempted games):")
+        flagged = sum(r.get("end_reason") == "WINNER" and not result_is_clean(r) for r in results)
+        print(f"  Completed wins with recorded flags: {flagged}")
         print(f"  {'Faction':<12} {'VC Wins':>8} {'FS Wins':>8} {'Total':>7} {'Pct':>7}")
         print(f"  {'-' * 44}")
         for f in FACTIONS:
@@ -1017,7 +1056,7 @@ def _print_winners_table(all_results: List[Dict], by_scenario: Dict[str, List[Di
 
 def _print_avg_game_length(all_results: List[Dict], by_scenario: Dict[str, List[Dict]]) -> None:
     print(f"\n{'=' * 74}")
-    print("  B. AVERAGE GAME LENGTH")
+    print("  B. AVERAGE GAME LENGTH (completed games only)")
     print(f"{'=' * 74}")
     print(f"  {'Scenario':<12} {'Avg Cards':>10} {'Avg WQ':>8} {'Avg End Year':>14}")
     print(f"  {'-' * 46}")
@@ -1028,6 +1067,8 @@ def _print_avg_game_length(all_results: List[Dict], by_scenario: Dict[str, List[
         wq_list = []
         year_list = []
         for r in results:
+            if r.get("end_reason") != "WINNER" or r.get("winner") not in FACTIONS:
+                continue
             cards_list.append(r.get("cards_played", 0))
             ld = r.get("large_data", {})
             wq_list.append(ld.get("wq_count", 0))
@@ -1120,6 +1161,18 @@ def _print_faction_performance(all_results: List[Dict], by_scenario: Dict[str, L
 
 # --- D. GAME DYNAMICS ------------------------------------------------------
 
+def _margin_sum_leader(snapshot: Dict) -> str | None:
+    """Descriptive metric only; ties use the displayed faction order."""
+    margins = snapshot.get("margins", {})
+    best_f, best_sum = None, float("-inf")
+    for faction in FACTIONS:
+        abbrev = FACTION_ABBREV[faction]
+        total = sum(margins.get(abbrev, [0, 0]))
+        if total > best_sum:
+            best_f, best_sum = abbrev, total
+    return best_f
+
+
 def _print_game_dynamics(all_results: List[Dict], by_scenario: Dict[str, List[Dict]]) -> None:
     print(f"\n{'=' * 74}")
     print("  D. GAME DYNAMICS")
@@ -1131,8 +1184,8 @@ def _print_game_dynamics(all_results: List[Dict], by_scenario: Dict[str, List[Di
     if vc_cards:
         print(f"\n  Average victory turn (VC wins only): {_safe_avg(vc_cards):.1f} cards")
 
-    # WQ leadership: who leads at each WQ?
-    print(f"\n  WQ Leadership (faction closest to victory at each WQ check):")
+    print("\n  Largest sum of two victory margins before WQ resolution:")
+    print("    Descriptive metric; ties use BRI, PAT, IND, FRE order.")
     max_wq = 0
     for r in all_results:
         ld = r.get("large_data", {})
@@ -1160,19 +1213,7 @@ def _print_game_dynamics(all_results: List[Dict], by_scenario: Dict[str, List[Di
                     if wqi >= len(snaps):
                         continue
                     total_with_wq += 1
-                    snap = snaps[wqi]
-                    marg = snap.get("margins", {})
-                    # Leader = faction with highest sum of margins
-                    best_f = None
-                    best_sum = float('-inf')
-                    for fa in FACTIONS:
-                        fa_abbrev = FACTION_ABBREV[fa]
-                        ms = marg.get(fa_abbrev, [0, 0])
-                        s = ms[0] + ms[1]
-                        if s > best_sum:
-                            best_sum = s
-                            best_f = fa
-                    if best_f == f:
+                    if _margin_sum_leader(snaps[wqi]) == abbrev:
                         lead_count += 1
                 pct = _safe_pct(lead_count, total_with_wq)
                 row += f"  {pct:>5.0f}%"
@@ -1184,7 +1225,7 @@ def _print_game_dynamics(all_results: List[Dict], by_scenario: Dict[str, List[Di
     for r in all_results:
         ld = r.get("large_data", {})
         tc = ld.get("_treaty_card_number")
-        if tc:
+        if tc is not None:
             toa_cards.append(tc)
             toa_count += 1
         elif ld.get("wq_snapshots"):
@@ -1242,24 +1283,12 @@ def _print_balance_indicators(all_results: List[Dict], by_scenario: Dict[str, Li
             continue
         games_with_both += 1
 
-        def _leader_at(snap):
-            marg = snap.get("margins", {})
-            best_f = None
-            best_sum = float('-inf')
-            for abbrev in ['BRI', 'PAT', 'FRE', 'IND']:
-                ms = marg.get(abbrev, [0, 0])
-                s = ms[0] + ms[1]
-                if s > best_sum:
-                    best_sum = s
-                    best_f = abbrev
-            return best_f
-
-        wq1_leader = _leader_at(snaps[0])
-        wq3_leader = _leader_at(snaps[2])
+        wq1_leader = _margin_sum_leader(snaps[0])
+        wq3_leader = _margin_sum_leader(snaps[2])
         if wq1_leader != wq3_leader:
             comebacks += 1
 
-    print(f"\n  Comeback frequency (WQ3 leader differs from WQ1 leader):")
+    print("\n  Change in largest margin sum from before WQ1 to before WQ3:")
     if games_with_both:
         pct = _safe_pct(comebacks, games_with_both)
         print(f"    {comebacks}/{games_with_both} games ({pct:.1f}%)")
@@ -1291,7 +1320,10 @@ def _print_balance_indicators(all_results: List[Dict], by_scenario: Dict[str, Li
     print(f"\n  Combat Summary:")
     total_battles = sum(r.get("large_data", {}).get("battles_total", 0) for r in all_results)
     n_games = len(all_results) or 1
-    print(f"    Total battles: {total_battles} ({total_battles / n_games:.1f}/game)")
+    total_commands = sum(r.get("large_data", {}).get("battle_commands_total", 0)
+                         for r in all_results)
+    print(f"    Battle Command executions: {total_commands} ({total_commands / n_games:.1f}/game)")
+    print(f"    Space battles resolved: {total_battles} ({total_battles / n_games:.1f}/game)")
     for f in FACTIONS:
         abbrev = FACTION_ABBREV[f]
         att = sum(r.get("large_data", {}).get("battles_as_attacker", {}).get(f, 0)
@@ -1319,7 +1351,7 @@ def _serialize_large_results(all_results: List[Dict]) -> List[Dict]:
     """Prepare large results for JSON serialization."""
     serialisable = []
     for r in all_results:
-        entry = dict(r)
+        entry = deepcopy(r)
         if entry.get("traceback"):
             entry["traceback"] = entry["traceback"][:2000]
         # Remove legacy diagnostics from large output to reduce size
@@ -1354,7 +1386,7 @@ def _parse_repro(argv) -> tuple[str, int] | None:
     return None
 
 
-def main() -> None:
+def main() -> int:
     single_mode = "--single" in sys.argv
     large_mode = "--large" in sys.argv
     invariants_mode = "--invariants" in sys.argv
@@ -1377,8 +1409,11 @@ def main() -> None:
             if result["traceback"]:
                 print(result["traceback"])
             raise SystemExit(1)
-        print("  clean: no crash, no invariant violation.")
-        return
+        if not result_is_clean(result):
+            print(f"  DIRTY: {issue_summary(result)}")
+            return 1
+        print("  clean: completed without recorded errors or invariant violations.")
+        return 0
 
     # ------------------------------------------------------------------
     # Single mode
@@ -1410,7 +1445,8 @@ def main() -> None:
         print(f"  Final resources: {diag.get('final_resources', {})}")
         print(f"  Treaty played: {diag.get('treaty_played', False)}")
         print(f"  Pieces on map: {diag.get('total_pieces_on_map', {})}")
-        return
+        _print_run_quality([result])
+        return 0 if result_is_clean(result) else 1
 
     # ------------------------------------------------------------------
     # Large mode (50 seeds x 3 scenarios = 150 games)
@@ -1431,7 +1467,8 @@ def main() -> None:
                 sys.stdout.write(f"  {tag} ... ")
                 sys.stdout.flush()
 
-                result = run_one_game(scenario, seed, detailed=True)
+                result = run_one_game(scenario, seed, detailed=True,
+                                      check_invariants=invariants_mode)
                 all_results.append(result)
                 by_scenario[scenario].append(result)
 
@@ -1465,7 +1502,8 @@ def main() -> None:
             json.dumps(serialisable, indent=2, default=str), encoding="utf-8"
         )
         print(f"\nFull results written to {LARGE_RESULTS_PATH}")
-        return
+        _print_run_quality(all_results)
+        return 0 if all(result_is_clean(r) for r in all_results) else 1
 
     # ------------------------------------------------------------------
     # Default mode (20 seeds x 3 scenarios = 60 games)
@@ -1476,8 +1514,8 @@ def main() -> None:
           f"= {total_games} games")
     print(f"Safety limit: {CARD_SAFETY_LIMIT} cards per game\n")
 
-    all_results: List[Dict[str, Any]] = []
-    by_scenario: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    all_results = []
+    by_scenario = defaultdict(list)
 
     for scenario in SCENARIOS:
         for seed in range(1, seeds + 1):
@@ -1529,7 +1567,9 @@ def main() -> None:
         json.dumps(diag_serialisable, indent=2), encoding="utf-8"
     )
     print(f"Diagnostic results written to {DIAG_RESULTS_PATH}")
+    _print_run_quality(all_results)
+    return 0 if all(result_is_clean(r) for r in all_results) else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
