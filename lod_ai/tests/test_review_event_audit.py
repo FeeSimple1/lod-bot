@@ -219,43 +219,38 @@ def test_event_condition_die_rechecks_queued_deterministic_target(monkeypatch):
     assert not st.get("free_op_followups")
 
 
-@pytest.mark.parametrize("battle_result", [C.ACTIVE_OPPOSITION, C.ACTIVE_SUPPORT])
-def test_queued_combat_result_does_not_supply_a_new_efficacy_policy(monkeypatch, battle_result):
-    """Q24 remains open: discard either favorable or harmful combat copies."""
+def test_queued_combat_preview_uses_known_followup_without_rolling(monkeypatch):
+    """Q24: an offered Battle cannot hide a harmful known Neutral shift."""
     from lod_ai.util.free_ops import queue_after_free_ops, queue_free_op
     st = build_state("1776", seed=1)
+    st["support"]["Boston"] = C.PASSIVE_SUPPORT
 
     def effect(state, **kw):
         queue_free_op(state, C.PATRIOTS, "battle", "Boston")
         queue_after_free_ops(state, "shift_support_toward", space="Boston",
                              target=C.NEUTRAL, steps=1)
 
-    def contingent_result(engine, state, card_id):
-        _roll_d3(state)
-        state["support"]["Boston"] = battle_result
-        state.pop("free_ops")
-        state.pop("free_op_followups")
-
-    monkeypatch.setattr(Engine, "_drain_free_ops", contingent_result)
+    monkeypatch.setattr("lod_ai.commands.battle._roll_d3", lambda *args:
+                        pytest.fail("must not roll speculative Battle dice"))
     obj = bot(monkeypatch, effect)
     original = snapshot(st)
-    assert not obj._is_ineffective_event(CARD, st)
+    assert obj._is_ineffective_event(CARD, st)
     preview = obj._event_choice_preview
-    assert preview["d_before"] == preview["d_after"]
-    assert preview["pending_free_ops"] is True
+    assert preview["d_after"] == preview["d_before"] - 1
+    assert preview["pending_free_ops"] is False
     assert preview["battle_dice"] == 0
     assert snapshot(st) == original
 
 
 def test_preview_does_not_choose_a_human_granted_command(monkeypatch):
-    from lod_ai.bots.base_bot import _complete_noncombat_preview
+    from lod_ai.bots.base_bot import _complete_pre_roll_preview
     from lod_ai.util.free_ops import queue_free_op
     st = build_state("1776", seed=1)
     st["human_factions"] = {C.PATRIOTS}
     queue_free_op(st, C.PATRIOTS, "march", "Boston")
     monkeypatch.setattr(Engine, "_drain_free_ops", lambda *args:
                         pytest.fail("must not plan a human choice"))
-    assert _complete_noncombat_preview(st, 1) is None
+    assert _complete_pre_roll_preview(st, 1) is None
 
 
 @pytest.mark.parametrize("empty_queue", [False, True])
@@ -287,8 +282,9 @@ def test_failed_deterministic_free_operation_is_a_preview_error(monkeypatch):
 
 def test_battle_counter_is_nonsemantic_and_roundtrips(monkeypatch):
     st = build_state("1776", seed=1)
-    obj = bot(monkeypatch, lambda state, **kw: _roll_d3(state))
-    assert obj._is_ineffective_event(CARD, st)  # merely rolling has no effect
+    obj = bot(monkeypatch, lambda state, **kw: None)
+    st["_battle_dice_rolled"] = 0
+    assert obj._is_ineffective_event(CARD, st)
     _roll_d3(st)
     encoded = _serialize_state(st, set())
     restored, _ = _deserialize_state(encoded)

@@ -90,6 +90,24 @@ def execute(
     if not spaces:
         raise ValueError("Need >= 1 battle space")
 
+    if state.get("_event_pre_roll_preview"):
+        # Q24: an Event decision may know that Battle is offered, never its
+        # future losses or Win-the-Day effects. Stop before ally fees,
+        # activation choices (including human prompts), callbacks, or dice.
+        own_tags = {BRITISH: (REGULAR_BRI, TORY, FORT_BRI),
+                    PATRIOTS: (REGULAR_PAT, MILITIA_A, MILITIA_U, FORT_PAT),
+                    FRENCH: (REGULAR_FRE,)}[faction]
+        enemy_tags = ((REGULAR_PAT, MILITIA_A, MILITIA_U, FORT_PAT, REGULAR_FRE)
+                      if faction == BRITISH else
+                      (REGULAR_BRI, TORY, FORT_BRI, WARPARTY_A, WARPARTY_U, VILLAGE))
+        for sid in spaces:
+            sp = state["spaces"][sid]
+            if (any(sp.get(tag, 0) for tag in own_tags)
+                    and any(sp.get(tag, 0) for tag in enemy_tags)):
+                state.setdefault("_event_preview_battles", []).append(
+                    {"faction": faction, "space": sid})
+        return ctx
+
     ctx["_planned_command"] = COMMAND_NAME
     ctx["_command_selected_spaces"] = set(spaces)
     interrupted = callable(ctx.get("_command_checkpoint"))
@@ -236,6 +254,9 @@ def execute(
                     if map_adj.is_city(battle_sid):
                         move_blockade_city_to_city(state, battle_sid, win_blockade_dest)
 
+    # Track actual resolution separately from D3 count: modifiers can cause
+    # losses and Win the Day even when both Force Levels roll zero dice.
+    state["_battle_commands_executed"] = state.get("_battle_commands_executed", 0) + 1
     refresh_control(state)
     enforce_global_caps(state)
     return ctx
@@ -305,6 +326,8 @@ def _resolve_defender_activation(state, sp, sid, def_side) -> None:
 
 # -------- Internal helpers --------
 def _roll_d3(state: Dict) -> int:
+    if state.get("_event_pre_roll_preview"):
+        raise RuntimeError("Event pre-roll preview cannot roll Battle dice")
     val = state["rng"].randint(1, 3)
     # Distinguish actual combat outcomes from Random Spaces D3 tie-breaks.
     state["_battle_dice_rolled"] = state.get("_battle_dice_rolled", 0) + 1

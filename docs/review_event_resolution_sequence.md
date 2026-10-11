@@ -1,5 +1,12 @@
 # Event follow-ups after immediate free Commands
 
+**2026-10-11 policy update:** The record below describes the earlier engine
+and validation. The user has now resolved Q24: Event effectiveness uses
+known pre-roll effects without forecasting any Battle-generated changes,
+including zero-die Battles, and the Event choice remains binding. See
+`QUESTIONS.md` Q24 and `audit_q24_pre_roll_event_evaluation.md`; the earlier
+handler-only/discard-after-combat preview policy below is superseded.
+
 Source review before implementation: `Reference Documents/Manual Ch 5.txt`
 §5.1 requires literal event text and §5.3 makes free Commands immediate.
 `Reference Documents/card reference full.txt` card 1 shaded gives free

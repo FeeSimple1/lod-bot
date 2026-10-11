@@ -1,5 +1,12 @@
 # Bot outcome diagnostic investigation — October 2026
 
+**2026-10-11 policy update:** The user has resolved Q24 with judgment based
+only on knowledge before rolls and a binding Event choice. The new preview excludes
+prospective Battle effects, including zero-die Battles; see `QUESTIONS.md`
+Q24 and `audit_q24_pre_roll_event_evaluation.md`. The results and policy
+limitations recorded below remain historical evidence of the specified
+earlier engine, not validation of this subsequent Q24 change.
+
 This follows the 1,500-game standard-setup experiment on the source tree
 `788ad3fbb0652ea687adbf65d53c3900079dc9a4` (PR #198). The experiment used
 seeds 10000–10499 for each of 1775, 1776, and 1778, with four bots and

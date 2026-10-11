@@ -432,56 +432,59 @@ into the British WQ economy.
 
 ---
 
-## Q24 (review, OPEN): Ineffective Events with contingent Battle outcomes
+## Q24 (review, RESOLVED): Ineffective Events with contingent Battle outcomes
 
-**Decision needed:** How should a Non-player apply §8.3.3 before choosing
-an Event whose completed Support minus Opposition change depends on Battle
-dice: assess only guaranteed non-Battle effects, require every possible
-Battle outcome to be non-harmful, or apply a specified probability or
-expected-value criterion? In particular, may a free Battle make card 1's
-otherwise harmful Opposition-to-Neutral shift effective?
+**User ruling, 2026-10-11:** “The bot should judge only based on what it
+knows before rolling.” The Event-versus-Command choice is made before
+Battle rolls and is binding: an adverse Battle result does not permit
+switching to a Command instead.
+
+Apply §8.3.3 to the known board and deterministic Event effects, including
+known changes from granted Commands and printed follow-ups, without
+simulating Battle losses, Win-the-Day shifts, or other combat-dependent
+changes. A legal offered free Battle is a possible meaningful Event effect;
+its actual outcome is not known in advance. Do not use a seeded future
+combat roll, an expected-value calculation, or an all-outcomes/worst-case
+test to decide effectiveness. Do not invent a human player's granted
+Command choices.
+
+The preview boundary excludes all prospective Battle-generated effects,
+including a Battle whose Force Levels require zero D3 rolls. It records
+the legal offer before Battle ally payments, activation, resolution, or
+callbacks; it does not forecast those effects in either case. Known
+non-Battle effects and printed follow-ups remain part of the judgment.
+
+For card 1 shaded, evaluate its Neutral shift against the political level
+known before combat, not a level produced by a speculative Battle result.
+A possible favorable Battle cannot rescue an otherwise enemy-favoring
+known shift. The actual selected Event still executes March, Battle,
+Propaganda, and Neutral in the printed order; the advance preview does not
+change live resolution. If a granted Battle is impossible or declines,
+that does not hide the remaining deterministic effects or create a
+meaningful Battle effect.
 
 Sources: `Reference Documents/Manual Ch 8.txt` §8.3.3 (lines 181–188),
-§8.3.5 (lines 202–206); `Manual Ch 5.txt` §5.3 (lines 56–62);
-`card reference full.txt`, card 1 shaded (lines 10–11) and card 5 shaded
-(lines 62–63). §8.3.3 rejects an enemy-favoring net shift; §5.3 makes
-granted free Commands immediate; §8.3.5 supplies their faction priorities.
-These provisions do not specify an advance aggregation of uncertain Battle
-results for this efficacy test.
+§8.3.5 (lines 202–207), and §8.3.6 (lines 227–239); `Manual Ch 5.txt`
+§5.3 (lines 56–62); `card reference full.txt`, card 1 shaded (lines
+10–11), card 5 shaded (lines 62–63), and card 48 unshaded (lines
+611–612). The faction Event-selection sections (§§8.4–8.7) already exclude
+free Battles from their favorable Support/Opposition trigger; British and
+French casualty triggers can include free Battles under their specified
+priorities. Those rules govern the flowchart questions; the user ruling
+supplies the advance information boundary for the shared effectiveness
+test. Source-of-truth files remain unchanged.
 
-The current `_is_ineffective_event` policy is retained for contingent events:
-it runs the handler on a copy of the current seeded RNG state. Card 5's
-handler executes Battle in that preview, before the actual flowchart may
-consume another die; the actual Battle can therefore differ. Card 1 queues
-March/Battle and its following marker/Neutral effects in printed order, so
-its handler-only efficacy preview does not evaluate their complete result.
-Before that sequencing fix it incorrectly applied Neutral before Battle,
-which could reject a potentially beneficial complete event. Draining the
-preview alone would extend RNG lookahead, not settle how a Non-player should
-evaluate an unknown combat result.
-
-The October follow-up distinguishes queued Commands that actually need
-Battle dice from deterministic completed Events. A second state copy runs
-the queued operations and following printed effects; only a completed
-result with no Battle dice and no human operation choice can supply the
-efficacy test. Any simulated combat-dependent result is discarded in full,
-leaving the existing handler-only contingent policy above. Thus a queued
-Battle that legally declines no longer hides a harmful card 1 Neutral shift
-or a no-effect Event. The deterministic test is repeated after the Event
-flowchart questions, whose D6 or question-space preference can change the
-actual target. This does not choose an advance criterion for uncertain
-Battle outcomes or resolve Q24.
-
-The diagnostic now records independent preview deltas/no-effect/removal
-evidence and waits for granted free operations before measuring the actual
-completed result. An actual adverse Battle outcome is retained as an
-observation, not declared an illegal decision. Deterministic adverse choices
-(including target changes after question-space selection) remain checked;
-Random Spaces tie-break dice do not create an exemption. Passing these
-diagnostics does not certify the unresolved contingent-event selection
-policy above. A compound Event with actual Battle dice is classified as
-contingent as a whole: the current evidence cannot isolate an unrelated
-deterministic harmful subeffect from its Battle-dependent net result.
-Independent harmful preview evidence is still rejected. Rule sources remain
-unchanged. The balance baseline is refreshed for the documented rules
-corrections; that refresh does not resolve this contingent-event question.
+The earlier handler-only contingent policy and discard-after-combat queued
+preview policy are superseded. The required common preview resolves known
+effects without Battle dice, including queued deterministic follow-ups.
+Random Spaces tie-breaking and prescribed flowchart D6 questions remain
+selection procedures, not combat outcomes; if they change the target,
+repeat the same pre-roll effectiveness test for that target. Independent
+diagnostics retain the pre-roll evidence separately from the actual
+completed Event. An adverse actual Battle is an outcome observation, not
+proof of an illegal advance choice; a harmful known preview remains a
+decision defect. Track actual Battle execution separately from the D3-roll
+count so a zero-die Battle likewise cannot cause retrospective rejection.
+This does not exempt an enemy-favoring known preview from the advance veto.
+See `docs/audit_q24_pre_roll_event_evaluation.md` for the pre-edit audit and
+regression scope.

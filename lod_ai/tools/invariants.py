@@ -434,14 +434,18 @@ def _rules_property_violations(state: Dict[str, Any],
             if entry.get("complete") is False:
                 # Retain partial evidence until the engine drains free ops.
                 continue
-            if (not entry.get("battle_dice", 0)
+            battle_outcome = bool(entry.get("battle_dice", 0)
+                                  or entry.get("battle_commands", 0))
+            if (not battle_outcome
                     and favors_enemy(fac, d_b, d_a)):
                 problems.append(
                     f"{prefix} but completed deterministic Support-Opposition "
                     f"moved {d_b} -> {d_a} (favors enemy)")
-            elif entry.get("battle_dice", 0) and favors_enemy(fac, d_b, d_a):
+            elif battle_outcome and favors_enemy(fac, d_b, d_a):
                 # This is an observed contingent outcome, not a proven
-                # illegal decision. Preserve the evidence for reports/Q24.
+                # illegal decision under the Q24 pre-roll ruling. A Battle
+                # may use zero dice and still change the board through loss
+                # modifiers: do not retroactively re-judge that decision.
                 observed = dict(entry)
                 log = state.setdefault("event_outcome_observations", [])
                 if observed not in log:
