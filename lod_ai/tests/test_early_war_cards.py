@@ -81,7 +81,9 @@ def test_card6_benedict_arnold_targets_fort_colony_underground_first():
 
     early_war.evt_006_benedict_arnold(state, shaded=False)
 
-    assert state["casualties"].get(FORT_PAT) == 1
+    assert state["casualties"].get(FORT_PAT, 0) == 0
+    assert state["available"].get(FORT_PAT) == 1
+    assert state["crc"] == 1
     assert FORT_PAT not in state["spaces"]["Georgia"]
     # 2 Militia removed, Underground first (§8.1.2 enemy bullet);
     # Available holds Militia folded to the U pool tag (S1.4.3, S67)
@@ -101,7 +103,9 @@ def test_card6_benedict_arnold_prefers_fort_over_more_militia():
 
     early_war.evt_006_benedict_arnold(state, shaded=False)
 
-    assert state["casualties"].get(FORT_PAT) == 1
+    assert state["casualties"].get(FORT_PAT, 0) == 0
+    assert state["available"].get(FORT_PAT) == 1
+    assert state["crc"] == 1
     assert state["spaces"]["Virginia"].get(MILITIA_A) == 5
 
 
@@ -114,7 +118,9 @@ def test_card6_benedict_arnold_shaded_any_space():
 
     early_war.evt_006_benedict_arnold(state, shaded=True)
 
-    assert state["casualties"].get(FORT_BRI) == 1
+    assert state["casualties"].get(FORT_BRI, 0) == 0
+    assert state["available"].get(FORT_BRI) == 1
+    assert state["cbc"] == 3  # Fort and two cubes, each counted once
     assert state["casualties"].get(REGULAR_BRI) == 1
     assert state["casualties"].get(TORY) == 1
     assert state["spaces"]["Boston"].get(TORY) == 1
