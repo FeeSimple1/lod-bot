@@ -90,6 +90,9 @@ not detect missing hooks. Its description now states that limitation.
   named-faction Event; the executor-only collection path remains a gap.
 - Add dedicated free-operation choices for Partisans/War Path, and audit
   voluntary map-piece removal choices when an Available pool is empty.
+- Audit multi-space Rally pool projections: newly recruited or returned
+  pieces are not fully projected into later planning menus. The new typed
+  movement ledger fixes reuse of departing units, not that broader issue.
 - Review French March destination filtering and Special Activity option
   descriptions flagged by the French player. These were observations for
   follow-up, not confirmed board-state errors in this batch.
@@ -109,7 +112,7 @@ for this batch.
 
 ## Verification
 
-- Full suite: **2,006 tests passed**.
+- Full suite: **2,008 tests passed**.
 - Bot invariant gate: **60/60 games clean** (seeds 1–20 across all three
   scenarios), including per-card schema and save/load checks.
 - Existing gradual type gate: no issues in 23 util/board source files.
@@ -121,3 +124,6 @@ for this batch.
   in Pennsylvania and spent two Continentals, preserving both Underground
   Militia. The resulting three Continentals/two Militia/two Forts position
   passed state/save checks. This was a constructed fixture, not a full game.
+- Final multi-space Rally regressions also verify that the Fort picker cannot
+  reuse Militia already assigned to regroup elsewhere, and that regrouped
+  arrivals cannot move twice.

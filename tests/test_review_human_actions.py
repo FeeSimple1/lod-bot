@@ -204,6 +204,49 @@ def test_rally_rejects_invalid_explicit_fort_mix_without_removing_units():
     assert state['spaces']['Virginia'].get(C.FORT_PAT, 0) == 0
 
 
+def test_rally_fort_picker_excludes_militia_already_planned_to_move(monkeypatch):
+    state = board({
+        'Boston': {C.FORT_PAT: 1},
+        'Massachusetts': {C.MILITIA_U: 2, C.REGULAR_PAT: 2},
+    })
+    seen = menus(monkeypatch,
+        singles=['Move Militia here and turn all Underground',
+                 'Replace 2 units with a Fort', 'No promotion'],
+        multiples=[['Boston', 'Massachusetts'], ['Massachusetts']], counts=[2])
+    cli._rally_wizard(Engine(state), C.PATRIOTS, False)(state, {})
+    assert state['spaces']['Boston'][C.MILITIA_U] == 2
+    assert state['spaces']['Massachusetts'][C.FORT_PAT] == 1
+    assert state['spaces']['Massachusetts'].get(C.REGULAR_PAT, 0) == 0
+    assert state['spaces']['Massachusetts'].get(C.MILITIA_U, 0) == 0
+    assert not any('to replace with Fort' in prompt for prompt in seen)
+
+
+def test_rally_regroup_hiding_keeps_arrivals_out_of_later_move_choices(monkeypatch):
+    state = board({
+        'Boston': {C.FORT_PAT: 1, C.MILITIA_A: 2},
+        'Massachusetts': {C.FORT_PAT: 1},
+        'New_Hampshire': {C.MILITIA_U: 2, C.REGULAR_PAT: 2},
+    })
+    menus(monkeypatch,
+        singles=['Move Militia here and turn all Underground',
+                 'Move Militia here and turn all Underground',
+                 'Replace 2 units with a Fort', 'No promotion'],
+        multiples=[['Boston', 'Massachusetts', 'New_Hampshire'],
+                   ['New_Hampshire'], ['Boston']], counts=[2, 2])
+    choose_count = cli.choose_count
+    def count(prompt, **kwargs):
+        if prompt == 'Militia from Boston to Massachusetts:':
+            assert kwargs['max_val'] == 2  # the two arrivals already moved
+        return choose_count(prompt, **kwargs)
+    monkeypatch.setattr(cli, 'choose_count', count)
+    cli._rally_wizard(Engine(state), C.PATRIOTS, False)(state, {})
+    assert state['spaces']['Boston'][C.MILITIA_U] == 2
+    assert state['spaces']['Boston'].get(C.MILITIA_A, 0) == 0
+    assert state['spaces']['Massachusetts'][C.MILITIA_U] == 2
+    assert state['spaces']['New_Hampshire'][C.FORT_PAT] == 1
+    assert state['spaces']['New_Hampshire'].get(C.REGULAR_PAT, 0) == 0
+
+
 def test_gather_can_hide_in_place_without_adjacent_war_parties(monkeypatch):
     state = board({'Northwest': {C.VILLAGE: 1, C.WARPARTY_A: 2}})
     menus(monkeypatch, singles=['Move War Parties in'], multiples=[['Northwest']])

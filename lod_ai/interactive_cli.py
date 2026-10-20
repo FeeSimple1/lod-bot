@@ -446,8 +446,11 @@ def _rally_wizard(engine: Engine, faction: str, limited: bool, *,
     fort_mix = {}
     remaining_militia = state["available"].get(RC.MILITIA_U, 0)
     remaining_forts = state["available"].get(RC.FORT_PAT, 0)
-    remaining = {sid: sp.get(RC.MILITIA_U, 0) + sp.get(RC.MILITIA_A, 0)
-                 for sid, sp in state["spaces"].items()}
+    remaining_by_tag = {
+        sid: {tag: sp.get(tag, 0) for tag in (RC.MILITIA_U, RC.MILITIA_A)}
+        for sid, sp in state["spaces"].items()
+    }
+    remaining = {sid: sum(counts.values()) for sid, counts in remaining_by_tag.items()}
     for sid in selected:
         sp = state["spaces"][sid]
         forts = sp.get(RC.FORT_PAT, 0)
@@ -474,9 +477,11 @@ def _rally_wizard(engine: Engine, faction: str, limited: bool, *,
             # §3.3.1 leaves the choice of the two replaced units to Patriots.
             mix, needed = {}, 2
             tags = (RC.MILITIA_U, RC.MILITIA_A, RC.REGULAR_PAT)
+            available_units = {**remaining_by_tag[sid],
+                               RC.REGULAR_PAT: sp.get(RC.REGULAR_PAT, 0)}
             for index, tag in enumerate(tags):
-                available = sp.get(tag, 0)
-                other = sum(sp.get(t, 0) for t in tags[index + 1:])
+                available = available_units[tag]
+                other = sum(available_units[t] for t in tags[index + 1:])
                 low, high = max(0, needed - other), min(needed, available)
                 take = (low if low == high else choose_count(
                     f"{tag} to replace with Fort in {sid}:", min_val=low, max_val=high))
@@ -484,7 +489,9 @@ def _rally_wizard(engine: Engine, faction: str, limited: bool, *,
                     mix[tag] = take
                 needed -= take
             fort_mix[sid] = mix
-            remaining[sid] -= mix.get(RC.MILITIA_U, 0) + mix.get(RC.MILITIA_A, 0)
+            for tag in (RC.MILITIA_U, RC.MILITIA_A):
+                remaining_by_tag[sid][tag] -= mix.get(tag, 0)
+            remaining[sid] = sum(remaining_by_tag[sid].values())
         elif action == "bulk":
             n = choose_count(f"Militia to place in {sid}:", min_val=1,
                 max_val=min(remaining_militia, forts + map_adj.population(sid)))
@@ -501,7 +508,15 @@ def _rally_wizard(engine: Engine, faction: str, limited: bool, *,
                 n = choose_count(f"Militia from {src} to {sid}:", min_val=1,
                                  max_val=remaining[src])
                 remaining[src] -= n
+                # Match Rally's default Underground-first source selection.
+                take_u = min(n, remaining_by_tag[src][RC.MILITIA_U])
+                remaining_by_tag[src][RC.MILITIA_U] -= take_u
+                remaining_by_tag[src][RC.MILITIA_A] -= n - take_u
                 move_plan.append((src, sid, n))
+            # Regroup hides existing units as well as arrivals. Arrivals stay
+            # outside this ledger because no Militia may move twice (§3.3.1).
+            remaining_by_tag[sid][RC.MILITIA_U] += remaining_by_tag[sid][RC.MILITIA_A]
+            remaining_by_tag[sid][RC.MILITIA_A] = 0
     promotion_spaces = [sid for sid in selected
                         if state["spaces"][sid].get(RC.FORT_PAT, 0) or sid in build_fort]
     promote_space, promote_n = None, None
