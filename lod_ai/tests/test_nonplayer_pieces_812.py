@@ -60,8 +60,10 @@ def test_remove_enemy_pieces_full_order():
     st = _st({C.FORT_PAT: 1, C.MILITIA_A: 1, C.MILITIA_U: 1,
               C.REGULAR_PAT: 1})
     NP.remove_enemy_pieces(st, "X", 3, NP.REBELLION)
-    assert st["casualties"] == {C.FORT_PAT: 1, C.MILITIA_U: 1,
-                                C.MILITIA_A: 1}
+    assert st["casualties"] == {C.MILITIA_U: 1, C.MILITIA_A: 1}
+    # §1.6.4 applies even when the shared removal helper requests Casualties.
+    assert st["available"] == {C.FORT_PAT: 1}
+    assert st["crc"] == 1
     assert st["spaces"]["X"][C.REGULAR_PAT] == 1
 
 

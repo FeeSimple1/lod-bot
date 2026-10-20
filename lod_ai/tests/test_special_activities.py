@@ -249,13 +249,15 @@ class TestWarPath:
         war_path.execute(state, C.INDIANS, {}, "Ohio", option=1)
         assert state["casualties"].get(C.REGULAR_PAT, 0) == 1
 
-    def test_option3_fort_to_casualties(self):
-        """Forts go to Casualties per §4.4.2 parenthetical."""
+    def test_option3_fort_casualty_returns_immediately(self):
+        """§4.4.2 casualty Forts return immediately per §1.6.4."""
         state = _base_state()
         _space(state, "Ohio", **{C.WARPARTY_U: 3, C.FORT_PAT: 1})
         state["available"][C.WARPARTY_A] = 5
         war_path.execute(state, C.INDIANS, {}, "Ohio", option=3)
-        assert state["casualties"].get(C.FORT_PAT, 0) == 1
+        assert state["casualties"].get(C.FORT_PAT, 0) == 0
+        assert state["available"].get(C.FORT_PAT, 0) == 1
+        assert state["crc"] == 1
 
     def test_no_base_extra_militia_removal(self):
         """Without Brant, War Path does NOT remove extra Militia beyond the option."""

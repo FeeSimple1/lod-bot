@@ -510,13 +510,12 @@ def _resource_income(state):
         pop = meta.get("population", sp.get("pop", 0))
         ctrl = control_map.get(sid)
 
-        # British Forts
-        if sp.get(FORT_BRI):
-            british_income += 1
+        # §6.3.1/.3 count Fort pieces, not spaces containing a Fort.
+        # §1.4.2 permits two Forts in the same space.
+        british_income += sp.get(FORT_BRI, 0)
 
         # Patriot Forts
-        if sp.get(FORT_PAT):
-            patriot_income += 1
+        patriot_income += sp.get(FORT_PAT, 0)
 
         # Villages (Indians)
         indian_income += sp.get(VILLAGE, 0)
@@ -596,12 +595,14 @@ def _support_phase(state):
     from lod_ai.leaders import leader_location
     gage_space = leader_location(state, leader_state.GAGE)
 
-    def _eff_pop(sid):
-        # C10 (§8.1.1×§1.9): a Blockaded City's population is 0 for the
-        # Support total, so its RL/CoC "change in Support" is 0.
-        p = map_adj.population(sid)
-        bl = state.get("markers", {}).get(BLOCKADE, {}).get("on_map", set())
-        return 0 if (p and sid in bl) else p
+    def _political_difference(sid, level):
+        # §§1.6.2/.3, 1.9: Blockades suppress Support, not Opposition.
+        # Score endpoints separately so a shift crossing Neutral counts
+        # only its actual change in Support minus Opposition.
+        from lod_ai.util.naval import effective_population
+        pop = map_adj.population(sid)
+        support_pop = effective_population(state, sid, pop)
+        return max(level, 0) * support_pop - max(-level, 0) * pop
 
     from collections import defaultdict
 
@@ -655,15 +656,13 @@ def _support_phase(state):
         n_raid = raid_on_map.get(sid, 0)
         n_prop = propaganda_on_map.get(sid, 0)
         marker_count = n_raid + n_prop
-        # C10 (§8.1.1×§1.9): effective population (Blockaded City -> 0);
-        # the S66 fix landed on the CoC side only (Session 67).
-        pop = _eff_pop(sid)
         # §8.4.5 "largest change ... possible": §6.4.1 caps shifts at two
         # levels per space, and the purse must pay the markers first
         # (Session 45: was the raw uncapped distance).
         levels = min(ACTIVE_SUPPORT - level, 2,
                      max(0, bri_res - marker_count + int(sid == gage_space)))
-        potential = levels * pop
+        potential = (_political_difference(sid, level + levels)
+                     - _political_difference(sid, level))
 
         brit_eligible.append((sid, marker_count, potential))
 
@@ -756,14 +755,13 @@ def _support_phase(state):
             continue
 
         n_raid = raid_on_map.get(sid, 0)
-        # C10 (§8.1.1×§1.9): effective population (Blockaded City -> 0).
-        pop = _eff_pop(sid)
         # §8.5.9 "largest change ... possible": §6.4.2 caps shifts at two
         # levels per space, and the purse must pay the Raid marker first
         # (Session 45: was the raw uncapped distance).
         levels = min(level - ACTIVE_OPPOSITION, 2,
                      max(0, pat_res - n_raid))
-        potential = levels * pop
+        potential = (_political_difference(sid, level)
+                     - _political_difference(sid, level - levels))
 
         pat_eligible.append((sid, n_raid, potential))
 

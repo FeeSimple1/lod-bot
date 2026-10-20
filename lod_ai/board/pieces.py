@@ -69,7 +69,7 @@ def increment_casualties(state: Dict[str, Any], tag: str, qty: int) -> None:
     """Increment CBC or CRC cumulative counter per §1.6.4.
 
     Called whenever a piece enters the Casualties box, or when a Fort
-    is removed as a battle casualty (Forts return to Available immediately
+    is removed as a casualty (Forts return to Available immediately
     but still count toward cumulative casualties).
     These counters never decrement.
     """
@@ -314,8 +314,14 @@ def remove_piece(state: Dict[str, Any], tag: str, loc: str | None,
             push_history(state, f"{tag} removed from {sid}")
         return removed
 
+    # §1.6.4: casualty Forts count toward CBC/CRC but return to Available
+    # immediately, for Commands, Special Activities, and Events alike.
+    # Preserve the requested casualty intent for the counter increment;
+    # only their physical destination differs from that of casualty units.
+    destination = ("available" if to == "casualties"
+                   and tag in (C.FORT_BRI, C.FORT_PAT) else to)
     if loc:
-        actual = move_piece(state, tag, loc, to, qty)
+        actual = move_piece(state, tag, loc, destination, qty)
         if to == "casualties":
             increment_casualties(state, tag, actual)
         return actual
@@ -324,7 +330,7 @@ def remove_piece(state: Dict[str, Any], tag: str, loc: str | None,
     for name in list(state["spaces"]):
         if remaining == 0:
             break
-        moved = move_piece(state, tag, name, to, remaining)
+        moved = move_piece(state, tag, name, destination, remaining)
         if to == "casualties":
             increment_casualties(state, tag, moved)
         remaining -= moved
