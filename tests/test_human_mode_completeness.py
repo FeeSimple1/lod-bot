@@ -1,34 +1,11 @@
-"""ROADMAP Piece 7 — human-mode completeness gate.
+"""Guard the inventory of existing human Event-choice hooks.
 
-A card presents a player choice iff its event handler reads a
-`state.get("card<N>_<key>")` override — the hook a human (via the CLI)
-or a bot is meant to set.  This test freezes the audited registry of
-such cards (docs/human_mode_audit.md, Session 72) so that:
-
-  * a NEW card that adds a player choice fails the test until it is
-    triaged into the registry (and, ultimately, wired into the CLI
-    event-choice step);
-  * removing a choice hook is likewise surfaced.
-
-The CLI collection layer (lod_ai/event_choices.py) is being wired in
-batches; tests/test_event_choices.py asserts each wired card's keys
-match this registry.  Wiring status:
-
-  * WIRED (batch 1, the 26 space-selection cards): 5, 7, 9, 11, 15, 16,
-    17, 19, 21, 23, 25, 27, 29, 31, 35, 47, 50, 59, 73, 76, 77, 79, 81,
-    83, 84, 93.  (Note: card 29's value is a FACTION, not a space —
-    audit-table correction recorded in docs/human_mode_audit.md.)
-  * WIRED (batch 2, sub-option cards): 14, 26, 38, 52, 55, 62.
-  * WIRED (batch 3, faction-target / piece-mix cards): 4, 18, 44, 48,
-    66, 67, 74, 80, 85, 87, 88.
-
-ALL 43 cards are wired (Session 73); tests/test_event_choices.py
-asserts EVENT_CHOICES covers this registry exactly.  Residual out of
-scope: event-GRANTED free ops for a human faction are still bot-planned
-(see docs/human_mode_audit.md).
-
-This gate stops the audit from silently drifting while the remaining
-batches are built out.
+The handler's ``state.get("card<N>_<key>")`` reads discover *implemented*
+choice hooks. Changes to that inventory must be reviewed and wired into
+``event_choices.py``. This structural check does not prove that every printed
+choice has a hook: cards 1 and 91 were found missing by human-seat review and
+play despite this test passing. Their source-based behavior tests now guard
+those specific omissions. See ``docs/human_mode_audit.md``.
 """
 import re
 import pathlib
@@ -39,6 +16,7 @@ _EFFECTS = pathlib.Path(__file__).resolve().parents[1] / "lod_ai/cards/effects"
 # Regenerate deliberately (never blindly) when a card's choices change,
 # and update docs/human_mode_audit.md in the same commit.
 CHOICE_REGISTRY = {
+    1: ('target',),
     4: ('base', 'units'),
     5: ('dest', 'src'),
     7: ('dest',),
@@ -81,6 +59,7 @@ CHOICE_REGISTRY = {
     85: ('mix', 'shaded_choice'),
     87: ('piece',),
     88: ('destinations', 'target_faction'),
+    91: ('target',),
     93: ('targets',),
 }
 
@@ -111,4 +90,4 @@ def test_choice_bearing_cards_match_registry():
 
 def test_registry_size_is_the_audited_count():
     # Guards the headline number in the audit doc.
-    assert len(CHOICE_REGISTRY) == 43
+    assert len(CHOICE_REGISTRY) == 45

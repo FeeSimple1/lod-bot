@@ -23,7 +23,7 @@ from lod_ai.util import eligibility as elig
 from lod_ai.cards.effects import brilliant_stroke as bs
 from lod_ai.state.setup_state import build_state
 from lod_ai.economy import resources
-from lod_ai.cli_utils import UndoException
+from lod_ai.cli_utils import BackException, UndoException
 
 # Command / SA implementations
 from lod_ai.commands import march, rally, battle, gather, muster, scout, raid
@@ -279,7 +279,7 @@ class Engine:
         target_state.pop("_turn_command", None)
         target_state.pop("_turn_command_meta", None)
         for key in ("_turn_muster_spaces", "_turn_garrison_destinations",
-                    "_turn_march_sources", "_turn_battle_spaces"):
+                    "_turn_march_sources", "_turn_movement_sources", "_turn_battle_spaces"):
             target_state.pop(key, None)
         target_state.pop("_limited", None)
         target_state.pop("_no_special", None)
@@ -489,12 +489,12 @@ class Engine:
                 if _op == "march_then_battle":
                     self._run_march_then_battle(target_state, _fac, _loc, card_id)
                     continue
-                # Human seats with no preset location plan their free op via
-                # the normal CLI wizard (e.g. the ToA-granted free French
-                # Muster), with costs waived through the bs_free flag.
-                if (_loc is None and _fac in self.human_factions
+                # §5.1: the faction receiving a free Command chooses its
+                # details, even when the Event fixes the destination.
+                if (_fac in self.human_factions
                         and self._interactive_input()):
-                    if self._run_human_free_op(target_state, _fac, _op):
+                    if self._run_human_free_op(target_state, _fac, _op,
+                                               _loc, card_id):
                         continue
                 # Bot seats: build an actual plan (8.3.1) instead of raw
                 # dispatch, and waive costs -- the card grants a FREE op.
@@ -650,37 +650,59 @@ class Engine:
             state.pop("bs_free", None)
 
     def _run_human_free_op(self, target_state: dict, faction: str,
-                           op: str) -> bool:
+                           op: str, loc: str | None = None, card_id=None) -> bool:
         """Let a human seat plan a card-granted free op through the matching
         CLI wizard. Returns True when the op executed (or was knowingly
-        declined); False to fall through to the default path."""
+        declined or failed); False only if there is no matching wizard."""
         from lod_ai import interactive_cli as _cli
-        wizard = getattr(_cli, f"_{op}_wizard", None)
+        wizard_op = "battle" if op == "battle_plus2" else op
+        wizard = getattr(_cli, f"_{wizard_op}_wizard", None)
         if wizard is None:
             return False
         self._bind_provider_faction(faction)
         print(f"\n{faction}: plan your FREE {op.upper()} (granted by the event).")
+        before = deepcopy(target_state)
         target_state["bs_free"] = True
         try:
-            runner = wizard(self, faction, False)
+            kwargs = {}
+            if loc is not None:
+                kwargs["allowed_spaces"] = {loc}
+            if op == "battle_plus2":
+                kwargs["force_bonus"] = 2
+            # British March may select its fixed destination in place.
+            if op == "march":
+                kwargs["allow_in_place"] = True
+            try:
+                runner = wizard(self, faction, loc is not None, **kwargs)
+            except ValueError as exc:
+                # An empty legal target/action menu is a genuine decline.
+                push_history(target_state,
+                             f"FREE {op.upper()} by {faction} — skipped "
+                             f"(no legal target: {exc})")
+                return True
+            except BackException:
+                push_history(target_state, f"FREE {op.upper()} by {faction} — declined")
+                return True
             runner(target_state, {})
             push_history(target_state, f"FREE {op.upper()} by {faction} (planned)")
             normalize_state(target_state)
             return True
-        except ValueError as exc:
-            # Wizard found no legal targets (its normal empty-menu signal):
-            # record a clean skip; nothing to fall back to.
-            push_history(target_state,
-                         f"FREE {op.upper()} by {faction} — skipped "
-                         f"(no legal target: {exc})")
-            return True
         except UndoException:
             raise
         except Exception as exc:
+            # Do not silently replace the human's failed plan with a default
+            # operation, or leave a partly applied command on the board.
+            target_state.clear()
+            target_state.update(before)
+            target_state.setdefault("_free_op_error_log", []).append({
+                "faction": faction, "operation": op, "location": loc,
+                "card_id": card_id, "error_type": type(exc).__name__,
+                "message": str(exc),
+            })
             push_history(target_state,
-                         f"FREE {op.upper()} by {faction} — wizard failed "
-                         f"({type(exc).__name__}), falling back")
-            return False
+                         f"FREE {op.upper()} by {faction} — failed "
+                         f"({type(exc).__name__}: {exc})")
+            return True
         finally:
             target_state.pop("bs_free", None)
 
@@ -1071,6 +1093,10 @@ class Engine:
         self.state["bs_free"] = True
         try:
             while remaining:
+                from lod_ai.leaders import leader_location
+                leader_space = next((loc for leader in bs.FACTION_LEADERS.get(faction, ())
+                                     if (loc := leader_location(self.state, leader)) is not None),
+                                    leader_space)
                 opts = []
                 if "command" in remaining:
                     opts.append((f"Limited Command "
@@ -1105,7 +1131,11 @@ class Engine:
                         print(f"(Step failed: {exc}; choose again.)")
                         continue
                     if kind == "command":
-                        affected = sb_state.get("_turn_affected_spaces") or set()
+                        # §1.10: Brilliant Stroke involvement explicitly
+                        # includes a movement Command's origination space.
+                        affected = set(sb_state.get("_turn_affected_spaces") or ())
+                        affected.update(sb_state.get("_turn_march_sources") or ())
+                        affected.update(sb_state.get("_turn_movement_sources") or ())
                         if (not leader_used and "command" not in remaining
                                 and leader_space not in affected):
                             print(f"(The Leader at {leader_space} must be "
@@ -1316,6 +1346,9 @@ class Engine:
         Command to the Leader's space (first LimCom only — the British
         planners read state["_bs_leader_origin"])."""
         st = self.state
+        before = deepcopy(st)
+        original_ctx = self.ctx
+        before_ctx = deepcopy(original_ctx)
         st["_limited"] = True
         st["bs_free"] = True
         if leader_origin:
@@ -1328,19 +1361,37 @@ class Engine:
             fn = getattr(bot, methods.get(cmd, ""), None)
             if fn is None:
                 return False
-            try:
-                if faction == C.BRITISH and cmd == "muster":
-                    result = bool(fn(st, tried_march=True))
-                elif faction == C.BRITISH and cmd == "march":
-                    result = bool(fn(st, tried_muster=True))
-                else:
-                    result = bool(fn(st))
-            except UndoException:
-                raise
-            except Exception:
-                return False
+            if faction == C.BRITISH and cmd == "muster":
+                result = bool(fn(st, tried_march=True))
+            elif faction == C.BRITISH and cmd == "march":
+                result = bool(fn(st, tried_muster=True))
+            else:
+                result = bool(fn(st))
             normalize_state(st)
             return result
+        except UndoException:
+            raise
+        except Exception as exc:
+            # A bot exception is not a legal no-plan result. Undo partial
+            # board/resource/RNG changes, then retain the failure evidence.
+            st.clear()
+            st.update(before)
+            original_ctx.clear()
+            original_ctx.update(before_ctx)
+            self.ctx = original_ctx
+            st.setdefault("_bot_error_log", []).append({
+                "faction": faction,
+                "card_number": (st.get("current_card") or {}).get("id"),
+                "exception_type": type(exc).__name__,
+                "exception_message": str(exc),
+                "traceback_str": _tb_module.format_exc(),
+                "phase": "brilliant_stroke",
+                "operation": cmd,
+                "leader_origin": leader_origin,
+            })
+            push_history(st, f"{faction} Brilliant Stroke {cmd.upper()} failed "
+                         f"({type(exc).__name__}: {exc}); Command rolled back")
+            return False
         finally:
             st.pop("_limited", None)
             st.pop("bs_free", None)

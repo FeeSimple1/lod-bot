@@ -133,6 +133,7 @@ def execute(
     # ═══ resource payment ══════════════════════════════════════════════════
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).update(selected)
+    state["_turn_movement_sources"] = {src for src, _ in (move_plan or [])}
     ctx["_planned_command"] = COMMAND_NAME
     ctx["_command_selected_spaces"] = set(selected)
     ctx["raid_active"] = True

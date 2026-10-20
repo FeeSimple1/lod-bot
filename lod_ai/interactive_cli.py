@@ -39,7 +39,8 @@ from lod_ai.engine import Engine
 from lod_ai.event_choices import collect_event_choices
 from lod_ai.map import adjacency as map_adj
 from lod_ai.state.setup_state import build_state
-from lod_ai.leaders import leader_location
+from lod_ai.leaders import leader_location, relocate_leader
+from lod_ai.util.history import push_history
 from lod_ai.tools.state_serializer import (
     build_crash_report,
     build_autosave,
@@ -252,8 +253,50 @@ def _log_empty_menu(state: Dict[str, Any], faction: str, command: str) -> None:
 # Command wizards
 # ---------------------------------------------------------------------------
 
+def _march_leader_choices(engine: Engine, state: dict, ctx: dict,
+                          origins: dict) -> None:
+    """§1.10: a human chooses optional following and mandatory orphan moves."""
+    own_tags = {
+        RC.BRITISH: {RC.REGULAR_BRI, RC.TORY, RC.FORT_BRI},
+        RC.PATRIOTS: {RC.REGULAR_PAT, RC.MILITIA_U, RC.MILITIA_A, RC.FORT_PAT},
+        RC.FRENCH: {RC.REGULAR_FRE},
+        RC.INDIANS: {RC.WARPARTY_U, RC.WARPARTY_A, RC.VILLAGE},
+    }
+    from lod_ai.cli_utils import get_input_provider
+    previous_faction = getattr(get_input_provider(), "current_faction", None)
+    try:
+        for leader, (owner, origin) in origins.items():
+            tags = own_tags[owner]
+            destinations = {move["dst"] for move in ctx.get("_march_moves", [])
+                            if move["src"] == origin and move["tag"] in tags
+                            and move["n"] > 0}
+            if not destinations:
+                continue
+            remaining = any(state["spaces"][origin].get(tag, 0) for tag in tags)
+            if remaining:
+                choices = [(f"Stay in {origin}", origin)] + [
+                    (f"Follow own units to {sid}", sid) for sid in sorted(destinations)]
+            else:
+                # Emptying the origin invokes §1.10's wider relocation
+                # choice, which also permits the Available Forces box.
+                choices = [(f"Move to {sid}", sid)
+                           for sid, sp in sorted(state["spaces"].items())
+                           if any(sp.get(tag, 0) for tag in tags)]
+                choices.append(("Move to Available Forces", None))
+            Engine._bind_provider_faction(owner)
+            destination = choose_one(
+                f"{owner}: move {leader} after March from {origin}:", choices)
+            relocate_leader(state, leader, destination)
+            push_history(state, f"{leader}: {origin} -> {destination or 'Available Forces'} "
+                         "(human choice after March)")
+    finally:
+        if previous_faction is not None:
+            Engine._bind_provider_faction(previous_faction)
+
+
 def _march_wizard(engine: Engine, faction: str, limited: bool, *,
-                  allow_in_place: bool = False) -> Callable[[dict, dict], Any]:
+                  allow_in_place: bool = False,
+                  allowed_spaces: set[str] | None = None) -> Callable[[dict, dict], Any]:
     allow_in_place = allow_in_place and faction == RC.BRITISH
     bring = choose_one("Bring escorts?", [("No", False), ("Yes", True)])
     sources = _movable_sources(engine.state, faction, bring_escorts=bring)
@@ -280,6 +323,8 @@ def _march_wizard(engine: Engine, faction: str, limited: bool, *,
     if allow_in_place:
         # §3.2.3 permits selecting a destination without moving cubes.
         dest_options.update(sid for sid in all_space_ids if sid != RC.WEST_INDIES_ID)
+    if allowed_spaces is not None:
+        dest_options.intersection_update(allowed_spaces)
     _log_wizard_filter(engine.state, "March", len(all_space_ids), len(dest_options), filtered_out)
     if not dest_options:
         _log_empty_menu(engine.state, faction, "March (destinations)")
@@ -312,16 +357,18 @@ def _march_wizard(engine: Engine, faction: str, limited: bool, *,
     if not move_plan and not allow_in_place:
         raise ValueError("March must move at least one piece.")
 
-    return lambda s, c: march.execute(
-        s,
-        faction,
-        c,
-        [],
-        dests,
-        bring_escorts=bring,
-        limited=limited,
-        move_plan=move_plan,
-    )
+    def run(s, c):
+        from lod_ai.cards.effects.brilliant_stroke import FACTION_LEADERS
+        origins = {leader: (owner, loc)
+                   for owner in engine.human_factions
+                   for leader in FACTION_LEADERS.get(owner, ())
+                   if (loc := leader_location(s, leader)) is not None}
+        result = march.execute(s, faction, c, [], dests, bring_escorts=bring,
+                               limited=limited, move_plan=move_plan)
+        _march_leader_choices(engine, s, c, origins)
+        return result
+
+    return run
 
 
 def _cli_defender_activation(state, sid, def_side, owner, n_ug, ug_tag):
@@ -336,7 +383,8 @@ def _cli_defender_activation(state, sid, def_side, owner, n_ug, ug_tag):
 
 
 def _battle_wizard(engine: Engine, faction: str, limited: bool, *,
-                   allowed_spaces: set[str] | None = None) -> Callable[[dict, dict], Any]:
+                   allowed_spaces: set[str] | None = None,
+                   force_bonus: int = 0) -> Callable[[dict, dict], Any]:
     candidates = _battle_candidates(engine.state, faction)
     if allowed_spaces is not None:
         candidates = [sid for sid in candidates if sid in allowed_spaces]
@@ -378,23 +426,31 @@ def _battle_wizard(engine: Engine, faction: str, limited: bool, *,
     return lambda s, c: battle.execute(
         s, faction, c, spaces=spaces, free=False,
         activate=activate or None,
+        choices={"force_bonus": force_bonus} if force_bonus else None,
     )
 
 
-def _rally_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
+def _rally_wizard(engine: Engine, faction: str, limited: bool, *,
+                  allowed_spaces: set[str] | None = None) -> Callable[[dict, dict], Any]:
     state = engine.state
     valid = _space_options(state, lambda sid, sp:
         map_adj.space_type(sid) in ("City", "Colony")
         and state.get("support", {}).get(sid, RC.NEUTRAL) != RC.ACTIVE_SUPPORT)
+    if allowed_spaces is not None:
+        valid = [(label, sid) for label, sid in valid if sid in allowed_spaces]
     if not valid:
         raise ValueError("No spaces available for Rally.")
     selected = choose_multiple("Select Rally spaces:", valid, min_sel=1,
                                max_sel=1 if limited else None)
     place_one, build_fort, bulk_place, move_plan = set(), set(), {}, []
+    fort_mix = {}
     remaining_militia = state["available"].get(RC.MILITIA_U, 0)
     remaining_forts = state["available"].get(RC.FORT_PAT, 0)
-    remaining = {sid: sp.get(RC.MILITIA_U, 0) + sp.get(RC.MILITIA_A, 0)
-                 for sid, sp in state["spaces"].items()}
+    remaining_by_tag = {
+        sid: {tag: sp.get(tag, 0) for tag in (RC.MILITIA_U, RC.MILITIA_A)}
+        for sid, sp in state["spaces"].items()
+    }
+    remaining = {sid: sum(counts.values()) for sid, counts in remaining_by_tag.items()}
     for sid in selected:
         sp = state["spaces"][sid]
         forts = sp.get(RC.FORT_PAT, 0)
@@ -403,7 +459,7 @@ def _rally_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
         choices = []
         if remaining_militia:
             choices.append(("Place 1 Militia", "one"))
-        if not forts and units >= 2 and remaining_forts and bases < 2:
+        if units >= 2 and remaining_forts and bases < 2:
             choices.append(("Replace 2 units with a Fort", "fort"))
         if forts:
             if remaining_militia:
@@ -418,6 +474,24 @@ def _rally_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
         elif action == "fort":
             build_fort.add(sid)
             remaining_forts -= 1
+            # §3.3.1 leaves the choice of the two replaced units to Patriots.
+            mix, needed = {}, 2
+            tags = (RC.MILITIA_U, RC.MILITIA_A, RC.REGULAR_PAT)
+            available_units = {**remaining_by_tag[sid],
+                               RC.REGULAR_PAT: sp.get(RC.REGULAR_PAT, 0)}
+            for index, tag in enumerate(tags):
+                available = available_units[tag]
+                other = sum(available_units[t] for t in tags[index + 1:])
+                low, high = max(0, needed - other), min(needed, available)
+                take = (low if low == high else choose_count(
+                    f"{tag} to replace with Fort in {sid}:", min_val=low, max_val=high))
+                if take:
+                    mix[tag] = take
+                needed -= take
+            fort_mix[sid] = mix
+            for tag in (RC.MILITIA_U, RC.MILITIA_A):
+                remaining_by_tag[sid][tag] -= mix.get(tag, 0)
+            remaining[sid] = sum(remaining_by_tag[sid].values())
         elif action == "bulk":
             n = choose_count(f"Militia to place in {sid}:", min_val=1,
                 max_val=min(remaining_militia, forts + map_adj.population(sid)))
@@ -434,7 +508,15 @@ def _rally_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
                 n = choose_count(f"Militia from {src} to {sid}:", min_val=1,
                                  max_val=remaining[src])
                 remaining[src] -= n
+                # Match Rally's default Underground-first source selection.
+                take_u = min(n, remaining_by_tag[src][RC.MILITIA_U])
+                remaining_by_tag[src][RC.MILITIA_U] -= take_u
+                remaining_by_tag[src][RC.MILITIA_A] -= n - take_u
                 move_plan.append((src, sid, n))
+            # Regroup hides existing units as well as arrivals. Arrivals stay
+            # outside this ledger because no Militia may move twice (§3.3.1).
+            remaining_by_tag[sid][RC.MILITIA_U] += remaining_by_tag[sid][RC.MILITIA_A]
+            remaining_by_tag[sid][RC.MILITIA_A] = 0
     promotion_spaces = [sid for sid in selected
                         if state["spaces"][sid].get(RC.FORT_PAT, 0) or sid in build_fort]
     promote_space, promote_n = None, None
@@ -445,8 +527,6 @@ def _rally_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
             existing = remaining.get(promote_space, 0)
             new = (1 if promote_space in place_one else bulk_place.get(promote_space, 0))
             incoming = sum(n for _, dst, n in move_plan if dst == promote_space)
-            if promote_space in build_fort:
-                existing = max(0, existing - 2)
             maximum = min(existing + new + incoming, state["available"].get(RC.REGULAR_PAT, 0))
             if maximum < 1:
                 raise ValueError("No Militia will be available to promote there.")
@@ -454,11 +534,13 @@ def _rally_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict
                                      max_val=maximum)
     return lambda s, c: rally.execute(s, faction, c, selected,
         place_one=place_one, build_fort=build_fort, bulk_place=bulk_place,
+        fort_mix=fort_mix,
         move_plan=move_plan, promote_space=promote_space, promote_n=promote_n,
         limited=limited)
 
 
-def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
+def _gather_wizard(engine: Engine, faction: str, limited: bool, *,
+                   allowed_spaces: set[str] | None = None) -> Callable[[dict, dict], Any]:
     state = engine.state
     support_ok = {RC.NEUTRAL, RC.PASSIVE_SUPPORT, RC.PASSIVE_OPPOSITION}
     avail_wp = state.get("available", {}).get(RC.WARPARTY_U, 0)
@@ -468,28 +550,25 @@ def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
         for sid, sp in state.get("spaces", {}).items()
     }
 
-    def _has_adjacent_wp(prov: str) -> bool:
-        return any(
-            remaining_wp_on_map.get(src, 0) > 0 and map_adj.is_adjacent(src, prov)
-            for src in state.get("spaces", {})
-        )
+    def _village_cost(prov: str) -> int:
+        return 1 if leader_location(state, "LEADER_CORNPLANTER") == prov else 2
 
     def _gather_choices_for(prov: str) -> List[str]:
         sp = state["spaces"][prov]
         if state.get("support", {}).get(prov, 0) not in support_ok:
             return []
-        if prov == RC.WEST_INDIES_ID:
+        if map_adj.space_type(prov) not in ("Colony", "Reserve"):
             return []
         options: List[str] = []
         base_total = sp.get(RC.VILLAGE, 0) + sp.get(RC.FORT_BRI, 0) + sp.get(RC.FORT_PAT, 0)
         wp_total = sp.get(RC.WARPARTY_U, 0) + sp.get(RC.WARPARTY_A, 0)
         if avail_wp > 0:
             options.append("place_one")
-        if wp_total >= 2 and base_total < 2 and avail_villages > 0:
+        if wp_total >= _village_cost(prov) and base_total < 2 and avail_villages > 0:
             options.append("build_village")
         if sp.get(RC.VILLAGE, 0) > 0 and avail_wp > 0:
             options.append("bulk_place")
-        if _has_adjacent_wp(prov):
+        if sp.get(RC.VILLAGE, 0) > 0:
             options.append("move_plan")
         return options
 
@@ -497,6 +576,8 @@ def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
     filtered_out = []
     province_options = []
     for sid in all_spaces:
+        if allowed_spaces is not None and sid not in allowed_spaces:
+            continue
         choices = _gather_choices_for(sid)
         if choices:
             province_options.append((sid, sid))
@@ -537,8 +618,9 @@ def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
         choices = []
         if remaining_available_wp > 0:
             choices.append(("Place 1 War Party", "place_one"))
-        if wp_total >= 2 and base_total < 2 and remaining_available_villages > 0:
-            choices.append(("Build Village (replace 2 WP)", "build_village"))
+        village_cost = _village_cost(prov)
+        if wp_total >= village_cost and base_total < 2 and remaining_available_villages > 0:
+            choices.append((f"Build Village (replace {village_cost} WP)", "build_village"))
         if sp.get(RC.VILLAGE, 0) > 0 and remaining_available_wp > 0:
             max_bulk = min(remaining_available_wp, sp.get(RC.VILLAGE, 0) + 1)
             if max_bulk > 0:
@@ -547,7 +629,7 @@ def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
             sid for sid, total in remaining_wp_on_map.items()
             if total > 0 and map_adj.is_adjacent(sid, prov)
         ]
-        if adj_sources:
+        if sp.get(RC.VILLAGE, 0) > 0:
             choices.append(("Move War Parties in", ("move_plan", adj_sources)))
 
         if not choices:
@@ -565,7 +647,7 @@ def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
         elif choice == "build_village":
             build_village.add(prov)
             remaining_available_villages -= 1
-            remaining_wp_on_map[prov] = max(0, remaining_wp_on_map.get(prov, 0) - 2)
+            remaining_wp_on_map[prov] = max(0, remaining_wp_on_map.get(prov, 0) - village_cost)
         elif isinstance(choice, tuple) and choice[0] == "bulk_place":
             max_bulk = choice[1]
             n_place = choose_count(
@@ -580,9 +662,11 @@ def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
             selected_sources = choose_multiple(
                 f"Select sources to move War Parties into {prov}:",
                 [(s, s) for s in mp_sources],
-                min_sel=1,
+                min_sel=0,
                 max_sel=None,
-            )
+            ) if mp_sources else []
+            # §3.4.1 permits hiding in place even when no War Parties move.
+            move_plan.append((prov, prov, 0))
             for src in selected_sources:
                 max_move = remaining_wp_on_map.get(src, 0)
                 n_move = choose_count(
@@ -612,7 +696,8 @@ def _gather_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
     )
 
 
-def _muster_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
+def _muster_wizard(engine: Engine, faction: str, limited: bool, *,
+                   allowed_spaces: set[str] | None = None) -> Callable[[dict, dict], Any]:
     state = engine.state
     if faction == RC.BRITISH:
         options = _space_options(state, lambda sid, sp:
@@ -620,6 +705,8 @@ def _muster_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
             or (map_adj.space_type(sid) in ("City", "Colony")
                 and state.get("support", {}).get(sid, RC.NEUTRAL) != RC.ACTIVE_OPPOSITION
                 and muster._is_adjacent_to_brit_power(state, sid)))
+        if allowed_spaces is not None:
+            options = [(label, sid) for label, sid in options if sid in allowed_spaces]
         if not options:
             raise ValueError("No qualifying Muster spaces.")
         selected = choose_multiple("Select Muster spaces:", options, min_sel=1,
@@ -682,14 +769,19 @@ def _muster_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
     options = _space_options(state, lambda sid, sp:
         sid == RC.WEST_INDIES_ID or (map_adj.space_type(sid) in ("City", "Colony")
                                     and state.get("control", {}).get(sid) == "REBELLION"))
+    if allowed_spaces is not None:
+        options = [(label, sid) for label, sid in options if sid in allowed_spaces]
     if not options:
         raise ValueError("No spaces with Rebellion Control (or West Indies) for French Muster.")
     sid = choose_one_or_back("Select City/Colony for French Muster:", options)
+    n_regulars = choose_count("French Regulars to place (up to 4):", min_val=0,
+        max_val=min(4, state.get("available", {}).get(RC.REGULAR_FRE, 0)))
     build_fort = False
     if sid != RC.WEST_INDIES_ID:
         build_fort = choose_one("Replace two French Regulars with a Patriot Fort?",
                                 [("No", False), ("Yes", True)])
-    return lambda s, c: muster.execute(s, faction, c, [sid], french_fort=build_fort)
+    return lambda s, c: muster.execute(s, faction, c, [sid], french_fort=build_fort,
+                                      french_regulars=n_regulars)
 
 
 def _scout_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
@@ -897,7 +989,10 @@ def _rabble_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dic
 
 
 def _agent_mobilization_wizard(engine: Engine, faction: str, limited: bool) -> Callable[[dict, dict], Any]:
-    options = _space_options(engine.state)
+    # §3.5.1: only these four Provinces, and never at Active Support.
+    options = _space_options(engine.state, lambda sid, sp:
+        sid in french_agent_mobilization._VALID_PROVINCES
+        and engine.state.get("support", {}).get(sid, RC.NEUTRAL) != RC.ACTIVE_SUPPORT)
     if not options:
         _log_empty_menu(engine.state, faction, "Agent Mobilization")
         raise ValueError("No spaces available for Agent Mobilization.")

@@ -120,26 +120,28 @@ def evt_001_waxhaws(state, shaded=False):
     # Unshaded: apply §8.3.6 shift priorities, then
     # maximise Continentals removed within those priorities (§8.3.5).
     # §8.2 table on remaining ties (Q22).
-    sup_map = state.get("support", {})
-    if shaded:
-        from lod_ai.commands import battle as _battle
-        bt = _battle.bot_march_battle_target(state, PATRIOTS)
-        scored = []
-        for sid in eligible:
-            sup = sup_map.get(sid, 0)
-            shift_ben = 1 if sup > 0 else (0 if sup == 0 else -1)
-            scored.append(((0 if sid == bt else 1, -shift_ben), sid))
-    else:
-        from .shared import support_shift_gain_key
-        from lod_ai.rules_consts import ACTIVE_SUPPORT
+    target = state.get("card1_target")
+    if target not in eligible:
+        sup_map = state.get("support", {})
+        if shaded:
+            from lod_ai.commands import battle as _battle
+            bt = _battle.bot_march_battle_target(state, PATRIOTS)
+            scored = []
+            for sid in eligible:
+                sup = sup_map.get(sid, 0)
+                shift_ben = 1 if sup > 0 else (0 if sup == 0 else -1)
+                scored.append(((0 if sid == bt else 1, -shift_ben), sid))
+        else:
+            from .shared import support_shift_gain_key
+            from lod_ai.rules_consts import ACTIVE_SUPPORT
 
-        scored = []
-        for sid in eligible:
-            cont = min(2, state["spaces"][sid].get(REGULAR_PAT, 0))
-            gain = support_shift_gain_key(
-                state, sid, target=ACTIVE_SUPPORT, shaded=False)
-            scored.append((tuple(-value for value in gain) + (-cont,), sid))
-    target = pick_by_priority(state, scored, count=1)[0]
+            scored = []
+            for sid in eligible:
+                cont = min(2, state["spaces"][sid].get(REGULAR_PAT, 0))
+                gain = support_shift_gain_key(
+                    state, sid, target=ACTIVE_SUPPORT, shaded=False)
+                scored.append((tuple(-value for value in gain) + (-cont,), sid))
+        target = pick_by_priority(state, scored, count=1)[0]
 
     if shaded:
         from lod_ai.util.free_ops import queue_after_free_ops

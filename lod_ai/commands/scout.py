@@ -105,6 +105,7 @@ def execute(
     ctx["_command_selected_spaces"] = {dst}
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).add(dst)
+    state["_turn_movement_sources"] = {src}
     command_checkpoint(state, ctx, "Before Scout movement", dst)
 
     sp_src = state["spaces"][src]

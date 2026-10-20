@@ -59,6 +59,19 @@ from lod_ai.map import adjacency as map_adj
 State = Dict[str, Any]
 
 
+def relocate_leader(state: State, leader_id: str, destination: str | None) -> None:
+    """Update a Leader location across canonical and tolerated legacy maps."""
+    locations = state.setdefault("leader_locs", {})
+    locations[leader_id] = destination
+    leaders = state.setdefault("leaders", {})
+    if leader_id in leaders and isinstance(leaders[leader_id], (str, type(None))):
+        leaders[leader_id] = destination
+    else:
+        for sid in [sid for sid, value in leaders.items() if value == leader_id]:
+            leaders.pop(sid)
+        leaders[leader_id] = destination
+
+
 def _leader_keys(leader_id: str) -> set[str]:
     return {leader_id}
 

@@ -137,6 +137,8 @@ def execute(
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_garrison_destinations", set()).update(dest_set)
     state.setdefault("_turn_affected_spaces", set()).update(dest_set)
+    state["_turn_movement_sources"] = {
+        src for src, destinations in move_map.items() if any(n > 0 for n in destinations.values())}
     command_checkpoint(state, ctx, "Before Garrison movement")
 
     # FNI gate -------------------------------------------------------

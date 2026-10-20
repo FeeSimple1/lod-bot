@@ -84,7 +84,7 @@ def test_wired_cards_and_keys_match_frozen_registry():
                 f"registry {sorted(reg_keys)}")
 
 
-def test_all_43_registry_cards_are_wired():
+def test_all_registry_cards_are_wired():
     assert sorted(EVENT_CHOICES) == sorted(CHOICE_REGISTRY)
 
 

@@ -170,6 +170,7 @@ def execute(
     provenance = {MILITIA_U: militia_provenance, MILITIA_A: militia_provenance,
                   WARPARTY_U: warparty_provenance, WARPARTY_A: warparty_provenance}
     moved_cubes: Dict[str, Dict[str, int]] = {}
+    executed_moves: List[Dict] = []
 
     def _checkpoint(label, sid):
         if not callable(ctx.get("_command_checkpoint")):
@@ -232,6 +233,8 @@ def execute(
             elif sp_src.get(tag, 0) - moved_cubes.get(src, {}).get(tag, 0) < count:
                 raise ValueError(f"{src}: a unit cannot March more than once.")
             move_piece(state, tag, src, dst, count)
+            executed_moves.append({"src": src, "dst": dst,
+                                   "tag": tag, "n": count})
             if tracker:
                 tracker.arrive(dst, count if tag == tracker.underground else 0,
                                count if tag == tracker.active else 0)
@@ -363,6 +366,7 @@ def execute(
     state["_turn_command"] = COMMAND_NAME
     state.setdefault("_turn_affected_spaces", set()).update(destinations_set)
     state["_turn_march_sources"] = set(sources_set)
+    state["_turn_movement_sources"] = set(sources_set)
     ctx["_planned_command"] = COMMAND_NAME
     ctx["_command_selected_spaces"] = set(destinations_set)
     interactive = callable(ctx.get("_command_checkpoint"))
@@ -506,4 +510,7 @@ def execute(
     state.setdefault("log", []).append(
         f"{faction} MARCH {sources} ➜ {destinations_set} (escorts={bring_escorts})"
     )
+    # Human Leaders may follow only their own units that actually moved
+    # (§1.10), including escorts and Common-Cause War Parties.
+    ctx["_march_moves"] = executed_moves
     return ctx

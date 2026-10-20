@@ -1,0 +1,22 @@
+{
+  "kind": "targeted_human_rally_fixture",
+  "scenario": "1778",
+  "seed": 21,
+  "space": "Pennsylvania",
+  "decisions": 4,
+  "before": {
+    "Patriot_Continental": 5,
+    "Patriot_Militia_U": 2,
+    "Patriot_Militia_A": 0,
+    "Patriot_Fort": 1
+  },
+  "after": {
+    "Patriot_Continental": 3,
+    "Patriot_Militia_U": 2,
+    "Patriot_Militia_A": 0,
+    "Patriot_Fort": 2
+  },
+  "state_valid": true,
+  "save_roundtrip": true,
+  "passed": true
+}

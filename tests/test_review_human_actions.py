@@ -170,6 +170,113 @@ def test_rally_regroup_hides_without_moving(monkeypatch):
     assert not state['spaces']['Virginia'].get(C.MILITIA_A)
 
 
+def test_rally_can_build_second_fort_and_choose_replaced_units(monkeypatch):
+    """§3.3.1 permits a second Fort and gives Patriots their unit choices."""
+    state = board({'Virginia': {C.FORT_PAT: 1, C.MILITIA_U: 2, C.REGULAR_PAT: 2}})
+    menus(monkeypatch, singles=['Replace 2 units with a Fort', 'No promotion'],
+          multiples=[['Virginia']], counts=[0])
+    cli._rally_wizard(Engine(state), C.PATRIOTS, False)(state, {})
+    assert state['spaces']['Virginia'][C.FORT_PAT] == 2
+    assert state['spaces']['Virginia'][C.MILITIA_U] == 2
+    assert state['spaces']['Virginia'].get(C.REGULAR_PAT, 0) == 0
+    assert state['resources'][C.PATRIOTS] == 9
+
+
+def test_rally_second_fort_obeys_two_base_limit(monkeypatch):
+    state = board({'Virginia': {C.FORT_PAT: 1, C.VILLAGE: 1, C.MILITIA_U: 2}})
+    seen = []
+    def choose(prompt, options, **kwargs):
+        seen.extend(label for label, _ in options)
+        return 'one' if 'Rally action' in prompt else False
+    monkeypatch.setattr(cli, 'choose_multiple', lambda *a, **k: ['Virginia'])
+    monkeypatch.setattr(cli, 'choose_one_or_back', choose)
+    cli._rally_wizard(Engine(state), C.PATRIOTS, False)(state, {})
+    assert 'Replace 2 units with a Fort' not in seen
+    assert state['spaces']['Virginia'][C.FORT_PAT] == 1
+
+
+def test_rally_rejects_invalid_explicit_fort_mix_without_removing_units():
+    from lod_ai.commands import rally
+    state = board({'Virginia': {C.MILITIA_U: 2}})
+    with pytest.raises(ValueError, match='Not enough selected'):
+        rally._replace_with_fort(state, 'Virginia', {C.REGULAR_PAT: 2})
+    assert state['spaces']['Virginia'][C.MILITIA_U] == 2
+    assert state['spaces']['Virginia'].get(C.FORT_PAT, 0) == 0
+
+
+def test_rally_fort_picker_excludes_militia_already_planned_to_move(monkeypatch):
+    state = board({
+        'Boston': {C.FORT_PAT: 1},
+        'Massachusetts': {C.MILITIA_U: 2, C.REGULAR_PAT: 2},
+    })
+    seen = menus(monkeypatch,
+        singles=['Move Militia here and turn all Underground',
+                 'Replace 2 units with a Fort', 'No promotion'],
+        multiples=[['Boston', 'Massachusetts'], ['Massachusetts']], counts=[2])
+    cli._rally_wizard(Engine(state), C.PATRIOTS, False)(state, {})
+    assert state['spaces']['Boston'][C.MILITIA_U] == 2
+    assert state['spaces']['Massachusetts'][C.FORT_PAT] == 1
+    assert state['spaces']['Massachusetts'].get(C.REGULAR_PAT, 0) == 0
+    assert state['spaces']['Massachusetts'].get(C.MILITIA_U, 0) == 0
+    assert not any('to replace with Fort' in prompt for prompt in seen)
+
+
+def test_rally_regroup_hiding_keeps_arrivals_out_of_later_move_choices(monkeypatch):
+    state = board({
+        'Boston': {C.FORT_PAT: 1, C.MILITIA_A: 2},
+        'Massachusetts': {C.FORT_PAT: 1},
+        'New_Hampshire': {C.MILITIA_U: 2, C.REGULAR_PAT: 2},
+    })
+    menus(monkeypatch,
+        singles=['Move Militia here and turn all Underground',
+                 'Move Militia here and turn all Underground',
+                 'Replace 2 units with a Fort', 'No promotion'],
+        multiples=[['Boston', 'Massachusetts', 'New_Hampshire'],
+                   ['New_Hampshire'], ['Boston']], counts=[2, 2])
+    choose_count = cli.choose_count
+    def count(prompt, **kwargs):
+        if prompt == 'Militia from Boston to Massachusetts:':
+            assert kwargs['max_val'] == 2  # the two arrivals already moved
+        return choose_count(prompt, **kwargs)
+    monkeypatch.setattr(cli, 'choose_count', count)
+    cli._rally_wizard(Engine(state), C.PATRIOTS, False)(state, {})
+    assert state['spaces']['Boston'][C.MILITIA_U] == 2
+    assert state['spaces']['Boston'].get(C.MILITIA_A, 0) == 0
+    assert state['spaces']['Massachusetts'][C.MILITIA_U] == 2
+    assert state['spaces']['New_Hampshire'][C.FORT_PAT] == 1
+    assert state['spaces']['New_Hampshire'].get(C.REGULAR_PAT, 0) == 0
+
+
+def test_gather_can_hide_in_place_without_adjacent_war_parties(monkeypatch):
+    state = board({'Northwest': {C.VILLAGE: 1, C.WARPARTY_A: 2}})
+    menus(monkeypatch, singles=['Move War Parties in'], multiples=[['Northwest']])
+    cli._gather_wizard(Engine(state), C.INDIANS, True)(state, {})
+    assert state['spaces']['Northwest'][C.WARPARTY_U] == 2
+    assert state['spaces']['Northwest'].get(C.WARPARTY_A, 0) == 0
+
+
+def test_gather_cornplanter_can_replace_one_war_party(monkeypatch):
+    state = board({'Northwest': {C.WARPARTY_U: 1}})
+    state['leaders']['LEADER_CORNPLANTER'] = 'Northwest'
+    menus(monkeypatch, singles=['Build Village (replace 1 WP)'], multiples=[['Northwest']])
+    cli._gather_wizard(Engine(state), C.INDIANS, True)(state, {})
+    assert state['spaces']['Northwest'][C.VILLAGE] == 1
+    assert state['spaces']['Northwest'].get(C.WARPARTY_U, 0) == 0
+
+
+def test_gather_does_not_offer_move_into_space_without_village(monkeypatch):
+    state = board({'Northwest': {C.WARPARTY_U: 2}})
+    seen = []
+    def choose(prompt, options, **kwargs):
+        seen.extend(label for label, _ in options)
+        return 'place_one'
+    monkeypatch.setattr(cli, 'choose_multiple', lambda *a, **k: ['Quebec'])
+    monkeypatch.setattr(cli, 'choose_one_or_back', choose)
+    cli._gather_wizard(Engine(state), C.INDIANS, True)(state, {})
+    assert 'Move War Parties in' not in seen
+    assert state['spaces']['Quebec'][C.WARPARTY_U] == 1
+
+
 def test_rabble_rousing_in_british_controlled_space(monkeypatch):
     state = board({'Virginia': {C.REGULAR_BRI: 2, C.MILITIA_U: 1}})
     menus(monkeypatch, multiples=[['Virginia']])
@@ -192,6 +299,18 @@ def test_british_muster_can_recruit_in_empty_city(monkeypatch):
     assert state['spaces']['Savannah'][C.REGULAR_BRI] == 2
 
 
+@pytest.mark.parametrize('quantity', [0, 1, 3])
+def test_french_muster_human_selects_up_to_four_regulars(monkeypatch, quantity):
+    state = board()
+    state['toa_played'] = True
+    menus(monkeypatch, singles=[C.WEST_INDIES_ID], counts=[quantity])
+    before = state['available'][C.REGULAR_FRE]
+    cli._muster_wizard(Engine(state), C.FRENCH, False)(state, {})
+    assert state['spaces'][C.WEST_INDIES_ID].get(C.REGULAR_FRE, 0) == quantity
+    assert state['available'][C.REGULAR_FRE] == before - quantity
+    assert state['resources'][C.FRENCH] == 8
+
+
 def test_limited_garrison_can_use_multiple_origins_and_displace(monkeypatch):
     state = board({'Boston': {C.REGULAR_BRI: 2}, 'New_York_City': {C.REGULAR_BRI: 2},
                    'Savannah': {C.MILITIA_U: 1}})
@@ -212,6 +331,35 @@ def test_no_special_activity_does_not_claim_one(monkeypatch):
     result, after, _ = human(state, C.PATRIOTS)
     assert result['used_special'] is False
     assert after['resources'][C.PATRIOTS] == 9
+
+
+def test_agent_mobilization_offers_only_printed_provinces(monkeypatch):
+    """§3.5.1 offers four Provinces, excluding any at Active Support."""
+    state = board()
+    state['support']['Massachusetts'] = C.ACTIVE_SUPPORT
+    seen = []
+    def choose(prompt, options, **kwargs):
+        if 'Province' in prompt:
+            seen.extend(value for _, value in options)
+            return 'New_York'
+        return True  # one Continental
+    monkeypatch.setattr(cli, 'choose_one_or_back', choose)
+    monkeypatch.setattr(cli, 'choose_one', choose)
+    cli._agent_mobilization_wizard(Engine(state), C.FRENCH, False)(state, {})
+    assert set(seen) == {'Quebec', 'New_York', 'New_Hampshire'}
+    assert state['spaces']['New_York'][C.REGULAR_PAT] == 1
+    assert state['resources'][C.FRENCH] == 9
+
+
+def test_agent_mobilization_has_no_menu_when_all_targets_at_active_support(monkeypatch):
+    state = board()
+    for sid in ('Quebec', 'New_York', 'New_Hampshire', 'Massachusetts'):
+        state['support'][sid] = C.ACTIVE_SUPPORT
+    def unexpected(*args, **kwargs):
+        raise AssertionError('No legal Province should be offered')
+    monkeypatch.setattr(cli, 'choose_one_or_back', unexpected)
+    with pytest.raises(ValueError, match='No spaces available'):
+        cli._agent_mobilization_wizard(Engine(state), C.FRENCH, False)
 
 
 def test_during_sa_before_details_funds_zero_resource_hortelez(monkeypatch):

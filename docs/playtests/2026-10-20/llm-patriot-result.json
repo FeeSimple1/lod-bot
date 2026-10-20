@@ -1,0 +1,32 @@
+{
+  "scenario": "1778",
+  "seed": 21,
+  "human_factions": [
+    "PATRIOTS"
+  ],
+  "stop_reason": "player_stop",
+  "error": null,
+  "state_valid": true,
+  "save_roundtrip": true,
+  "cards_played": 11,
+  "decisions": 78,
+  "automatic_pauses": 16,
+  "checked_boundaries": 12,
+  "victory_result": null,
+  "diagnostics": {
+    "bot_errors": [],
+    "illegal_actions": [],
+    "free_op_errors": [],
+    "event_preview_errors": [],
+    "event_outcome_observations": [],
+    "free_op_skips": [],
+    "bot_error_count": 0,
+    "illegal_action_count": 0,
+    "free_op_error_count": 0,
+    "free_op_skip_count": 0,
+    "event_preview_error_count": 0,
+    "event_outcome_observation_count": 0
+  },
+  "cli_rejections": [],
+  "clean": true
+}
