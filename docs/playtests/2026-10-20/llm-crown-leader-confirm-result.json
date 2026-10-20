@@ -1,0 +1,10 @@
+{
+  "fixture": "1776 seed21, card91 unshaded placed in Florida; isolated human free Limited March, not a full game",
+  "error": null,
+  "state_valid": true,
+  "save_roundtrip": true,
+  "confirmed_leader": "Pennsylvania",
+  "florida_wp": 4,
+  "pennsylvania_wp": 2,
+  "decisions": 6
+}

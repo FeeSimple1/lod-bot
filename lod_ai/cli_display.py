@@ -435,12 +435,12 @@ def display_bot_summary(faction: str, state: Dict[str, Any],
                         pre_snapshot: Dict[str, Any],
                         result: Dict[str, Any] | None = None,
                         card: Dict[str, Any] | None = None) -> None:
-    """Print a structured summary of what a bot did by diffing state snapshots.
+    """Print a structured turn summary by diffing state snapshots.
 
     S76 (fs-bot playtest lesson 1.4): a bot EVENT play names the side and
     quotes the card's printed text, so it is never a black box."""
     print()
-    print(f"\u2501\u2501\u2501 {faction} BOT \u2501\u2501\u2501")
+    print(f"\u2501\u2501\u2501 {faction} \u2501\u2501\u2501")
     if (result or {}).get("action") == "event" and card:
         side = (result or {}).get("event_side") or (
             "shaded" if faction in (RC.PATRIOTS, RC.FRENCH) else "unshaded")

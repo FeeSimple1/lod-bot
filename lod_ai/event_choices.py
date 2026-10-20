@@ -222,6 +222,21 @@ def collect_event_choices(engine, executor: str, card: dict, shaded: bool) -> Di
 # Candidate builders (one per card where non-trivial)
 # ---------------------------------------------------------------------------
 
+def _c1_british_spaces(state, executor, picks):
+    return _ids(sid for sid in _spaces(state)
+                if _has_any(state, sid, (REGULAR_BRI, TORY, FORT_BRI)))
+
+
+def _c91_reserves(state, executor, picks):
+    from lod_ai.cards.effects.early_war import _reserve_provinces
+    return _ids(_reserve_provinces(state))
+
+
+def _c91_villages(state, executor, picks):
+    return [(label, sid) for label, sid in _c91_reserves(state, executor, picks)
+            if _sp(state, sid).get(VILLAGE, 0)]
+
+
 def _c5_dests(state, executor, picks):
     # Any space with an adjacent source holding Patriot units (handler
     # marches 1 unit src -> dest, then Battles in dest).
@@ -669,11 +684,18 @@ def _c88_dest_map(state, executor, picks):
 
 
 # ---------------------------------------------------------------------------
-# The wired registry (Piece 7: all 43 choice-bearing cards —
-# batch 1 space-selection, batch 2 sub-option, batch 3 faction/mix)
+# The wired registry (45 cards with exposed choice hooks; this is not an
+# exhaustive audit of printed card choices).
 # ---------------------------------------------------------------------------
 
 EVENT_CHOICES: Dict[int, Tuple[Step, ...]] = {
+    1: (
+        Step("target", "Waxhaws: choose one space with British",
+             _c1_british_spaces, side=False),
+        Step("target", "Free March + Battle: destination space",
+             lambda state, executor, picks: _ids(_spaces(state)),
+             side=True, decider=PATRIOTS),
+    ),
     4: (
         Step("base", "Place which base in Massachusetts?", _c4_bases,
              side=True, min_options=3),
@@ -898,6 +920,12 @@ EVENT_CHOICES: Dict[int, Tuple[Step, ...]] = {
         Step("colonies", "Indians free Gather in 2 Colonies", _c84_colonies,
              side=False, kind="multi", max_sel=2, exact=True, min_options=2,
              decider=INDIANS),
+    ),
+    91: (
+        Step("target", "Place a Village and 2 War Parties in which Reserve Province?",
+             _c91_reserves, side=False),
+        Step("target", "Remove a Village from which Reserve Province?",
+             _c91_villages, side=True),
     ),
     93: (
         Step("targets", "Shift toward Neutral + Raid marker in up to 3 Colonies",

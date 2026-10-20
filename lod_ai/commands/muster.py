@@ -230,12 +230,16 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
             build_fort: bool = False,
             reward_levels: int = 0,
             french_fort: bool = False,
+            french_regulars: int | None = None,
             fort_space: Optional[str] = None,
             rl_free_first: bool = False) -> Dict:
     """Perform the Muster Command for *faction* in *selected* spaces."""
     # Treaty gate
     if faction == FRENCH and not state.get("toa_played"):
         raise ValueError("FRENCH cannot Muster before Treaty of Alliance.")
+    if french_regulars is not None and (
+            type(french_regulars) is not int or not 0 <= french_regulars <= 4):
+        raise ValueError("French Muster may place 0 to 4 Regulars.")
 
     # Mutual‑exclusion checks
     if build_fort and reward_levels:
@@ -370,7 +374,8 @@ def execute(state: Dict, faction: str, ctx: Dict, selected: List[str], *,
                     "French Muster requires Rebellion Control (or West Indies)."
                 )
 
-        n_reg = _draw_from_pool(state, REGULAR_FRE, 4)
+        n_reg = _draw_from_pool(state, REGULAR_FRE,
+                                4 if french_regulars is None else french_regulars)
         add_piece(state, REGULAR_FRE, sp_id, n_reg)
 
         # §3.5.3: "if desired … replace two French Regulars with one

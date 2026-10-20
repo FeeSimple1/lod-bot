@@ -59,6 +59,23 @@ The harness drives the same legality-checked CLI wizards a human would use, so t
 model can only ever pick legal moves. See `lod_ai/llm/` for the Policy interface
 (`random`, `first`, `anthropic`, or scripted) and `run_game()` for programmatic use.
 
+For an LLM that supplies decisions through files (including an agent in a coding
+session), run the full interactive game loop with an isolated, empty directory:
+
+```bash
+python -m lod_ai.tools.llm_playtest --scenario 1778 --seed 21 --factions PATRIOTS --max-cards 60 --directory /tmp/lod-trial
+```
+
+Read `decision.json`, then atomically write `response.json` with
+`{"request_id": 1, "answer": "2", "rationale": "Reason for this choice"}` using the
+current request ID. Requests include the rendered CLI output, public board
+summary, menu, and recent history. A response with `"stop": true` ends the trial.
+Bare continuation pauses are recorded separately and entered automatically;
+game decisions have no automatic fallback. The directory retains the complete
+transcript, CLI output, isolated saves, and `result.json` with explicit stop
+status, state/save checks, and runtime diagnostics. A bounded trial is not a
+completed game or a win-rate estimate.
+
 ### Heuristic self-play
 `lod_ai/llm/heuristic.py` ships strategy profiles (two per faction) that answer the
 same menus without a model, for fast batch experiments:

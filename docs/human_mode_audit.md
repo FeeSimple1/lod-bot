@@ -1,5 +1,16 @@
 # Human-Mode Completeness Audit (ROADMAP Piece 7, part 1)
 
+2026-10-20 correction: this historical audit inventories existing handler
+hooks; it does not establish that every printed player choice is exposed.
+Human-seat review identified card 1 (Waxhaws Massacre), which had no
+hook at all and was therefore omitted by this method. Card 1 now exposes a
+validated `card1_target` choice on both sides. Card 91 now exposes its Reserve
+choice on both sides, bringing the hook
+inventory to **45 cards**. See `card1_human_choice_audit.md` and
+`card91_human_choice_audit.md` for the pre-edit findings.
+The remaining historical completeness claims below describe hook wiring,
+not an exhaustive card-text audit.
+
 _Session 72._  Enumerates every card that presents a **player choice**
 and diffs it against what the interactive CLI actually collects from a
 human seat.  Per the ROADMAP: "any card whose choice silently falls

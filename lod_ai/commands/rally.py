@@ -25,7 +25,8 @@ Parameters
 * **place_one** – subset of *selected* where exactly 1 Militia is added.
   (Defaults to every selected space not referenced elsewhere.)
 * **build_fort** – subset of *selected* where 2 Patriot units are replaced
-  by 1 Fort (space must *not* already have a Patriot Fort).
+  by 1 Fort, subject to the two-base stacking limit.
+* **fort_mix** – optional per-space piece counts chosen for that replacement.
 * **bulk_place** – mapping ``space_id ↦ n`` for spaces that *already have* ≥1
   Patriot Fort. Ensures ``n ≤ (#Fort + population)``.
 * **move_plan** – list of ``(src, dst, n)`` moves of Militia between *adjacent*
@@ -101,7 +102,7 @@ def _place_militia(state: Dict, space_id: str, n: int = 1) -> None:
     """
     add_piece(state, MILITIA_U, space_id, n)
 
-def _replace_with_fort(state: Dict, space_id: str):
+def _replace_with_fort(state: Dict, space_id: str, mix: Dict[str, int] | None = None):
     """
     Replace any 2 Patriot pieces in *space_id* with 1 Fort,
     using centralized helpers.
@@ -111,6 +112,19 @@ def _replace_with_fort(state: Dict, space_id: str):
     base_total = sp.get(FORT_PAT, 0) + sp.get(FORT_BRI, 0) + sp.get(VILLAGE, 0)
     if base_total >= 2:
         raise ValueError("Cannot build Fort; stacking limit reached.")
+
+    if mix is not None:
+        if (any(tag not in (MILITIA_U, MILITIA_A, REGULAR_PAT)
+                or not isinstance(n, int) or n < 0 for tag, n in mix.items())
+                or sum(mix.values()) != 2):
+            raise ValueError("Fort replacement must select exactly 2 Patriot units.")
+        if any(sp.get(tag, 0) < n for tag, n in mix.items()):
+            raise ValueError("Not enough selected Patriot units to build Fort.")
+        for tag, n in mix.items():
+            if n:
+                remove_piece(state, tag, space_id, n)
+        add_piece(state, FORT_PAT, space_id, 1)
+        return
 
     tags_priority = (MILITIA_U, MILITIA_A, REGULAR_PAT)
     removed = 0
@@ -168,6 +182,7 @@ def execute(
     *,
     place_one: Set[str] | None = None,
     build_fort: Set[str] | None = None,
+    fort_mix: Dict[str, Dict[str, int]] | None = None,
     bulk_place: Dict[str, int] | None = None,
     move_plan: List[Tuple[str, str, int]] | None = None,
     move_active_first: bool = False,
@@ -238,9 +253,7 @@ def execute(
         sp = state["spaces"][space_id]
         forts = sp.get(FORT_PAT, 0)
         if space_id in build_fort:
-            if forts > 0:
-                raise ValueError("Cannot build Fort where one already exists.")
-            _replace_with_fort(state, space_id)
+            _replace_with_fort(state, space_id, (fort_mix or {}).get(space_id))
         elif space_id in moves_by_dest:
             if not forts:
                 raise ValueError("Destination must have a Fort for move action.")

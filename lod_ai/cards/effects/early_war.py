@@ -1210,12 +1210,12 @@ def evt_091_indians_help(state, shaded=False):
         # Equal-priority Villages → §8.2 seeded (Session 48/T9: was the
         # first Reserve in dict order).
         # Q22: equal-priority Villages resolved via the Random Spaces table.
-        with_village = pick_random_spaces(
-            state,
-            [n for n in reserve_spaces if state["spaces"][n].get(VILLAGE, 0)],
-            count=len(reserve_spaces) or 1,
-        )
-        target = with_village[0] if with_village else None
+        candidates = [n for n in reserve_spaces if state["spaces"][n].get(VILLAGE, 0)]
+        target = state.get("card91_target")
+        if target not in candidates:
+            with_village = pick_random_spaces(
+                state, candidates, count=len(reserve_spaces) or 1)
+            target = with_village[0] if with_village else None
         if target:
             remove_piece(state, VILLAGE, target, 1, to="available")
             push_history(state, f"Indians Help British Outside Colonies (shaded): removed 1 Village in {target}")
@@ -1237,9 +1237,11 @@ def evt_091_indians_help(state, shaded=False):
         wp = -(state["spaces"][n].get(WARPARTY_U, 0)
                + state["spaces"][n].get(WARPARTY_A, 0))
         return (room, wp)
-    ordered = pick_by_priority(  # Q22
-        state, [(_k91u(n), n) for n in reserve_spaces])
-    target = ordered[0]
+    target = state.get("card91_target")
+    if target not in reserve_spaces:
+        ordered = pick_by_priority(  # Q22
+            state, [(_k91u(n), n) for n in reserve_spaces])
+        target = ordered[0]
     place_with_caps(state, VILLAGE, target)
 
     # New War Parties must be placed Underground (Manual 1.4.3).
